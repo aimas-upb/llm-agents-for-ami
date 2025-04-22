@@ -1,0 +1,89 @@
+# Default values for time-telling-agent-chart.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# This will set the replicaset count more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/
+replicaCount: 1
+
+# This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
+image:
+  repository: ghcr.io/victor201202/time-telling-agent
+  # This sets the pull policy for images.
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "0.1.0"
+
+# This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+imagePullSecrets: []
+# This is to override the chart name.
+nameOverride: ""
+fullnameOverride: ""
+
+capabilities:
+  - name: "get_current_time"
+    version: "0.1.0"
+
+# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Automatically mount a ServiceAccount's API credentials?
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+env:
+  # Reference the OpenAI API Key from a Kubernetes Secret
+  - name: OPENAI_API_KEY # Used by application.yml: arc.ai.clients[0].api-key: ${OPENAI_API_KEY}
+    valueFrom:
+      secretKeyRef:
+        name: time-agent-secrets # Name of the K8s Secret object
+        key: OPENAI_API_KEY     # Key within that Secret object
+  # Configure the ARC AI Client ID used in the agent bean's model {} block
+  - name: ARC_AI_CLIENTS_0_ID
+    value: "TIME_AGENT_LLM"
+  # Configure the ARC AI Client type
+  - name: ARC_AI_CLIENTS_0_CLIENT
+    value: "openai" # Or azure, ollama, etc.
+  # You could add model name/URL here too if not hardcoded in application.yml
+  # - name: ARC_AI_CLIENTS_0_MODELNAME
+  #   value: "gpt-4o"
+
+podSecurityContext:
+  fsGroup: 185
+  runAsUser: 185
+  runAsGroup: 185
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+  supplementalGroups:
+    - 185
+
+securityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  capabilities:
+    drop:
+      - "ALL"
+  readOnlyRootFilesystem: true # Important: Agent must not write to arbitrary paths
+  runAsUser: 185
+
+service:
+  type: ClusterIP # Only accessible within the cluster
+  port: 8080     # Port the Service exposes
+
+# Resource requests/limits copied from lmos-demo
+resources:
+  limits:
+    memory: 1024Mi
+  requests:
+    cpu: 50m
+    memory: 768Mi
+
+autoscaling:
+  enabled: false
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

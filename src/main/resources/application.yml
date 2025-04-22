@@ -21,7 +21,7 @@ arc:
   cors:
     enabled: true
   scripts:
-    enabled: true
+    enabled: false
     folder: agents
     hotReload:
       enable: true

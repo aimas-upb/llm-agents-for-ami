@@ -8,7 +8,7 @@ plugins {
     kotlin("plugin.spring") version "2.1.10"
     id("org.springframework.boot") version "3.4.3"
     id("io.spring.dependency-management") version "1.1.7"
-    id("org.graalvm.buildtools.native") version "0.10.2"
+    //id("org.graalvm.buildtools.native") version "0.10.2"
 }
 
 group = "org.eclipse.lmos.app"
@@ -26,11 +26,13 @@ kotlin {
 }
 
 dependencies {
-    val arcVersion = "0.121.0"
+    val arcVersion = "0.122.0-M2"
     val langchain4jVersion = "0.36.2"
 
     // Arc
-    implementation("org.eclipse.lmos:arc-azure-client:$arcVersion")
+    //implementation("org.eclipse.lmos:arc-langchain4j-client:$arcVersion")
+    //implementation("org.eclipse.lmos:arc-agents:$arcVersion")
+    implementation("org.eclipse.lmos:arc-agents:$arcVersion")
     implementation("org.eclipse.lmos:arc-spring-boot-starter:$arcVersion")
     implementation("org.eclipse.lmos:arc-reader-pdf:$arcVersion")
     implementation("org.eclipse.lmos:arc-reader-html:$arcVersion")
