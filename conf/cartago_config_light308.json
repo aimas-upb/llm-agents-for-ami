@@ -1,48 +1,119 @@
 {
-  "http-config" : {
-    "host" : "localhost",
-    "port" : 8080,
-    "base-uri" : "http://localhost:8080/"
+  "http-config": {
+    "host": "localhost",
+    "port": 8080,
+    "base-uri": "http://localhost:8080/"
   },
-  "notification-config" : {
-    "enabled" : true
+  "notification-config": {
+    "enabled": true
   },
-  "agents" : [
+  "agents": [
     {
-      "name" : "alex_agent",
-      "agent-uri" : "http://localhost:8080/agents/alex",
-      "callback-uri" : "http://localhost:8081/"
+      "name": "alex_agent",
+      "agent-uri": "http://localhost:8080/agents/alex",
+      "callback-uri": "http://localhost:8081/"
+    },
+    {
+      "name": "env_explorer_agent",
+      "agent-uri": "http://localhost:8080/agents/env_explorer_agent",
+      "callback-uri": "http://localhost:8082/"
     }
   ],
-  "environment-config" : {
-    "known-artifacts" : [
+  "environment-config": {
+    "known-artifacts": [
       {
-        "class" : "http://example.org/HueLamp",
-        "template" : "org.hyperagents.yggdrasil.cartago.artifacts.HueLampTD"
+        "class": "http://example.org/HueLamp",
+        "template": "org.hyperagents.yggdrasil.cartago.artifacts.HueLampTD"
+      },
+      {
+        "class": "http://example.org/Blinds",
+        "template": "org.hyperagents.yggdrasil.cartago.artifacts.BlindsTD"
+      },
+      {
+        "class": "http://example.org/PeoplePresenceSensor",
+        "template": "org.hyperagents.yggdrasil.cartago.artifacts.PeoplePresenceSensorTD"
+      },
+      {
+        "class": "http://example.org/LightSensor",
+        "template": "org.hyperagents.yggdrasil.cartago.artifacts.LightSensorTD"
+      },
+      {
+        "class": "http://example.org/Clock",
+        "template": "org.hyperagents.yggdrasil.cartago.artifacts.ClockTD"
       }
     ],
-    "workspaces" : [
+    "workspaces": [
       {
-        "name" : "lab308",
-        "parent-name" : "precis",
-        "artifacts" : [
+        "name": "lab308",
+        "parent-name": "precis",
+        "artifacts": [
           {
-            "name" : "light308",
-            "class" : "http://example.org/HueLamp",
-            "init-params" : [
+            "name": "light308",
+            "class": "http://example.org/HueLamp",
+            "init-params": [
               "off",
               "blue"
             ],
-            "focused-by" : ["alex_agent"]
+            "focused-by": [
+              "alex_agent",
+              "env_explorer_agent"
+            ]
+          },
+          {
+            "name": "blinds308",
+            "class": "http://example.org/Blinds",
+            "init-params": [
+              "closed"
+            ],
+            "focused-by": [
+              "alex_agent",
+              "env_explorer_agent"
+            ]
+          },
+          {
+            "name": "peoplePresenceSensor308",
+            "class": "http://example.org/PeoplePresenceSensor",
+            "init-params": [
+              false
+            ],
+            "focused-by": [
+              "alex_agent",
+              "env_explorer_agent"
+            ]
+          },
+          {
+            "name": "lightSensor308",
+            "class": "http://example.org/LightSensor",
+            "init-params": [
+              0.0
+            ],
+            "focused-by": [
+              "alex_agent",
+              "env_explorer_agent"
+            ]
+          },
+          {
+            "name": "clock308",
+            "class": "http://example.org/Clock",
+            "init-params": [
+              480
+            ],
+            "focused-by": [
+              "alex_agent",
+              "env_explorer_agent"
+            ]
           }
         ],
-        "joined-by" : ["alex_agent"]
+        "joined-by": [
+          "alex_agent",
+          "env_explorer_agent"
+        ]
       },
       {
-        "name" : "precis"
+        "name": "precis"
       }
     ],
-    "enabled" : true,
-    "ontology" : "td"
+    "enabled": true,
+    "ontology": "td"
   }
 }

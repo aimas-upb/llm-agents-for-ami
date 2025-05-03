@@ -64,6 +64,7 @@ public class HttpNotificationVerticle extends AbstractVerticle {
     );
     ownMessagebox.init();
     ownMessagebox.receiveMessages(message -> {
+      // Removed debug print
       switch (message.body()) {
         case HttpNotificationDispatcherMessage.AddCallback(String requestIri, String callbackIri) ->
           this.registry.addCallbackIri(requestIri, callbackIri);
@@ -81,7 +82,8 @@ public class HttpNotificationVerticle extends AbstractVerticle {
         case HttpNotificationDispatcherMessage.ArtifactObsPropertyUpdated(
             String requestIri,
             String content
-          ) -> this.handleNotificationSendingArtifactObsPropertyUpdated(
+          ) -> {
+            this.handleNotificationSendingArtifactObsPropertyUpdated(
             client,
             webSubHubUri,
             requestIri,
@@ -96,10 +98,12 @@ public class HttpNotificationVerticle extends AbstractVerticle {
               ),
           "application/json"
           );
+          }
         case HttpNotificationDispatcherMessage.EntityCreated(String requestIri, String content) ->
           this.handleNotificationSending(client, webSubHubUri, requestIri, content, "text/turtle");
-        case HttpNotificationDispatcherMessage.EntityChanged(String requestIri, String content) ->
+        case HttpNotificationDispatcherMessage.EntityChanged(String requestIri, String content) -> {
           this.handleNotificationSending(client, webSubHubUri, requestIri, content, "text/turtle");
+        }
         case HttpNotificationDispatcherMessage.ActionFailed(String requestIri, String content) ->
           this.handleActionNotificationSending(
             client,
@@ -154,9 +158,10 @@ public class HttpNotificationVerticle extends AbstractVerticle {
       final String contentType
   ) {
     this.registry.getCallbackIris(requestIri).forEach(c ->
-        this.createNotificationRequest(client, webSubHubUri, c, requestIri.replace("/focus", ""))
+        this.createNotificationRequest(client, webSubHubUri, c, requestIri)
             .putHeader(HttpHeaders.CONTENT_LENGTH, Integer.toString(content.length()))
             .putHeader(HttpHeaders.CONTENT_TYPE, contentType)
+            .putHeader("X-Notification-Type", "ArtifactObsPropertyUpdated")
             .sendBuffer(Buffer.buffer(content), this.reponseHandler(c))
     );
   }

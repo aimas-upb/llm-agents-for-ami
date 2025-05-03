@@ -10,9 +10,11 @@
 @prefix ex: <http://example.org/> .
 
 
-<http://localhost:8080/workspaces/lab308/artifacts/light308/#artifact> a td:Thing, cashmere:ContextAuthorizedResource, hmas:Artifact, ex:HueLamp ;
+<http://localhost:8080/workspaces/lab308/artifacts/light308/#artifact> 
+    a td:Thing, cashmere:ContextAuthorizedResource, hmas:Artifact, ex:HueLamp ;
     td:title "Hue Lamp with Context-Based Authorization" ;
     td:hasSecurityConfiguration [ a wotsec:NoSecurityScheme ] ;
+    
     td:hasPropertyAffordance [
         a td:PropertyAffordance, ex:StatusProperty ;
         td:name "status" ;

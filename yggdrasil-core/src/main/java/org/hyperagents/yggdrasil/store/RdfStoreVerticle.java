@@ -411,6 +411,13 @@ public class RdfStoreVerticle extends AbstractVerticle {
                     RdfModelUtils.modelToString(entityModel, RDFFormat.TURTLE,
                         this.httpConfig.getBaseUriTrailingSlash());
                 this.replyWithPayload(message, stringGraphResult);
+                final String notificationPayload = "{ \"uri\": \"" + artifactIri + "\" }";
+                this.dispatcherMessagebox.sendMessage(
+                    new HttpNotificationDispatcherMessage.EntityCreated(
+                        artifactIri,
+                        notificationPayload
+                    )
+                );
               }),
               () -> this.replyFailed(message)
           );

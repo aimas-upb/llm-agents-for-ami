@@ -13,6 +13,10 @@ import cartago.WorkspaceId;
 import cartago.events.ActionFailedEvent;
 import cartago.events.ActionSucceededEvent;
 import cartago.utils.BasicLogger;
+import ch.unisg.ics.interactions.wot.td.ThingDescription;
+import ch.unisg.ics.interactions.wot.td.affordances.ActionAffordance;
+import ch.unisg.ics.interactions.wot.td.io.TDGraphReader;
+import ch.unisg.ics.interactions.wot.td.schemas.DataSchema;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
@@ -28,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set; // Added import for Set
+import java.util.concurrent.ConcurrentHashMap; // Added import for ConcurrentHashMap
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.function.Failable;
@@ -36,6 +42,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.eclipse.rdf4j.model.impl.LinkedHashModel;
 import org.hyperagents.yggdrasil.cartago.artifacts.HypermediaArtifact;
+import org.hyperagents.yggdrasil.cartago.artifacts.NeedsPeriodic;
+import org.hyperagents.yggdrasil.cartago.artifacts.VertxInjectable;
 import org.hyperagents.yggdrasil.cartago.entities.NotificationCallback;
 import org.hyperagents.yggdrasil.cartago.entities.WorkspaceRegistry;
 import org.hyperagents.yggdrasil.cartago.entities.errors.AgentNotFoundException;
@@ -55,7 +63,8 @@ import org.hyperagents.yggdrasil.utils.JsonObjectUtils;
 import org.hyperagents.yggdrasil.utils.RepresentationFactory;
 import org.hyperagents.yggdrasil.utils.WebSubConfig;
 import org.hyperagents.yggdrasil.utils.impl.RepresentationFactoryFactory;
-
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 
 /**
  * The Vertx Verticle that is responsible for enabling Cartago functionality.
@@ -75,6 +84,11 @@ public class CartagoVerticle extends AbstractVerticle {
   private RdfStoreMessagebox storeMessagebox;
   private HttpNotificationDispatcherMessagebox dispatcherMessagebox;
   private HypermediaArtifactRegistry registry;
+  // Map to store the last executed action name per artifact (key: workspaceName/artifactName)
+  private final Map<String, String> lastActionPerArtifact = new HashMap<>();
+
+  // Set to track artifacts for which initial state has been sent upon first focus
+  private static final Set<String> initialStateSentArtifacts = ConcurrentHashMap.newKeySet();
 
   @Override
   public void start(final Promise<Void> startPromise) {
@@ -428,23 +442,36 @@ public class CartagoVerticle extends AbstractVerticle {
       WorkspaceNotFoundException {
     final var workspace = this.workspaceRegistry.getWorkspace(workspaceName)
         .orElseThrow(() -> new WorkspaceNotFoundException(workspaceName));
-    workspace
-        .focus(
+    final var obsProps = workspace.focus(
             this.getAgentId(this.getAgentCredential(agentUri, workspaceName)
                     .orElseThrow(() -> new AgentNotFoundException(agentUri)),
                 workspace.getId()),
             p -> true,
             new NotificationCallback(this.httpConfig, this.dispatcherMessagebox, workspaceName,
-                artifactName),
+                artifactName, this.lastActionPerArtifact, this.registry),
             Optional.ofNullable(workspace.getArtifact(artifactName))
                 .orElseThrow(() -> new ArtifactNotFoundException(artifactName))
-        )
-        .forEach(p -> this.dispatcherMessagebox.sendMessage(
-            new HttpNotificationDispatcherMessage.ArtifactObsPropertyUpdated(
-                this.httpConfig.getArtifactUriFocusing(workspaceName, artifactName),
-                p.toString()
-            )
-        ));
+        );
+      
+    final String artifactUriForCheck = this.httpConfig.getArtifactUri(workspaceName, artifactName);
+    boolean shouldSendInitialState;
+    shouldSendInitialState = initialStateSentArtifacts.add(artifactUriForCheck);
+
+    if (shouldSendInitialState) {
+      obsProps.forEach(p -> {
+        final String artifactUri =
+            this.httpConfig.getArtifactUri(workspaceName, artifactName);
+        final String triggerUri = "urn:initial-state";
+        JsonObject payload = buildJsonPropertyPayload(artifactUri, p, triggerUri);
+
+        this.dispatcherMessagebox.sendMessage(
+          new HttpNotificationDispatcherMessage.ArtifactObsPropertyUpdated(
+              this.httpConfig.getArtifactUriFocusing(workspaceName, artifactName),
+              payload.encode()
+          )
+        );
+      });
+    }
   }
 
   private void leaveWorkspace(final String agentUri, final String workspaceName)
@@ -476,6 +503,15 @@ public class CartagoVerticle extends AbstractVerticle {
 
     final var artifact =
         (HypermediaArtifact) workspace.getArtifactDescriptor(artifactId.getName()).getArtifact();
+
+    if (artifact instanceof VertxInjectable) {
+      ((VertxInjectable) artifact).setVertx(this.vertx);
+    }
+
+    if (artifact instanceof NeedsPeriodic) {
+      ((NeedsPeriodic) artifact).startPeriodicTasks();
+    }
+
     registry.register(artifact);
 
 
@@ -513,6 +549,7 @@ public class CartagoVerticle extends AbstractVerticle {
 
     final var listOfParams = new ArrayList<OpFeedbackParam<Object>>();
     final var numberOfFeedbackParams = hypermediaArtifact.handleOutputParams(storeResponse, action);
+    
     for (int i = 0; i < numberOfFeedbackParams; i++) {
       listOfParams.add(new OpFeedbackParam<>());
     }
@@ -539,6 +576,9 @@ public class CartagoVerticle extends AbstractVerticle {
 
 
     final var promise = Promise.<Void>promise();
+
+    final String artifactMapKey = workspaceName + "/" + artifactName;
+    this.lastActionPerArtifact.put(artifactMapKey, action);
 
     this.dispatcherMessagebox.sendMessage(
         new HttpNotificationDispatcherMessage.ActionRequested(
@@ -569,6 +609,7 @@ public class CartagoVerticle extends AbstractVerticle {
                 )
             );
             promise.fail(f.getFailureMsg());
+            this.lastActionPerArtifact.remove(artifactMapKey);
           }
         },
         artifactName,
@@ -577,8 +618,30 @@ public class CartagoVerticle extends AbstractVerticle {
         null);
     return promise.future()
         .map(ignored -> {
-          // TODO: add feedbackConversion into the logik as well
           if (!listOfParams.isEmpty()) {
+            final Optional<DataSchema> outputSchema = TDGraphReader.readFromString(
+                      ThingDescription.TDFormat.RDF_TURTLE, 
+                      storeResponse
+                  )
+                  .getActions()
+                  .stream()
+                  .filter(a -> a.getTitle().isPresent() 
+                      && a.getTitle().get().equals(action))
+                  .findFirst()
+                  .flatMap(ActionAffordance::getOutputSchema);
+
+                  if (outputSchema.isPresent()) {
+                    if (outputSchema.get().getDatatype().equals(DataSchema.OBJECT)) {
+                        return Optional.of(listOfParams.get(0).get().toString());
+                    } else if (outputSchema.get().getDatatype().equals(DataSchema.ARRAY)) {
+                      String joined = listOfParams.stream()
+                          .map(OpFeedbackParam::get)
+                          .map(Object::toString)
+                          .collect(Collectors.joining(", "));
+                      return Optional.of("[" + joined + "]");
+                    }
+                }
+
             return listOfParams.stream()
                 .map(OpFeedbackParam::get)
                 .map(Object::toString)
@@ -619,6 +682,33 @@ public class CartagoVerticle extends AbstractVerticle {
         "actionName",
         action
     );
+  }
+
+  private JsonObject buildJsonPropertyPayload(String artifactUri, cartago.ArtifactObsProperty property, String triggerUri) {
+    String propertyName = property.getName();
+    Object value = property.getValue();
+    String xsdType = getXsdType(value);
+    String propertyUri = artifactUri + "/props/" + propertyName;
+
+    return new JsonObject()
+      .put("artifactUri", artifactUri)
+      .put("propertyUri", propertyUri)
+      .put("value", value)
+      .put("valueTypeUri", xsdType)
+      .put("timestamp", DateTimeFormatter.ISO_INSTANT.format(Instant.now()))
+      .put("triggerUri", triggerUri);
+  }
+
+  private String getXsdType(Object value) {
+    if (value instanceof Integer || value instanceof Long) {
+      return "http://www.w3.org/2001/XMLSchema#integer";
+    } else if (value instanceof Double || value instanceof Float) {
+      return "http://www.w3.org/2001/XMLSchema#double";
+    } else if (value instanceof Boolean) {
+      return "http://www.w3.org/2001/XMLSchema#boolean";
+    } else {
+      return "http://www.w3.org/2001/XMLSchema#string";
+    }
   }
 
   private Optional<String> getAgentNameFromAgentUri(final String agentUri,

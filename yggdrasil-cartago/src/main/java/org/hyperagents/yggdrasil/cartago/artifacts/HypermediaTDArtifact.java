@@ -9,9 +9,11 @@ import ch.unisg.ics.interactions.wot.td.affordances.Form;
 import ch.unisg.ics.interactions.wot.td.io.TDGraphReader;
 import ch.unisg.ics.interactions.wot.td.schemas.ArraySchema;
 import ch.unisg.ics.interactions.wot.td.schemas.DataSchema;
+import ch.unisg.ics.interactions.wot.td.schemas.ObjectSchema;
 import ch.unisg.ics.interactions.wot.td.security.SecurityScheme;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimaps;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
@@ -235,23 +237,43 @@ public abstract class HypermediaTDArtifact extends Artifact implements Hypermedi
    * @param context       Context of the http request, represents the wanted input to the action.
    * @return String that represents correct input for the given action.
    */
-  public Optional<String> handleInput(final String storeResponse, final String actionName,
-                                      final String context) {
-    return TDGraphReader
-        .readFromString(ThingDescription.TDFormat.RDF_TURTLE, storeResponse)
-        .getActions()
-        .stream()
-        .filter(
-            action -> action.getTitle().isPresent()
-                && action.getTitle().get().equals(actionName)
-        )
-        .findFirst()
-        .flatMap(ActionAffordance::getInputSchema)
-        .filter(inputSchema -> inputSchema.getDatatype().equals(DataSchema.ARRAY))
-        .map(inputSchema -> CartagoDataBundle.toJson(
-            ((ArraySchema) inputSchema)
-                .parseJson(JsonParser.parseString(context))
-        ));
+  public Optional<String> handleInput(
+    final String storeResponse,
+    final String actionName,
+    final String context
+) {
+  return TDGraphReader
+      .readFromString(ThingDescription.TDFormat.RDF_TURTLE, storeResponse)
+      .getActions()
+      .stream()
+      .filter(action -> 
+          action.getTitle().isPresent() 
+          && action.getTitle().get().equals(actionName)
+      )
+      .findFirst()
+      .flatMap(ActionAffordance::getInputSchema)
+      .flatMap(inputSchema -> {
+        final JsonElement jsonElement = JsonParser.parseString(context);
+        final List<Object> params = new ArrayList<>();
+
+        if (inputSchema.getDatatype().equals(DataSchema.ARRAY)) {
+          params.addAll((List<?>) ((ArraySchema) inputSchema).parseJson(jsonElement));
+          return Optional.of(CartagoDataBundle.toJson(params));
+        } else if (inputSchema.getDatatype().equals(DataSchema.OBJECT)) {
+          final var objectSchema = (ObjectSchema) inputSchema;
+          final var parsedMap = (Map<String, Object>) objectSchema.parseJson(jsonElement);
+          objectSchema.getProperties().keySet().forEach(prop -> {
+            if (parsedMap.containsKey(prop)) {
+              params.add(parsedMap.get(prop));
+            } else if (objectSchema.hasRequiredProperty(prop)) {
+              throw new IllegalArgumentException("Missing required property: " + prop);
+            }
+          });
+          return Optional.of(CartagoDataBundle.toJson(params));
+        } else {
+          return Optional.empty();
+        }
+      });
   }
 
   /**
@@ -277,6 +299,10 @@ public abstract class HypermediaTDArtifact extends Artifact implements Hypermedi
       if (outputSchema.getDatatype().equals(DataSchema.ARRAY)) {
         final var arraySchema = (ArraySchema) outputSchema;
         return arraySchema.getItems().size();
+      } else if (outputSchema.getDatatype().equals(DataSchema.OBJECT)) {
+        // final var objectSchema = (ObjectSchema) outputSchema;
+        // return objectSchema.getProperties().size();
+        return 1;
       }
     }
     return 0;

@@ -79,7 +79,8 @@ public class HttpServerVerticle extends AbstractVerticle {
             .allowedHeader("Access-Control-Allow-Credentials")
             .allowedHeader("Content-Type")
             .allowedHeader("Expires")
-            .allowedHeader("Origin"))
+            .allowedHeader("Origin")
+            .allowedHeader("X-Agent-WebID"))
         .handler(BodyHandler.create());
 
     final HttpEntityHandlerInterface handler = new HttpEntityHandler(

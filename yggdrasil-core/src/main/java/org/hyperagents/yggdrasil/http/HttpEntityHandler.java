@@ -550,7 +550,8 @@ public class HttpEntityHandler implements HttpEntityHandlerInterface {
                 } else {
                   // TODO: Once we remove constriction on return type being json array this will
                   // move into CartagoVerticle
-                  final var responseString = "[" + cartagoResponse.body() + "]";
+                  //final var responseString = "[" + cartagoResponse.body() + "]";
+                  final var responseString = cartagoResponse.body();
                   httpResponse.putHeader(HttpHeaders.CONTENT_TYPE,
                           HttpHeaderValues.APPLICATION_JSON)
                       .end(responseString);
