@@ -15,7 +15,7 @@ spring:
       enabled: true
 
 server:
-  port: 8080
+  port: 8082
 
 arc:
   cors:
@@ -39,6 +39,8 @@ logging:
     org.eclipse.lmos.arc: DEBUG
     org.eclipse.lmos.arc.app: WARN
     ArcDSL: DEBUG
+    controller: INFO
+    service: DEBUG
 
 management:
   tracing:
@@ -46,7 +48,7 @@ management:
     sampling:
       probability: 1.0
   server:
-    port: 9090
+    port: 9092
   endpoints:
     web:
       base-path: /

@@ -11,7 +11,7 @@ import org.springframework.boot.runApplication
 /**
  * Simple Spring Boot application that demonstrates how to use the Arc Agents.
  */
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = ["org.eclipse.lmos.arc.app", "controller", "service"])
 class ArcAIApplication
 
 fun main(args: Array<String>) {

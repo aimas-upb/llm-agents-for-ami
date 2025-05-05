@@ -28,7 +28,17 @@ kotlin {
 dependencies {
     val arcVersion = "0.122.0-M2"
     val langchain4jVersion = "0.36.2"
+    val rdf4jVersion = "4.3.12"
+    val kotlinXVersion = "1.8.1"
 
+    implementation("org.eclipse.rdf4j:rdf4j-model:$rdf4jVersion")
+
+    implementation("org.eclipse.rdf4j:rdf4j-rio-api:$rdf4jVersion")
+    implementation("org.eclipse.rdf4j:rdf4j-rio-turtle:$rdf4jVersion")
+    implementation("org.eclipse.rdf4j:rdf4j-rio-jsonld:$rdf4jVersion")
+    implementation("org.eclipse.rdf4j:rdf4j-model-vocabulary:$rdf4jVersion")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:$kotlinXVersion")
     // Arc
     //implementation("org.eclipse.lmos:arc-langchain4j-client:$arcVersion")
     //implementation("org.eclipse.lmos:arc-agents:$arcVersion")
@@ -52,6 +62,8 @@ dependencies {
 
     // Spring Boot
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-webflux")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
     // Langchain4j
     implementation("dev.langchain4j:langchain4j-bedrock:$langchain4jVersion")
