@@ -28,6 +28,14 @@ kotlin {
 dependencies {
     val arcVersion = "0.122.0-M2"
     val langchain4jVersion = "0.36.2"
+    val kotlinXVersion = "1.8.1"
+    val ktorVersion = "2.3.12"
+
+    implementation("io.ktor:ktor-client-core:$ktorVersion")
+    implementation("io.ktor:ktor-client-cio:$ktorVersion")
+    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     // Arc
     //implementation("org.eclipse.lmos:arc-langchain4j-client:$arcVersion")
@@ -40,6 +48,8 @@ dependencies {
     implementation("org.eclipse.lmos:arc-reader-html:$arcVersion")
     implementation("org.eclipse.lmos:arc-api:$arcVersion")
     implementation("org.eclipse.lmos:arc-graphql-spring-boot-starter:$arcVersion")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:$kotlinXVersion")
 
     // Tracing
     implementation("io.micrometer:micrometer-tracing-bridge-otel")
