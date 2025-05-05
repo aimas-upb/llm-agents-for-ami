@@ -15,13 +15,13 @@ spring:
       enabled: true
 
 server:
-  port: 8080
+  port: 8081
 
 arc:
   cors:
     enabled: true
   scripts:
-    enabled: true
+    enabled: false
     folder: agents
     hotReload:
       enable: true
@@ -37,7 +37,8 @@ logging:
   level:
     root: WARN
     org.eclipse.lmos.arc: DEBUG
-    org.eclipse.lmos.arc.app: WARN
+    org.eclipse.lmos.arc.app: INFO
+    controller: INFO
     ArcDSL: DEBUG
 
 management:
@@ -46,7 +47,7 @@ management:
     sampling:
       probability: 1.0
   server:
-    port: 9090
+    port: 9091
   endpoints:
     web:
       base-path: /

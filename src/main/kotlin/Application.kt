@@ -5,13 +5,17 @@
 
 package org.eclipse.lmos.arc.app
 
+import kotlinx.coroutines.runBlocking
+import org.slf4j.LoggerFactory
+import org.springframework.boot.CommandLineRunner
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
+import org.springframework.context.annotation.Bean
 
 /**
- * Simple Spring Boot application that demonstrates how to use the Arc Agents.
+ * Simple Spring Boot application that demonstrates how to use the Arc Agents and test YggdrasilClient.
  */
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = ["org.eclipse.lmos.arc.app", "client", "controller"])
 class ArcAIApplication
 
 fun main(args: Array<String>) {

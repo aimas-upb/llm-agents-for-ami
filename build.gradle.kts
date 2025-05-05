@@ -8,7 +8,7 @@ plugins {
     kotlin("plugin.spring") version "2.1.10"
     id("org.springframework.boot") version "3.4.3"
     id("io.spring.dependency-management") version "1.1.7"
-    id("org.graalvm.buildtools.native") version "0.10.2"
+    //id("org.graalvm.buildtools.native") version "0.10.2"
 }
 
 group = "org.eclipse.lmos.app"
@@ -26,11 +26,26 @@ kotlin {
 }
 
 dependencies {
-    val arcVersion = "0.121.0"
+    val arcVersion = "0.122.0-M2"
     val langchain4jVersion = "0.36.2"
+    val rdf4jVersion = "4.3.12"
+    val kotlinXVersion = "1.8.1"
 
+    implementation("org.eclipse.rdf4j:rdf4j-model:$rdf4jVersion")
+
+    implementation("org.eclipse.rdf4j:rdf4j-rio-api:$rdf4jVersion")
+    implementation("org.eclipse.rdf4j:rdf4j-rio-turtle:$rdf4jVersion")
+    implementation("org.eclipse.rdf4j:rdf4j-rio-jsonld:$rdf4jVersion")
+
+
+    implementation("org.apache.jena:jena-core:4.10.0")
+    implementation("org.apache.jena:jena-arq:4.10.0")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:$kotlinXVersion")
     // Arc
-    implementation("org.eclipse.lmos:arc-azure-client:$arcVersion")
+    //implementation("org.eclipse.lmos:arc-langchain4j-client:$arcVersion")
+    //implementation("org.eclipse.lmos:arc-agents:$arcVersion")
+    implementation("org.eclipse.lmos:arc-agents:$arcVersion")
     implementation("org.eclipse.lmos:arc-spring-boot-starter:$arcVersion")
     implementation("org.eclipse.lmos:arc-reader-pdf:$arcVersion")
     implementation("org.eclipse.lmos:arc-reader-html:$arcVersion")
@@ -50,6 +65,7 @@ dependencies {
 
     // Spring Boot
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-webflux")
 
     // Langchain4j
     implementation("dev.langchain4j:langchain4j-bedrock:$langchain4jVersion")
@@ -59,6 +75,12 @@ dependencies {
 
     // Metrics
     implementation("io.micrometer:micrometer-registry-prometheus")
+
+    // Kotlin Coroutines (Needed for Application.kt runBlocking)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+
+    implementation("io.ktor:ktor-client-core:2.3.12")
+    implementation("io.ktor:ktor-client-cio:2.3.12")
 
     // Test
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
