@@ -38,7 +38,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     // Arc
-    //implementation("org.eclipse.lmos:arc-langchain4j-client:$arcVersion")
+    implementation("org.eclipse.lmos:arc-langchain4j-client:$arcVersion")
+    implementation("org.eclipse.lmos:arc-azure-client:$arcVersion")
     //implementation("org.eclipse.lmos:arc-agents:$arcVersion")
     implementation("org.eclipse.lmos:arc-agents:$arcVersion")
     implementation("org.eclipse.lmos:arc-spring-boot-starter:$arcVersion")
@@ -52,10 +53,13 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:$kotlinXVersion")
 
     // Tracing
+    implementation(platform("io.micrometer:micrometer-tracing-bom:1.4.5"))
+    implementation("io.micrometer:micrometer-tracing")
     implementation("io.micrometer:micrometer-tracing-bridge-otel")
-    implementation("io.opentelemetry:opentelemetry-exporter-zipkin")
-    implementation("com.google.protobuf:protobuf-java:4.30.0")
-    implementation("io.opentelemetry.proto:opentelemetry-proto:1.3.2-alpha")
+    implementation("io.opentelemetry:opentelemetry-exporter-otlp")
+    // implementation("io.grpc:grpc-netty-shaded:1.58.0") // REMOVE - Let BOM handle transport
+    // implementation("com.google.protobuf:protobuf-java:4.30.0") // REMOVE - Let BOM/exporter handle
+    // implementation("io.opentelemetry.proto:opentelemetry-proto:1.3.2-alpha") // REMOVE - Let BOM/exporter handle
 
     // Azure
     implementation("com.azure:azure-identity:1.15.4")

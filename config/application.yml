@@ -6,6 +6,10 @@ arc:
   ai:
     clients:
       - id: test-gemini
-        model-name: gemini-2.0-flash
+        model-name: gemini-2.5-flash-preview-04-17
         api-key: ${GEMINI_API_KEY}
         client: gemini
+      - id: test-openai
+        model-name: gpt-4.1
+        api-key: ${OPENAI_API_KEY}
+        client: openai
