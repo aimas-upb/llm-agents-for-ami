@@ -63,6 +63,37 @@ open class ToolConfiguration {
              } else {
                  "No artifacts are currently known."
              }
+         } +
+         functions(
+             name = "get_all_artifacts_states",
+             description = "Gets the current state of all known artifacts with their metadata as RDF Turtle format.",
+             params = types()
+         ) {
+             val allStates = environmentStateService.getAllArtifactStates()
+             if (allStates.isNotEmpty()) {
+                 val allStatesReport = StringBuilder()
+                 
+                 allStates.forEachIndexed { index, state ->
+                     allStatesReport.appendLine("# ============= Artifact ${index + 1} =============")
+                     allStatesReport.appendLine("# Artifact URI: ${state.artifactUri.stringValue()}")
+                     allStatesReport.appendLine("# Last Updated At: ${state.lastUpdatedAt}")
+                     allStatesReport.appendLine("# Last Triggering Affordance: ${state.lastTriggeringAffordanceUri?.stringValue() ?: "N/A"}")
+                     allStatesReport.appendLine("# --- RDF Data (Turtle) ---")
+                     
+                     val writer = StringWriter()
+                     if (state.rdfModel.isNotEmpty()) {
+                         Rio.write(state.rdfModel, writer, RDFFormat.TURTLE)
+                         allStatesReport.appendLine(writer.toString())
+                     } else {
+                         allStatesReport.appendLine("# RDF Model is empty.")
+                     }
+                     allStatesReport.appendLine()
+                 }
+                 
+                 allStatesReport.toString()
+             } else {
+                 "# No artifacts are currently known."
+             }
          }
     }
 }
