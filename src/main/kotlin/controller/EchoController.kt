@@ -81,7 +81,7 @@ class EchoController(
                                 log.info("[Artifact: {}] Fetched description (Status {}).", artifactUriString, response.statusCode())
                                 if (!turtleBody.isNullOrBlank()) {
                                     try {
-                                        val model = Rio.parse(StringReader(turtleBody), artifactUriString, RDFFormat.TURTLE)
+                                        val model = Rio.parse(StringReader(turtleBody), "", RDFFormat.TURTLE)
                                         actionIndexService.indexActionsFromModel(artifactUri, model)
                                         Mono.just(ResponseEntity.ok("Artifact actions indexed successfully for $artifactUriString"))
                                     } catch (e: Exception) {

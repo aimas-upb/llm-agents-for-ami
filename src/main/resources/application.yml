@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 spring:
   application:
-    name: Arc Agent
+    name: env-explorer-agent
   jackson:
     default-property-inclusion: NON_NULL
   main:
@@ -36,15 +36,17 @@ arc:
 logging:
   level:
     root: WARN
-    org.eclipse.lmos.arc: DEBUG
+    org.eclipse.lmos.arc: INFO
     org.eclipse.lmos.arc.app: WARN
-    ArcDSL: DEBUG
     controller: INFO
-    service: DEBUG
+    service: INFO
 
 management:
+  otlp:
+    tracing:
+      endpoint: http://localhost:6006/v1/traces
   tracing:
-    enabled: false
+    enabled: true
     sampling:
       probability: 1.0
   server:
