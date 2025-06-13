@@ -1,0 +1,196 @@
+// ================ Signifier for raising the blinds ===================
+<#raise-blinds-signifier> a cashmere:Signifier ;
+    cashmere:signifies <#adjust-blinds-action-affordance> ; // #adjust-blinds-action-affordance is the TD ActionAffordance to set the blinds to a certain position
+    cashmere:recommendsAbility [
+        a hmas:LLMReasoningAbility ;
+    ] ;
+    cashmere:hasIntentionDescription [
+        a cashmere:IntentionDescription ;
+        cashmere:hasStructuredDescription "
+            {
+                'intent': 'increase luminosity in a room',
+            }
+        "^^xsd:string ;
+    ] ;
+    cashmere:recommendsContext [
+        a cashmere:IntentContext ;
+        cashmere:hasStructuredDescription "
+            {
+                'conditions': [
+                    {
+                        'artifact': <http://example.org/precis/workspaces/lab308/artifacts/external_light_sensing308>,
+                        'propertyAffordance': <http://example.org/LightSensor#hasLuminosityLevel>,
+                        'valueConditions': [
+                            {
+                                'operator': 'greaterThan',
+                                'value': 10000
+                            }
+                        ]
+                    },
+                    {
+                        'artifact': <http://example.org/precis/workspaces/lab308/artifacts/temperature_sensor308>,
+                        'propertyAffordance': <http://example.org/TemperatureSensor#hasTemperatureLevel>,
+                        'valueConditions': [
+                            {
+                                'operator': 'lessThan',
+                                'value': 25
+                            }
+                        ]
+                    }
+                ]
+            }
+        "^^xsd:string ;
+
+        cashmere:hasShaclCondition [
+            a sh:NodeShape ;
+            sh:targetNode <http://example.org/precis/workspaces/lab308/artifacts/external_light_sensing308> ;
+            sh:targetClass <http://example.org/LightSensor> ;
+            sh:property [
+                sh:path <http://example.org/LightSensor#hasLuminosityLevel> ;
+                sh:dataType xsd:integer ;
+                sh:minInclusive 10000 ;
+            ]
+        ] ;
+        cashmere:hasShaclCondition [
+            a sh:NodeShape ;
+            sh:targetNode <http://example.org/precis/workspaces/lab308/artifacts/temperature_sensor308> ;
+            sh:targetClass <http://example.org/TemperatureSensor> ;
+            sh:property [
+                sh:path <http://example.org/TemperatureSensor#hasTemperatureLevel> ;
+                sh:dataType xsd:integer ;
+                sh:maxInclusive 25 ;
+            ]
+        ]
+    ] .
+
+
+// ================= The signifier for lowering the blinds ===================
+<#lower-blinds-signifier> a cashmere:Signifier ;
+    cashmere:signifies <#adjust-blinds-action-affordance> ; // #adjust-blinds-action-affordance is the TD ActionAffordance to set the blinds to a certain position
+    cashmere:recommendsAbility [
+        a hmas:LLMReasoningAbility ;
+    ] ;
+    cashmere:hasIntentionDescription [
+        a cashmere:IntentionDescription ;
+        cashmere:hasStructuredDescription "
+            {
+                'intent': 'decrease luminosity in a room',
+            }
+        "^^xsd:string ;
+    ] ;
+    cashmere:recommendsContext [
+        a cashmere:IntentContext ;
+        cashmere:hasStructuredDescription "
+            {
+                'conditions': [
+                    {
+                        'artifact': <http://example.org/precis/workspaces/lab308/artifacts/external_light_sensing308>,
+                        'propertyAffordance': <http://example.org/LightSensor#hasLuminosityLevel>,
+                        'valueConditions': [
+                            {
+                                'operator': 'greaterThan',
+                                'value': 50000
+                            }
+                        ]
+                    },
+                    {
+                        'artifact': <http://example.org/precis/workspaces/lab308/artifacts/temperature_sensor308>,
+                        'propertyAffordance': <http://example.org/TemperatureSensor#hasTemperatureLevel>,
+                        'valueConditions': [
+                            {
+                                'operator': 'greaterThan',
+                                'value': 25
+                            }
+                        ]
+                    }
+                ]
+            }
+        "^^xsd:string ;
+
+        cashmere:hasShaclCondition [
+            a sh:NodeShape ;
+            sh:targetNode <http://example.org/precis/workspaces/lab308/artifacts/external_light_sensing308> ;
+            sh:targetClass <http://example.org/LightSensor> ;
+            sh:property [
+                sh:path <http://example.org/LightSensor#hasLuminosityLevel> ;
+                sh:dataType xsd:integer ;
+                sh:minInclusive 50000 ;
+            ]
+        ] ;
+        cashmere:hasShaclCondition [
+            a sh:NodeShape ;
+            sh:targetNode <http://example.org/precis/workspaces/lab308/artifacts/temperature_sensor308> ;
+            sh:targetClass <http://example.org/TemperatureSensor> ;
+            sh:property [
+                sh:path <http://example.org/TemperatureSensor#hasTemperatureLevel> ;
+                sh:dataType xsd:integer ;
+                sh:minExclusive 25 ;
+            ]
+        ]
+    ] .
+
+
+// ================= The signifier for turning the light on to a certain intensity level ===================
+<#turn-light-on-signifier> a cashmere:Signifier ;
+    cashmere:signifies <#adjust-light-action-affordance> ; // #adjust-light-action-affordance is the TD ActionAffordance to set the light to a certain intensity
+    cashmere:recommendsAbility [
+        a hmas:LLMReasoningAbility ;
+    ] ;
+    cashmere:hasIntentionDescription [
+        a cashmere:IntentionDescription ;
+        cashmere:hasStructuredDescription "
+            {
+                'intent': 'increase luminosity in a room',
+            }
+        "^^xsd:string ;
+    ] ;
+    cashmere:recommendsContext [
+        a cashmere:IntentContext ;
+        cashmere:hasStructuredDescription "
+            {
+                'conditions': [
+                    {
+                        'artifact': <http://example.org/precis/workspaces/lab308/artifacts/internal_light_sensing308>,
+                        'propertyAffordance': <http://example.org/LightSensor#hasLuminosityLevel>,
+                        'valueConditions': [
+                            {
+                                'operator': 'lessThan',
+                                'value': 100
+                            }
+                        ]
+                    },
+                    {
+                        'artifact': <http://example.org/precis/workspaces/lab308/artifacts/person_counter308>,
+                        'propertyAffordance': <http://example.org/PersonCounter#hasPersonCount>,
+                        'valueConditions': [
+                            {
+                                'operator': 'greaterEqual',
+                                'value': 1
+                            }
+                        ]
+                    }
+                ]
+            }
+        "^^xsd:string ;
+
+        cashmere:hasShaclCondition [
+            a sh:NodeShape ;
+            sh:targetNode <http://example.org/precis/workspaces/lab308/artifacts/internal_light_sensing308> ;
+            sh:targetClass <http://example.org/LightSensor> ;
+            sh:property [
+                sh:path <http://example.org/LightSensor#hasLuminosityLevel> ;
+                sh:dataType xsd:integer ;
+                sh:maxInclusive 100 ;
+            ]
+        ] ;
+        cashmere:hasShaclCondition [
+            a sh:NodeShape ;
+            sh:targetNode <http://example.org/precis/workspaces/lab308/artifacts/person_counter308> ;
+            sh:targetClass <http://example.org/PersonCounter> ;
+            sh:property [
+                sh:path <http://example.org/PersonCounter#hasPersonCount> ;
+                sh:dataType xsd:integer ;
+                sh:minInclusive 1 ;
+            ]
+        ]
+    ] .
