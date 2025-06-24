@@ -3,118 +3,78 @@ SPDX-FileCopyrightText: 2023 Deutsche Telekom AG
 
 SPDX-License-Identifier: CC0-1.0    
 -->
-# Welcome to the Arc Agent Init Project
+# Interaction Solver Agent
 
-The following project is a demo project for the Arc Agent Framework. 
-It can also be used to kickstart a new Spring Boot project that uses the Arc Agent Framework.
+The Interaction Solver Agent is the "brain" of the `lab308` multi-agent system. It functions as a pure planning engine, taking a list of goals from other agents and generating a detailed, executable JSON plan to achieve them. It queries the Explorer Agent for capabilities and the Monitoring Agent for the current state, then reasons about the best sequence of actions to fulfill the request, creating new plans or adapting existing ones.
 
-## How to run
+**Important:** This agent is designed to work within the `lab308` simulation. Please ensure this agent is running before starting the simulation.
 
-#### 1. Add language model configuration
+## How to Run
 
-Add an OpenAI API-KEY to `config/application.yml` or as the environment variable, `OPENAI_API_KEY`.
+### 1. Configure Environment Variables
 
-```
-arc:
-  ai:
-    clients:
-      - id: GPT-4o
-        model-name: GPT-4o
-        api-key: ${OPENAI_API_KEY}
-        client: openai
-      - id: llama3.3
-        modelName: llama3.3
-        client: ollama
-```
-
-Alternatively, you can run an LLM locally with the `ollama` client, see https://ollama.com/,
-and change the model in the agent `assistant.agent.kts` file accordingly.
-
-```kts
-agent {
-    name = "assistant-agent"
-    model = { "llama3.3" }
-    ...
-}
-```
-
-#### 2. Start the Application
-
-Start the Demo Application like a normal Spring Boot application.
-This requires the port 8080 to be available.
+This agent requires an OpenAI API key to function. Please set the following environment variable:
 
 ```bash
-  ./gradlew bootRun
+export OPENAI_API_KEY="your_openai_api_key"
 ```
 
+On Windows, you can use this command:
 
-#### 3. Access the Agent
-
-You can chat with the Arc Agents using the [Arc View](https://github.com/eclipse-lmos/arc-view).
-
-Simply open https://eclipse.dev/lmos/chat/index.html?agentUrl=http://localhost:8080#/chat in your browser.
-
-Alternatively, the Graphiql interface is also available, under http://localhost:8080/graphiql?path=/graphql.
-
-Example Request:
-
-```graphql
-subscription {
-    agent(
-        agentName: "assistant-agent"
-        request: {
-            conversationContext: {
-                conversationId: "1"
-            }
-            systemContext: [],
-            userContext: {
-                userId: "1234",
-                profile: [{
-                    key: "name",
-                    value: "Pat"
-                }]
-            },
-            messages: [
-                {
-                    role: "user",
-                    content: "Hi",
-                    format: "text",
-                }
-            ]
-        }
-    ) {
-        messages {
-            content
-        }
-    }
-}
+```powershell
+$env:OPENAI_API_KEY="your_openai_api_key"
 ```
 
+### 2. Start the Application
 
-#### 4. Add new Agents
+You can run the agent using the Gradle wrapper script:
 
-New agents can be added to the `agents` folder located at the root of the project.
-The folder contains a default agent `assistant-agent` that can be used as a template.
+```bash
+# On Linux/macOS
+./gradlew bootRun
 
+# On Windows
+./gradlew.bat bootRun
+```
 
-#### 5. Tracing
+The agent will start on port 8083.
 
-The Arc Framework supports tracing with Micrometer Tracing. 
-See [Arc Tracing](https://eclipse.dev/lmos/docs/arc/tracing/) for more information.
+### 3. Chat Interface
 
-By default, tracing is disabled in the project. To enable it, update your application.yaml as follows:
+You can interact with this agent through a web interface. Once the agent is running, open the following URL in your browser:
+
+```
+https://eclipse.dev/lmos/chat/index.html?agentUrl=http://localhost:8083#/chat
+```
+
+### 4. Tracing with OpenTelemetry and Phoenix
+
+This agent uses OpenTelemetry for tracing. To visualize traces, you can use Arize Phoenix.
+
+#### Enable Tracing
+
+To enable tracing, edit the `src/main/resources/application.yml` file and ensure the following properties are set:
+
 ```yaml
 management:
+  otlp:
+    tracing:
+      endpoint: http://localhost:6006/v1/traces
   tracing:
     enabled: true
+    sampling:
+      probability: 1.0
 ```
 
-To use tracing with [Zipkin](https://zipkin.io/pages/quickstart), start a Zipkin server using Docker:
-```shell
-docker run -d -p 9411:9411 openzipkin/zipkin
+#### Run Phoenix
+
+You can run Phoenix using Docker. Make sure you have Docker installed and running.
+
+```bash
+docker run -p 6006:6006 -p 4317:4317 -p 4318:4318 arizephoenix/phoenix:latest
 ```
 
-Open the Zipkin UI in your browser at [http://localhost:9411](http://localhost:9411/) to watch the traces of your Arc Agents in real time.
+Once Phoenix is running, you can access the UI at [http://localhost:6006](http://localhost:6006) to view traces.
 
 ## Code of Conduct
 

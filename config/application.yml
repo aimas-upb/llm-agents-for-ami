@@ -10,6 +10,6 @@ arc:
         api-key: ${GEMINI_API_KEY}
         client: gemini
       - id: test-openai
-        model-name: gpt-4.1
+        model-name: o4-mini
         api-key: ${OPENAI_API_KEY}
         client: openai
