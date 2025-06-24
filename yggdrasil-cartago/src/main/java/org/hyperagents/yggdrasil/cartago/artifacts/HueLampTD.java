@@ -22,19 +22,21 @@ import javax.json.JsonReader;
 import java.io.StringReader;
 
 /**
- * HueLamp TD Artifact, has an on/off state that can be toggled and a color 
- * that can be set. Serves as an exemplary Hypermedia Artifact, uses TD as its ontology
+ * HueLamp TD Artifact, has an on/off state, color, and lightIntensity.
+ * Serves as an exemplary Hypermedia Artifact, uses TD as its ontology
  */
 public class HueLampTD extends HypermediaTDArtifact {
     
   public void init() {
     this.defineObsProperty("state", "off");
     this.defineObsProperty("color", "blue");
+    this.defineObsProperty("lightIntensity", 25);
   }
 
-  public void init(final String state, final String color) {
+  public void init(final String state, final String color, final Integer lightIntensity) {
     this.defineObsProperty("state", state);
     this.defineObsProperty("color", color);
+    this.defineObsProperty("lightIntensity", lightIntensity);
   }
 
   /**
@@ -44,10 +46,12 @@ public class HueLampTD extends HypermediaTDArtifact {
   public void getStatus(final OpFeedbackParam<String> jsonStatus) {
     String stateValue = this.getObsProperty("state").stringValue();
     String colorValue = this.getObsProperty("color").stringValue();
+    Integer lightIntensityValue = this.getObsProperty("lightIntensity").intValue();
 
     JsonObject json = Json.createObjectBuilder()
         .add("state", stateValue)
         .add("color", colorValue)
+        .add("lightIntensity", lightIntensityValue)
         .build();
     jsonStatus.set(json.toString());
     System.out.println("Status is " + json);
@@ -77,6 +81,16 @@ public class HueLampTD extends HypermediaTDArtifact {
     System.out.println("color set to " + color);
   }
 
+  /**
+   * Sets the internal light intensity of the lamp.
+   */
+  @OPERATION
+  public void setLightIntensity(final Integer lightIntensity) {
+    final var prop = this.getObsProperty("lightIntensity");
+    prop.updateValue(lightIntensity);
+    System.out.println("lightIntensity set to " + lightIntensity);
+  }
+
   @Override
   protected void registerInteractionAffordances() {
     this.setSecurityScheme(SecurityScheme.getNoSecurityScheme());
@@ -88,7 +102,9 @@ public class HueLampTD extends HypermediaTDArtifact {
         .addEnum(new HashSet<>(Arrays.asList("on", "off"))).build())
       .addProperty("color", new StringSchema.Builder()
         .addEnum(new HashSet<>(Arrays.asList("red", "green", "blue"))).build())
-      .addRequiredProperties("state", "color")
+      .addProperty("lightIntensity", new IntegerSchema.Builder()
+        .addEnum(new HashSet<>(Arrays.asList("25", "50", "75", "100"))).build())
+      .addRequiredProperties("state", "color", "lightIntensity")
       .build()
     );
 
@@ -106,6 +122,18 @@ public class HueLampTD extends HypermediaTDArtifact {
         .addProperty("color", new StringSchema.Builder()
           .addEnum(new HashSet<>(Arrays.asList("red", "green", "blue"))).build())
         .addRequiredProperties("color")
+        .build(),
+      null
+    );
+
+    this.registerActionAffordance(
+      "http://example.org/LightIntensityCommand",
+      "setLightIntensity",
+      "lightIntensity",
+      new ObjectSchema.Builder()
+        .addProperty("lightIntensity", new IntegerSchema.Builder()
+          .addEnum(new HashSet<>(Arrays.asList("25", "50", "75", "100"))).build())
+        .addRequiredProperties("lightIntensity")
         .build(),
       null
     );

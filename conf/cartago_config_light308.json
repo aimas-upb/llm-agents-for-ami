@@ -52,7 +52,8 @@
             "class": "http://example.org/HueLamp",
             "init-params": [
               "off",
-              "blue"
+              "blue",
+              0
             ],
             "focused-by": [
               "alex_agent",
@@ -63,7 +64,7 @@
             "name": "blinds308",
             "class": "http://example.org/Blinds",
             "init-params": [
-              "closed"
+              25
             ],
             "focused-by": [
               "alex_agent",
@@ -85,7 +86,7 @@
             "name": "lightSensor308",
             "class": "http://example.org/LightSensor",
             "init-params": [
-              0.0
+              1
             ],
             "focused-by": [
               "alex_agent",
@@ -96,7 +97,7 @@
             "name": "clock308",
             "class": "http://example.org/Clock",
             "init-params": [
-              480
+              680
             ],
             "focused-by": [
               "alex_agent",

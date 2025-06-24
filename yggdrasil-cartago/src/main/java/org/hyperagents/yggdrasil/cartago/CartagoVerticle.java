@@ -459,17 +459,20 @@ public class CartagoVerticle extends AbstractVerticle {
 
     if (shouldSendInitialState) {
       obsProps.forEach(p -> {
-        final String artifactUri =
-            this.httpConfig.getArtifactUri(workspaceName, artifactName);
-        final String triggerUri = "urn:initial-state";
-        JsonObject payload = buildJsonPropertyPayload(artifactUri, p, triggerUri);
+        final String propertyName = p.getName();
+        if (!"timeOfDay".equals(propertyName) && !"luminosity".equals(propertyName)) {
+            final String artifactUri =
+                this.httpConfig.getArtifactUri(workspaceName, artifactName);
+            final String triggerUri = "urn:initial-state";
+            JsonObject payload = buildJsonPropertyPayload(artifactUri, p, triggerUri);
 
-        this.dispatcherMessagebox.sendMessage(
-          new HttpNotificationDispatcherMessage.ArtifactObsPropertyUpdated(
-              this.httpConfig.getArtifactUriFocusing(workspaceName, artifactName),
-              payload.encode()
-          )
-        );
+            this.dispatcherMessagebox.sendMessage(
+              new HttpNotificationDispatcherMessage.ArtifactObsPropertyUpdated(
+                  this.httpConfig.getArtifactUriFocusing(workspaceName, artifactName),
+                  payload.encode()
+              )
+            );
+        }
       });
     }
   }
@@ -684,33 +687,6 @@ public class CartagoVerticle extends AbstractVerticle {
     );
   }
 
-  private JsonObject buildJsonPropertyPayload(String artifactUri, cartago.ArtifactObsProperty property, String triggerUri) {
-    String propertyName = property.getName();
-    Object value = property.getValue();
-    String xsdType = getXsdType(value);
-    String propertyUri = artifactUri + "/props/" + propertyName;
-
-    return new JsonObject()
-      .put("artifactUri", artifactUri)
-      .put("propertyUri", propertyUri)
-      .put("value", value)
-      .put("valueTypeUri", xsdType)
-      .put("timestamp", DateTimeFormatter.ISO_INSTANT.format(Instant.now()))
-      .put("triggerUri", triggerUri);
-  }
-
-  private String getXsdType(Object value) {
-    if (value instanceof Integer || value instanceof Long) {
-      return "http://www.w3.org/2001/XMLSchema#integer";
-    } else if (value instanceof Double || value instanceof Float) {
-      return "http://www.w3.org/2001/XMLSchema#double";
-    } else if (value instanceof Boolean) {
-      return "http://www.w3.org/2001/XMLSchema#boolean";
-    } else {
-      return "http://www.w3.org/2001/XMLSchema#string";
-    }
-  }
-
   private Optional<String> getAgentNameFromAgentUri(final String agentUri,
                                                    final String workspaceName) {
 
@@ -746,5 +722,32 @@ public class CartagoVerticle extends AbstractVerticle {
     this.agentCredentials.putIfAbsent(agentUri, new HashMap<>());
     this.agentCredentials.get(agentUri).put(workspaceName, new AgentIdCredential(agentBodyName));
     return this.agentCredentials.get(agentUri).get(workspaceName);
+  }
+
+  private io.vertx.core.json.JsonObject buildJsonPropertyPayload(String artifactUri, cartago.ArtifactObsProperty property, String triggerUri) {
+    String propertyName = property.getName();
+    Object value = property.getValue();
+    String xsdType = getXsdType(value);
+    String propertyUri = artifactUri + "/props/" + propertyName;
+
+    return new io.vertx.core.json.JsonObject() // Ensure this is io.vertx.core.json.JsonObject
+      .put("artifactUri", artifactUri)
+      .put("propertyUri", propertyUri)
+      .put("value", value) // Vert.x JsonObject handles various types appropriately
+      .put("valueTypeUri", xsdType)
+      .put("timestamp", DateTimeFormatter.ISO_INSTANT.format(Instant.now()))
+      .put("triggerUri", triggerUri);
+  }
+
+  private String getXsdType(Object value) {
+    if (value instanceof Integer || value instanceof Long) {
+        return "http://www.w3.org/2001/XMLSchema#integer";
+    } else if (value instanceof Double || value instanceof Float) {
+        return "http://www.w3.org/2001/XMLSchema#double";
+    } else if (value instanceof Boolean) {
+        return "http://www.w3.org/2001/XMLSchema#boolean";
+    } else {
+        return "http://www.w3.org/2001/XMLSchema#string";
+    }
   }
 }

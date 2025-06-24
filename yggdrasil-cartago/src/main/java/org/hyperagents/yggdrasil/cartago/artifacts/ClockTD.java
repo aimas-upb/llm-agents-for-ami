@@ -6,8 +6,13 @@ import ch.unisg.ics.interactions.wot.td.schemas.IntegerSchema;
 import ch.unisg.ics.interactions.wot.td.schemas.ObjectSchema;
 import ch.unisg.ics.interactions.wot.td.security.SecurityScheme;
 import io.vertx.core.Vertx;
+import org.hyperagents.yggdrasil.eventbus.messageboxes.HttpNotificationDispatcherMessagebox;
+import org.hyperagents.yggdrasil.eventbus.messages.HttpNotificationDispatcherMessage;
+import org.hyperagents.yggdrasil.utils.HttpInterfaceConfig;
+import org.hyperagents.yggdrasil.utils.WebSubConfig;
 import javax.json.Json;
 import javax.json.JsonObject;
+import java.time.Instant;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
@@ -18,6 +23,11 @@ import java.time.format.DateTimeFormatter;
 public class ClockTD extends HypermediaTDArtifact implements VertxInjectable, NeedsPeriodic {
 
     private Vertx vertxInstance;
+    private HttpInterfaceConfig httpConfig;
+    private WebSubConfig webSubConfig;
+    private HttpNotificationDispatcherMessagebox dispatcherMessagebox;
+    private static final String DEFAULT_CONFIG_VALUE = "default";
+
     private long timeOfDay = 480;
     private final long tickIncrement = 1;
     private final long tickInterval = 1000;
@@ -25,6 +35,27 @@ public class ClockTD extends HypermediaTDArtifact implements VertxInjectable, Ne
     @Override
     public void setVertx(Vertx vertx) {
         this.vertxInstance = vertx;
+        if (this.vertxInstance != null) {
+            this.httpConfig = this.vertxInstance
+                .sharedData()
+                .<String, HttpInterfaceConfig>getLocalMap("http-config")
+                .get(DEFAULT_CONFIG_VALUE);
+            this.webSubConfig = this.vertxInstance
+                .sharedData()
+                .<String, WebSubConfig>getLocalMap("notification-config")
+                .get(DEFAULT_CONFIG_VALUE);
+            if (this.webSubConfig != null) {
+                 this.dispatcherMessagebox = new HttpNotificationDispatcherMessagebox(
+                    this.vertxInstance.eventBus(),
+                    this.webSubConfig
+                );
+            } else {
+                System.err.println("ClockTD: WebSubConfig not found in shared data.");
+            }
+            if (this.httpConfig == null) {
+                 System.err.println("ClockTD: HttpInterfaceConfig not found in shared data.");
+            }
+        }
     }
 
     public void init() {
@@ -38,14 +69,42 @@ public class ClockTD extends HypermediaTDArtifact implements VertxInjectable, Ne
 
     @Override
     public void startPeriodicTasks() {
-        if (this.vertxInstance != null) {
+        if (this.vertxInstance != null && this.httpConfig != null && this.dispatcherMessagebox != null) {
             vertxInstance.setPeriodic(tickInterval, timerId -> {
                 timeOfDay = (timeOfDay + tickIncrement) % 1440;
                 this.getObsProperty("timeOfDay").updateValue(timeOfDay);
-                //System.out.println("Simulation time updated: " + formatTime(timeOfDay));
+
+                String currentWorkspaceName = getId().getWorkspaceId().getName();
+                String currentArtifactName = getId().getName();
+
+                String artifactUri = this.httpConfig.getArtifactUri(currentWorkspaceName, currentArtifactName);
+                String propertyName = "timeOfDay";
+                String propertyUri = artifactUri + "/props/" + propertyName;
+                String triggerUri = propertyUri;
+                
+                String formattedTimeValue = formatTime(this.timeOfDay);
+                String valueXsdType = "http://www.w3.org/2001/XMLSchema#string";
+
+                JsonObject payload = Json.createObjectBuilder()
+                  .add("artifactUri", artifactUri)
+                  .add("propertyUri", propertyUri)
+                  .add("value", formattedTimeValue)
+                  .add("valueTypeUri", valueXsdType)
+                  .add("timestamp", DateTimeFormatter.ISO_INSTANT.format(Instant.now()))
+                  .add("triggerUri", triggerUri)
+                  .build();
+
+                String notificationTargetUri = this.httpConfig.getArtifactUriFocusing(currentWorkspaceName, currentArtifactName);
+
+                this.dispatcherMessagebox.sendMessage(
+                  new HttpNotificationDispatcherMessage.ArtifactObsPropertyUpdated(
+                      notificationTargetUri,
+                      payload.toString()
+                  )
+                );
             });
         } else {
-            System.err.println("Vert.x instance not injected in ClockTD!");
+            System.err.println("ClockTD: Vert.x instance, httpConfig, or dispatcherMessagebox not initialized properly. Cannot start periodic tasks for manual notification.");
         }
     }
 
@@ -62,7 +121,6 @@ public class ClockTD extends HypermediaTDArtifact implements VertxInjectable, Ne
                 .add("formattedTime", formattedTime)
                 .build();
         jsonTime.set(json.toString());
-        //System.out.println("Current simulation time: " + json);
     }
 
     /**

@@ -110,14 +110,17 @@ public class NotificationCallback implements ICartagoCallback {
                   ? "urn:unknown"
                   : artifactUri + "/actions/" + actionName;
 
-              JsonObject payload = buildJsonPropertyPayload(artifactUri, p, triggerUri);
+              // Check if the property name is timeOfDay or luminosity
+              if (!"timeOfDay".equals(propertyName) && !"luminosity".equals(propertyName)) {
+                JsonObject payload = buildJsonPropertyPayload(artifactUri, p, triggerUri);
 
-              this.messagebox.sendMessage(
-                new HttpNotificationDispatcherMessage.ArtifactObsPropertyUpdated(
-                    artifactUri,
-                    payload.encode()
-                )
-               );
+                this.messagebox.sendMessage(
+                  new HttpNotificationDispatcherMessage.ArtifactObsPropertyUpdated(
+                      this.httpConfig.getArtifactUriFocusing(this.workspaceName, this.artifactName),
+                      payload.encode()
+                  )
+                 );
+              } // End of check for timeOfDay and luminosity properties
           });
     }
   }
