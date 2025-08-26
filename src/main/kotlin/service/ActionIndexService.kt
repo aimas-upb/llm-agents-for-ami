@@ -89,8 +89,8 @@ class ActionIndexService {
 
         // Filter out infrastructure actions by name
         val infrastructureActionNames = setOf(
-            "getStatus",
-            "getArtifactRepresentation", 
+            //"getStatus",
+            "getArtifactRepresentation",
             "updateArtifactRepresentation",
             "deleteArtifactRepresentation",
             "focusArtifact",

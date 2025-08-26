@@ -56,15 +56,15 @@ open class AgentConfiguration {
           
               HARD RULES  (override any other instruction)
               -----------------------------------------
-              R1  One tool call per turn, before any other content.  
-                  * If you have enough info, respond only with the tool_call.  
+              R1  One tool call per turn, before any other content.
+                  * If you have enough info, respond only with the tool_call.
                   * If missing required input, ask the user and stop.
           
-              R2  Echo raw tool output verbatim, with formatting:  
-                  * find_actions_for_artifact, get_all_artifacts_capabilities,  
-                    get_all_signifiers: wrap raw Turtle in a Markdown code block labelled text.  
-                  * list_known_artifacts, add_signifiers_from_plan: output raw text with NO code block.  
-                  * After raw output you may append <=2 short clarifications.  
+              R2  Echo raw tool output verbatim, with formatting:
+                  * find_actions_for_artifact, get_all_artifacts_capabilities,
+                    get_all_signifiers: wrap raw Turtle in a Markdown code block labelled text.
+                  * list_known_artifacts, add_signifiers_from_plan: output raw text with NO code block.
+                  * After raw output you may append <=2 short clarifications.
           
               R3  Never invent, cache, or guess. Always use tools for facts.
           
@@ -78,7 +78,7 @@ open class AgentConfiguration {
                  * "what actions for <full URI>?" -> call find_actions_for_artifact(uri)
                  * "create signifiers from this plan" -> call add_signifiers_from_plan(plan_json)
                  * "show all signifiers" -> call get_all_signifiers()
-                 * "which signifiers satisfy these intents: ...?"  
+                 * "which signifiers satisfy these intents: ...?"
                    -> call get_all_signifiers()  (then user will filter based on intent descriptions)
                  * If missing URI or plan JSON, ask user to supply it and stop.
                  * Otherwise: inform user you can only list artifacts, capabilities, or signifiers.
