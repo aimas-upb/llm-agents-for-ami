@@ -14,6 +14,7 @@ import org.eclipse.lmos.arc.core.Result
 import org.eclipse.lmos.arc.core.Success
 import org.eclipse.lmos.arc.core.Failure
 import service.ActionIndexService
+import service.PlanSignifierService
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory
 import org.eclipse.rdf4j.rio.RDFFormat
 import org.eclipse.rdf4j.rio.Rio
@@ -39,7 +40,8 @@ data class NotificationPayload(val uri: String)
 class EchoController(
     private val actionIndexService: ActionIndexService,
     private val objectMapper: ObjectMapper,
-    private val agentProvider: AgentProvider
+    private val agentProvider: AgentProvider,
+    private val planSignifierService: PlanSignifierService
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -149,5 +151,12 @@ class EchoController(
                 }
             }
         }
+    }
+
+    @PostMapping("/admin/reset")
+    fun resetExplorerState(): Mono<ResponseEntity<String>> = mono {
+        val removedArtifacts = actionIndexService.clearAllIndexedArtifacts()
+        planSignifierService.clearAllSignifiers()
+        ResponseEntity.ok("Explorer state reset: cleared $removedArtifacts indexed artifact(s) and all signifiers.")
     }
 }
