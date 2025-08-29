@@ -92,6 +92,12 @@ class EchoController(
         }
     }
 
+    @PostMapping("/reset")
+    fun resetState(): ResponseEntity<String> {
+        val removed = environmentStateService.reset()
+        return ResponseEntity.ok("Environment state reset: removed $removed artifact(s)")
+    }
+
     private fun createRdfValue(value: Any, typeUriStr: String): Value {
         val typeIRI = environmentStateService.createIRI(typeUriStr)
         return try {
