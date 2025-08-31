@@ -1,4 +1,3 @@
-#!/bin/bash
 export MONITOR_URL="http://localhost:8081"
 export EXPLORER_URL="http://localhost:8082"
 export AREAS="lab308"

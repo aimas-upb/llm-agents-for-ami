@@ -61,3 +61,16 @@ On startup the adapter will:
 - Begin forwarding HA state changes to MONITOR_URL
 
 Health check: `GET http://localhost:8080/_forwarder/status`.
+
+## Utilities
+set_property.py - set a property in HomeAssistant using the same environment varibles. Examples:
+- ./set-property.py person_counter_308 state 1
+- ./set-property.py internal_light_sensing_308 state 350
+- ./set-property.py temperature_sensing_308 state 25
+- ./set-property.py external_light_sensing_308 state 4000
+- ./set-property.py clock_308 state "2025-08-01T08:30:00Z"
+- ./set-property.py lights_308 state on
+- ./set-property.py lights_308 brightness_pct 75
+- ./set-property.py lights_308 brightness 192
+- ./set-property.py blinds_308 state closed
+- ./set-property.py blinds_308 position 60
