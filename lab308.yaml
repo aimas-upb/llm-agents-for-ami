@@ -1,0 +1,46 @@
+version: 1
+
+devices:
+  lights_308:
+    - platform: light
+      support_brightness: true
+      initial_value: 'off'        # on / off
+      initial_brightness: 128     # 0-255 ≈ 50 %
+
+  blinds_308:
+    - platform: cover
+      initial_value: 'closed'    # 'open' or 'closed'
+      open_close_duration: 30    # seconds to go 0 ↔ 100 %
+      open_close_tick: 1         # update interval while moving
+ 
+  internal_light_sensing_308:
+    - platform: sensor
+      name: internal_light_sensing_308
+      class: illuminance
+      unit_of_measurement: lx
+      initial_value: 250
+
+  external_light_sensing_308:
+    - platform: sensor
+      name: external_light_sensing_308
+      class: illuminance
+      unit_of_measurement: lx
+      initial_value: 5000
+
+  temperature_sensing_308:
+    - platform: sensor
+      name: temperature_sensing_308
+      class: temperature
+      unit_of_measurement: °C
+      initial_value: 22
+
+  person_counter_308:
+    - platform: sensor
+      name: person_counter_308
+      unit_of_measurement: persons
+      initial_value: 0
+
+  clock_308:
+    - platform: sensor
+      name: clock_308
+      class: timestamp
