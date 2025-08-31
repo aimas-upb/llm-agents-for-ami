@@ -253,4 +253,11 @@ class ActionIndexService {
         return actionIndex.containsKey(artifactUriString) && 
                actionIndex[artifactUriString]?.isEmpty() == false
     }
+
+    fun clearAllIndexedArtifacts(): Int {
+        val count = actionIndex.size
+        actionIndex.clear()
+        log.info("Cleared all indexed artifacts from actionIndex (removed {} entries)", count)
+        return count
+    }
 }
