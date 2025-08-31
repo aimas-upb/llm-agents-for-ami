@@ -5,6 +5,7 @@ This is a demonstrator project for the deployment of the AmI HMAS agent system o
 
 Note that the demonstrator setup is split per branches in this repository:
  - Yggdrasil Deployment with the simulated Lab308 smart lab environment --> branch lab308
+ - Home Assistant Adapter that serves artifacts with the same API as Yggdrasil pulled real time from HomeAssistant --> branch HomeAssistantAdapter
  - Eclipse LMOS agent deployment for the UserAssistant agent --> branch UserAssistantAgent
  - Eclipse LMOS agent deployment for the EnvMonitor agent --> branch EnvMonitor
  - Eclipse LMOS agent deployment for the EnvExplorer agent --> branch EnvExplorer
