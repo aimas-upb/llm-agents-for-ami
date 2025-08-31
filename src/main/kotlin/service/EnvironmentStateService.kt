@@ -71,6 +71,16 @@ class EnvironmentStateService {
         return artifactStates.values.toList()
     }
 
+    /**
+     * Clears all tracked artifact states and returns the number of entries removed.
+     */
+    fun reset(): Int {
+        val removed = artifactStates.size
+        log.warn("Resetting environment state; removing {} artifacts", removed)
+        artifactStates.clear()
+        return removed
+    }
+
     fun createIRI(uri: String): IRI = valueFactory.createIRI(uri)
     fun createLiteral(value: String): Literal = valueFactory.createLiteral(value)
     fun createLiteral(value: Boolean): Literal = valueFactory.createLiteral(value)
