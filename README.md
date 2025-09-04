@@ -63,6 +63,8 @@ On startup the adapter will:
 Health check: `GET http://localhost:8080/_forwarder/status`.
 
 ## Utilities
+adjust_lux_on_events.py - runs in the background and adjusts the internal light sensor up and down when blinds or lights change states. Uses HA_URL and HA_TOKEN environment variable to connect to HA. Light increments and decrements are configurable via INCREMENT_LIGHT, DECREMENT_LIGHT, INCREMENT_BLINDS and INCREMENT_BLINDS.
+
 set_property.py - set a property in HomeAssistant using the same environment varibles. Examples:
 - ./set-property.py person_counter_308 state 1
 - ./set-property.py internal_light_sensing_308 state 350
