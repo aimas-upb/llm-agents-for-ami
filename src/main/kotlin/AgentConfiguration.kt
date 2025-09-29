@@ -6,19 +6,53 @@ package org.eclipse.lmos.arc.app.config
 
 import org.eclipse.lmos.arc.agents.Agent
 import org.eclipse.lmos.arc.spring.Agents
+import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.env.Environment
 
 @Configuration
 open class AgentConfiguration {
 
+    private val log = LoggerFactory.getLogger(javaClass)
+
     @Bean
-    open fun interactionSolverAgent(agents: Agents): Agent<*, *> {
+    open fun interactionSolverAgent(agents: Agents, environment: Environment): Agent<*, *> {
+        val ollamaUrl = environment.getProperty("OLLAMA_URL").orEmpty()
+        val openRouterKey = environment.getProperty("OPENROUTER_API_KEY").orEmpty()
+        val openAiKey = environment.getProperty("OPENAI_API_KEY").orEmpty()
+
+        val modelId = when {
+            ollamaUrl.isNotBlank() -> "test-ollama"
+            openRouterKey.isNotBlank() -> "test-openrouter"
+            openAiKey.isNotBlank() -> "test-openai"
+            else -> error("No LLM provider configured. Set OLLAMA_URL, OPENROUTER_API_KEY, or OPENAI_API_KEY.")
+        }
+
+        val providerDetails = when (modelId) {
+            "test-ollama" -> {
+                val modelName = environment.getProperty("OLLAMA_MODEL_NAME") ?: "llama3.1"
+                val url = ollamaUrl.ifBlank { environment.getProperty("OLLAMA_URL") ?: "http://localhost:11434" }
+                "Ollama model='$modelName' url='$url'"
+            }
+            "test-openrouter" -> {
+                val modelName = environment.getProperty("OPENROUTER_MODEL_NAME") ?: "openrouter/openai/gpt-4.1-mini"
+                val baseUrl = environment.getProperty("OPENROUTER_BASE_URL") ?: "https://openrouter.ai/api/v1"
+                "OpenRouter model='$modelName' baseUrl='$baseUrl' apiKeySupplied=true"
+            }
+            else -> {
+                val modelName = environment.getProperty("OPENAI_MODEL_NAME") ?: "gpt-4.1-mini"
+                val baseUrl = environment.getProperty("OPENAI_BASE_URL") ?: "https://api.openai.com/v1"
+                "OpenAI model='$modelName' baseUrl='$baseUrl' apiKeySupplied=true"
+            }
+        }
+        log.info("Configuring interaction-solver-agent to use model client '{}' ({})", modelId, providerDetails)
+
         return agents {
             name = "interaction-solver-agent"
             description = "Receives user intents, queries other agents for context and capabilities using full artifact URIs, and determines how to fulfill the intent."
 
-            model { "test-openai" }
+            model { modelId }
 
             tools {
                 +"query_environment_state"
