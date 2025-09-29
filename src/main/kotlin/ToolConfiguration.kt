@@ -42,7 +42,7 @@ open class AgentCommunicationToolsConfig {
                 })
             }
             engine {
-                requestTimeout = 180000
+                requestTimeout = 300000
             }
         }
     }
