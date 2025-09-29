@@ -38,6 +38,7 @@ logging:
     root: WARN
     org.eclipse.lmos.arc: INFO
     org.eclipse.lmos.arc.app: WARN
+    org.eclipse.lmos.arc.app.config: INFO
     controller: INFO
     service: INFO
 

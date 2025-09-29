@@ -13,17 +13,32 @@ The Environment Explorer Agent acts as the system's "librarian" for `lab308`. It
 
 ### 1. Configure Environment Variables
 
-This agent requires an OpenAI API key to function. Please set the following environment variable:
+The agent picks its chat completion backend in this order: `OLLAMA_URL` -> `OPENROUTER_API_KEY` -> `OPENAI_API_KEY`. Configure one of the following before launch (you can also keep `GEMINI_API_KEY` for the sample Gemini client).
+
+**Local Ollama**
+
+```bash
+export OLLAMA_URL="http://localhost:11434"
+export OLLAMA_MODEL_NAME="llama3.1"   # optional override
+```
+
+**OpenRouter**
+
+```bash
+export OPENROUTER_API_KEY="your_openrouter_key"
+export OPENROUTER_MODEL_NAME="openrouter/openai/gpt-4.1-mini"   # optional
+export OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"        # optional
+```
+
+**OpenAI (fallback)**
 
 ```bash
 export OPENAI_API_KEY="your_openai_api_key"
+export OPENAI_MODEL_NAME="gpt-4.1-mini"   # optional
 ```
 
-On Windows, you can use this command:
-
-```powershell
-$env:OPENAI_API_KEY="your_openai_api_key"
-```
+On Windows PowerShell, use `$env:VARIABLE_NAME=...` to set the same values.
+If none of the variables are provided, startup will abort with `No LLM provider configured` so you can supply one explicitly.
 
 ### 2. Start the Application
 

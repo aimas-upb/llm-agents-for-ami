@@ -6,10 +6,20 @@ arc:
   ai:
     clients:
       - id: test-gemini
-        model-name: gemini-2.0-flash
-        api-key: ${GEMINI_API_KEY}
+        model-name: ${GEMINI_MODEL_NAME:gemini-2.0-flash}
+        api-key: ${GEMINI_API_KEY:changeme-gemini}
         client: gemini
+      - id: test-ollama
+        model-name: ${OLLAMA_MODEL_NAME:llama3.1}
+        url: ${OLLAMA_URL:http://localhost:11434}
+        client: ollama
+      - id: test-openrouter
+        model-name: ${OPENROUTER_MODEL_NAME:openrouter/openai/gpt-4.1-mini}
+        api-key: ${OPENROUTER_API_KEY:changeme-openrouter}
+        url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
+        client: openrouter
       - id: test-openai
-        model-name: gpt-4.1-mini
-        api-key: ${OPENAI_API_KEY}
+        model-name: ${OPENAI_MODEL_NAME:gpt-4.1-mini}
+        api-key: ${OPENAI_API_KEY:changeme-openai}
+        url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
         client: openai
