@@ -46,7 +46,7 @@ management:
     tracing:
       endpoint: http://localhost:6006/v1/traces
   tracing:
-    enabled: true
+    enabled: false
     sampling:
       probability: 1.0
   server:
