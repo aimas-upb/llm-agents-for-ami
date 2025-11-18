@@ -1,0 +1,199 @@
+# External Services Configuration
+# User can add new services continuously through this configuration
+
+# Service definitions follow a uniform structure
+# All services are mapped to virtual Things with action affordances
+
+services:
+  # Example: Google Calendar Service
+  google_calendar:
+    enabled: false
+    category: "productivity"
+
+    thing_description:
+      title: "Google Calendar Service"
+      description: "Access to Google Calendar events and scheduling"
+
+      # Action affordances (API endpoints mapped as actions)
+      actions:
+        - name: "list_events"
+          description: "List calendar events"
+          input_schema:
+            type: "object"
+            properties:
+              start_date:
+                type: "string"
+                format: "date-time"
+              end_date:
+                type: "string"
+                format: "date-time"
+
+        - name: "create_event"
+          description: "Create a new calendar event"
+          input_schema:
+            type: "object"
+            properties:
+              title:
+                type: "string"
+              start_time:
+                type: "string"
+                format: "date-time"
+              end_time:
+                type: "string"
+                format: "date-time"
+              description:
+                type: "string"
+
+    connection:
+      api_base_url: "https://www.googleapis.com/calendar/v3"
+      auth_type: "oauth2"
+      credentials_file: "credentials/google_calendar.json"
+
+  # Example: Weather API Service
+  weather_api:
+    enabled: false
+    category: "weather_and_environment"
+
+    thing_description:
+      title: "Weather Information Service"
+      description: "Current weather and forecast data"
+
+      # Properties (sensor-like data)
+      properties:
+        - name: "current_temperature"
+          description: "Current temperature"
+          type: "number"
+          unit: "celsius"
+          observable: true
+
+        - name: "humidity"
+          description: "Current humidity"
+          type: "number"
+          unit: "percent"
+          observable: true
+
+      # Actions
+      actions:
+        - name: "get_forecast"
+          description: "Get weather forecast"
+          input_schema:
+            type: "object"
+            properties:
+              location:
+                type: "string"
+              days:
+                type: "integer"
+                minimum: 1
+                maximum: 7
+
+    connection:
+      api_base_url: "https://api.openweathermap.org/data/2.5"
+      auth_type: "api_key"
+      api_key_param: "appid"
+      api_key: null  # Set via environment variable
+
+  # Example: Air Quality API Service
+  air_quality_api:
+    enabled: false
+    category: "weather_and_environment"
+
+    thing_description:
+      title: "Air Quality Service"
+      description: "Air quality index and pollutant data"
+
+      properties:
+        - name: "aqi"
+          description: "Air Quality Index"
+          type: "number"
+          observable: true
+
+        - name: "pm25"
+          description: "PM2.5 concentration"
+          type: "number"
+          unit: "μg/m³"
+          observable: true
+
+      actions:
+        - name: "get_air_quality"
+          description: "Get current air quality data"
+          input_schema:
+            type: "object"
+            properties:
+              location:
+                type: "string"
+
+    connection:
+      api_base_url: "https://api.waqi.info"
+      auth_type: "api_key"
+      api_key_param: "token"
+      api_key: null
+
+  # Example: Google Spreadsheets Service
+  google_sheets:
+    enabled: false
+    category: "productivity"
+
+    thing_description:
+      title: "Google Sheets Service"
+      description: "Access to Google Spreadsheets data"
+
+      actions:
+        - name: "read_range"
+          description: "Read data from a spreadsheet range"
+          input_schema:
+            type: "object"
+            properties:
+              spreadsheet_id:
+                type: "string"
+              range:
+                type: "string"
+
+        - name: "write_range"
+          description: "Write data to a spreadsheet range"
+          input_schema:
+            type: "object"
+            properties:
+              spreadsheet_id:
+                type: "string"
+              range:
+                type: "string"
+              values:
+                type: "array"
+
+        - name: "create_spreadsheet"
+          description: "Create a new spreadsheet"
+          input_schema:
+            type: "object"
+            properties:
+              title:
+                type: "string"
+
+    connection:
+      api_base_url: "https://sheets.googleapis.com/v4"
+      auth_type: "oauth2"
+      credentials_file: "credentials/google_sheets.json"
+
+# Template for adding new services
+service_template:
+  # Service identifier (unique name)
+  service_name:
+    enabled: false
+    category: "productivity"  # or other category
+
+    thing_description:
+      title: "Service Title"
+      description: "Service description"
+
+      # Optional: Properties (for sensor-like data)
+      properties: []
+
+      # Actions (API endpoints mapped as affordances)
+      actions: []
+
+      # Optional: Events
+      events: []
+
+    connection:
+      api_base_url: ""
+      auth_type: "none"  # or "api_key", "oauth2", "basic"
+      # Additional connection parameters as needed

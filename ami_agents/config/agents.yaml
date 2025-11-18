@@ -1,0 +1,194 @@
+# Agent Configuration
+# Defines settings for all agents in the AMI system
+
+# SPADE Configuration
+spade:
+  server: "localhost"
+  port: 5222
+  use_tls: false
+
+# UserAssistant Agent Configuration
+user_assistant:
+  jid: "user_assistant@localhost"
+  password: "user_assistant_password"
+
+  # Chat management
+  chat:
+    max_concurrent_conversations: 10
+    conversation_timeout: 1800  # seconds (30 minutes)
+
+    # Message classification settings
+    classification:
+      model: "gpt-4"  # or other LLM model identifier
+      confidence_threshold: 0.7
+      categories:
+        - ENV_CAPABILITIES
+        - ENV_STATE
+        - GOAL_REQUEST
+        - PLAN_MANAGEMENT
+        - PREFERENCE_STATEMENT
+
+  # Intent extraction
+  intent_extraction:
+    model: "gpt-4"
+    max_retries: 3
+    validation_enabled: true
+
+  # Intent matching for existing goals
+  intent_matching:
+    similarity_threshold: 0.85
+    context_matching_enabled: true
+    context_similarity_threshold: 0.75
+
+  # Plan management
+  plan_management:
+    storage_backend: "sqlite"  # or "postgresql", "mongodb"
+    database_path: "data/plans.db"
+
+    plan_types:
+      - immediate  # One-time execution
+      - maintenance  # Persistent, triggered goals
+
+    metadata_fields:
+      - goal_description
+      - conversation_id
+      - timestamp_created
+      - timestamp_last_executed
+      - execution_count
+
+# EnvExplorer Agent Configuration
+env_explorer:
+  jid: "env_explorer@localhost"
+  password: "env_explorer_password"
+
+  # Environment discovery
+  discovery:
+    initial_crawl_on_startup: true
+    crawl_depth: -1  # -1 for unlimited
+    parallel_requests: 5
+
+    # Notification after initial discovery
+    notify_on_discovery_complete: true
+    notify_agents:
+      - "user_assistant@localhost"
+      - "interaction_solver@localhost"
+
+  # Change detection
+  change_detection:
+    enabled: true
+    polling_interval: 30  # seconds
+    detect_events:
+      - artifact_added
+      - artifact_removed
+      - capability_changed
+      - state_changed
+
+    # Plan impact analysis
+    analyze_plan_impact: true
+
+  # Signifier storage (usage experiences)
+  signifiers:
+    storage_backend: "sqlite"
+    database_path: "data/signifiers.db"
+
+    # Signifier matching
+    intent_similarity_threshold: 0.8
+    context_matching_enabled: true
+
+    # Signifier extraction from plans
+    extract_from_behavior_trees: true
+
+  # Affordance matching
+  affordance_matching:
+    use_hybrid_reasoning: true  # Rule-based + LLM
+    llm_model: "gpt-4"
+    prioritize_signifiers: true
+    physics_informed_modeling: true  # As per Ganesh Ramanathan approach
+
+# InteractionSolver Agent Configuration
+interaction_solver:
+  jid: "interaction_solver@localhost"
+  password: "interaction_solver_password"
+
+  # Planning
+  planning:
+    # Context gathering
+    context_gathering:
+      from_env_explorer: true
+      from_community: false  # For future multi-environment support
+      timeout: 10  # seconds
+
+    # LLM-based planning
+    llm_planning:
+      model: "gpt-4"
+      temperature: 0.7
+      max_tokens: 2000
+
+      # Behavior Tree generation
+      output_format: "behavior_tree"
+      include_node_templates: true
+
+      # Node template features
+      node_template_features:
+        - status_tracking  # running, done, failed
+        - expected_duration
+        - retry_policy
+        - error_handling
+
+  # Plan execution monitoring
+  execution_monitoring:
+    enabled: true
+    status_update_interval: 5  # seconds
+
+# LLM Configuration (shared across agents)
+llm:
+  default_provider: "openai"
+
+  providers:
+    openai:
+      api_key: null  # Set via environment variable OPENAI_API_KEY
+      model: "gpt-4"
+      temperature: 0.7
+      max_tokens: 1500
+
+    anthropic:
+      api_key: null  # Set via environment variable ANTHROPIC_API_KEY
+      model: "claude-3-opus-20240229"
+      temperature: 0.7
+      max_tokens: 1500
+
+  # Retry configuration
+  retry:
+    max_attempts: 3
+    backoff_factor: 2
+    timeout: 30  # seconds
+
+# Memory Configuration (shared across agents)
+memory:
+  conversation_memory:
+    backend: "sqlite"
+    database_path: "data/conversations.db"
+    max_history_per_conversation: 100
+    summarization_enabled: true
+    summarization_threshold: 50  # messages
+
+  # Vector store for semantic search
+  vector_store:
+    enabled: true
+    backend: "chromadb"  # or "faiss", "pinecone"
+    embedding_model: "text-embedding-ada-002"
+    collection_name: "ami_memories"
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+  file_logging:
+    enabled: true
+    path: "logs/ami_agents.log"
+    max_bytes: 10485760  # 10 MB
+    backup_count: 5
+
+  console_logging:
+    enabled: true
