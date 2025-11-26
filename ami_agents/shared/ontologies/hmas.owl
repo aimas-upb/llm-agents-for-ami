@@ -1,0 +1,1392 @@
+<?xml version="1.0"?>
+<Ontology xmlns="http://www.w3.org/2002/07/owl#"
+     xml:base="https://purl.org/hmas/core"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     ontologyIRI="https://purl.org/hmas/core">
+    <Prefix name="cc" IRI="http://creativecommons.org/ns#"/>
+    <Prefix name="dct" IRI="http://purl.org/dc/terms/"/>
+    <Prefix name="owl" IRI="http://www.w3.org/2002/07/owl#"/>
+    <Prefix name="rdf" IRI="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/>
+    <Prefix name="xml" IRI="http://www.w3.org/XML/1998/namespace"/>
+    <Prefix name="xsd" IRI="http://www.w3.org/2001/XMLSchema#"/>
+    <Prefix name="core" IRI="https://purl.org/hmas/core#"/>
+    <Prefix name="hmas" IRI="https://purl.org/hmas/"/>
+    <Prefix name="rdfs" IRI="http://www.w3.org/2000/01/rdf-schema#"/>
+    <Prefix name="skos" IRI="http://www.w3.org/2004/02/skos/core#"/>
+    <Prefix name="vann" IRI="http://purl.org/vocab/vann/"/>
+    <Prefix name="schema" IRI="http://schema.org/"/>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="cc:license"/>
+        <IRI>https://creativecommons.org/licenses/by/4.0/</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dct:contributor"/>
+        <IRI>http://maxime-lefrancois.info/me#</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dct:contributor"/>
+        <IRI>http://ns.inria.fr/fabien.gandon#me</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dct:contributor"/>
+        <IRI>http://w3id.org/people/az/me</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dct:contributor"/>
+        <IRI>https://danaivach.inrupt.net/profile/card#me</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dct:contributor"/>
+        <IRI>https://id.inrupt.com/smnmyr</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dct:contributor"/>
+        <IRI>https://orcid.org/0000-0002-2956-0533</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dct:contributor"/>
+        <IRI>https://orcid.org/0000-0002-4506-2745</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dct:contributor"/>
+        <IRI>https://orcid.org/0000-0003-0821-6095</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dct:contributor"/>
+        <IRI>https://www.vcharpenay.link/#me</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dct:creator"/>
+        <IRI>https://id.inrupt.com/andreiciortea</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dct:description"/>
+        <Literal xml:lang="en">An ontology to describe Hypermedia Multi-Agent Systems.</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dct:description"/>
+        <Literal xml:lang="fr">Une ontologie pour la description de systèmes multi-agents hypermédias.</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dct:issued"/>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#date">2021-11-21</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dct:title"/>
+        <Literal xml:lang="en">Hypermedia MAS Core Ontology</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dct:title"/>
+        <Literal xml:lang="fr">Ontologie Centrale des SMA Hypermédias</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="vann:preferredNamespacePrefix"/>
+        <Literal>hmas</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="vann:preferredNamespaceUri"/>
+        <AbbreviatedIRI>hmas:</AbbreviatedIRI>
+    </Annotation>
+    <Declaration>
+        <Class abbreviatedIRI="schema:CollegeOrUniversity"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="schema:Person"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="schema:ResearchOrganization"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="hmas:Agent"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="hmas:Artifact"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="hmas:HypermediaMASPlatform"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="hmas:Organization"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="hmas:ResourceProfile"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="hmas:Signifier"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="hmas:Workspace"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="hmas:contains"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="hmas:exposesSignifier"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="hmas:hasProfile"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="hmas:hosts"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="hmas:isContainedIn"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="hmas:isExposedIn"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="hmas:isHostedOn"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="hmas:isMaterialOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="hmas:isMemberOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="hmas:isProfileOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="hmas:isTransitivelyContainedIn"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="hmas:transitivelyContains"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="cc:license"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dct:contributor"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dct:creator"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dct:description"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dct:issued"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dct:source"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dct:title"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="vann:preferredNamespacePrefix"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="vann:preferredNamespaceUri"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="schema:affiliation"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="schema:email"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="schema:identifier"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="schema:url"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="skos:example"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="skos:note"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="skos:historyNote"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="skos:editorialNote"/>
+    </Declaration>
+    <Declaration>
+        <Datatype abbreviatedIRI="xsd:date"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="http://dbpedia.org/resource/University_of_St._Gallen"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="http://maxime-lefrancois.info/me#"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="http://ns.inria.fr/fabien.gandon#me"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="https://orcid.org/0000-0003-0543-1232"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="https://orcid.org/0000-0003-0821-6095"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="https://www.vcharpenay.link/#me"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="skos:prefLabel"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="http://w3id.org/people/az/me"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="https://orcid.org/0000-0001-6367-3454"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="https://orcid.org/0000-0002-2956-0533"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="skos:definition"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="https://orcid.org/0000-0001-9814-8991"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="https://orcid.org/0000-0002-6697-0427"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="https://danaivach.inrupt.net/profile/card#me"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="https://id.inrupt.com/smnmyr"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dct:references"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="https://orcid.org/0000-0003-0721-4135"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="https://id.inrupt.com/andreiciortea"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="https://orcid.org/0000-0003-4509-9537"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dct:identifier"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="https://orcid.org/0000-0002-3497-8758"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="https://orcid.org/0000-0002-4506-2745"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dct:bibliographicCitation"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="http://dbpedia.org/resource/French_Institute_for_Research_in_Computer_Science_and_Automation"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual abbreviatedIRI="hmas:Affordance"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="skos:related"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="skos:Concept"/>
+    </Declaration>
+    <DisjointClasses>
+        <Class abbreviatedIRI="hmas:Agent"/>
+        <Class abbreviatedIRI="hmas:Artifact"/>
+        <Class abbreviatedIRI="hmas:ResourceProfile"/>
+        <Class abbreviatedIRI="hmas:Signifier"/>
+    </DisjointClasses>
+    <ClassAssertion>
+        <Class abbreviatedIRI="schema:ResearchOrganization"/>
+        <NamedIndividual IRI="http://dbpedia.org/resource/French_Institute_for_Research_in_Computer_Science_and_Automation"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="schema:CollegeOrUniversity"/>
+        <NamedIndividual IRI="http://dbpedia.org/resource/University_of_St._Gallen"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="schema:CollegeOrUniversity"/>
+        <NamedIndividual IRI="http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="schema:Person"/>
+        <NamedIndividual IRI="http://maxime-lefrancois.info/me#"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="schema:Person"/>
+        <NamedIndividual IRI="http://ns.inria.fr/fabien.gandon#me"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="schema:Person"/>
+        <NamedIndividual IRI="http://w3id.org/people/az/me"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="schema:Person"/>
+        <NamedIndividual IRI="https://danaivach.inrupt.net/profile/card#me"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="schema:Person"/>
+        <NamedIndividual IRI="https://id.inrupt.com/andreiciortea"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="schema:Person"/>
+        <NamedIndividual IRI="https://id.inrupt.com/smnmyr"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="schema:Person"/>
+        <NamedIndividual IRI="https://orcid.org/0000-0002-2956-0533"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="schema:Person"/>
+        <NamedIndividual IRI="https://orcid.org/0000-0002-3497-8758"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="schema:Person"/>
+        <NamedIndividual IRI="https://orcid.org/0000-0002-4506-2745"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="schema:Person"/>
+        <NamedIndividual IRI="https://orcid.org/0000-0003-0821-6095"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="schema:Person"/>
+        <NamedIndividual IRI="https://orcid.org/0000-0003-4509-9537"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="skos:Concept"/>
+        <NamedIndividual abbreviatedIRI="hmas:Affordance"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="schema:Person"/>
+        <NamedIndividual IRI="https://www.vcharpenay.link/#me"/>
+    </ClassAssertion>
+    <SameIndividual>
+        <NamedIndividual IRI="http://maxime-lefrancois.info/me#"/>
+        <NamedIndividual IRI="https://orcid.org/0000-0001-9814-8991"/>
+    </SameIndividual>
+    <SameIndividual>
+        <NamedIndividual IRI="http://ns.inria.fr/fabien.gandon#me"/>
+        <NamedIndividual IRI="https://orcid.org/0000-0003-0543-1232"/>
+    </SameIndividual>
+    <SameIndividual>
+        <NamedIndividual IRI="https://danaivach.inrupt.net/profile/card#me"/>
+        <NamedIndividual IRI="https://orcid.org/0000-0002-6697-0427"/>
+    </SameIndividual>
+    <SameIndividual>
+        <NamedIndividual IRI="https://id.inrupt.com/andreiciortea"/>
+        <NamedIndividual IRI="https://orcid.org/0000-0003-0721-4135"/>
+    </SameIndividual>
+    <SameIndividual>
+        <NamedIndividual IRI="https://id.inrupt.com/smnmyr"/>
+        <NamedIndividual IRI="https://orcid.org/0000-0001-6367-3454"/>
+    </SameIndividual>
+    <SubObjectPropertyOf>
+        <ObjectProperty abbreviatedIRI="hmas:contains"/>
+        <ObjectProperty abbreviatedIRI="hmas:transitivelyContains"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty abbreviatedIRI="hmas:isContainedIn"/>
+        <ObjectProperty abbreviatedIRI="hmas:isTransitivelyContainedIn"/>
+    </SubObjectPropertyOf>
+    <InverseObjectProperties>
+        <ObjectProperty abbreviatedIRI="hmas:contains"/>
+        <ObjectProperty abbreviatedIRI="hmas:isContainedIn"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty abbreviatedIRI="hmas:exposesSignifier"/>
+        <ObjectProperty abbreviatedIRI="hmas:isExposedIn"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty abbreviatedIRI="hmas:hasProfile"/>
+        <ObjectProperty abbreviatedIRI="hmas:isProfileOf"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty abbreviatedIRI="hmas:hosts"/>
+        <ObjectProperty abbreviatedIRI="hmas:isHostedOn"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty abbreviatedIRI="hmas:isTransitivelyContainedIn"/>
+        <ObjectProperty abbreviatedIRI="hmas:transitivelyContains"/>
+    </InverseObjectProperties>
+    <AsymmetricObjectProperty>
+        <ObjectProperty abbreviatedIRI="hmas:hasProfile"/>
+    </AsymmetricObjectProperty>
+    <AsymmetricObjectProperty>
+        <ObjectProperty abbreviatedIRI="hmas:hosts"/>
+    </AsymmetricObjectProperty>
+    <AsymmetricObjectProperty>
+        <ObjectProperty abbreviatedIRI="hmas:isHostedOn"/>
+    </AsymmetricObjectProperty>
+    <TransitiveObjectProperty>
+        <ObjectProperty abbreviatedIRI="hmas:isTransitivelyContainedIn"/>
+    </TransitiveObjectProperty>
+    <TransitiveObjectProperty>
+        <ObjectProperty abbreviatedIRI="hmas:transitivelyContains"/>
+    </TransitiveObjectProperty>
+    <ObjectPropertyDomain>
+        <ObjectProperty abbreviatedIRI="hmas:exposesSignifier"/>
+        <Class abbreviatedIRI="hmas:ResourceProfile"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty abbreviatedIRI="hmas:hosts"/>
+        <Class abbreviatedIRI="hmas:HypermediaMASPlatform"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty abbreviatedIRI="hmas:isExposedIn"/>
+        <Class abbreviatedIRI="hmas:Signifier"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty abbreviatedIRI="hmas:isMaterialOf"/>
+        <Class abbreviatedIRI="hmas:Artifact"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty abbreviatedIRI="hmas:isMemberOf"/>
+        <Class abbreviatedIRI="hmas:Agent"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty abbreviatedIRI="hmas:isProfileOf"/>
+        <Class abbreviatedIRI="hmas:ResourceProfile"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty abbreviatedIRI="hmas:transitivelyContains"/>
+        <Class abbreviatedIRI="hmas:Workspace"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="hmas:exposesSignifier"/>
+        <Class abbreviatedIRI="hmas:Signifier"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="hmas:hasProfile"/>
+        <Class abbreviatedIRI="hmas:ResourceProfile"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="hmas:isExposedIn"/>
+        <Class abbreviatedIRI="hmas:ResourceProfile"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="hmas:isHostedOn"/>
+        <Class abbreviatedIRI="hmas:HypermediaMASPlatform"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="hmas:isMaterialOf"/>
+        <Class abbreviatedIRI="hmas:Organization"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="hmas:isMemberOf"/>
+        <Class abbreviatedIRI="hmas:Organization"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="hmas:isTransitivelyContainedIn"/>
+        <Class abbreviatedIRI="hmas:Workspace"/>
+    </ObjectPropertyRange>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+        <IRI>http://dbpedia.org/resource/French_Institute_for_Research_in_Computer_Science_and_Automation</IRI>
+        <IRI>https://inria.fr/</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+        <IRI>http://dbpedia.org/resource/French_Institute_for_Research_in_Computer_Science_and_Automation</IRI>
+        <Literal>Inria</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+        <IRI>http://dbpedia.org/resource/University_of_St._Gallen</IRI>
+        <IRI>https://www.unisg.ch</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+        <IRI>http://dbpedia.org/resource/University_of_St._Gallen</IRI>
+        <Literal>University of St.Gallen</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+        <IRI>http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne</IRI>
+        <IRI>https://mines-stetienne.fr</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+        <IRI>http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne</IRI>
+        <Literal>MINES Saint-Étienne</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:affiliation"/>
+        <IRI>http://maxime-lefrancois.info/me#</IRI>
+        <IRI>http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:email"/>
+        <IRI>http://maxime-lefrancois.info/me#</IRI>
+        <Literal>maxime.lefrancois@emse.fr</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:identifier"/>
+        <IRI>http://maxime-lefrancois.info/me#</IRI>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#anyURI">https://orcid.org/0000-0001-9814-8991#orcid-id</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+        <IRI>http://maxime-lefrancois.info/me#</IRI>
+        <IRI>http://maxime-lefrancois.info/</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+        <IRI>http://maxime-lefrancois.info/me#</IRI>
+        <Literal>Maxime Lefrançois</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:affiliation"/>
+        <IRI>http://ns.inria.fr/fabien.gandon#me</IRI>
+        <IRI>http://dbpedia.org/resource/French_Institute_for_Research_in_Computer_Science_and_Automation</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:email"/>
+        <IRI>http://ns.inria.fr/fabien.gandon#me</IRI>
+        <Literal>fabien.gandon@inria.fr</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:identifier"/>
+        <IRI>http://ns.inria.fr/fabien.gandon#me</IRI>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#anyURI">https://orcid.org/0000-0003-0543-1232#orcid-id</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+        <IRI>http://ns.inria.fr/fabien.gandon#me</IRI>
+        <IRI>http://fabien.info/</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+        <IRI>http://ns.inria.fr/fabien.gandon#me</IRI>
+        <Literal>Fabien Gandon</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:affiliation"/>
+        <IRI>http://w3id.org/people/az/me</IRI>
+        <IRI>http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:email"/>
+        <IRI>http://w3id.org/people/az/me</IRI>
+        <Literal>antoine.zimmermann@emse.fr</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:identifier"/>
+        <IRI>http://w3id.org/people/az/me</IRI>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#anyURI">http://w3id.org/people/az/me</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:identifier"/>
+        <IRI>http://w3id.org/people/az/me</IRI>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#anyURI">https://orcid.org/0000-0003-1502-6986#orcid-id</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+        <IRI>http://w3id.org/people/az/me</IRI>
+        <IRI>http://w3id.org/people/az/cv</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+        <IRI>http://w3id.org/people/az/me</IRI>
+        <Literal>Antoine Zimmermann</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:affiliation"/>
+        <IRI>https://danaivach.inrupt.net/profile/card#me</IRI>
+        <IRI>http://dbpedia.org/resource/University_of_St._Gallen</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:email"/>
+        <IRI>https://danaivach.inrupt.net/profile/card#me</IRI>
+        <Literal>danai.vachtsevanou@unisg.ch</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:identifier"/>
+        <IRI>https://danaivach.inrupt.net/profile/card#me</IRI>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#anyURI">https://orcid.org/0000-0002-6697-0427#orcid-id</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+        <IRI>https://danaivach.inrupt.net/profile/card#me</IRI>
+        <IRI>https://scholar.google.com/citations?user=ju1FICsAAAAJ</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+        <IRI>https://danaivach.inrupt.net/profile/card#me</IRI>
+        <Literal>Danai Vachtsevanou</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:affiliation"/>
+        <IRI>https://id.inrupt.com/andreiciortea</IRI>
+        <IRI>http://dbpedia.org/resource/University_of_St._Gallen</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:email"/>
+        <IRI>https://id.inrupt.com/andreiciortea</IRI>
+        <Literal>andrei.ciortea@unisg.ch</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:identifier"/>
+        <IRI>https://id.inrupt.com/andreiciortea</IRI>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#anyURI">https://orcid.org/0000-0003-0721-4135#orcid-id</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+        <IRI>https://id.inrupt.com/andreiciortea</IRI>
+        <IRI>http://andreiciortea.ro/</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+        <IRI>https://id.inrupt.com/andreiciortea</IRI>
+        <Literal>Andrei Ciortea</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:affiliation"/>
+        <IRI>https://id.inrupt.com/smnmyr</IRI>
+        <IRI>http://dbpedia.org/resource/University_of_St._Gallen</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:email"/>
+        <IRI>https://id.inrupt.com/smnmyr</IRI>
+        <Literal>simon.mayer@unisg.ch</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:identifier"/>
+        <IRI>https://id.inrupt.com/smnmyr</IRI>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#anyURI">https://orcid.org/0000-0001-6367-3454#orcid-id</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+        <IRI>https://id.inrupt.com/smnmyr</IRI>
+        <IRI>https://www.linkedin.com/in/simon-mayer-b7979936/</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+        <IRI>https://id.inrupt.com/smnmyr</IRI>
+        <Literal>Simon Mayer</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:affiliation"/>
+        <IRI>https://orcid.org/0000-0002-2956-0533</IRI>
+        <IRI>http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:email"/>
+        <IRI>https://orcid.org/0000-0002-2956-0533</IRI>
+        <Literal>olivier.boissier@emse.fr</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:identifier"/>
+        <IRI>https://orcid.org/0000-0002-2956-0533</IRI>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#anyURI">https://orcid.org/0000-0002-2956-0533#orcid-id</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+        <IRI>https://orcid.org/0000-0002-2956-0533</IRI>
+        <IRI>https://www.emse.fr/~boissier/</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+        <IRI>https://orcid.org/0000-0002-2956-0533</IRI>
+        <Literal>Olivier Boissier</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:affiliation"/>
+        <IRI>https://orcid.org/0000-0002-3497-8758</IRI>
+        <IRI>http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:email"/>
+        <IRI>https://orcid.org/0000-0002-3497-8758</IRI>
+        <Literal>nesrine.hafiene@emse.fr</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:identifier"/>
+        <IRI>https://orcid.org/0000-0002-3497-8758</IRI>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#anyURI">https://orcid.org/0000-0002-3497-8758#orcid-id</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+        <IRI>https://orcid.org/0000-0002-3497-8758</IRI>
+        <IRI>https://www.linkedin.com/in/nesrine-hafiene-059120114/</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+        <IRI>https://orcid.org/0000-0002-3497-8758</IRI>
+        <Literal>Nesrine Hafiene</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:affiliation"/>
+        <IRI>https://orcid.org/0000-0002-4506-2745</IRI>
+        <IRI>http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:email"/>
+        <IRI>https://orcid.org/0000-0002-4506-2745</IRI>
+        <Literal>luisgustavo.nardin@emse.fr</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:identifier"/>
+        <IRI>https://orcid.org/0000-0002-4506-2745</IRI>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#anyURI">https://orcid.org/0000-0002-4506-2745#orcid-id</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+        <IRI>https://orcid.org/0000-0002-4506-2745</IRI>
+        <IRI>http://gnardin.github.io/website/</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+        <IRI>https://orcid.org/0000-0002-4506-2745</IRI>
+        <Literal>Luis Gustavo Nardin</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:affiliation"/>
+        <IRI>https://orcid.org/0000-0003-0821-6095</IRI>
+        <IRI>http://dbpedia.org/resource/French_Institute_for_Research_in_Computer_Science_and_Automation</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:email"/>
+        <IRI>https://orcid.org/0000-0003-0821-6095</IRI>
+        <Literal>christopher.leturc@inria.fr</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:identifier"/>
+        <IRI>https://orcid.org/0000-0003-0821-6095</IRI>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#anyURI">https://orcid.org/0000-0003-0821-6095#orcid-id</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+        <IRI>https://orcid.org/0000-0003-0821-6095</IRI>
+        <IRI>https://www.linkedin.com/in/christopher-leturc/</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+        <IRI>https://orcid.org/0000-0003-0821-6095</IRI>
+        <Literal>Chistopher Leturc</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:affiliation"/>
+        <IRI>https://orcid.org/0000-0003-4509-9537</IRI>
+        <IRI>http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:email"/>
+        <IRI>https://orcid.org/0000-0003-4509-9537</IRI>
+        <Literal>yousouf.taghzouti@emse.fr</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:identifier"/>
+        <IRI>https://orcid.org/0000-0003-4509-9537</IRI>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#anyURI">https://orcid.org/0000-0003-4509-9537#orcid-id</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+        <IRI>https://orcid.org/0000-0003-4509-9537</IRI>
+        <IRI>https://youctagh.github.io/</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+        <IRI>https://orcid.org/0000-0003-4509-9537</IRI>
+        <Literal>Yousouf Taghzouti</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="dct:references"/>
+        <AbbreviatedIRI>hmas:Affordance</AbbreviatedIRI>
+        <AnonymousIndividual nodeID="_:genid2147483648"/>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="dct:references"/>
+        <AbbreviatedIRI>hmas:Affordance</AbbreviatedIRI>
+        <AnonymousIndividual nodeID="_:genid2147483649"/>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:Affordance</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="skos:definition"/>
+        <AbbreviatedIRI>hmas:Affordance</AbbreviatedIRI>
+        <Literal xml:lang="en">A behavior possibility that is a relationship between an ability of an agent and a situation that includes agents and features of the environment.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="skos:editorialNote"/>
+        <AbbreviatedIRI>hmas:Affordance</AbbreviatedIRI>
+        <Literal xml:lang="en">The concept has been considered as a candidate term for representing interaction cues and metadata in the Hypermedia MAS Core Ontology. The term :Signifier is selected instead for the following reasons: 1) Affordances emerge upon the presence of individual agents in the appropriate situation, while signifiers are defined with respect to agent types to preserve the evolvability and reusability of interaction cues without requiring prior knowledge about individual agents; 2) Affordances are defined in [Chemero and Turvey, 2007] for studying interactions of animals, while signifiers are defined here for supporting interactions of autonomous agents, which exhibit more heterogeneous abilities than animals — including agents whose cognitive abilities exclusively rely on computational processes such as reasoning over representations. Here, the concept is provided to support the discussion, management, and modelling of signifiers, which reveal information about affordances [Norman, 2013]. For example, the association between the two terms enables examining the dynamic exposure of signifiers based on the run-time availability of agent abilities and situations, or the modelling of signifiers that reveal information about affordances for both artificial and human agents.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="skos:historyNote"/>
+        <AbbreviatedIRI>hmas:Affordance</AbbreviatedIRI>
+        <Literal xml:lang="en">The definition of the concept follows affordance theorists [Chemero and Turvey, 2007].</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="skos:prefLabel"/>
+        <AbbreviatedIRI>hmas:Affordance</AbbreviatedIRI>
+        <Literal xml:lang="en">affordance</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="skos:related"/>
+        <AbbreviatedIRI>hmas:Affordance</AbbreviatedIRI>
+        <AbbreviatedIRI>hmas:Signifier</AbbreviatedIRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:Agent</AbbreviatedIRI>
+        <Literal xml:lang="en">An entity that is capable of autonomous behavior.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:Agent</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:Agent</AbbreviatedIRI>
+        <Literal xml:lang="en">agent</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:Artifact</AbbreviatedIRI>
+        <Literal xml:lang="en">A resource that can be dynamically constructed, shared, and used by agents to support their activities. In a Hypermedia MAS, an artifact exposes and can be accessed through a hypermedia interface (in addition to other possible interfaces, such as a physical interface).</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:Artifact</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:Artifact</AbbreviatedIRI>
+        <Literal xml:lang="en">artifact</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:Artifact</AbbreviatedIRI>
+        <Literal xml:lang="fr">artéfact</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:Artifact</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/38</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:HypermediaMASPlatform</AbbreviatedIRI>
+        <Literal xml:lang="en">A Hypermedia MAS (HMAS) platform is a system providing a collection of features to support Hypermedia MAS. Common features include support for communication and interaction, runtime environments for agents, artifacts, or organizations, etc.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:HypermediaMASPlatform</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:HypermediaMASPlatform</AbbreviatedIRI>
+        <Literal xml:lang="en">HMAS platform</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:HypermediaMASPlatform</AbbreviatedIRI>
+        <Literal xml:lang="fr">platforme SMAH</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:HypermediaMASPlatform</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/20</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:HypermediaMASPlatform</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/32</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="skos:example"/>
+        <AbbreviatedIRI>hmas:HypermediaMASPlatform</AbbreviatedIRI>
+        <Literal xml:lang="en">Examples of hmas:HypermediaMASPlatform include Twitter, Facebook, a JADE node/delpoyment, or a JaCaMo node/delpoyment — all of which provide features that could support Hypermedia MAS &amp; hybrid communities.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:Organization</AbbreviatedIRI>
+        <Literal xml:lang="en">An Organization is an entity situated on Agents and Artifacts, and regulated by a regulation system.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:Organization</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:Organization</AbbreviatedIRI>
+        <Literal xml:lang="fr">organisation</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:Organization</AbbreviatedIRI>
+        <Literal xml:lang="en">organization</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:ResourceProfile</AbbreviatedIRI>
+        <Literal xml:lang="en">Structured data describing a resource through general metadata, domain- and application-specific metadata, and signifiers.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:ResourceProfile</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:ResourceProfile</AbbreviatedIRI>
+        <Literal xml:lang="fr">profil de ressource</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:ResourceProfile</AbbreviatedIRI>
+        <Literal xml:lang="en">resource profile</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="skos:example"/>
+        <AbbreviatedIRI>hmas:ResourceProfile</AbbreviatedIRI>
+        <Literal xml:lang="en">e.g., a Thing Description document, a Hydra document, an Socio-Technical Network platform description, an agent description based on the FIPA standard</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:Signifier</AbbreviatedIRI>
+        <Literal xml:lang="en">A perceivable sign/cue that can be interpreted meaningfully by an agent to reveal information about a behavior possibility.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:Signifier</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:Signifier</AbbreviatedIRI>
+        <Literal xml:lang="fr">signifiant</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:Signifier</AbbreviatedIRI>
+        <Literal xml:lang="en">signifier</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:Signifier</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/13#issuecomment-1028904491</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:Signifier</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/41</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="skos:note"/>
+        <AbbreviatedIRI>hmas:Signifier</AbbreviatedIRI>
+        <Literal xml:lang="en">:Signifier works as a bridge between the Core and the Interaction Vocabularies.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="skos:related"/>
+        <AbbreviatedIRI>hmas:Signifier</AbbreviatedIRI>
+        <AbbreviatedIRI>hmas:Affordance</AbbreviatedIRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:Workspace</AbbreviatedIRI>
+        <Literal xml:lang="en">A logical container for any resource in general and in particular for agents, artifacts or other workspaces. Workspaces can be created or deleted by agents on a needed basis. All agent interactions happen in the context of a workspace whether or not the worspace was explicitly reified. A workspace can be, for instance, implemented on top of an LDP (Linked Data Platform) indirect container.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:Workspace</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:Workspace</AbbreviatedIRI>
+        <Literal xml:lang="fr">espace de travail</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:Workspace</AbbreviatedIRI>
+        <Literal xml:lang="en">workspace</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:Workspace</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/138</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:Workspace</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/24</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:Workspace</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/32</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:Workspace</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/36</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:Workspace</AbbreviatedIRI>
+        <IRI>https://www.w3.org/ns/ldp#</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="dct:source"/>
+        <AbbreviatedIRI>hmas:contains</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/18#issuecomment-1040448029</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:contains</AbbreviatedIRI>
+        <Literal xml:lang="en">A relation that refers to a direct logical containment relation and is related to the definition of a workspace as a logical container.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:contains</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:contains</AbbreviatedIRI>
+        <Literal xml:lang="fr">contient directement</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:contains</AbbreviatedIRI>
+        <Literal xml:lang="en">directly contains</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="dct:source"/>
+        <AbbreviatedIRI>hmas:exposesSignifier</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/13#issuecomment-1029349488</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:exposesSignifier</AbbreviatedIRI>
+        <Literal xml:lang="en">A relation between a resource profile and a signifier it exposes.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:exposesSignifier</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:exposesSignifier</AbbreviatedIRI>
+        <Literal xml:lang="fr">expose le signifiant</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:exposesSignifier</AbbreviatedIRI>
+        <Literal xml:lang="en">exposes signifier</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:exposesSignifier</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/13</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:hasProfile</AbbreviatedIRI>
+        <Literal xml:lang="en">A relation that links a resource to its profile.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:hasProfile</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:hasProfile</AbbreviatedIRI>
+        <Literal xml:lang="fr">a pour profil</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:hasProfile</AbbreviatedIRI>
+        <Literal xml:lang="en">has for profile</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="dct:source"/>
+        <AbbreviatedIRI>hmas:hosts</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/8#issuecomment-1025991719</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:hosts</AbbreviatedIRI>
+        <Literal xml:lang="en">A relation that refers to an information resource or a process that is hosted on a platform. A hosting relation might have further implications, e.g. the usage of the hosted resource (or the usage of platform resources by the hosted resource) could be subject to terms of service or data licensing policies specific to the hosting platform.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:hosts</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:hosts</AbbreviatedIRI>
+        <Literal xml:lang="en">hosts</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:hosts</AbbreviatedIRI>
+        <Literal xml:lang="fr">héberge</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:hosts</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/18</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:hosts</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/49</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:isContainedIn</AbbreviatedIRI>
+        <Literal xml:lang="en">A relation that describes a workspace that contains a resource.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:isContainedIn</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:isContainedIn</AbbreviatedIRI>
+        <Literal xml:lang="fr">est directement contenu dans</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:isContainedIn</AbbreviatedIRI>
+        <Literal xml:lang="en">is directly contained in</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:isExposedIn</AbbreviatedIRI>
+        <Literal xml:lang="en">A relation between a signifier and a resource profile it is exposed in.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:isExposedIn</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:isExposedIn</AbbreviatedIRI>
+        <Literal xml:lang="fr">est exposé dans</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:isExposedIn</AbbreviatedIRI>
+        <Literal xml:lang="en">is exposed in</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:isHostedOn</AbbreviatedIRI>
+        <Literal xml:lang="en">A relation that refers to the platform that hosts the information resource or process.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:isHostedOn</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:isHostedOn</AbbreviatedIRI>
+        <Literal xml:lang="fr">est hébergé sur</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:isHostedOn</AbbreviatedIRI>
+        <Literal xml:lang="en">is hosted on</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:isMaterialOf</AbbreviatedIRI>
+        <Literal xml:lang="en">A relation between an Artifact and an Organization it belongs to.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:isMaterialOf</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:isMaterialOf</AbbreviatedIRI>
+        <Literal xml:lang="en">is material of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:isMemberOf</AbbreviatedIRI>
+        <Literal xml:lang="en">A relation between an Agent and an Organization it belongs to.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:isMemberOf</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:isMemberOf</AbbreviatedIRI>
+        <Literal xml:lang="en">is member of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:isProfileOf</AbbreviatedIRI>
+        <Literal xml:lang="en">A relation that links a resource profile to the resource it is a profile of.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:isProfileOf</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:isProfileOf</AbbreviatedIRI>
+        <Literal xml:lang="fr">est le profil de</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:isProfileOf</AbbreviatedIRI>
+        <Literal xml:lang="en">is profile of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:isProfileOf</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/13</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:isProfileOf</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/26</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:isTransitivelyContainedIn</AbbreviatedIRI>
+        <Literal xml:lang="en">A relation that refers to all workspaces in which a resource is contained. </Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:isTransitivelyContainedIn</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:isTransitivelyContainedIn</AbbreviatedIRI>
+        <Literal xml:lang="fr">est transitivement contenu dans</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:isTransitivelyContainedIn</AbbreviatedIRI>
+        <Literal xml:lang="en">is transitively contained in</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="dct:source"/>
+        <AbbreviatedIRI>hmas:transitivelyContains</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/8#issuecomment-1025991719</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>hmas:transitivelyContains</AbbreviatedIRI>
+        <Literal xml:lang="en">Links all the resources that are logically contained in a workspaces, directly or indirectly by transitivity.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:isDefinedBy"/>
+        <AbbreviatedIRI>hmas:transitivelyContains</AbbreviatedIRI>
+        <IRI></IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:transitivelyContains</AbbreviatedIRI>
+        <Literal xml:lang="fr">contient transitivement</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>hmas:transitivelyContains</AbbreviatedIRI>
+        <Literal xml:lang="en">transitively contains</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:transitivelyContains</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/18</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>hmas:transitivelyContains</AbbreviatedIRI>
+        <IRI>https://github.com/HyperAgents/ns.hyperagents.org/issues/39</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:affiliation"/>
+        <IRI>https://www.vcharpenay.link/#me</IRI>
+        <IRI>http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:email"/>
+        <IRI>https://www.vcharpenay.link/#me</IRI>
+        <Literal>victor.charpenay@emse.fr</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:identifier"/>
+        <IRI>https://www.vcharpenay.link/#me</IRI>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#anyURI">https://orcid.org/0000-0002-9210-1583#orcid-id</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:mainEntityOfPage"/>
+        <IRI>https://www.vcharpenay.link/#me</IRI>
+        <IRI>https://www.vcharpenay.link/</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="schema:name"/>
+        <IRI>https://www.vcharpenay.link/#me</IRI>
+        <Literal>Victor Charpenay</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="dct:bibliographicCitation"/>
+        <AnonymousIndividual nodeID="_:genid2147483648"/>
+        <Literal xml:lang="en">Chemero, A., &amp; Turvey, M. T. (2007). Complexity, hypersets, and the ecological perspective on perception-action. Biological Theory, 2(1), 23-36.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="dct:identifier"/>
+        <AnonymousIndividual nodeID="_:genid2147483648"/>
+        <IRI>https://doi.org/10.1162/biot.2007.2.1.23</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AnonymousIndividual nodeID="_:genid2147483648"/>
+        <Literal xml:lang="en">Chemero and Turvey, 2007</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="dct:bibliographicCitation"/>
+        <AnonymousIndividual nodeID="_:genid2147483649"/>
+        <Literal xml:lang="en">Norman, D. (2013). The design of everyday things: Revised and expanded edition. Basic books.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="dct:identifier"/>
+        <AnonymousIndividual nodeID="_:genid2147483649"/>
+        <IRI>https://mitpress.mit.edu/9780262640374/</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AnonymousIndividual nodeID="_:genid2147483649"/>
+        <Literal xml:lang="en">Norman, 2013</Literal>
+    </AnnotationAssertion>
+</Ontology>
+
+
+
+<!-- Generated by the OWL API (version 4.5.29.2024-05-13T12:11:03Z) https://github.com/owlcs/owlapi -->
+

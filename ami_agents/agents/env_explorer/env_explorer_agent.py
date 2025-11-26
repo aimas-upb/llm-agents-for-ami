@@ -63,7 +63,15 @@ class EnvExplorerAgent(Agent, IAgent):
         3. Connect HMAS client to environment
         4. Log agent ready
         """
-        pass
+        
+        ## Step1: TODO: Initialize signifier storage
+        
+        ## Step2: Register the initial discovery behavior
+        initial_discovery_behaviour = InitialDiscoveryBehaviour()
+        self.add_behaviour(initial_discovery_behaviour)
+
+        # run
+        
 
     async def start(self) -> None:
         """

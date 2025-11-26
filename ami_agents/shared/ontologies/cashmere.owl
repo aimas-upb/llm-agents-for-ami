@@ -1,0 +1,940 @@
+<?xml version="1.0"?>
+<Ontology xmlns="http://www.w3.org/2002/07/owl#"
+     xml:base="https://aimas.cs.pub.ro/ont/cashmere"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     ontologyIRI="https://aimas.cs.pub.ro/ont/cashmere"
+     versionIRI="https://aimas.cs.pub.ro/ont/cashmere/2.0.0">
+    <Prefix name="" IRI="https://aimas.cs.pub.ro/ont/cashmere#"/>
+    <Prefix name="v2" IRI="https://aimas.cs.pub.ro/ont/cashmere/2.0.0#"/>
+    <Prefix name="acl" IRI="http://www.w3.org/ns/auth/acl#"/>
+    <Prefix name="owl" IRI="http://www.w3.org/2002/07/owl#"/>
+    <Prefix name="rdf" IRI="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/>
+    <Prefix name="xml" IRI="http://www.w3.org/XML/1998/namespace"/>
+    <Prefix name="xsd" IRI="http://www.w3.org/2001/XMLSchema#"/>
+    <Prefix name="rdfs" IRI="http://www.w3.org/2000/01/rdf-schema#"/>
+    <Prefix name="2.0.0" IRI="https://aimas.cs.pub.ro/ont/cashmere/2.0.0#"/>
+    <Prefix name="shacl" IRI="http://www.w3.org/ns/shacl#"/>
+    <Declaration>
+        <Class IRI="http://pervasive.semanticweb.org/ont/2017/07/consert/core#ContextAssertion"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="rdfs:Class"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="rdfs:Resource"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://www.w3.org/2006/gen/ont#InformationResource"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://www.w3.org/2006/vcard/ns#Group"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="acl:Access"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="acl:Append"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="acl:AuthenticatedAgent"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="acl:Authorization"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="acl:Control"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="acl:Origin"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="acl:Read"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="acl:Write"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="shacl:NodeShape"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://xmlns.com/foaf/0.1/Agent"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#AgentAbility"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ContextAuthorizedResource"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ContextBasedAccessAuthorization"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ContextBasedAccessCondition"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ContextBasedAuthorization"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ContextBasedControlAuthorization"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ContextDomain"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ContextDomainCondition"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ContextDomainGroup"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ContextManagementService"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ContextStream"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#IntentContext"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#IntentionDescription"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#LLMReasoningAbility"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ProfiledContextCondition"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Signifier"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#StaticContextCondition"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="acl:accessTo"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="acl:accessToClass"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="acl:agent"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="acl:agentClass"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="acl:agentGroup"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="acl:delegates"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="acl:mode"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="acl:origin"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty abbreviatedIRI="acl:owner"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#definesGroup"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#groupFor"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasAccessAuthorization"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasAccessCondition"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasContextDimension"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasControlAuthorization"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasIntentionDescription"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasShaclCondition"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#managesDomain"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#managesStream"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#memberIn"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#recommendsAbility"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#recommendsContext"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#signifies"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#streams"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#contextGraphURI"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#hasStructuredDescription"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty IRI="http://purl.org/dc/elements/1.1/describes"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty IRI="http://purl.org/dc/elements/1.1/title"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty IRI="http://purl.org/dc/terms/title"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="acl:accessControl"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="acl:default"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="acl:defaultForNew"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="acl:label"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty IRI="http://xmlns.com/foaf/0.1/topic"/>
+    </Declaration>
+    <SubClassOf>
+        <Class abbreviatedIRI="acl:Append"/>
+        <Class abbreviatedIRI="acl:Access"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class abbreviatedIRI="acl:Append"/>
+        <Class abbreviatedIRI="acl:Write"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class abbreviatedIRI="acl:AuthenticatedAgent"/>
+        <Class IRI="http://xmlns.com/foaf/0.1/Agent"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class abbreviatedIRI="acl:Control"/>
+        <Class abbreviatedIRI="acl:Access"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class abbreviatedIRI="acl:Read"/>
+        <Class abbreviatedIRI="acl:Access"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class abbreviatedIRI="acl:Write"/>
+        <Class abbreviatedIRI="acl:Access"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ContextBasedAccessAuthorization"/>
+        <Class IRI="#ContextBasedAuthorization"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ContextBasedAccessCondition"/>
+        <Class abbreviatedIRI="shacl:NodeShape"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ContextBasedAuthorization"/>
+        <Class abbreviatedIRI="acl:Authorization"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ContextBasedControlAuthorization"/>
+        <Class IRI="#ContextBasedAuthorization"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ContextDomainCondition"/>
+        <Class abbreviatedIRI="shacl:NodeShape"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#LLMReasoningAbility"/>
+        <Class IRI="#AgentAbility"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ProfiledContextCondition"/>
+        <Class abbreviatedIRI="shacl:NodeShape"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#StaticContextCondition"/>
+        <Class abbreviatedIRI="shacl:NodeShape"/>
+    </SubClassOf>
+    <DisjointClasses>
+        <Class IRI="#ContextBasedAccessAuthorization"/>
+        <Class IRI="#ContextBasedControlAuthorization"/>
+    </DisjointClasses>
+    <DisjointClasses>
+        <Class IRI="#ContextDomain"/>
+        <Class IRI="#ContextStream"/>
+    </DisjointClasses>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasContextDimension"/>
+        <ObjectProperty abbreviatedIRI="owl:topObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#managesDomain"/>
+        <ObjectProperty abbreviatedIRI="owl:topObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#signifies"/>
+        <ObjectProperty abbreviatedIRI="owl:topObjectProperty"/>
+    </SubObjectPropertyOf>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#definesGroup"/>
+        <ObjectProperty IRI="#groupFor"/>
+    </InverseObjectProperties>
+    <ObjectPropertyDomain>
+        <ObjectProperty abbreviatedIRI="acl:accessTo"/>
+        <Class abbreviatedIRI="acl:Authorization"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty abbreviatedIRI="acl:accessToClass"/>
+        <Class abbreviatedIRI="acl:Authorization"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty abbreviatedIRI="acl:agent"/>
+        <Class abbreviatedIRI="acl:Authorization"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty abbreviatedIRI="acl:agentClass"/>
+        <Class abbreviatedIRI="acl:Authorization"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty abbreviatedIRI="acl:agentGroup"/>
+        <Class abbreviatedIRI="acl:Authorization"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty abbreviatedIRI="acl:mode"/>
+        <Class abbreviatedIRI="acl:Authorization"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty abbreviatedIRI="acl:origin"/>
+        <Class abbreviatedIRI="acl:Authorization"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#definesGroup"/>
+        <Class IRI="#ContextDomain"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#groupFor"/>
+        <Class IRI="#ContextDomainGroup"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasAccessAuthorization"/>
+        <Class IRI="#ContextAuthorizedResource"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasAccessCondition"/>
+        <Class IRI="#ContextBasedAuthorization"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasContextDimension"/>
+        <Class IRI="#ContextDomain"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasControlAuthorization"/>
+        <Class IRI="#ContextAuthorizedResource"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasIntentionDescription"/>
+        <Class IRI="#Signifier"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasShaclCondition"/>
+        <Class IRI="#IntentContext"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#managesDomain"/>
+        <Class IRI="#ContextManagementService"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#managesStream"/>
+        <Class IRI="#ContextManagementService"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#memberIn"/>
+        <Class IRI="http://xmlns.com/foaf/0.1/Agent"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#recommendsAbility"/>
+        <Class IRI="#Signifier"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#recommendsContext"/>
+        <Class IRI="#Signifier"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#signifies"/>
+        <Class IRI="#Signifier"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#streams"/>
+        <Class IRI="#ContextStream"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="acl:accessTo"/>
+        <Class IRI="http://www.w3.org/2006/gen/ont#InformationResource"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="acl:accessToClass"/>
+        <Class abbreviatedIRI="rdfs:Class"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="acl:agent"/>
+        <Class IRI="http://xmlns.com/foaf/0.1/Agent"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="acl:agentClass"/>
+        <Class abbreviatedIRI="rdfs:Class"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="acl:agentGroup"/>
+        <Class IRI="http://www.w3.org/2006/vcard/ns#Group"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="acl:delegates"/>
+        <Class IRI="http://xmlns.com/foaf/0.1/Agent"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="acl:mode"/>
+        <Class abbreviatedIRI="rdfs:Class"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="acl:origin"/>
+        <Class abbreviatedIRI="acl:Origin"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="acl:owner"/>
+        <Class IRI="http://xmlns.com/foaf/0.1/Agent"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="#definesGroup"/>
+        <Class IRI="#ContextDomainGroup"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="#groupFor"/>
+        <Class IRI="#ContextDomain"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="#hasAccessAuthorization"/>
+        <Class IRI="#ContextBasedAccessAuthorization"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="#hasAccessCondition"/>
+        <Class IRI="#ContextBasedAccessCondition"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="#hasContextDimension"/>
+        <Class IRI="http://pervasive.semanticweb.org/ont/2017/07/consert/core#ContextAssertion"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="#hasControlAuthorization"/>
+        <Class IRI="#ContextBasedControlAuthorization"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="#hasIntentionDescription"/>
+        <Class IRI="#IntentionDescription"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="#hasShaclCondition"/>
+        <Class abbreviatedIRI="shacl:NodeShape"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="#managesDomain"/>
+        <Class IRI="#ContextDomain"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="#managesStream"/>
+        <Class IRI="#ContextStream"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="#memberIn"/>
+        <Class IRI="#ContextDomainGroup"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="#recommendsAbility"/>
+        <Class IRI="#AgentAbility"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="#recommendsContext"/>
+        <Class IRI="#IntentContext"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="#signifies"/>
+        <Class abbreviatedIRI="rdfs:Resource"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="#streams"/>
+        <Class IRI="http://pervasive.semanticweb.org/ont/2017/07/consert/core#ContextAssertion"/>
+    </ObjectPropertyRange>
+    <DataPropertyDomain>
+        <DataProperty IRI="#contextGraphURI"/>
+        <Class IRI="#ProfiledContextCondition"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#hasStructuredDescription"/>
+        <ObjectUnionOf>
+            <Class IRI="#IntentContext"/>
+            <Class IRI="#IntentionDescription"/>
+        </ObjectUnionOf>
+    </DataPropertyDomain>
+    <DataPropertyRange>
+        <DataProperty IRI="#contextGraphURI"/>
+        <Datatype abbreviatedIRI="xsd:anyURI"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#hasStructuredDescription"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <AnnotationAssertion>
+        <AnnotationProperty IRI="http://purl.org/dc/elements/1.1/title"/>
+        <IRI>http://www.w3.org/ns/auth/acl</IRI>
+        <Literal>Basic Access Control ontology</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://www.w3.org/ns/auth/acl</IRI>
+        <Literal>Defines the class Authorization and its essential properties,
+    and also some classes of access such as read and write. </Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:Access</AbbreviatedIRI>
+        <Literal>Any kind of access to a resource. Don&apos;t use this, use R W and RW</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:Access</AbbreviatedIRI>
+        <Literal xml:lang="en">access</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="acl:label"/>
+        <AbbreviatedIRI>acl:Access</AbbreviatedIRI>
+        <Literal xml:lang="en">access</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:Append</AbbreviatedIRI>
+        <Literal>Append accesses are specific write access which only add information, and do not remove information.
+    For text files, for example, append access allows bytes to be added onto the end of the file.
+    For RDF graphs, Append access allows adds triples to the graph but does not remove any.
+    Append access is useful for dropbox functionality.
+    Dropbox can be used for link notification, which the information added is a notification
+    that a some link has been made elsewhere relevant to the given resource.
+    </Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:Append</AbbreviatedIRI>
+        <Literal xml:lang="en">append</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:AuthenticatedAgent</AbbreviatedIRI>
+        <Literal>A class of agents who have been authenticated.
+In other words, anyone can access this resource, but not anonymously.
+The social expectation is that the authentication process will provide an
+identify and a name, or pseudonym.
+(A new ID should not be minted for every access: the intent is that the user
+is able to continue to use the ID for continues interactions with peers,
+and for example to develop a reputation)
+</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:AuthenticatedAgent</AbbreviatedIRI>
+        <Literal>Anyone authenticated</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:Authorization</AbbreviatedIRI>
+        <Literal>An element of access control,
+    allowing agent to agents access of some kind to resources or classes of resources</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:Authorization</AbbreviatedIRI>
+        <Literal>authorization</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:Control</AbbreviatedIRI>
+        <Literal>Allows read/write access to the ACL for the resource(s)</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:Control</AbbreviatedIRI>
+        <Literal xml:lang="en">control</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:Origin</AbbreviatedIRI>
+        <Literal>An Origin is basically a web site
+        (Note WITHOUT the trailing slash after the domain name and port in its URI)
+        and is the basis for controlling access to data by web apps
+        in the Same Origin Model of web security.
+        All scripts from the same origin are given the same right.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:Origin</AbbreviatedIRI>
+        <Literal>Origin</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>acl:Origin</AbbreviatedIRI>
+        <IRI>https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Origin</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:Read</AbbreviatedIRI>
+        <Literal>The class of read operations</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:Read</AbbreviatedIRI>
+        <Literal xml:lang="en">read</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:Write</AbbreviatedIRI>
+        <Literal xml:lang="en">write</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:accessControl</AbbreviatedIRI>
+        <Literal>The Access Control file for this information resource.
+        This may of course be a virtual resource implemented by the access control system.
+        Note also HTTP&apos;s header  Link:  foo.meta ;rel=meta can be used for this.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:accessControl</AbbreviatedIRI>
+        <Literal>The Access Control file for this information resource.
+        This may of course be a virtual resource implemented by the access control system.
+        Note that HTTP header `Link: &lt;foo.acl&gt;; rel=&quot;acl&quot;` can also be used for this.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:accessControl</AbbreviatedIRI>
+        <Literal>access control</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>acl:accessControl</AbbreviatedIRI>
+        <IRI>https://solidproject.org/TR/wac#acl-link-relation</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:accessTo</AbbreviatedIRI>
+        <Literal>The information resource to which access is being granted.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:accessTo</AbbreviatedIRI>
+        <Literal>to</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:accessToClass</AbbreviatedIRI>
+        <Literal>A class of information resources to which access is being granted.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:accessToClass</AbbreviatedIRI>
+        <Literal>to all in</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:agent</AbbreviatedIRI>
+        <Literal>A person or social entity to being given the right</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:agent</AbbreviatedIRI>
+        <Literal>agent</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:agentClass</AbbreviatedIRI>
+        <Literal>A class of persons or social entities to being given the right</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:agentClass</AbbreviatedIRI>
+        <Literal>agent class</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:agentGroup</AbbreviatedIRI>
+        <Literal>A group of persons or social entities to being given the right.
+          The right is given to any entity which is a vcard:member of the group,
+          as defined by the document received when the Group is dereferenced.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:agentGroup</AbbreviatedIRI>
+        <Literal>agent group</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:default</AbbreviatedIRI>
+        <Literal>If a resource has no ACL file (it is 404),
+        then access to the resource if given by the ACL of the immediately
+        containing directory, or failing that (404) the ACL of the recursively next
+        containing directory which has an ACL file.
+        Within that ACL file,
+        any Authentication which has that directory as its acl:default applies to the
+        resource. (The highest directory must have an ACL file.)
+</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:default</AbbreviatedIRI>
+        <Literal>If a resource has no ACL file (it is 404),
+        then access to the resource is given by the ACL of the immediately
+        containing directory, or failing that (404) the ACL of the recursively next
+        containing directory which has an ACL file.
+        Within that ACL file,
+        any Authorization which has that directory as its acl:default applies to the
+        resource. (The highest directory must have an ACL file.)
+</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:default</AbbreviatedIRI>
+        <Literal>default access for things in this</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:defaultForNew</AbbreviatedIRI>
+        <Literal>THIS IS OBSOLETE AS OF 2017-08-01.   See &apos;default&apos;.
+        Was: A directory for which this authorization is used for new files in the directory.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:defaultForNew</AbbreviatedIRI>
+        <Literal>default access for new things in the object</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:delegates</AbbreviatedIRI>
+        <Literal>Delegates a person or another agent to act on behalf of the agent.
+    For example, Alice delegates Bob to act on behalf of Alice for ACL purposes.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:delegates</AbbreviatedIRI>
+        <Literal xml:lang="en">delegates</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:mode</AbbreviatedIRI>
+        <Literal>A mode of access such as read or write.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:mode</AbbreviatedIRI>
+        <Literal>access mode</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:origin</AbbreviatedIRI>
+        <Literal>A web application, identified by its Origin, such as
+        &lt;https://scripts.example.com&gt;, being given the right.
+        When a user of the web application at a certain origin accesses the server,
+        then the browser sets the Origin: header to warn that a possibly untrusted webapp
+        is being used.
+        Then, BOTH the user AND the origin must have the required access.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:origin</AbbreviatedIRI>
+        <Literal>origin</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+        <AbbreviatedIRI>acl:origin</AbbreviatedIRI>
+        <IRI>https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Origin</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:owner</AbbreviatedIRI>
+        <Literal>The person or other agent which owns this.
+    For example, the owner of a file in a filesystem.
+    There is a sense of &quot;right to control&quot;.   Typically defaults to the agent who created
+    something, but can be changed.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <AbbreviatedIRI>acl:owner</AbbreviatedIRI>
+        <Literal>The person or other agent which owns this.
+    For example, the owner of a file in a filesystem.
+    There is a sense of right to control.   Typically defaults to the agent who craeted
+    something but can be changed.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <AbbreviatedIRI>acl:owner</AbbreviatedIRI>
+        <Literal xml:lang="en">owner</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#AgentAbility</IRI>
+        <Literal>An agent ability that can be recommended by an affordance signifier</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#ContextAuthorizedResource</IRI>
+        <Literal>A Resource in a HyperAgents Environment for which Context-Based Access is enabled.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#ContextBasedAccessCondition</IRI>
+        <Literal>The top-level SHACL NodeShape which specifies the conditions for accessing a resource in a HyperAgents Environment.
+
+The NodeShape will be a disjunction of conjunctions of NodeShapes, identifying ContextDomain (dynamic), Profiled- or Static- context information available in the HyperAgents Environment, that condition the access.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#ContextBasedAuthorization</IRI>
+        <Literal xml:lang="en">The Shared Context Authorization base concept identifying the resource for which authorization is given, the type of authorization and the individual / class of individuals to which authorization is given.
+Can be further subclassed into access and control (right to alter authorizations) authorizations.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#ContextDomainCondition</IRI>
+        <Literal>The SHACL NodeShape that specifies membership in a ContextDomain as a condition for accessing a resource in a Hyperagents Environment.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#ContextDomainGroup</IRI>
+        <Literal>A group denoting the dyanmic &quot;membership&quot; in a ContextDomain, that is resources and agents who are determined to satisfy the RSP (RDF Stream Processing) query describing the membership.
+
+The RSP query will involve processing a Stream of dynamic ContextAssertions which define a ContextDimension of a given application (e.g. location), while the ContextDomains are given by the possible role fillers (objects) of the ContextDimension.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#IntentContext</IRI>
+        <Literal>The IntentContext is part of the structure of a Signifier and refers to the recommended context for the successful use of a signified affordance.
+The IntentContext is given as a list of conditions expressed either as SHACL NodeShape conditions applied to artifact nodes, where the matched-for properties are Literals and the tested conditions include numerical equalities or inequalities, string and substring matches or datetime operations.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#IntentContext</IRI>
+        <Literal>Intent Context</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#IntentionDescription</IRI>
+        <Literal>The structured language (usually under a JSON form) description of the intention (goal) for which an affordance in exploited, as signalled in a Signifier.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#LLMReasoningAbility</IRI>
+        <Literal>The ability of an agent to perform LLM-based reasoning.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#ProfiledContextCondition</IRI>
+        <Literal>The SHACL NodeShape that specifies profiled context information as a condition for accessing a resource in a Hyperagents Environment.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#Signifier</IRI>
+        <Literal>A Signifier is a modeling element that binds together a Hypermedia MAS resource affordance with the intent of an agent, and the recommended abilities of the agent and the context of the affordance use / invocation.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#StaticContextCondition</IRI>
+        <Literal>The SHACL NodeShape that specifies profiled context information as a condition for accessing a resource in a Hyperagents Environment.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#contextGraphURI</IRI>
+        <Literal>A property of a Static- or Profiled- ContextCondition SHACL NodeShape identifying the RDF Named Graphs managed in the HyperAgents Environment against which the SHACL shape has to be validated.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#hasAccessCondition</IRI>
+        <Literal>Property linking a ContextBasedAuthorization to the ContextBasedAccessCondition (a SHACL NodeShape) that defines the context-based conditions that need to be matched in order to access the resource protected by the ContextBasedAuthorization.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#hasStructuredDescription</IRI>
+        <Literal>The property indicating the structured natural language description of a recommended context or the agent intention.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#memberIn</IRI>
+        <Literal>Property specifying the membership of an agent identified by a WebID in a ContextDomainGroup.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty IRI="http://purl.org/dc/elements/1.1/describes"/>
+        <IRI>https://github.com/solid/web-access-control-spec</IRI>
+        <IRI>http://www.w3.org/ns/auth/acl</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty IRI="http://xmlns.com/foaf/0.1/topic"/>
+        <IRI>https://solidproject.org/TR/wac</IRI>
+        <IRI>urn:default:baseUri:</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty IRI="http://purl.org/dc/elements/1.1/describes"/>
+        <IRI>https://www.w3.org/wiki/WebAccessControl</IRI>
+        <IRI>http://www.w3.org/ns/auth/acl</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty IRI="http://xmlns.com/foaf/0.1/topic"/>
+        <IRI>https://www.w3.org/wiki/WebAccessControl</IRI>
+        <IRI>urn:default:baseUri:</IRI>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty IRI="http://purl.org/dc/terms/title"/>
+        <IRI>urn:default:baseUri:</IRI>
+        <Literal>Basic Access Control ontology</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>urn:default:baseUri:</IRI>
+        <Literal>Defines the class Authorization and its essential properties,
+    and also some classes of access such as read and write. </Literal>
+    </AnnotationAssertion>
+    <SubAnnotationPropertyOf>
+        <AnnotationProperty abbreviatedIRI="acl:accessControl"/>
+        <AnnotationProperty abbreviatedIRI="rdfs:seeAlso"/>
+    </SubAnnotationPropertyOf>
+    <AnnotationPropertyRange>
+        <AnnotationProperty abbreviatedIRI="acl:accessControl"/>
+        <IRI>http://www.w3.org/2006/gen/ont#InformationResource</IRI>
+    </AnnotationPropertyRange>
+    <AnnotationPropertyDomain>
+        <AnnotationProperty abbreviatedIRI="acl:accessControl"/>
+        <IRI>http://www.w3.org/2006/gen/ont#InformationResource</IRI>
+    </AnnotationPropertyDomain>
+    <AnnotationPropertyDomain>
+        <AnnotationProperty abbreviatedIRI="acl:default"/>
+        <AbbreviatedIRI>acl:Authorization</AbbreviatedIRI>
+    </AnnotationPropertyDomain>
+    <AnnotationPropertyDomain>
+        <AnnotationProperty abbreviatedIRI="acl:defaultForNew"/>
+        <AbbreviatedIRI>acl:Authorization</AbbreviatedIRI>
+    </AnnotationPropertyDomain>
+</Ontology>
+
+
+
+<!-- Generated by the OWL API (version 4.5.29.2024-05-13T12:11:03Z) https://github.com/owlcs/owlapi -->
+

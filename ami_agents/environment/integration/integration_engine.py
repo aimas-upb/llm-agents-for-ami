@@ -7,8 +7,15 @@ deployments into ThingDescription-based HMAS environments.
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
+import logging
+
+from rdflib import Graph, URIRef, Namespace
+from rdflib.namespace import RDF
 
 from ...shared.models.environment import Workspace, Artifact, WorkspaceType
+from ...shared.ontologies import get_hmas_ontology
+
+logger = logging.getLogger(__name__)
 
 
 class IIntegrationEngine(ABC):
@@ -226,20 +233,87 @@ class YggdrasilIntegration(IIntegrationEngine):
         Initialize Yggdrasil integration.
 
         Args:
-            yggdrasil_url: Yggdrasil environment URL.
+            yggdrasil_url: Yggdrasil environment URL. This will be the URL to an hmas:HypermediaMASPlatform instance.
         """
         self.yggdrasil_url = yggdrasil_url
+        self.platform_uri: Optional[URIRef] = None
+        self.graph: Optional[Graph] = None
 
     async def initialize(self, config: Dict[str, Any]) -> bool:
         """
         Initialize Yggdrasil integration.
 
-        TODO: Implementation steps:
-        1. Connect to Yggdrasil instance
-        2. Verify it's a valid A&A HMAS environment
-        3. Return initialization status
+        Dereferences the Yggdrasil URL to obtain an RDF graph and validates
+        that it represents a valid HMAS platform using the HMAS ontology vocabulary.
+
+        Args:
+            config: Configuration dictionary (unused for Yggdrasil).
+
+        Returns:
+            True if a valid HMAS platform is found, False otherwise.
         """
-        pass
+        try:
+            logger.info(f"Dereferencing Yggdrasil URL: {self.yggdrasil_url}")
+
+            # Load the HMAS ontology to get vocabulary terms
+            hmas_onto = get_hmas_ontology()
+            if hmas_onto is None:
+                logger.error("Failed to load HMAS ontology")
+                return False
+
+            logger.debug(f"HMAS ontology loaded: {hmas_onto.base_iri}")
+
+            # Get the hmas namespace in owlready2
+            hmas_ns = hmas_onto.get_namespace("https://purl.org/hmas/")
+
+            # Extract vocabulary IRIs from the ontology
+            HypermediaMASPlatform_iri = URIRef(hmas_ns.HypermediaMASPlatform.iri)
+            ResourceProfile_iri = URIRef(hmas_ns.ResourceProfile.iri)
+            isProfileOf_iri = URIRef(hmas_ns.isProfileOf.iri)
+
+            logger.debug(f"HMAS vocabulary: Platform={HypermediaMASPlatform_iri}, "
+                        f"Profile={ResourceProfile_iri}, isProfileOf={isProfileOf_iri}")
+
+            # Create an RDF graph and parse the Yggdrasil URL
+            self.graph = Graph()
+            self.graph.parse(self.yggdrasil_url)
+
+            logger.debug(f"Successfully parsed RDF graph with {len(self.graph)} triples")
+
+            # Case A: The URL itself is the subject identifying the HypermediaMASPlatform
+            url_ref = URIRef(self.yggdrasil_url)
+            if (url_ref, RDF.type, HypermediaMASPlatform_iri) in self.graph:
+                logger.info(f"Found HypermediaMASPlatform directly at URL: {self.yggdrasil_url}")
+                self.platform_uri = url_ref
+                return True
+
+            # Case B: The URL is a ResourceProfile with an isProfileOf property
+            if (url_ref, RDF.type, ResourceProfile_iri) in self.graph:
+                logger.info(f"URL is a ResourceProfile, searching for isProfileOf property")
+
+                # Find the platform URI via isProfileOf
+                for _, _, platform in self.graph.triples((url_ref, isProfileOf_iri, None)):
+                    # Verify that the target is indeed a HypermediaMASPlatform
+                    if (platform, RDF.type, HypermediaMASPlatform_iri) in self.graph:
+                        logger.info(f"Found HypermediaMASPlatform via ResourceProfile: {platform}")
+                        self.platform_uri = platform
+                        return True
+                    else:
+                        logger.warning(f"isProfileOf target {platform} is not a HypermediaMASPlatform")
+
+                logger.error("ResourceProfile found but no valid HypermediaMASPlatform linked via isProfileOf")
+                return False
+
+            # Neither case matched
+            logger.error(
+                f"URL {self.yggdrasil_url} is neither a HypermediaMASPlatform "
+                f"nor a ResourceProfile with isProfileOf property"
+            )
+            return False
+
+        except Exception as e:
+            logger.error(f"Failed to dereference or validate Yggdrasil URL: {e}", exc_info=True)
+            return False
 
     async def create_hmas_environment(self) -> Dict[str, Any]:
         """

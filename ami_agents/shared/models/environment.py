@@ -100,12 +100,14 @@ class Affordance:
     # Parent artifact
     artifact_id: str
 
+    # Endpoint information
+    uri: str
+
     # Schema information
     input_schema: Optional[Dict[str, Any]] = None
     output_schema: Optional[Dict[str, Any]] = None
 
-    # Endpoint information
-    uri: str
+    # Metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
