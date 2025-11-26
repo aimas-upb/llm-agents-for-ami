@@ -33,13 +33,17 @@ zeroconf>=0.148.0
 python-dateutil>=2.9.0.post0
 pydantic>=2.12.0
 
+# RDF and Semantic Web
+rdflib>=7.0.0
+owlready2>=0.46
+
 # Logging and Monitoring
 structlog>=25.5.0
 
 # Testing (optional)
-# pytest>=9.0.0
-# pytest-asyncio>=1.3.0
-# pytest-cov>=7.0.0
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
 
 # # Development (optional)
 # black>=24.10.0
