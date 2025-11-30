@@ -119,6 +119,7 @@ def _sanitize_unit(unit: Optional[str]) -> Optional[str]:
     # generic: keep letters/numbers only
     return "".join(ch for ch in unit if ch.isalnum()).lower() or None
 
+
 def _camel_token(token: str) -> str:
     token = "".join(ch if ch.isalnum() else " " for ch in token)
     return "".join(part.capitalize() for part in token.split())
@@ -139,17 +140,192 @@ def _sensor_action_name(device_class: Optional[str], unit: Optional[str]) -> Opt
         return f"get{dc_cc}In{unit_cc}"
     return f"getIn{unit_cc}"
 
-async def _resolve_device_and_entities(workspace_id: str, artifact_name: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+
+def _entity_display_name(entity: Optional[Dict[str, Any]], devices_by_id: Dict[str, Dict[str, Any]]) -> str:
+    if not entity:
+        return ""
+    for key in ("name", "original_name"):
+        val = entity.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    object_id = ""
+    ent_id = entity.get("entity_id", "")
+    if isinstance(ent_id, str) and "." in ent_id:
+        object_id = ent_id.split(".", 1)[1]
+    device = devices_by_id.get(entity.get("device_id"))
+    device_name = (device or {}).get("name") if isinstance(device, dict) else None
+    if device_name and object_id:
+        return f"{device_name}.{object_id}"
+    if device_name:
+        return device_name
+    return object_id or ent_id or "artifact"
+
+
+def _sensor_action_names(device_class: Optional[str], unit: Optional[str]) -> List[str]:
+    """Return canonical + fallback action names for numeric sensors."""
+    names: List[str] = []
+    for candidate in (
+        _sensor_action_name(device_class, unit),
+        _sensor_action_name(None, unit),
+    ):
+        if candidate and candidate not in names:
+            names.append(candidate)
+    return names
+
+
+def _binary_sensor_action_names(device_class: Optional[str]) -> List[str]:
+    """Return action names for binary sensors."""
+    names: List[str] = []
+    dc = (device_class or "").strip()
+    if dc:
+        names.append(f"get{_camel_token(dc)}State")
+    names.append("getBinarySensorState")
+    return names
+
+
+def _canonical_label(label: str) -> str:
+    return "".join(ch for ch in label.lower() if ch.isalnum())
+
+
+def _normalize_workspace_id(area_id: Optional[str]) -> Optional[str]:
+    if not area_id:
+        return None
+    if not AREAS:
+        return area_id
+    for ws in AREAS:
+        if area_id == ws or area_id.startswith(ws + "_"):
+            return ws
+    return area_id
+
+
+def _area_matches(workspace_id: str, candidate: Optional[str]) -> bool:
+    if not candidate:
+        return False
+    if candidate == workspace_id:
+        return True
+    if candidate.startswith(workspace_id + "_"):
+        return True
+    norm = _normalize_workspace_id(candidate)
+    return bool(norm and norm == workspace_id)
+
+
+def _workspace_allowed(area_id: Optional[str]) -> bool:
+    if not AREAS:
+        return True
+    normalized = _normalize_workspace_id(area_id)
+    return bool(normalized and normalized in AREAS)
+
+
+def _entity_matches_workspace(entity_id: Optional[str], workspace_id: str) -> bool:
+    if not entity_id or "." not in entity_id:
+        return False
+    object_id = entity_id.split(".", 1)[1]
+    return object_id.startswith(workspace_id + "_") or object_id.startswith(workspace_id)
+
+
+def _format_climate_state(state: Dict[str, Any]) -> Dict[str, Any]:
+    attrs = state.get("attributes", {}) if isinstance(state, dict) else {}
+    return {
+        "state": state.get("state"),
+        "currentTemperature": attrs.get("current_temperature"),
+        "targetTemperature": attrs.get("temperature"),
+        "targetTemperatureLow": attrs.get("target_temp_low"),
+        "targetTemperatureHigh": attrs.get("target_temp_high"),
+        "hvacAction": attrs.get("hvac_action"),
+        "hvacModes": attrs.get("hvac_modes"),
+        "presetMode": attrs.get("preset_mode"),
+        "availablePresetModes": attrs.get("preset_modes"),
+        "minTemperature": attrs.get("min_temp"),
+        "maxTemperature": attrs.get("max_temp"),
+        "targetTemperatureStep": attrs.get("target_temp_step"),
+    }
+
+
+async def _resolve_device_and_entities(workspace_id: str, artifact_name: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]], Optional[Dict[str, Any]], str]:
     decoded_name = urllib.parse.unquote(artifact_name)
-    devices = await ha_client.get_devices(workspace_id)
+    decoded_canon = _canonical_label(decoded_name)
+    devices, entities = await _get_workspace_devices_and_entities(workspace_id)
+    dev_by_id = {d["id"]: d for d in devices}
+    # Try matching named entities first
+    for entity in entities:
+        label = entity.get("_artifact_label") or _entity_display_name(entity, dev_by_id)
+        object_id = entity.get("entity_id", "").split(".", 1)[-1]
+        candidates = {
+            label,
+            entity.get("_artifact_base_label", ""),
+            entity.get("_artifact_slug", ""),
+            _entity_display_name(entity, dev_by_id),
+            entity.get("entity_id", ""),
+            object_id,
+        }
+        matched = decoded_name in {c for c in candidates if c} or any(
+            _canonical_label(c) == decoded_canon for c in candidates if c
+        )
+        if matched:
+            device = dev_by_id.get(entity.get("device_id"))
+            device_entities = [entity]
+            return device or {}, device_entities, entity, label
     device = next((d for d in devices if d.get("name") == decoded_name), None)
     if not device:
+        device = next((d for d in devices if _canonical_label(d.get("name", "")) == decoded_canon), None)
+    if not device:
         raise HTTPException(status_code=404, detail="Artifact not found")
-    entities = await ha_client.get_entities()
     device_entities = [e for e in entities if e.get("device_id") == device["id"]]
     if not device_entities:
         raise HTTPException(status_code=404, detail="No entities for artifact")
-    return device, device_entities
+    return device, device_entities, None, decoded_name
+
+
+async def _get_workspace_devices_and_entities(workspace_id: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    devices = await ha_client.get_devices()
+    entities = await ha_client.get_entities()
+    workspace_device_ids = {d["id"] for d in devices if _area_matches(workspace_id, d.get("area_id"))}
+    workspace_entities: List[Dict[str, Any]] = []
+    external_entities: List[Dict[str, Any]] = []
+    for ent in entities:
+        dev_id = ent.get("device_id")
+        ent_area = ent.get("area_id")
+        ent_match = _area_matches(workspace_id, ent_area) or _entity_matches_workspace(ent.get("entity_id"), workspace_id)
+        if ent_match or (dev_id in workspace_device_ids):
+            workspace_entities.append(ent)
+            if dev_id:
+                workspace_device_ids.add(dev_id)
+        elif _area_matches(workspace_id, next((d.get("area_id") for d in devices if d.get("id") == dev_id), None)):
+            external_entities.append(ent)
+    filtered_devices = [d for d in devices if d["id"] in workspace_device_ids]
+    dev_by_id = {d["id"]: d for d in filtered_devices}
+    label_counts: Dict[str, int] = {}
+    def _register_label(ent: Dict[str, Any]) -> None:
+        label = _entity_display_name(ent, dev_by_id)
+        ent["_artifact_base_label"] = label
+        label_counts[label] = label_counts.get(label, 0) + 1
+    filtered_entities: List[Dict[str, Any]] = []
+    for ent in workspace_entities:
+        if AREAS:
+            ent_area = ent.get("area_id") or (dev_by_id.get(ent.get("device_id"), {}) or {}).get("area_id")
+            if not _workspace_allowed(ent_area):
+                continue
+        filtered_entities.append(ent)
+        _register_label(ent)
+    workspace_entities = filtered_entities
+    for ent in external_entities:
+        if ent.get("device_id") in workspace_device_ids:
+            if AREAS:
+                ent_area = ent.get("area_id") or (dev_by_id.get(ent.get("device_id"), {}) or {}).get("area_id")
+                if not _workspace_allowed(ent_area):
+                    continue
+            workspace_entities.append(ent)
+            _register_label(ent)
+    for ent in workspace_entities:
+        base_label = ent.get("_artifact_base_label", "artifact")
+        label = base_label
+        if label_counts.get(base_label, 0) > 1:
+            suffix = ent.get("entity_id", "")
+            object_id = suffix.split(".", 1)[1] if isinstance(suffix, str) and "." in suffix else suffix
+            label = f"{base_label} ({object_id})"
+        ent["_artifact_label"] = label
+        ent["_artifact_slug"] = urllib.parse.quote(label, safe="")
+    return filtered_devices, workspace_entities
 
 def _pick_entity(device_entities: List[Dict[str, Any]], domain: str) -> Optional[str]:
     for e in device_entities:
@@ -197,7 +373,7 @@ async def _ws_handshake(url: str, token: str):
         raise RuntimeError("Auth failed")
     return ws
 
-async def _build_entity_area_map() -> Tuple[Dict[str, str], Dict[str, str], Dict[str, Dict[str, Any]]]:
+async def _build_entity_area_map() -> Tuple[Dict[str, str], Dict[str, str], Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]:
     ws = await _ws_handshake(HA_URL, HA_TOKEN)
     try:
         await ws.send(json.dumps({"id": 1, "type": "config/device_registry/list"}))
@@ -217,11 +393,17 @@ async def _build_entity_area_map() -> Tuple[Dict[str, str], Dict[str, str], Dict
             area_id = e.get("area_id")
             if not area_id and e.get("device_id"):
                 area_id = dev_by_id.get(e["device_id"], {}).get("area_id")
-            if area_id:
+            workspace_id = _normalize_workspace_id(area_id)
+            if AREAS:
+                if workspace_id not in AREAS:
+                    continue
+                ent_to_area[e["entity_id"]] = workspace_id
+            elif area_id:
                 ent_to_area[e["entity_id"]] = area_id
             if e.get("device_id"):
                 ent_to_device[e["entity_id"]] = e["device_id"]
-        return ent_to_area, ent_to_device, dev_by_id
+        ent_by_id = {e["entity_id"]: e for e in entities}
+        return ent_to_area, ent_to_device, dev_by_id, ent_by_id
     finally:
         await ws.close()
 
@@ -229,7 +411,7 @@ async def _event_forwarder_task():
     if not MONITOR_URL:
         print("Forwarder disabled: MONITOR_URL is not set")
         return  # forwarding disabled
-    ent_to_area, ent_to_device, dev_by_id = await _build_entity_area_map()
+    ent_to_area, ent_to_device, dev_by_id, ent_by_id = await _build_entity_area_map()
     print("Starting event forwarder task; areas=", (sorted(AREAS) if AREAS else "ALL"))
     async with httpx.AsyncClient(timeout=10) as http:
         while True:
@@ -257,14 +439,9 @@ async def _event_forwarder_task():
                     if not area_id or (AREAS and area_id not in AREAS):
                         continue
                     # Determine artifact name from device name; fallback to object_id
-                    device_name = None
-                    dev_id = ent_to_device.get(entity_id)
-                    if dev_id:
-                        device_name = (dev_by_id.get(dev_id, {}) or {}).get("name")
-                    if not device_name:
-                        object_id = entity_id.split(".", 1)[-1]
-                        device_name = object_id
-                    artifact_name = urllib.parse.quote(device_name, safe="")
+                    entity_meta = ent_by_id.get(entity_id)
+                    artifact_label = _entity_display_name(entity_meta, dev_by_id)
+                    artifact_name = urllib.parse.quote(artifact_label, safe="")
                     prop = attrs.get("device_class") or "state"
                     value, xtype = _infer_value_and_type(state)
                     artifact_profile = f"{BASE_WS_URI.rstrip('/')}/workspaces/{area_id}/artifacts/{artifact_name}"
@@ -338,7 +515,7 @@ async def _register_known_artifacts_to_monitor():
     if not MONITOR_URL or not AREAS:
         return
     try:
-        ent_to_area, ent_to_device, dev_by_id = await _build_entity_area_map()
+        ent_to_area, ent_to_device, dev_by_id, ent_by_id = await _build_entity_area_map()
         states = await ha_rest.get_states()
         async with httpx.AsyncClient(timeout=10.0) as client:
             for st in states:
@@ -350,15 +527,9 @@ async def _register_known_artifacts_to_monitor():
                 if state in (None, "unknown", "unavailable"):
                     continue
                 attrs = st.get("attributes", {}) or {}
-                # Resolve artifact name from device, fallback to object_id
-                device_name = None
-                dev_id = ent_to_device.get(entity_id)
-                if dev_id:
-                    device_name = (dev_by_id.get(dev_id, {}) or {}).get("name")
-                if not device_name:
-                    object_id = entity_id.split(".", 1)[-1]
-                    device_name = object_id
-                artifact_name = urllib.parse.quote(device_name, safe="")
+                entity_meta = ent_by_id.get(entity_id)
+                artifact_label = _entity_display_name(entity_meta, dev_by_id)
+                artifact_name = urllib.parse.quote(artifact_label, safe="")
                 prop = attrs.get("device_class") or "state"
                 value, xtype = _infer_value_and_type(state)
                 artifact_profile = f"{BASE_WS_URI.rstrip('/')}/workspaces/{area_id}/artifacts/{artifact_name}"
@@ -426,7 +597,7 @@ async def workspace(workspace_id: str, request: Request):
         area = next((a for a in areas if a["area_id"] == workspace_id), None)
         if area is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
-        devices = await ha_client.get_devices(workspace_id)
+        devices, _ = await _get_workspace_devices_and_entities(workspace_id)
         rdf = HomeAssistantRDF(str(request.base_url))
         rdf.workspace_to_rdf(area, devices)
         return Response(rdf.serialize(), media_type="text/turtle")
@@ -443,18 +614,18 @@ async def list_artifacts(workspace_id: str, request: Request):
         area = next((a for a in areas if a["area_id"] == workspace_id), None)
         if area is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
-        devices = await ha_client.get_devices(workspace_id)
+        devices, entities = await _get_workspace_devices_and_entities(workspace_id)
         rdf = HomeAssistantRDF(str(request.base_url))
         aid = area["area_id"]
         ws = URIRef(f"{rdf.base}workspaces/{aid}#workspace")
         art_dir = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/")
-        for d in devices:
-            name = d.get("name", d["id"])  # device label
-            safe_name = urllib.parse.quote(name, safe="")
+        for ent in entities:
+            label = ent.get("_artifact_label") or _entity_display_name(ent, {d["id"]: d for d in devices})
+            safe_name = ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
             art = URIRef(f"{art_dir}{safe_name}#artifact")
             rdf.g.add((art, RDF.type, HMAS.Artifact))
             rdf.g.add((ws, HMAS.contains, art))
-            rdf.g.add((art, TD.title, Literal(name)))
+            rdf.g.add((art, TD.title, Literal(label)))
         return Response(rdf.serialize(), media_type="text/turtle")
     except HTTPException:
         raise
@@ -466,7 +637,7 @@ async def list_artifacts(workspace_id: str, request: Request):
 async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
     """Return RDF TD (Accept: text/turtle) or JSON snapshot (application/json) for an artifact."""
     try:
-        device, device_entities = await _resolve_device_and_entities(workspace_id, artifact_name)
+        device, device_entities, primary_entity, artifact_label = await _resolve_device_and_entities(workspace_id, artifact_name)
         states = await ha_rest.get_states()
         state_map = {s["entity_id"]: s for s in states}
 
@@ -476,13 +647,13 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
         aid = workspace_id
         ws = URIRef(f"{rdf.base}workspaces/{aid}#workspace")
         art_dir = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/")
-        safe_name = urllib.parse.quote(device.get("name"), safe="")
+        safe_name = urllib.parse.quote(artifact_label, safe="")
         art = URIRef(f"{art_dir}{safe_name}#artifact")
 
         # Build RDF
         rdf.g.add((art, RDF.type, TD.Thing))
         rdf.g.add((art, RDF.type, HMAS.Artifact))
-        rdf.g.add((art, TD.title, Literal(device.get("name"))))
+        rdf.g.add((art, TD.title, Literal(artifact_label)))
         domains = {e["entity_id"].split(".")[0] for e in device_entities}
         if "light" in domains:
             rdf.g.add((art, RDF.type, EX.HueLamp))
@@ -525,18 +696,50 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                 )
 
         # Sensor-specific value action
-        if any(d in domains for d in ("sensor",)):
+        if "sensor" in domains:
             sensor_ent = _pick_entity(device_entities, "sensor")
             st = state_map.get(sensor_ent, {}) if sensor_ent else {}
             attrs = st.get("attributes", {}) if isinstance(st, dict) else {}
-            action_name = _sensor_action_name(attrs.get("device_class"), attrs.get("unit_of_measurement"))
-            if action_name:
+            action_names = _sensor_action_names(
+                attrs.get("device_class"),
+                attrs.get("unit_of_measurement"),
+            )
+            if action_names:
+                action_name = action_names[0]
                 rdf._add_action(
                     art,
                     action_name,
                     EX.StatusCommand,
                     "POST",
                     URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/{urllib.parse.quote(action_name, safe='')}"),
+                    "application/json",
+                )
+
+        if "binary_sensor" in domains:
+            binary_ent = _pick_entity(device_entities, "binary_sensor")
+            st = state_map.get(binary_ent, {}) if binary_ent else {}
+            attrs = st.get("attributes", {}) if isinstance(st, dict) else {}
+            action_names = _binary_sensor_action_names(attrs.get("device_class"))
+            if action_names:
+                action_name = action_names[0]
+                rdf._add_action(
+                    art,
+                    action_name,
+                    EX.StatusCommand,
+                    "POST",
+                    URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/{urllib.parse.quote(action_name, safe='')}"),
+                    "application/json",
+                )
+
+        if "climate" in domains:
+            climate_ent = _pick_entity(device_entities, "climate")
+            if climate_ent and climate_ent in state_map:
+                rdf._add_action(
+                    art,
+                    "getThermostatState",
+                    EX.StatusCommand,
+                    "POST",
+                    URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/getThermostatState"),
                     "application/json",
                 )
 
@@ -566,7 +769,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
             return Response(rdf.serialize(), media_type="text/turtle")
         else:
             snapshot = {
-                "artifact": device.get("name"),
+                "artifact": artifact_label,
                 "workspace": aid,
                 "entities": {
                     e["entity_id"]: state_map.get(e["entity_id"], {}) for e in device_entities
@@ -584,12 +787,13 @@ async def _register_workspace_to_explorer(area_id: str):
     if not EXPLORER_URL:
         return
     try:
-        devices = await ha_client.get_devices(area_id)
+        devices, entities = await _get_workspace_devices_and_entities(area_id)
         base = BASE_WS_URI.rstrip("/")
         artifact_uris = []
-        for d in devices:
-            name = d.get("name", d["id"])  # device label
-            safe_name = urllib.parse.quote(name, safe="")
+        device_map = {d["id"]: d for d in devices}
+        for ent in entities:
+            label = ent.get("_artifact_label") or _entity_display_name(ent, device_map)
+            safe_name = ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
             artifact_uris.append(f"{base}/workspaces/{area_id}/artifacts/{safe_name}#artifact")
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
             for uri in artifact_uris:
@@ -603,7 +807,7 @@ async def _register_workspace_to_explorer(area_id: str):
         print("Explorer registration failed for area", area_id, "error:", exc)
 
 async def _ensure_entity(workspace_id: str, artifact_name: str, domain: str) -> str:
-    device, device_entities = await _resolve_device_and_entities(workspace_id, artifact_name)
+    _, device_entities, _, _ = await _resolve_device_and_entities(workspace_id, artifact_name)
     ent = _pick_entity(device_entities, domain)
     if not ent:
         raise HTTPException(status_code=404, detail=f"No {domain} entity on artifact")
@@ -656,30 +860,54 @@ async def update_artifact_representation(workspace_id: str, artifact_name: str, 
 async def delete_artifact_representation(workspace_id: str, artifact_name: str):
     return Response(content="Action succeeded:")
 
-# Dynamic sensor action: get<device_class>in<unit>
+# Dynamic sensor/binary sensor actions
 @app.post("/workspaces/{workspace_id}/artifacts/{artifact_name}/{action_name}")
 async def action_sensor_dynamic(workspace_id: str, artifact_name: str, action_name: str):
-    # Only handle actions shaped like get<dc>in<unit>
-    if not (action_name.startswith("get") and "In" in action_name[3:]):
-        raise HTTPException(status_code=404, detail="Unknown action")
+    _, device_entities, _, _ = await _resolve_device_and_entities(workspace_id, artifact_name)
+    sensor_ent = _pick_entity(device_entities, "sensor")
+    binary_ent = _pick_entity(device_entities, "binary_sensor")
+    climate_ent = _pick_entity(device_entities, "climate")
 
-    # Resolve sensor entity
-    _, device_entities = await _resolve_device_and_entities(workspace_id, artifact_name)
-    ent = _pick_entity(device_entities, "sensor")
-    if not ent:
-        raise HTTPException(status_code=404, detail="No sensor entity on artifact")
-
-    # Fetch current state and validate the requested action matches this sensor
     states = await ha_rest.get_states()
-    st = next((s for s in states if s.get("entity_id") == ent), None)
-    if not st:
-        raise HTTPException(status_code=404, detail="Sensor state not found")
+    state_map = {s.get("entity_id"): s for s in states}
+    sensor_state = state_map.get(sensor_ent) if sensor_ent else None
+    binary_state = state_map.get(binary_ent) if binary_ent else None
+    climate_state = state_map.get(climate_ent) if climate_ent else None
 
-    attrs = st.get("attributes", {})
-    expected_with_dc = _sensor_action_name(attrs.get("device_class"), attrs.get("unit_of_measurement"))
-    expected_without_dc = _sensor_action_name(None, attrs.get("unit_of_measurement"))
-    if action_name not in {x for x in (expected_with_dc, expected_without_dc) if x}:
+    sensor_names = _sensor_action_names(
+        (sensor_state or {}).get("attributes", {}).get("device_class"),
+        (sensor_state or {}).get("attributes", {}).get("unit_of_measurement"),
+    ) if sensor_state else []
+    binary_names = _binary_sensor_action_names(
+        (binary_state or {}).get("attributes", {}).get("device_class")
+    ) if binary_state else []
+
+    if action_name in sensor_names:
+        return PlainTextResponse(str((sensor_state or {}).get("state", "")))
+    if action_name in binary_names:
+        return PlainTextResponse(str((binary_state or {}).get("state", "")))
+
+    if action_name == "getThermostatState":
+        if not climate_ent:
+            raise HTTPException(status_code=404, detail="No climate entity on artifact")
+        if not climate_state:
+            raise HTTPException(status_code=404, detail="Climate state not found")
+        return JSONResponse(_format_climate_state(climate_state))
+
+    # Provide meaningful errors for known patterns
+    if action_name.startswith("get") and "In" in action_name[3:]:
+        if not sensor_ent:
+            raise HTTPException(status_code=404, detail="No sensor entity on artifact")
+        if not sensor_state:
+            raise HTTPException(status_code=404, detail="Sensor state not found")
         raise HTTPException(status_code=404, detail="Action not applicable to this sensor")
 
-    # Return exact state value as plain text
-    return PlainTextResponse(str(st.get("state", "")))
+    binary_like = action_name.startswith("get") and action_name.endswith("State")
+    if binary_like:
+        if not binary_ent:
+            raise HTTPException(status_code=404, detail="No binary sensor entity on artifact")
+        if not binary_state:
+            raise HTTPException(status_code=404, detail="Binary sensor state not found")
+        raise HTTPException(status_code=404, detail="Action not applicable to this binary sensor")
+
+    raise HTTPException(status_code=404, detail="Unknown action")

@@ -31,6 +31,14 @@ Open Home Assistant at http://localhost:8123/ (or http://your-server:8123) and c
   - File: `/config/custom_components/virtual/lab308.yaml`
   - Create an area named `lab308` when prompted.
 
+## 3.1) Add home simulations
+- To use the home simulations you will need to install my Virtual Components extensions
+- git clone https://github.com/icordos/hass-virtual.git
+- Dry-run the file copy: ./install <path-to>/homeassistant
+- Push the component into HA: ./install go <path-go>/homeassistant
+- Restart home assistent
+- repeat Step 3 for each of home1.yaml, home2.yaml, home3.yaml
+
 ## 4) Install adapter dependencies
 ```
 pip install -r requirements.txt
@@ -48,6 +56,9 @@ export BASE_WS_URI="http://localhost:8080"        # public base for adapter URIs
 export MONITOR_URL="http://localhost:8081"
 export EXPLORER_URL="http://localhost:8082"
 ```
+
+## 5.1) Configure environment for the three homes
+export AREAS="home1" # or "home2" or "home1,home2", etc
 
 ## 6) Start the adapter
 ```
