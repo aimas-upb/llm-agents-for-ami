@@ -1,0 +1,457 @@
+<?xml version="1.0"?>
+<rdf:RDF xmlns="http://www.w3.org/2019/wot/td#"
+     xml:base="https://www.w3.org/2019/wot/td#"
+     xmlns:dc="http://purl.org/dc/terms/"
+     xmlns:td="https://www.w3.org/2019/wot/td#"
+     xmlns:owl="http://www.w3.org/2002/07/owl#"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:dc11="http://purl.org/dc/elements/1.1/"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">
+    <owl:Ontology rdf:about="https://www.w3.org/2019/wot/td#">
+       
+    </owl:Ontology>
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Annotation properties
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    
+
+
+    <!-- http://purl.org/dc/elements/1.1/publisher -->
+
+    <owl:AnnotationProperty rdf:about="http://purl.org/dc/elements/1.1/publisher"/>
+    
+
+
+    <!-- http://purl.org/dc/elements/1.1/title -->
+
+    <owl:AnnotationProperty rdf:about="http://purl.org/dc/elements/1.1/title"/>
+    
+
+
+    <!-- http://purl.org/dc/terms/author -->
+
+    <owl:AnnotationProperty rdf:about="http://purl.org/dc/terms/author"/>
+    
+
+
+    <!-- http://purl.org/dc/terms/contributor -->
+
+    <owl:AnnotationProperty rdf:about="http://purl.org/dc/terms/contributor"/>
+    
+
+
+    <!-- http://purl.org/dc/terms/license -->
+
+    <owl:AnnotationProperty rdf:about="http://purl.org/dc/terms/license"/>
+    
+
+
+    <!-- http://purl.org/vocab/vann/preferredNamespacePrefix -->
+
+    <owl:AnnotationProperty rdf:about="http://purl.org/vocab/vann/preferredNamespacePrefix"/>
+    
+
+
+    <!-- http://purl.org/vocab/vann/preferredNamespaceUri -->
+
+    <owl:AnnotationProperty rdf:about="http://purl.org/vocab/vann/preferredNamespaceUri"/>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#defaultUnit -->
+
+    <owl:AnnotationProperty rdf:about="https://www.w3.org/2019/wot/td#defaultUnit">
+        <rdfs:comment xml:lang="en">Provides unit information that is used, e.g., in international science, engineering, and business.</rdfs:comment>
+        <rdfs:label>defaultUnit</rdfs:label>
+    </owl:AnnotationProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#supportContact -->
+
+    <owl:AnnotationProperty rdf:about="https://www.w3.org/2019/wot/td#supportContact">
+        <rdfs:comment xml:lang="en">Provides information about the TD maintainer as URI scheme (e.g., &lt;code&gt;mailto&lt;/code&gt; [[?RFC6068]], &lt;code&gt;tel&lt;/code&gt; [[?RFC3966]], &lt;code&gt;https&lt;/code&gt;).</rdfs:comment>
+        <rdfs:label>supportContact</rdfs:label>
+    </owl:AnnotationProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#versionInfo -->
+
+    <owl:AnnotationProperty rdf:about="https://www.w3.org/2019/wot/td#versionInfo">
+        <rdfs:comment xml:lang="en">Provides version information.</rdfs:comment>
+        <rdfs:label>versionInfo</rdfs:label>
+    </owl:AnnotationProperty>
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Object Properties
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#descriptions -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#descriptions">
+        <rdfs:comment xml:lang="en">Can be used to support (human-readable) information in different languages.</rdfs:comment>
+        <rdfs:label>descriptions</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#hasActionAffordance -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#hasActionAffordance">
+        <rdfs:subPropertyOf rdf:resource="https://www.w3.org/2019/wot/td#hasInteractionAffordance"/>
+        <rdfs:subPropertyOf rdf:resource="https://www.w3.org/2019/wot/td#interactions"/>
+        <rdfs:comment xml:lang="en">All Action-based &lt;a&gt;Interaction Affordances&lt;/a&gt; of the Thing.</rdfs:comment>
+        <rdfs:label>hasActionAffordance</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#hasCancellationSchema -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#hasCancellationSchema">
+        <rdfs:comment xml:lang="en">Defines any data that needs to be passed to cancel a subscription, e.g., a specific message to remove a Webhook</rdfs:comment>
+        <rdfs:label>hasCancellationSchema</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#hasEventAffordance -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#hasEventAffordance">
+        <rdfs:subPropertyOf rdf:resource="https://www.w3.org/2019/wot/td#hasInteractionAffordance"/>
+        <rdfs:comment xml:lang="en">All Event-based &lt;a&gt;Interaction Affordances&lt;/a&gt; of the Thing.</rdfs:comment>
+        <rdfs:label>hasEventAffordance</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#hasForm -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#hasForm">
+        <rdfs:comment xml:lang="en">Set of form hypermedia controls that describe how an operation can be performed. Forms are serializations of Protocol Bindings.</rdfs:comment>
+        <rdfs:label>hasForm</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#hasInputSchema -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#hasInputSchema">
+        <rdfs:comment xml:lang="en">Used to define the input data schema of the Action.</rdfs:comment>
+        <rdfs:label>hasInputSchema</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#hasInteractionAffordance -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#hasInteractionAffordance"/>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#hasLink -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#hasLink">
+        <rdfs:comment xml:lang="en">Provides Web links to arbitrary resources that relate to the specified Thing Description.</rdfs:comment>
+        <rdfs:label>hasLink</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#hasNotificationSchema -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#hasNotificationSchema">
+        <rdfs:comment xml:lang="en">Defines the data schema of the Event instance messages pushed by the Thing.</rdfs:comment>
+        <rdfs:label>hasNotificationSchema</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#hasOutputSchema -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#hasOutputSchema">
+        <rdfs:comment xml:lang="en">Used to define the output data schema of the Action.</rdfs:comment>
+        <rdfs:label>hasOutputSchema</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#hasPropertyAffordance -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#hasPropertyAffordance">
+        <rdfs:subPropertyOf rdf:resource="https://www.w3.org/2019/wot/td#hasInteractionAffordance"/>
+        <rdfs:comment xml:lang="en">All Property-based &lt;a&gt;Interaction Affordances&lt;/a&gt; of the Thing.</rdfs:comment>
+        <rdfs:label>hasPropertyAffordance</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#hasSecurityConfiguration -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#hasSecurityConfiguration">
+        <rdfs:comment xml:lang="en">Set of security definition names, chosen from those defined in &lt;code&gt;securityDefinitions&lt;/code&gt;.  These must all be satisfied for access to resources.</rdfs:comment>
+        <rdfs:label>hasSecurityConfiguration</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#hasSubscriptionSchema -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#hasSubscriptionSchema">
+        <rdfs:comment xml:lang="en">Defines data that needs to be passed upon subscription, e.g., filters or message format for setting up Webhooks.</rdfs:comment>
+        <rdfs:label>hasSubscriptionSchema</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#hasUriTemplateVariable -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#hasUriTemplateVariable">
+        <rdfs:comment xml:lang="en">Define URI template variables as collection based on DataSchema declarations.</rdfs:comment>
+        <rdfs:label>hasUriTemplateVariable</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#interactions -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#interactions"/>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#isIdempotent -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#isIdempotent">
+        <rdfs:comment xml:lang="en">Indicates whether the Action is idempotent (=true) or not. Informs whether the Action can be called repeatedly with the same result, if present, based on the same input.</rdfs:comment>
+        <rdfs:label>isIdempotent</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#isSafe -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#isSafe">
+        <rdfs:comment xml:lang="en">Signals if the Action is safe (=true) or not. Used to signal if there is no internal state (cf. resource state) is changed when invoking an Action. In that case responses can be cached as example.</rdfs:comment>
+        <rdfs:label>isSafe</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#securityDefinitions -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#securityDefinitions">
+        <rdfs:comment xml:lang="en">Set of named security configurations (definitions only).  Not actually applied unless names are used in a &lt;code&gt;security&lt;/code&gt; name-value pair.</rdfs:comment>
+        <rdfs:label>securityDefinitions</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#titles -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/td#titles">
+        <rdfs:comment xml:lang="en">Provides multi-language human-readable titles (e.g., display a text for UI representation in different languages).</rdfs:comment>
+        <rdfs:label>titles</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Data properties
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#baseUri -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/td#baseUri">
+        <rdfs:comment xml:lang="en">Define the base URI that is used for all relative URI references throughout a TD document. In TD instances, all relative URIs are resolved relative to the base URI using the algorithm defined in [[RFC3986]].</rdfs:comment>
+        <rdfs:label xml:lang="en">baseUri</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#created -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/td#created">
+        <rdfs:comment xml:lang="en">Provides information when the TD instance was created.</rdfs:comment>
+        <rdfs:label>created</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#description -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/td#description">
+        <rdfs:comment xml:lang="en">Provides additional (human-readable) information based on a default language.</rdfs:comment>
+        <rdfs:label>description</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#instance -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/td#instance">
+        <rdfs:comment xml:lang="en">Provides a version indicator of this TD instance.</rdfs:comment>
+        <rdfs:label>instance</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#isObservable -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/td#isObservable">
+        <rdfs:comment xml:lang="en">A hint that indicates whether Servients hosting the Thing and Intermediaries should provide a Protocol Binding that supports the &lt;code&gt;observeproperty&lt;/code&gt; operation for this Property.</rdfs:comment>
+        <rdfs:label>isObservable</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#modified -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/td#modified">
+        <rdfs:comment xml:lang="en">Provides information when the TD instance was last modified.</rdfs:comment>
+        <rdfs:label>modified</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#name -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/td#name">
+        <rdfs:comment xml:lang="en">Indexing property to store entity names when serializing them in a JSON-LD @index container.</rdfs:comment>
+        <rdfs:label>name</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#title -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/td#title">
+        <rdfs:comment xml:lang="en">Provides a human-readable title (e.g., display a text for UI representation) based on a default language.</rdfs:comment>
+        <rdfs:label>title</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- https://www.w3.org/2019/wot/td#title -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/td#type">
+        <rdfs:label>type</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Classes
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#ActionAffordance -->
+
+    <owl:Class rdf:about="https://www.w3.org/2019/wot/td#ActionAffordance">
+        <rdfs:subClassOf rdf:resource="https://www.w3.org/2019/wot/td#InteractionAffordance"/>
+        <rdfs:comment xml:lang="en">An Interaction Affordance that allows to invoke a function of the Thing, which manipulates state (e.g., toggling a lamp on or off) or triggers a process on the Thing (e.g., dim a lamp over time).</rdfs:comment>
+        <rdfs:label>ActionAffordance</rdfs:label>
+    </owl:Class>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#EventAffordance -->
+
+    <owl:Class rdf:about="https://www.w3.org/2019/wot/td#EventAffordance">
+        <rdfs:subClassOf rdf:resource="https://www.w3.org/2019/wot/td#InteractionAffordance"/>
+        <rdfs:comment xml:lang="en">An Interaction Affordance that describes an event source, which asynchronously pushes event data to &lt;a&gt;Consumers&lt;/a&gt; (e.g., overheating alerts).</rdfs:comment>
+        <rdfs:label>EventAffordance</rdfs:label>
+    </owl:Class>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#InteractionAffordance -->
+
+    <owl:Class rdf:about="https://www.w3.org/2019/wot/td#InteractionAffordance">
+        <rdfs:comment xml:lang="en">Metadata of a Thing that shows the possible choices to &lt;a&gt;Consumers&lt;/a&gt;, thereby suggesting how &lt;a&gt;Consumers&lt;/a&gt; may interact with the Thing. There are many types of potential affordances, but W3C WoT defines three types of Interaction Affordances: Properties, Actions, and Events.</rdfs:comment>
+        <rdfs:label>InteractionAffordance</rdfs:label>
+    </owl:Class>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#Link -->
+
+    <owl:Class rdf:about="https://www.w3.org/2019/wot/td#Link">
+        <rdfs:comment xml:lang="en">A Web link, as specified by IETF RFC 8288 (https://tools.ietf.org/html/rfc8288).</rdfs:comment>
+        <rdfs:label>Link</rdfs:label>
+    </owl:Class>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#MultiLanguage -->
+
+    <owl:Class rdf:about="https://www.w3.org/2019/wot/td#MultiLanguage">
+        <rdfs:comment xml:lang="en">A &lt;a&gt;Map&lt;/a&gt; providing a set of human-readable texts in different languages identified by language tags described in [[BCP47]].</rdfs:comment>
+        <rdfs:label>MultiLanguage</rdfs:label>
+    </owl:Class>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#PropertyAffordance -->
+
+    <owl:Class rdf:about="https://www.w3.org/2019/wot/td#PropertyAffordance">
+        <rdfs:subClassOf rdf:resource="https://www.w3.org/2019/wot/td#InteractionAffordance"/>
+        <rdfs:comment xml:lang="en">An Interaction Affordance that exposes state of the Thing. This state can then be retrieved (read) and optionally updated (write). Things can also choose to make Properties observable by pushing the new state after a change.</rdfs:comment>
+        <rdfs:label>PropertyAffordance</rdfs:label>
+    </owl:Class>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#Thing -->
+
+    <owl:Class rdf:about="https://www.w3.org/2019/wot/td#Thing">
+        <rdfs:comment xml:lang="en">An abstraction of a physical or a virtual entity whose metadata and interfaces are described by a WoT Thing Description, whereas a virtual entity is the composition of one or more Things.</rdfs:comment>
+        <rdfs:label xml:lang="en">Thing</rdfs:label>
+    </owl:Class>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/td#VersionInfo -->
+
+    <owl:Class rdf:about="https://www.w3.org/2019/wot/td#VersionInfo">
+        <rdfs:comment xml:lang="en">Metadata of a Thing that provides version information about the TD document. If required, additional version information such as firmware and hardware version (term definitions outside of the TD namespace) can be extended via the &lt;a&gt;TD Context Extension&lt;/a&gt; mechanism.</rdfs:comment>
+        <rdfs:label>VersionInfo</rdfs:label>
+    </owl:Class>
+</rdf:RDF>
+
+
+
+<!-- Generated by the OWL API (version 4.5.9.2019-02-01T07:24:44Z) https://github.com/owlcs/owlapi -->
+

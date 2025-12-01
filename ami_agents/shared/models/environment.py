@@ -8,8 +8,8 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 
-class WorkspaceType(Enum):
-    """Types of workspaces in the HMAS environment."""
+class WorkspaceCategory(Enum):
+    """Categories of workspaces in the HMAS environment."""
     ROOT = "root"  # Top-level workspace (e.g., "home")
     FLOOR = "floor"  # Floor-level workspace
     AREA = "area"  # Area-level workspace (room)
@@ -17,8 +17,8 @@ class WorkspaceType(Enum):
     EXTERNAL_SERVICES = "external_services"  # Workspace for external services
 
 
-class ArtifactType(Enum):
-    """Types of artifacts in the environment."""
+class ArtifactCategory(Enum):
+    """Categories of artifacts in the environment."""
     PHYSICAL_DEVICE = "physical_device"
     VIRTUAL_DEVICE = "virtual_device"
     SERVICE = "service"
@@ -32,6 +32,13 @@ class ChangeEventType(Enum):
     STATE_CHANGED = "state_changed"
 
 
+class AffordanceType(Enum):
+    """Types of affordances for artifacts."""
+    PROPERTY = "property"
+    ACTION = "action"
+    EVENT = "event"
+
+
 @dataclass
 class ThingDescription:
     """W3C WoT Thing Description representation."""
@@ -39,24 +46,24 @@ class ThingDescription:
     title: str
     description: str
 
+    # RDF serialization - this will always hold the full TD in RDF/Turtle format 
+    # as obtained from the Integration Engine
+    rdf: str
+
     # Interaction affordances
-    properties: List[Dict[str, Any]] = field(default_factory=list)
-    actions: List[Dict[str, Any]] = field(default_factory=list)
-    events: List[Dict[str, Any]] = field(default_factory=list)
+    properties: List[Dict[str, "Affordance"]] = field(default_factory=list)
+    actions: List[Dict[str, "Affordance"]] = field(default_factory=list)
+    events: List[Dict[str, "Affordance"]] = field(default_factory=list)
 
-    # Additional metadata
+    # Additional metadata will include other TD fields related to security, context, etc.
     metadata: Dict[str, Any] = field(default_factory=dict)
-
-    # Links and forms
-    links: List[Dict[str, Any]] = field(default_factory=list)
-    forms: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
 class Artifact:
     """Represents an artifact in the HMAS environment."""
     artifact_id: str
-    artifact_type: ArtifactType
+    artifact_type: ArtifactCategory
     name: str
     workspace_id: str
 
@@ -69,15 +76,20 @@ class Artifact:
     # Metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
     timestamp_added: datetime = field(default_factory=datetime.now)
+    last_updated: datetime = field(default_factory=datetime.now)
 
 
 @dataclass
 class Workspace:
     """Represents a workspace in the HMAS environment."""
     workspace_id: str
-    workspace_type: WorkspaceType
+    workspace_type: WorkspaceCategory
     name: str
     parent_workspace_id: Optional[str] = None
+
+    # RDF representation of the workspace - this will always hold the full RDF/Turtle serialization 
+    # as obtained from the Integration Engine
+    rdf: str = None
 
     # Contained artifacts
     artifacts: List[str] = field(default_factory=list)  # artifact IDs
@@ -93,15 +105,22 @@ class Workspace:
 class Affordance:
     """Represents an affordance (capability) of an artifact."""
     affordance_id: str
-    affordance_type: str  # property, action, event
+    affordance_type: AffordanceType  # property, action, event
     name: str
     description: str
 
     # Parent artifact
     artifact_id: str
 
-    # Endpoint information
-    uri: str
+    # RDF serialization - this will always hold the full affordance description in RDF/Turtle format 
+    # as obtained from the Integration Engine
+    rdf: str
+
+    # form details: includes protocol, method type, content type, and target URI
+    form: "AffordanceForm" = field(default_factory="AffordanceForm")
+
+    # Semantic types
+    semantic_types: List[str] = field(default_factory=list)  # List of RDF types (IRIs)
 
     # Schema information
     input_schema: Optional[Dict[str, Any]] = None
@@ -109,6 +128,15 @@ class Affordance:
 
     # Metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class AffordanceForm:
+    """Represents the form details of an affordance."""
+    href: str  # The URI of the affordance
+    content_type: Optional[str] = None  # e.g., application/json
+    method: Optional[str] = None  # e.g., GET, POST
+    operation_type: Optional[str] = None  # e.g., td:observeProperty, td:invokeAction, td:subscribeEvent
+    additional_fields: Dict[str, Any] = field(default_factory=dict)  # Any other form fields
 
 
 @dataclass

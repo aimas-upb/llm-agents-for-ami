@@ -1,0 +1,295 @@
+<?xml version="1.0"?>
+<rdf:RDF xmlns="https://www.w3.org/2019/wot/hypermedia#"
+     xml:base="https://www.w3.org/2019/wot/hypermedia"
+     xmlns:owl="http://www.w3.org/2002/07/owl#"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     xmlns:vann="http://purl.org/vocab/vann/"
+     xmlns:schema="http://schema.org/"
+     xmlns:dcterms="http://purl.org/dc/terms/">
+    <owl:Ontology rdf:about="https://www.w3.org/2019/wot/hypermedia#">
+        <dcterms:creator rdf:resource="https://vcharpenay.link/#me"/>
+        <vann:preferredNamespacePrefix>hctl</vann:preferredNamespacePrefix>
+        <vann:preferredNamespaceUri>https://www.w3.org/2019/wot/hypermedia#</vann:preferredNamespaceUri>
+        <rdfs:comment>Ontology designed to provide an RDF representation of Hypermedia Controls, in particular links and forms.</rdfs:comment>
+        <rdfs:label>Hypermedia Controls Ontology</rdfs:label>
+    </owl:Ontology>
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Annotation properties
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    
+
+
+    <!-- http://purl.org/dc/terms/creator -->
+
+    <owl:AnnotationProperty rdf:about="http://purl.org/dc/terms/creator"/>
+    
+
+
+    <!-- http://purl.org/vocab/vann/preferredNamespacePrefix -->
+
+    <owl:AnnotationProperty rdf:about="http://purl.org/vocab/vann/preferredNamespacePrefix"/>
+    
+
+
+    <!-- http://purl.org/vocab/vann/preferredNamespaceUri -->
+
+    <owl:AnnotationProperty rdf:about="http://purl.org/vocab/vann/preferredNamespaceUri"/>
+    
+
+
+    <!-- http://schema.org/domainIncludes -->
+
+    <owl:AnnotationProperty rdf:about="http://schema.org/domainIncludes"/>
+    
+
+
+    <!-- http://schema.org/rangeIncludes -->
+
+    <owl:AnnotationProperty rdf:about="http://schema.org/rangeIncludes"/>
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Object Properties
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#additionalReturns -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/hypermedia#additionalReturns">
+        <schema:domainIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#Form"/>
+        <schema:rangeIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#AdditionalExpectedResponse"/>
+        <rdfs:comment xml:lang="en">This optional term can be used if additional expected responses
+      are possible, e.g. for error reporting.  Each additional response needs to be 
+      distinguished from others in some way (for example, by specifying
+      a protocol-specific response code), and may also have its own data schema.</rdfs:comment>
+        <rdfs:label>additionalReturns</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#hasAdditionalOutputSchema -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/hypermedia#hasAdditionalOutputSchema">
+        <schema:domainIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#AdditionalExpectedResponse"/>
+        <rdfs:comment xml:lang="en">This optional term can be used to define a data schema for
+                an additional response if it differs from the default
+                output data schema. 
+                Rather than a &lt;code&gt;DataSchema&lt;/code&gt; object, the
+                name of a previous definition given in a 
+                &lt;code&gt;schemaDefinitions&lt;/code&gt; map must be used.</rdfs:comment>
+        <rdfs:isDefinedBy rdf:resource="https://www.w3.org/2019/wot/hypermedia#"/>
+        <rdfs:label>hasAdditionalOutputSchema</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#hasOperationType -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/hypermedia#hasOperationType">
+        <schema:domainIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#Form"/>
+        <rdfs:comment>Indicates the semantic intention of performing the operation(s) described by the form.</rdfs:comment>
+        <rdfs:label>hasOperationType</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#returns -->
+
+    <owl:ObjectProperty rdf:about="https://www.w3.org/2019/wot/hypermedia#returns">
+        <schema:domainIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#Form"/>
+        <schema:rangeIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#ExpectedResponse"/>
+        <rdfs:comment xml:lang="en">This optional term can be used if, e.g., the output communication metadata differ from input metadata (e.g., output contentType differ from the
+     input contentType). The response name contains metadata that is only valid for the reponse messages.</rdfs:comment>
+        <rdfs:label>returns</rdfs:label>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Data properties
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#forContentCoding -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/hypermedia#forContentCoding">
+        <schema:domainIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#Form"/>
+        <schema:rangeIncludes rdf:resource="http://schema.org/Text"/>
+        <rdfs:comment xml:lang="en">Content coding values indicate an encoding transformation that has been or can be applied to a representation. Content codings are primarily used to allow a representation to be compressed or otherwise usefully transformed without losing the identity of its underlying media type and without loss of information. Examples of content coding include &quot;gzip&quot;, &quot;deflate&quot;, etc. </rdfs:comment>
+        <rdfs:label>forContentCoding</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#forContentType -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/hypermedia#forContentType">
+        <schema:domainIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#Form"/>
+        <schema:rangeIncludes rdf:resource="http://schema.org/Text"/>
+        <rdfs:comment xml:lang="en">Assign a content type based on a media type [[IANA-MEDIA-TYPES]] (e.g., &apos;text/plain&apos;) and potential parameters (e.g., &apos;charset=utf-8&apos;) for the media type.</rdfs:comment>
+        <rdfs:label>forContentType</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#forSubProtocol -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/hypermedia#forSubProtocol">
+        <schema:domainIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#Form"/>
+        <schema:rangeIncludes rdf:resource="http://schema.org/Text"/>
+        <rdfs:comment xml:lang="en">Indicates the exact mechanism by which an interaction will be accomplished for a given protocol when there are multiple options.
+     
+For example, for HTTP and Events, it indicates which of several available mechanisms should be used for asynchronous notifications such as long polling, websub (also see https://www.w3.org/TR/websub/), or server sent events (also see https://www.w3.org/TR/eventsource/). Please note that there is no restriction on the sub-protocol selection and other mechanisms can also be announced by this subprotocol term.</rdfs:comment>
+        <rdfs:label>forSubProtocol</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#hasAnchor -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/hypermedia#hasAnchor">
+        <schema:domainIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#Link"/>
+        <rdfs:comment>By default, the context, or anchor, of a link conveyed in the Link header field is the URL of the representation it is associated with, as defined in RFC7231, Section 3.1.4.1, and is serialized as a URI.</rdfs:comment>
+        <rdfs:label>hasAnchor</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#hasHreflang -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/hypermedia#hasHreflang">
+        <schema:domainIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#Link"/>
+        <rdfs:comment>The hreflang attribute specifies the language of a linked document. The value of this must be a valid language tag [[BCP47]].</rdfs:comment>
+        <rdfs:label>hasHreflang</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#hasRelationType -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/hypermedia#hasRelationType">
+        <schema:domainIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#Link"/>
+        <rdfs:comment>A link relation type identifies the semantics of a link.</rdfs:comment>
+        <rdfs:label>hasRelationType</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#hasSizes -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/hypermedia#hasSizes">
+        <schema:domainIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#Link"/>
+        <rdfs:comment>Target attribute that specifies one or more sizes for the referenced icon. Only applicable for relation type &apos;icon&apos;. The value pattern follows {Height}x{Width} (e.g., &quot;16x16&quot;, &quot;16x16 32x32&quot;)</rdfs:comment>
+        <rdfs:label>hasSizes</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#hasTarget -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/hypermedia#hasTarget">
+        <schema:domainIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#Form"/>
+        <schema:domainIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#Link"/>
+        <rdfs:comment>target IRI of a link or submission target of a form.</rdfs:comment>
+        <rdfs:label>hasTarget</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#hintsAtMediaType -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/hypermedia#hintsAtMediaType">
+        <schema:domainIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#Link"/>
+        <schema:rangeIncludes rdf:resource="http://schema.org/Text"/>
+        <rdfs:comment>Target attribute providing a hint indicating what the media type [IANA-MEDIA-TYPES] of the result of dereferencing the link should be.</rdfs:comment>
+        <rdfs:label>hintsAtMediaType</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#isSuccess -->
+
+    <owl:DatatypeProperty rdf:about="https://www.w3.org/2019/wot/hypermedia#isSuccess">
+        <schema:domainIncludes rdf:resource="https://www.w3.org/2019/wot/hypermedia#AdditionalExpectedResponse"/>
+        <schema:rangeIncludes rdf:resource="http://schema.org/Boolean"/>
+        <rdfs:comment xml:lang="en">Signals if the additional response should not be considered an error.</rdfs:comment>
+        <rdfs:isDefinedBy rdf:resource="https://www.w3.org/2019/wot/hypermedia#"/>
+        <rdfs:label>isSuccess</rdfs:label>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Classes
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#AdditionalExpectedResponse -->
+
+    <owl:Class rdf:about="https://www.w3.org/2019/wot/hypermedia#AdditionalExpectedResponse">
+        <rdfs:comment xml:lang="en">Communication metadata describing the expected response message for additional responses.</rdfs:comment>
+        <rdfs:label>AdditionalExpectedResponse</rdfs:label>
+    </owl:Class>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#ExpectedResponse -->
+
+    <owl:Class rdf:about="https://www.w3.org/2019/wot/hypermedia#ExpectedResponse">
+        <rdfs:comment xml:lang="en">Communication metadata describing the expected response message for the primary response.</rdfs:comment>
+        <rdfs:label>ExpectedResponse</rdfs:label>
+    </owl:Class>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#Form -->
+
+    <owl:Class rdf:about="https://www.w3.org/2019/wot/hypermedia#Form">
+        <rdfs:comment xml:lang="en">A form can be viewed as a statement of &quot;To perform an &lt;b&gt;&lt;em&gt;operation type&lt;/em&gt;&lt;/b&gt; operation on &lt;b&gt;&lt;em&gt;form context&lt;/b&gt;&lt;/em&gt;, make a &lt;b&gt;&lt;em&gt;request method&lt;/b&gt;&lt;/em&gt; request to &lt;b&gt;&lt;em&gt;submission target&lt;/b&gt;&lt;/em&gt;&quot; where the optional &lt;b&gt;&lt;em&gt;form fields&lt;/b&gt;&lt;/em&gt; may further describe the required request. In Thing Descriptions, the &lt;b&gt;&lt;em&gt;form context&lt;/b&gt;&lt;/em&gt; is the surrounding Object, such as Properties, Actions, and Events or the Thing itself for meta-interactions.</rdfs:comment>
+        <rdfs:label>Form</rdfs:label>
+    </owl:Class>
+    
+
+
+    <!-- https://www.w3.org/2019/wot/hypermedia#Link -->
+
+    <owl:Class rdf:about="https://www.w3.org/2019/wot/hypermedia#Link">
+        <rdfs:comment xml:lang="en">A link can be viewed as a statement of the form &quot;&lt;b&gt;&lt;em&gt;link context&lt;/em&gt;&lt;/b&gt;  has a &lt;b&gt;&lt;em&gt;relation type&lt;/em&gt;&lt;/b&gt; resource at &lt;b&gt;&lt;em&gt;link target&lt;/em&gt;&lt;/b&gt;&quot;, where the optional &lt;b&gt;&lt;em&gt;target attributes&lt;/em&gt;&lt;/b&gt;  may further describe the resource.</rdfs:comment>
+        <rdfs:label>Link</rdfs:label>
+    </owl:Class>
+</rdf:RDF>
+
+
+
+<!-- Generated by the OWL API (version 4.5.29.2024-05-13T12:11:03Z) https://github.com/owlcs/owlapi -->
+

@@ -133,3 +133,59 @@ def get_cashmere_ontology(reload: bool = False) -> Optional[Ontology]:
 
     logger.error("CASHMERE ontology file not found (tried cashmere.owl, cashmere.rdf, cashmere.nt)")
     return None
+
+
+def get_td_ontology(reload: bool = False) -> Optional[Ontology]:
+    """
+    Load the W3C Thing Description (TD) ontology.
+
+    Args:
+        reload: If True, reload the ontology even if it's cached.
+
+    Returns:
+        The TD Ontology object, or None if loading fails.
+    """
+    # Try supported formats: .owl (OWL/XML), .rdf (RDF/XML), .nt (NTriples)
+    for ext in ["td.owl", "td.rdf", "td.nt"]:
+        if (ONTOLOGIES_DIR / ext).exists():
+            return OntologyLoader.load_ontology(ext, reload=reload)
+
+    logger.error("TD ontology file not found (tried td.owl, td.rdf, td.nt)")
+    return None
+
+
+def get_hctl_ontology(reload: bool = False) -> Optional[Ontology]:
+    """
+    Load the HCTL (Hypermedia Control Transfer Language) ontology.
+
+    Args:
+        reload: If True, reload the ontology even if it's cached.
+
+    Returns:
+        The HCTL Ontology object, or None if loading fails.
+    """
+    # Try supported formats: .owl (OWL/XML), .rdf (RDF/XML), .nt (NTriples)
+    for ext in ["hctl.owl", "hctl.rdf", "hctl.nt"]:
+        if (ONTOLOGIES_DIR / ext).exists():
+            return OntologyLoader.load_ontology(ext, reload=reload)
+
+    logger.error("HCTL ontology file not found (tried hctl.owl, hctl.rdf, hctl.nt)")
+    return None
+
+
+def get_http_ontology(reload: bool = False) -> Optional[Ontology]:
+    """
+    Load the HTTP (Hypertext Transfer Protocol) ontology.
+
+    Args:
+        reload: If True, reload the ontology even if it's cached.
+    Returns:
+        The HTTP Ontology object, or None if loading fails.
+    """
+    # Try supported formats: .owl (OWL/XML), .rdf (RDF/XML), .nt (NTriples)
+    for ext in ["http.owl", "http.rdf", "http.nt"]:
+        if (ONTOLOGIES_DIR / ext).exists():
+            return OntologyLoader.load_ontology(ext, reload=reload)
+
+    logger.error("HTTP ontology file not found (tried http.owl, http.rdf, http.nt)")
+    return None
