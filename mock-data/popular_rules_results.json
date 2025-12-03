@@ -1,0 +1,2243 @@
+[
+  {
+    "categories": [
+      {
+        "name": "smart lights",
+        "scenarios": [
+          {
+            "name": "Turn Your Lights Pink",
+            "description": " Turn your lights a deep pink with the Alexa Command \"Trigger Pink\" "
+          },
+          {
+            "name": "Enable \"Sexy Time\" Hue Lights With Amazon Alexa",
+            "description": "Lights will set to Hot Pink @ 75% brightness"
+          },
+          {
+            "name": "Blink lights when it starts snowing",
+            "description": "Don't miss those first snow flakes! Get notified with a gentle blink of your LIFX lights."
+          },
+          {
+            "name": "Severe Weather Alert",
+            "description": "1. Find your state and then your county code http://alerts.weather.gov/#m     \n2. Take that code and paste it to the end of this: http://alerts.weather.gov/cap/wwaatmget.php?x= \n3. Enter that string below in the \"New feed item\" window.\n\nThis will blink your lights in the event of a severe weather warning in your area whenever IFTTT updates - which is usually around every 15 minutes."
+          },
+          {
+            "name": "Change Philips Hue colours based on electricity prices",
+            "description": "This connection will change your Philips Hub colours when electricity price is low or high in your area."
+          },
+          {
+            "name": "Change your Hue lights to a softer white to help you sleep",
+            "description": "Adjusts the lighting to a more natural night time temperature (~3500K ). (inspired by f.lux)"
+          },
+          {
+            "name": "Gently fade out your lights when you sleep",
+            "description": "Simulating natural sunset and offering relaxing dimming to help you sleep. The light will be completely turned off after 10 minutes. Please select sunset in the dropdown list."
+          },
+          {
+            "name": "Set lights to warm in the evening for better sleep",
+            "description": "In the evening dim the lights and set them to a warm colour to help prepare for bed."
+          },
+          {
+            "name": "Turn off All lights when I go to work",
+            "description": "Just Change your day and time :)"
+          },
+          {
+            "name": "On every Google Calendar event notification blink HUE lights",
+            "description": "On every Google Calendar event notification blink HUE lights"
+          }
+        ]
+      },
+      {
+        "name": "thermostats",
+        "scenarios": [
+          {
+            "name": "When Tado reaches a set temperature, go back to auto mode and send a notification",
+            "description": "This applet is usefull if you want to warm a room that is normally set to a low temperature (like the bathroom for a shower). \nWhen the set temperature is reached, Tado will go back to automatic mode and send a notification (bath is ready!)"
+          },
+          {
+            "name": "If indoor temperature dips below a certain point, send a text message alert",
+            "description": "Set the temperature threshold a couple of degrees lower than what you have your thermostat set to, so if the indoor temperature ever gets that cold, then it's likely because your furnace is having problems and you'll get notified about it."
+          },
+          {
+            "name": "If indoor temperature rises above a certain point, send a text message alert",
+            "description": "Set the temperature threshold a couple of degrees higher than what you have your thermostat set to, so if the indoor temperature ever gets that hot, then it's likely because your air conditioner is having problems and you'll get notified about it."
+          },
+          {
+            "name": "Set your Lyric Thermostat at a certain time",
+            "description": "This Recipe enables you to set your Lyric Round Wi-Fi thermostat to a permanent hold at a specific time."
+          },
+          {
+            "name": "Cool down the house with Alexa and Honeywell Lyric.",
+            "description": "Cool down the house with Alexa and Honeywell Lyric."
+          },
+          {
+            "name": "Receive a notification when your Nuheat Signature thermostat goes offline",
+            "description": "Get notified of any connection issues with your thermostat. "
+          },
+          {
+            "name": "Ensure that your ecobee is running on its regular program every day at the time you specify",
+            "description": "Select a time during the day to remove the currently running event on the selected thermostat provided the event is not a mandatory demand response event."
+          },
+          {
+            "name": "Switch your ecobee to your chosen comfort profile as you arrive home",
+            "description": "Automatically activate your ecobee to your chosen comfort profile as you approach home."
+          }
+        ]
+      },
+      {
+        "name": "security cameras and doorbells",
+        "scenarios": [
+          {
+            "name": "Turn on Sleep Mode at night.",
+            "description": "Turn on Sleep Mode at night."
+          },
+          {
+            "name": "Turn your camera on when you leave home",
+            "description": "Turn off the Sleep mode when you leave home. For Android phones."
+          },
+          {
+            "name": "Get an email when your EZVIZ camera senses motion",
+            "description": "This Applet monitors for when a specific alarm type is triggered then sends you an email as soon as possible."
+          },
+          {
+            "name": "Tell the Slack channel when Ring says someone's at the door",
+            "description": "Pick a Slack Channel below to automatically share the visitors your Ring video doorbell registers with a select group. "
+          },
+          {
+            "name": "Receive a text notification if motion is detected",
+            "description": "Always know when someone (or something) is moving around your home. If you want to receive a text when motion is detected, try this. Only works for Android phones."
+          },
+          {
+            "name": "Receive an email when your Withings Home goes offline",
+            "description": "Perfect to monitor your Withings Home internet connection or if it is plugged to a power outlet. "
+          },
+          {
+            "name": "Arm Blink With Google Home",
+            "description": "Use Google assistant to arm your Blink system."
+          },
+          {
+            "name": "Disarm Blink With Google Home",
+            "description": "Use Google assistant to disarm your Blink system."
+          },
+          {
+            "name": "Receive Blink System Motion Alerts on Slack ",
+            "description": "Motion alerts automatically send a message to yourself (or channel you specify) on Slack with camera and date/time. "
+          },
+          {
+            "name": "Turn on your Hive View monitoring when you leave home",
+            "description": "Your Hive View monitoring will turn on when you leave an area you chose."
+          }
+        ]
+      },
+      {
+        "name": "smart plugs and outlets",
+        "scenarios": [
+          {
+            "name": "Turn off DLink Light Every 15min",
+            "description": "Cant make a timer when the light comes on with Ring, so I will make sure its off before another Ring happens at my door."
+          },
+          {
+            "name": "Turn off WeMo Smart Plug when you leave home",
+            "description": "Turns off a WeMo Smart Plug when you leave your home. This is useful for almost anything from lamps to curling irons.\n\nChoose a smaller area around your home for a more reliable experience."
+          },
+          {
+            "name": "Turn on your outlet at sunset",
+            "description": "Turn on your outlet within 15 minutes of the sunset at your location."
+          },
+          {
+            "name": "Turn off your outlet at sunrise",
+            "description": "Turn off your outlet within 15 minutes of the sunrise at your location."
+          },
+          {
+            "name": "Turn on TP-Link/Kasa Outlet when Entering Area",
+            "description": "Set a location, when you enter the area, TP-Link/Kasa Outlet turns on."
+          },
+          {
+            "name": "Toggle Insight switch on/off with one tap",
+            "description": "This Applet turns your Belkin Insight switch on and off. Note: IFTTT app is needed for this Applet."
+          }
+        ]
+      },
+      {
+        "name": "smart shades and blinds",
+        "scenarios": [
+          {
+            "name": "Alexa Open Shades",
+            "description": "Simply Open HD Shades using Alexa"
+          },
+          {
+            "name": "Use Alexa to open your window shades",
+            "description": "Choose a phrase to set the scene. When you say \"Alexa, trigger + [ your phrase]\" your PowerView shades will open. \n\nTip: You can adjust this Recipe to run any PowerView scene!"
+          },
+          {
+            "name": "Open the shades at sunrise ",
+            "description": "Activate any Automate scene at sunrise to open shades. "
+          },
+          {
+            "name": "Close the shades at sunset ",
+            "description": "Activate any Automate scene at sunset to close shades."
+          },
+          {
+            "name": "Close shades on a bright day",
+            "description": "If the UV index in your area exceeds 11,  your selected Scene is activated in the home."
+          },
+          {
+            "name": "Open your Somfy-powered shades with voice control (using Google Assistant)",
+            "description": "Talk to your Google Assistant to open your Somfy-powered shades with simple customized commands."
+          },
+          {
+            "name": "Lower your Somfy-powered shades with voice control (using Google Assistant)",
+            "description": "Talk to your Google Assistant to lower your Somfy-powered shades with simple customized commands."
+          },
+          {
+            "name": "Close SOMA shades at sunset",
+            "description": "Protect your privacy by lowering your shades when the sun goes down."
+          }
+        ]
+      },
+      {
+        "name": "robot vacuums and lawn mowers",
+        "scenarios": [
+          {
+            "name": "Clean a specific room with the touch of a button",
+            "description": "Use this applet to create a button on your phone or smart watch that triggers your robot to clean a specific room. For robots with Imprint\u00022 Smart Mapping technology."
+          },
+          {
+            "name": "Start Roomba\u0000ae with the press of a button",
+            "description": "Use this applet to create a button that triggers your robot to start. Ideal for starting your robot straight from your smart watch or home screen on your phone!"
+          },
+          {
+            "name": "After Roomba\u0000ae completes a job, start your Braava jet\u0000ae",
+            "description": "This Applet will monitor for whenever the Roomba\u0000ae you select completes its job, it will start your Braava jet\u0000ae immediately after."
+          },
+          {
+            "name": "Park mower with a Google Calendar event",
+            "description": "Select a keyword like \u001cpark\u001d and any time there is an event with the keyword in its title or description, your mower will park itself."
+          },
+          {
+            "name": "Show consideration for wildlife in your garden by parking your mower overnight",
+            "description": "Show consideration for nocturnal animals that want to visit your garden during the night. Park Automower\u0000ae from dusk to dawn."
+          },
+          {
+            "name": "Park Automower\u0000ae when wind speed rises above high wind",
+            "description": "Husqvarna Automower\u0000ae will be parked until further notice when wind speed rises above high wind (above 50 kph)."
+          }
+        ]
+      },
+      {
+        "name": "air quality and purifiers",
+        "scenarios": [
+          {
+            "name": "Set your air purifier to Sleep Mode at night",
+            "description": "Automatically set your air purifier to sleep mode at night and enjoy its quietness and air-cleaning capability."
+          },
+          {
+            "name": "Turn on or off the display when you sleep",
+            "description": "Automatically turns on or off the display when you sleep to avoid sleep disruption."
+          },
+          {
+            "name": "Get a notification when your air quality is poor",
+            "description": "Know exactly when your home's air quality turns poor, so that you can address it. When the air quality of your device exceeds a threshold that you have set, you will receive a notification on your mobile device."
+          },
+          {
+            "name": "Send me an email when uHoo detects anything out of range",
+            "description": "Get notified via email whenever any of my sensors for uHoo look like they are higher than my thresholds."
+          },
+          {
+            "name": "Get a notification for unhealthy air quality",
+            "description": "When the air quality measured from Acer Air Monitor is unhealthy (i.e. when IAQ is higher than 150), you'll receive a notification with the air quality reading."
+          },
+          {
+            "name": "Record unhealthy air quality readings in a Google Spreadsheet",
+            "description": "When the air quality measured from Acer Air Monitor is not good (i.e. IAQ is higher than 50), add a new row with the reading in a Google Sheet."
+          }
+        ]
+      },
+      {
+        "name": "garage door controllers",
+        "scenarios": [
+          {
+            "name": "Check and close the garage door every night with Garageio",
+            "description": "Ever wonder if you closed the garage? Set a time of day and if Garageio sees that the door is open at that time, it will automatically close it. "
+          },
+          {
+            "name": "MyQ open history",
+            "description": "When your garage door is opened, this applet will log activity to a spreadsheet.\n\nThis applet requires an active account linking subscription."
+          },
+          {
+            "name": "Open Garage Door with Button Widget",
+            "description": "Open garage door with button widget on your smartphone."
+          },
+          {
+            "name": "Close Garage Door with Button Widget",
+            "description": "Close garage door with button widget on your smartphone"
+          }
+        ]
+      },
+      {
+        "name": "smart locks",
+        "scenarios": [
+          {
+            "name": "Locking several NUKI smart locks via Google Assistant",
+            "description": "Say a phrase (e.g. \"lock doors\") via Google Assistant to lock'n'go one NUKI smart lock and also lock another."
+          },
+          {
+            "name": "Lock your Danalock by voice via an Amazon Echo, Tap and Dot",
+            "description": "Say \"Alexa, trigger lock\" to lock your door. You can customize the passphrase when you set up the Applet. "
+          },
+          {
+            "name": "Unlock your door by voice with Amazon Echo, Tap and Dot",
+            "description": "IF passphrase THEN unlock door"
+          },
+          {
+            "name": "Log August 'Unlocked' Events to Google Calendar",
+            "description": "When your August lock is Unlocked, it will be recorded in a Google Calendar of your choosing."
+          }
+        ]
+      },
+      {
+        "name": "routers and wi\u2011fi systems",
+        "scenarios": [
+          {
+            "name": "Google Wifi Connection Log",
+            "description": "Track connections to your Google Wifi for a chosen device with an IFTTT push notification, an entry into a Google Sheets log, and a new Google Calendar event that begins at the time of device connection. "
+          },
+          {
+            "name": "Google Wifi Disconnection Log",
+            "description": "Track disconnections from your Google Wifi for a chosen device with an IFTTT push notification, an entry into a Google Sheets log, and a new Google Calendar event that begins at the time of device connection. "
+          },
+          {
+            "name": "Warning, Stranger Connected! Get notification when a new device is online.",
+            "description": "Sick of Wi-Fi squatters? Set an applet to send notifications and log network issues real-time."
+          },
+          {
+            "name": "Prioritize a device with one click",
+            "description": "This creates a widget you can add to the home screen on your phone. When you press it,  a specific device you choose will get a faster internet connection on your TP-Link network."
+          },
+          {
+            "name": "Turn off your Wi-Fi for family time",
+            "description": "Your Wi-Fi will turn off at a time you set for family time. That means more time to spend  quality time together without any modern world interference!"
+          }
+        ]
+      },
+      {
+        "name": "security systems / alarms",
+        "scenarios": [
+          {
+            "name": "When you leave home, arm your Myfox Home Alarm",
+            "description": "If you exit the area around your house then change Myfox Home Alarm security mode to armed."
+          },
+          {
+            "name": "Secure your home with Google Assistant",
+            "description": "Arm Safe by HUB6 using a simple phrase through Google Assistant."
+          },
+          {
+            "name": "Play a Myfox scenario with a tap",
+            "description": "Control your Myfox alarm system with DO button"
+          }
+        ]
+      },
+      {
+        "name": "home automation hubs and scenes",
+        "scenarios": [
+          {
+            "name": "When I get close to the home in location, run a scene in domovea",
+            "description": "When I get close to the home  in location, run a scene in domovea"
+          },
+          {
+            "name": "Run your FIBARO scene when you arrive at a chosen destination",
+            "description": "Whenever you arrive at a specified location, FIBARO will run a chosen scene."
+          },
+          {
+            "name": "Directly launch a TaHoma scenario when activating an IFTTT widget on your phone.",
+            "description": "Directly launch a TaHoma scenario when activating an IFTTT widget on your phone. For example, have your favorite scenario played at your finger tips."
+          },
+          {
+            "name": "At sunset, activate a Wink shortcut",
+            "description": "A great way to automatically turn on your lights as the sun goes down. Select a shortcut that controls your lights and it'll run every day at sunset!"
+          }
+        ]
+      },
+      {
+        "name": "smart irrigation",
+        "scenarios": [
+          {
+            "name": "Delay my Rachio Sprinkler cycle when it rains. ",
+            "description": "When rain is detected, delay your Rachio Sprinkler cycle by X day(s). Reduce water waste when it rains. "
+          },
+          {
+            "name": "Rachio Summer Climate Monitor ",
+            "description": "Start Climate Monitor watering once tempuature reaches this point"
+          },
+          {
+            "name": "Delay watering if it's going to rain",
+            "description": "If the weather looks like it's going to rain, automatically pause your sprinkler system for a day to help conserve wastage and save money."
+          }
+        ]
+      },
+      {
+        "name": "appliances and whitegoods",
+        "scenarios": [
+          {
+            "name": "Get notified when your wash is about to end",
+            "description": "Receive a notification reminding you to take out the clothes from the washing machine."
+          },
+          {
+            "name": "Have your laundry history marked on Google Calendar",
+            "description": "Each laundry session automatically gets marked as an event on your Google Calendar. Ever wonder how often you use the washer? Check your Google Calendar."
+          },
+          {
+            "name": "Have your dryer usage history marked on Google Calendar",
+            "description": "Each dry session automatically gets marked as an event on your Google Calendar. Ever wonder how often you use the dryer? Check your Google Calendar."
+          },
+          {
+            "name": "Get a notification when your coffee machine is out of beans",
+            "description": "Get a notification on your iPhone, Android phone or any other device when your coffee machine with Home Connect is out of beans."
+          },
+          {
+            "name": "Say \"Alexa trigger coffee\" to start the wemo coffee pot",
+            "description": "Saying \"Alexa trigger coffee\" tells the coffee pot to start brewing coffee.  "
+          },
+          {
+            "name": "Boil your iKettle with Button",
+            "description": "Add a button widget to your device to boil your iKettle. "
+          }
+        ]
+      },
+      {
+        "name": "home entertainment hubs",
+        "scenarios": [
+          {
+            "name": "Tell Alexa to start a Harmony activity",
+            "description": "Choose a phrase to control your Harmony Home with Alexa. When you say \"Alexa, trigger + [your phrase]\" you can start any Harmony activity you choose below. "
+          },
+          {
+            "name": "Google Assistant start Harmony Activity",
+            "description": "Start a harmony activity with Google Assistant"
+          },
+          {
+            "name": "Control your TV with Alexa",
+            "description": "Trigger activities on your Harmony Home with Alexa. Simply say \"Alexa, trigger + [your phrase]\" to start an activity."
+          }
+        ]
+      },
+      {
+        "name": "weather stations and sensors",
+        "scenarios": [
+          {
+            "name": "Get notified when it starts raining",
+            "description": "Get a notification on your mobile IFTTT app when your Ambient Weather device starts picking up new rain."
+          },
+          {
+            "name": "Netatmo Rain Calendar Entry",
+            "description": "Daily Entry of yesterday's rain fall as measured by Netatmo weather station"
+          },
+          {
+            "name": "Log Lightning to Google Sheet",
+            "description": "Log details about each lightning strike reported by your WeatherFlow Smart Weather Station to a Google spreadsheet."
+          }
+        ]
+      },
+      {
+        "name": "buttons and remotes",
+        "scenarios": [
+          {
+            "name": "Turn on my Nanoleaf lights with Flic",
+            "description": "Turn on my Nanoleaf lights when a Flic button with your specified tag is pressed. Choose wisely, young grasshopper."
+          },
+          {
+            "name": "Toggle TP-Link Kasa devices on/off with Flic",
+            "description": "Toggle TP-Link Kasa devices on/off with Flic"
+          },
+          {
+            "name": "Turn on or off your device with the press of a button",
+            "description": "This Applet uses a button widget on your phone to turn on or off your device. Simply add the button widget with the IFTTT mobile app to access it. Learn more at https://help.ifttt.com/hc/en-us/articles/115010361688"
+          },
+          {
+            "name": "Turn on a Scene with a single tap",
+            "description": "A press on the button widget will activate the Scene of your choice on your WiZ lights.\nIt's never been easier to re-play your favorite light moods!"
+          }
+        ]
+      },
+      {
+        "name": "multi-device scenarios",
+        "scenarios": [
+          {
+            "name": "Amazon Alexa trigger Hue \"Sexy Time\" (with Music)",
+            "description": "Dim your hue lights to 70%, change the Color to a smooth Pink/Red and let ifttt give you a VoipCall to your Phone. \nProtip: Save the Contact and assign a sexy Ringtone to it (f.ex. \"Let's get it on\" from Marvin Gaye). "
+          },
+          {
+            "name": "Get notified when dryer cycle ends",
+            "description": "Your Philips Hue lights will change color to green and you will receive a notification, when dryer cycle is complete."
+          },
+          {
+            "name": "Get notified if refrigerator door is left open too long",
+            "description": "Your Philips Hue lights will change color to blue and you will receive a notification, if refrigerator door is left open too long.\n"
+          },
+          {
+            "name": "Get notified if freezer door is left open too long",
+            "description": "Your Philips Hue lights will change color to blue and you will receive a notification, if freezer door is left open too long."
+          },
+          {
+            "name": "Automatically turn on your Hue lights when Nest Cam detects motion or sound",
+            "description": "The lights will alert whoever (or whatever) is moving around that their presence has been noted! "
+          },
+          {
+            "name": "Use Alexa To Run My Shades And Turn On My Lights",
+            "description": "Tell Alexa to operate the Hunter Douglas PowerView Scene of your choice and turn on your Philips Hue lights."
+          },
+          {
+            "name": "Press A Button To Activate Shades And Lights",
+            "description": "Press the button widget to activate a Scene for Hunter Douglas PowerView shades and a Scene for Philips Hue lights."
+          },
+          {
+            "name": "Turn off lights when motion is no longer detected by Wyze Motion Sensor",
+            "description": "Whenever the motion sensor clears on the Wyze Sense motion sensor, turn off a particular light. Please note that it takes several seconds for the Wyze Sense motion sensor to say that it is clear. Check the Wyze app to verify. (Create your own applet to if you wanted the lights to do something else, like flash or change colors)."
+          },
+          {
+            "name": "Turn off Kasa when motion is no longer detected by Wyze Motion Sensor",
+            "description": "Whenever the motion sensor clears on the Wyze Sense motion sensor, turn off a Kasa device. Please note that it takes several seconds for the Wyze Sense motion sensor to say that it is clear. Check the Wyze app to verify. (I'm using this to turn off a device plugged into a Kasa smart plug when the motion clears, but you can do anything)."
+          },
+          {
+            "name": "Adjust the room temperature to be optimal for sleeping when I get into bed",
+            "description": "When Withings Sleep detects you get into bed, your Nest Thermostat will adjust the room temperature to be optimal for sleeping."
+          },
+          {
+            "name": "Setup your sleep environment with Eight Night Mode",
+            "description": "Setup your bedroom for a quality night sleep by dimming your Hue lights, turning down the room temperature with Nest Thermostat, and silence your Android phone. "
+          },
+          {
+            "name": "When Tado switches to away turn off Hue lights",
+            "description": "This will allow you to turn off all or selected zones of Philips Hue lights when your Tado heating switches to away mode.  This should help save electricity and money when you're forgetful or in a hurry and leave lights on around the house."
+          },
+          {
+            "name": "Turn your WeMo switch on when motion is detected ",
+            "description": "Turn on your WeMo switch when motion is detected by your Ezviz camera."
+          },
+          {
+            "name": "Use Google voice control to activate a Philips Hue and myLink scene ",
+            "description": "Talk to your Google Assistant to open your Somfy-Powered shades and Philips Hue lights with simple customized commands or use the preset command"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "categories": [
+      {
+        "name": "smart lights",
+        "scenarios": [
+          {
+            "name": "Notify me with light when the doorbell rings",
+            "description": "This will turn on the WiZ lights of your choice in the mode and brightness you defined whenever your Ring doorbell rings."
+          },
+          {
+            "name": "Turn on Hue lights when you connect to your WiFi",
+            "description": "Turns on Hue lights when you connect to your home WiFi (or any other WiFi network)"
+          },
+          {
+            "name": "Turn your Hue lights on/off with this button",
+            "description": "Toggle your Hue lights with this shortcut widget button."
+          },
+          {
+            "name": "Wake up with the sunrise by gently fading on your LIFX lights",
+            "description": "As the sun rises, your LIFX bulbs will turn on slowly."
+          },
+          {
+            "name": "Switch on your Yeelights with \"Ok Google, <your phrase>\"",
+            "description": "Say \"OK Google, <your phrase>\" to turn on your Yeelight."
+          },
+          {
+            "name": "Turn #Off Hue lights with Siri",
+            "description": "Turn #Off Hue lights with Siri via email trigger."
+          },
+          {
+            "name": "Toggle Hue Lights with the click of a button",
+            "description": "Toggle Hue Lights with LaMetric button."
+          },
+          {
+            "name": "Alert me via my Hue if the wind gets dangerous",
+            "description": "Change Hue lights based on Netatmo wind conditions."
+          },
+          {
+            "name": "Turn on colour loop on select lights with brightness",
+            "description": "Use Google Assistant to start a colour loop on Philips Hue."
+          },
+          {
+            "name": "Wakeup with Hue",
+            "description": "Schedule Hue lights to wake you up at a set time."
+          },
+          {
+            "name": "Start your morning off right with Nanoleaf daylight mode",
+            "description": "At a time you choose, set a daylight Scene on Nanoleaf."
+          },
+          {
+            "name": "Turn ON your HALO Home lights with one tap",
+            "description": "Use Button widget to turn HALO Home lights ON or OFF."
+          },
+          {
+            "name": "Wake Up with Philips Hue",
+            "description": "Sets scene and turns on light for Philips Hue at a time."
+          },
+          {
+            "name": "Turn on the light when I get home",
+            "description": "Automatically turn on WiZ light(s) when you enter a defined area."
+          },
+          {
+            "name": "Automatically turn your lights on at sunset",
+            "description": "Turn Philips Hue on at sunset."
+          }
+        ]
+      },
+      {
+        "name": "smart plugs and switches",
+        "scenarios": [
+          {
+            "name": "Email IFTTT with #wemooff in the subject to turn off WeMo Switch",
+            "description": "Email trigger@recipe.ifttt.com with #wemooff in the subject to turn WeMo off."
+          },
+          {
+            "name": "Quickly reset a device with a wemo switch",
+            "description": "Button widget toggles WeMo Insight Switch off and back on."
+          },
+          {
+            "name": "Turn on your smart plug with the press of a button",
+            "description": "Use a button widget to turn on a BroadLink smart switch."
+          },
+          {
+            "name": "Toggle your switch on/off with Button widget (VeSync)",
+            "description": "Turn on/off your VeSync switch with one tap on your phone."
+          },
+          {
+            "name": "Exiting an area will power off devices",
+            "description": "When you leave a location, turn off TP-Link Kasa device."
+          },
+          {
+            "name": "Turn on WIFIPLUG at sunset",
+            "description": "Automatically turn on WIFIPLUG at local sunset."
+          },
+          {
+            "name": "Turn on a WeMo smart switch at sunset",
+            "description": "Automatically turns a WeMo switch on at sunset."
+          }
+        ]
+      },
+      {
+        "name": "thermostats and HVAC",
+        "scenarios": [
+          {
+            "name": "Set Honeywell Thermostat to temperature with Google Assistant",
+            "description": "Control Honeywell Total Connect Comfort via Google Assistant."
+          },
+          {
+            "name": "If connect to Home WiFi, Turn on Nest Thermostat",
+            "description": "When Android connects to home WiFi, adjust Nest."
+          },
+          {
+            "name": "Set your Wiser Air to \"Home\" when you come home",
+            "description": "On arrival set Wiser Air to Home."
+          },
+          {
+            "name": "Sage \"Mir ist kalt!\" und Tado\u00b0 heizt 30min voll",
+            "description": "Voice via Google Assistant boosts tado\u00b0 for 30 minutes."
+          },
+          {
+            "name": "Turn on AQUAREA with Google Assistant",
+            "description": "Turn on Panasonic AQUAREA in Heat Mode via Assistant."
+          },
+          {
+            "name": "Activate thermostat timer with a single tap",
+            "description": "Button widget sets Nefit Easy timer/temperature."
+          },
+          {
+            "name": "Honeywell Thermostat reset to normal programming at set time",
+            "description": "Resume schedule on Honeywell TCC at a daily time."
+          },
+          {
+            "name": "Use Google Assistant to turn off AC (Ambi Climate)",
+            "description": "Voice off for air conditioner via Ambi Climate."
+          },
+          {
+            "name": "Set your Wiser Air to heat mode when outdoor < 55\u00b0F",
+            "description": "Weather-based mode change on Wiser Air."
+          }
+        ]
+      },
+      {
+        "name": "security cameras",
+        "scenarios": [
+          {
+            "name": "Turn on Withings Home automatically when I leave home",
+            "description": "Switch Withings Home to Active Monitoring when Android exits an area."
+          },
+          {
+            "name": "Daily Sunset Recording with Arlo",
+            "description": "Record a video every day at sunset with Arlo."
+          },
+          {
+            "name": "Activate Arlo with Alexa",
+            "description": "Use Alexa to arm Arlo security."
+          },
+          {
+            "name": "Start recording with Manything at a specific time",
+            "description": "Schedule camera recording with Manything."
+          },
+          {
+            "name": "Turn on/off Wyze motion detection based on WiFi connection",
+            "description": "Enable/disable Wyze motion detection when Android disconnects/connects to home WiFi."
+          },
+          {
+            "name": "Get an email when your Blink Camera detects motions",
+            "description": "Email on Blink motion events."
+          },
+          {
+            "name": "Automatically start recording via Arlo when it detects motion",
+            "description": "Arlo starts recording on motion."
+          }
+        ]
+      },
+      {
+        "name": "video doorbells",
+        "scenarios": [
+          {
+            "name": "Notify me with light when the doorbell rings",
+            "description": "Turn on WiZ lights when Ring doorbell rings."
+          },
+          {
+            "name": "If Ring doorbell rings, turn off and on WeMo smart plug",
+            "description": "Flash a WeMo-controlled device when Ring detects a ring."
+          },
+          {
+            "name": "Blink your Hue lights when your doorbell rings",
+            "description": "Hue lights blink on Ring doorbell press."
+          },
+          {
+            "name": "Use Alexa to record video of your front door",
+            "description": "SkyBell HD starts recording via Alexa command."
+          }
+        ]
+      },
+      {
+        "name": "robot vacuums",
+        "scenarios": [
+          {
+            "name": "When I leave home, start a cleaning job",
+            "description": "Start Roomba when you leave home."
+          },
+          {
+            "name": "Ok Google, start Roomba",
+            "description": "Voice start iRobot cleaning via Google Assistant."
+          },
+          {
+            "name": "Dock Roomba when motion is detected at your front door",
+            "description": "Pause/dock Roomba when Ring detects motion."
+          },
+          {
+            "name": "Pause your Roomba before a Zoom Meeting",
+            "description": "Automatically pause Roomba when Zoom meeting starts."
+          }
+        ]
+      },
+      {
+        "name": "garage doors and gates",
+        "scenarios": [
+          {
+            "name": "Open garage door with Siri via SMS",
+            "description": "Use SMS to control Gogogate garage door opener."
+          },
+          {
+            "name": "Close garage door with Siri via SMS",
+            "description": "Use SMS to close Gogogate."
+          },
+          {
+            "name": "Be sure that your garage is closed every night",
+            "description": "Attempt to close garage at a set time with Gogogate."
+          },
+          {
+            "name": "When I arrive at my house, open my garage door",
+            "description": "Open gate/door when you enter a geofence (Gogogate/GarageWiFi)."
+          },
+          {
+            "name": "When you leave home, close the garage",
+            "description": "Auto-close garage on leaving a geofence (MyQ/GarageWiFi)."
+          }
+        ]
+      },
+      {
+        "name": "smart locks",
+        "scenarios": [
+          {
+            "name": "Turn off your Hue lights when you leave home",
+            "description": "When you leave via Nuki Lock 'n' Go, turn off Hue."
+          },
+          {
+            "name": "Turn on your Hue lights when you arrive home",
+            "description": "On Nuki Auto Unlock arrival, turn on Hue."
+          },
+          {
+            "name": "Log timestamp on Google Drive whenever Sesame is unlocked",
+            "description": "Create a log entry each time Sesame is unlocked."
+          }
+        ]
+      },
+      {
+        "name": "window coverings & shades",
+        "scenarios": [
+          {
+            "name": "Activate a scene using a home screen Widget",
+            "description": "Quickly activate Somfy myLink scenes via Button widget."
+          },
+          {
+            "name": "Automatically close your awning when it gets too windy",
+            "description": "Use Weather Underground and Somfy myLink to close awning in high winds."
+          },
+          {
+            "name": "Run a PowerView Scene with a tagged text message",
+            "description": "Execute a Hunter Douglas PowerView scene via SMS."
+          },
+          {
+            "name": "Ask Google Assistant to launch a TaHoma scene",
+            "description": "Launch a Somfy TaHoma scene by voice."
+          },
+          {
+            "name": "Use Google Assistant to open my blind",
+            "description": "Voice open Connector (Dooya) blind to a position."
+          }
+        ]
+      },
+      {
+        "name": "sprinklers, garden & lawn mowers",
+        "scenarios": [
+          {
+            "name": "Stop watering if Netatmo detects strong winds",
+            "description": "Netatmo Weather Station winds stop GARDENA watering."
+          },
+          {
+            "name": "Turn off your sprinklers when it's too windy",
+            "description": "Ambient Weather device triggers Rachio off."
+          },
+          {
+            "name": "Tell Google Assistant to start watering",
+            "description": "Open RainMachine valve for a specified time."
+          },
+          {
+            "name": "Tell Google Assistant to stop mowing",
+            "description": "Send GARDENA mower to charging station."
+          },
+          {
+            "name": "Park Automower when it Rains",
+            "description": "Park Husqvarna Automower when raining."
+          }
+        ]
+      },
+      {
+        "name": "speakers and audio",
+        "scenarios": [
+          {
+            "name": "Play Sonos with MyStrom Button",
+            "description": "Trigger Sonos favorite with myStrom button."
+          },
+          {
+            "name": "Start your morning with the lights on and some music",
+            "description": "Google Assistant turns Hue on and opens music player on Android."
+          },
+          {
+            "name": "When Roomba starts, turn up Sonos volume",
+            "description": "Increase Sonos volume when iRobot starts."
+          }
+        ]
+      },
+      {
+        "name": "wi\u2011fi routers & networking",
+        "scenarios": [
+          {
+            "name": "Prioritize PS4 with your voice on Google Wifi",
+            "description": "Use Google Assistant to prioritize PS4 on Google Wifi for one hour."
+          },
+          {
+            "name": "Have Google Wifi prioritize your zoom call quality",
+            "description": "Auto-prioritize your Zoom device on Google Wifi when a meeting starts."
+          },
+          {
+            "name": "TP-Link Router + devices automation",
+            "description": "Turn Hue on/off when device connects/disconnects to TP-Link Router."
+          }
+        ]
+      },
+      {
+        "name": "appliances (washer, dryer, oven, hood, AC, coffee, kettle)",
+        "scenarios": [
+          {
+            "name": "Tell Google Assistant to preheat your oven",
+            "description": "Voice preheat Home Connect Oven to a set temperature."
+          },
+          {
+            "name": "Pre-cool your home using a GE Smart Window AC",
+            "description": "Turn on GE Window AC before on-peak hours."
+          },
+          {
+            "name": "Press a button to turn on your hood light",
+            "description": "Button widget turns on Home Connect hood lighting."
+          },
+          {
+            "name": "Ask Alexa to prepare your favorite coffee",
+            "description": "Start Home Connect Coffee Machine program via Alexa."
+          },
+          {
+            "name": "Turn on Appkettle using Google Home",
+            "description": "Use Google Assistant to turn on Appkettle."
+          },
+          {
+            "name": "Ask Alexa to start your washer",
+            "description": "Start Home Connect Washer via Alexa."
+          },
+          {
+            "name": "Play music when your laundry is complete",
+            "description": "Android device plays music when LG Washer finishes."
+          }
+        ]
+      },
+      {
+        "name": "air quality, sensors & purifiers",
+        "scenarios": [
+          {
+            "name": "Blink your LIFX lights when CO\u2082 is back to normal",
+            "description": "If Netatmo CO\u2082 drops below threshold, blink LIFX."
+          },
+          {
+            "name": "Flash Hue Light if radon level is high",
+            "description": "Airthings high radon triggers Hue blink."
+          },
+          {
+            "name": "Record the time on Google Sheets when air purifier is turned on",
+            "description": "Log Levoit Air Purifier usage times."
+          },
+          {
+            "name": "Turn on air purifier at sunset",
+            "description": "Levoit Air Purifier turns on at local sunset."
+          },
+          {
+            "name": "Track outdoor air quality in Google Sheets",
+            "description": "Filtrete Smart logs hourly outdoor AQ to Sheets."
+          }
+        ]
+      },
+      {
+        "name": "pool & water systems",
+        "scenarios": [
+          {
+            "name": "Send myself an e-mail with my swimming pool water measurements",
+            "description": "Email every time Blue Connect measures pool water."
+          },
+          {
+            "name": "Receive a text if Phyn sends a freeze warning alert",
+            "description": "SMS when Phyn detects freezing risk."
+          }
+        ]
+      },
+      {
+        "name": "home security systems & alarms",
+        "scenarios": [
+          {
+            "name": "Arm Somfy Protect with Google Assistant",
+            "description": "Voice arm Somfy Protect system."
+          },
+          {
+            "name": "Arm smanos with Amazon Alexa",
+            "description": "Use Alexa to arm smanos connect."
+          },
+          {
+            "name": "When your timer goes off, blink Yeelights",
+            "description": "Alexa timer causes Yeelight blink as alert."
+          },
+          {
+            "name": "If Nest Protect detects smoke, turn on lights",
+            "description": "Nest Protect smoke emergency turns on Hue."
+          },
+          {
+            "name": "Abode alarm activates lights",
+            "description": "If Abode alarm activates, all Hue lights turn on."
+          }
+        ]
+      },
+      {
+        "name": "weather stations & environment sensors",
+        "scenarios": [
+          {
+            "name": "Log strong wind gusts in my Google Drive",
+            "description": "Log Netatmo Weather Station wind to Google Sheets."
+          },
+          {
+            "name": "Blink my Hue lights when the first rain drops start falling",
+            "description": "Tempest Weather System triggers Hue blink on rain."
+          },
+          {
+            "name": "Display humidity on Wink Nimbus",
+            "description": "Show Weather Underground data on Wink Nimbus."
+          }
+        ]
+      },
+      {
+        "name": "controllers & smart buttons",
+        "scenarios": [
+          {
+            "name": "Turn on your SwitchBot with one tap on your phone",
+            "description": "Control SwitchBot via Button widget."
+          },
+          {
+            "name": "Say a specific phrase and Amazon Alexa will run a Scene (AICO Smart Egg)",
+            "description": "Trigger IR scenes with AICO Smart Egg via voice."
+          },
+          {
+            "name": "Toggle your Hive Active Lights on and off with your Flic",
+            "description": "Click Flic to toggle Hive lights."
+          }
+        ]
+      },
+      {
+        "name": "multi-device scenarios",
+        "scenarios": [
+          {
+            "name": "Alexa trigger Movie Night (Wink)",
+            "description": "Alexa triggers Harmony and Wink to start Netflix and dim the lights."
+          },
+          {
+            "name": "Arlo Arm with Somfy Protect",
+            "description": "Activate Arlo when Somfy Protect is armed."
+          },
+          {
+            "name": "When your Nest is set to Away, your Withings Home will turn on automatically",
+            "description": "Use Nest Thermostat state to control Withings Home camera."
+          },
+          {
+            "name": "Disarm your Blink System and turn on Philips Hue Lights when you get home",
+            "description": "On arrival, disarm Blink and turn on Hue."
+          },
+          {
+            "name": "If Arlo Motion outside, then Turn on Lamp with WeMo Insight Switch",
+            "description": "Use Arlo motion to turn on a WeMo-controlled lamp."
+          },
+          {
+            "name": "Start your morning with the lights on and some music",
+            "description": "Google Assistant turns on Hue and opens default music player on phone."
+          },
+          {
+            "name": "Turn off your coffee machine and lights when you leave home",
+            "description": "On exit, turn off Home Connect Coffee Machine and Philips Hue."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "categories": [
+      {
+        "name": "smart switches and plugs",
+        "scenarios": [
+          {
+            "name": "Turn WeMo switch on when entering area at certain time.",
+            "description": "Turns on WeMo light switch when an area is entered between 17:00 and 7:00"
+          },
+          {
+            "name": "If my WeMo Insight enters standby send me sms",
+            "description": "If my WeMo Insight enters standby send me sms"
+          },
+          {
+            "name": "Check Wemo Insight On every hour",
+            "description": "Check Wemo Insight On every hour"
+          },
+          {
+            "name": "When WeMo #1 is switched on this Recipe turns on WeMo #2",
+            "description": "When WeMo #1 is switched on this Recipe turns on WeMo #2"
+          },
+          {
+            "name": "Turn on WeMo",
+            "description": "Turn on WeMo"
+          },
+          {
+            "name": "Toggle WeMo Switch on Email",
+            "description": "Toggle WeMo Switch on Email"
+          },
+          {
+            "name": "Mail to turn WeMo On",
+            "description": "Email trigger@recipe.ifttt.com with #WeMoOn in the subject to turn WeMo on."
+          },
+          {
+            "name": "Turn off Wemo Switch when leave home",
+            "description": "Turn off Wemo Switch when leave home"
+          },
+          {
+            "name": "Turn on WeMo Insight when the sun goes down",
+            "description": "Turn on WeMo Insight when the sun goes down"
+          },
+          {
+            "name": "Turn off WeMo Switch at sunrise.",
+            "description": "This is nice for a lamp."
+          },
+          {
+            "name": "Toggle on/off WeMo switch when you arrive or leave your home",
+            "description": "Toggle on/off WeMo switch when you arrive or leave your home"
+          },
+          {
+            "name": "Wemo on at Sunset",
+            "description": "Wemo on at Sunset"
+          },
+          {
+            "name": "Turn off WeMo Smart Plug at a specific time each day.",
+            "description": "This applets can be used to turn off an appliance or lamp every day at a certain time."
+          },
+          {
+            "name": "On then off",
+            "description": "On then off"
+          },
+          {
+            "name": "Power Cycle the WeMo every hour.",
+            "description": "Power Cycle the WeMo every hour."
+          },
+          {
+            "name": "Timed off for Wemo.",
+            "description": "Timed off for Wemo."
+          },
+          {
+            "name": "Turn Switch off when you leave the house",
+            "description": "Turn Switch off when you leave the house"
+          }
+        ]
+      },
+      {
+        "name": "smart lights (bulbs, light panels, and lighting systems)",
+        "scenarios": [
+          {
+            "name": "Switch on lights at sunset",
+            "description": "Switch on lights at sunset"
+          },
+          {
+            "name": "Switch on all hue lights at 6:00am mon to Friday and run a colour loop",
+            "description": "Switch on all hue lights at 6:00am mon to Friday and run a colour loop"
+          },
+          {
+            "name": "Switch off",
+            "description": "Switch all lights off"
+          },
+          {
+            "name": "Turn on your WeMo Dimmer when you get home",
+            "description": "Have the lights connected to your WeMo Dimmer turn on as soon as you're in range of your home."
+          },
+          {
+            "name": "Toggle your lights on/off",
+            "description": "Quickly toggle your WeMo Light Switch on and off with this Button Widget. Note: IFTTT app is needed for this Applet."
+          },
+          {
+            "name": "Switch off WEMO lights every night",
+            "description": "Turn off WEMO light switch at set time every night"
+          },
+          {
+            "name": "Turn on WeMo dimmer at sunrise",
+            "description": "Wake up with the sun by having your WeMo dimmer turn on at sunrise."
+          }
+        ]
+      },
+      {
+        "name": "thermostats and HVAC",
+        "scenarios": [
+          {
+            "name": "Switch heating on, when nearly @home",
+            "description": "Switch the heating on, when you are nearly at home"
+          },
+          {
+            "name": "Turn my heating up when I get near my home",
+            "description": "Switch your thermostat up when you are coming home"
+          },
+          {
+            "name": "IF temperature rises above threshold THEN switch AC on in comfort mode",
+            "description": "IF temperature measured by Ambi Climate rises above threshold THEN switch AC on in comfort mode"
+          },
+          {
+            "name": "IF temperature drops below threshold THEN switch AC on in comfort mode",
+            "description": "IF temperature measured by Ambi Climate drops below threshold THEN switch AC on in comfort mode"
+          },
+          {
+            "name": "Cold weather forecast time to turn the heating on",
+            "description": "Turn on the heating when the weather forecast is to get cold."
+          }
+        ]
+      },
+      {
+        "name": "security cameras and doorbells",
+        "scenarios": [
+          {
+            "name": "Wyze motion detected",
+            "description": "Notify me when motion detected"
+          },
+          {
+            "name": "Activate motion detection on your Wyze Cams on any specific weekday & time",
+            "description": "By using Date and Time you can schedule the activation of motion detection on your Wyze Cams by any day of the week and time of day."
+          },
+          {
+            "name": "Deactivate motion detection on your Wyze Cams on any specific weekday & time",
+            "description": "By using Date and Time you can schedule the deactivation of motion detection on your Wyze Cams by any day of the week and time of day."
+          },
+          {
+            "name": "When connected to home Wi-Fi, turn light on",
+            "description": "Select Wi-Fi and light options."
+          }
+        ]
+      },
+      {
+        "name": "appliances (connected ovens, dishwashers, washers, dryers, coffee machines, hoods)",
+        "scenarios": [
+          {
+            "name": "Turn off your oven when you leave home",
+            "description": "Never ask yourself, \u201cDid I turn the oven off,\u201d again. Use your location to turn off your oven with Home Connect when you leave home. "
+          },
+          {
+            "name": "Preheat your oven",
+            "description": "Press the Button widget to preheat your oven using the fast preheat option. Just set your preferred temperature, duration and program."
+          },
+          {
+            "name": "Start the dishwasher every evening before going to bed",
+            "description": "Wake up every morning to clean dishes. Just define a time when your dishwasher shall start every evening. Please make sure that remote start is activated and the door is closed."
+          },
+          {
+            "name": "Turn off your switch at sunrise",
+            "description": "Turn off your switch within 15 minutes of the sunrise at your location."
+          },
+          {
+            "name": "Turn on your switch at sunset",
+            "description": "Turn on your switch within 15 minutes of the sunset at your location."
+          }
+        ]
+      },
+      {
+        "name": "garage doors and gates",
+        "scenarios": [
+          {
+            "name": "Close your MyQ garage when you leave home",
+            "description": "Let MyQ automatically close the garage when you leave the area of your home. \n\nThis applet requires an active account linking subscription."
+          },
+          {
+            "name": "Send notification when MyQ garage door opens",
+            "description": "Receive a notification when your MyQ garage door is opened.\n\nThis applet requires an active account linking subscription."
+          }
+        ]
+      },
+      {
+        "name": "smart locks and access control",
+        "scenarios": [
+          {
+            "name": "Alexa Tells SmartThings To UNLOCK Front Door. I use the Phrase \"Unlatch front door lock\" \n(updated)",
+            "description": "Please be careful with this command. I used the word  Unlatch to make it harder to guess. \nFor Example    \"Alexa trigger Unlatch front door lock\"   \n\nNew Option: Made the Phrase editable.\n\nupdated 10/17/16\n"
+          }
+        ]
+      },
+      {
+        "name": "shades and blinds",
+        "scenarios": [
+          {
+            "name": "Alexa, trigger my Hunter Douglas PowerView Scene #1",
+            "description": "Speak a phrase to Alexa to activate a Hunter Douglas PowerView Scene"
+          },
+          {
+            "name": "Hey Google, trigger my Hunter Douglas PowerView Scene #1",
+            "description": "Speak a phrase to Google Assistant to activate a Hunter Douglas PowerView Scene"
+          }
+        ]
+      },
+      {
+        "name": "multi-device scenarios",
+        "scenarios": [
+          {
+            "name": "Flip on my Hue Lights via WeMo Wall Switch",
+            "description": "Flip on my Hue Lights via WeMo Wall Switch"
+          },
+          {
+            "name": "Long press Wemo Switch = All Hue lights off",
+            "description": "Long press Wemo Switch = All Hue lights off"
+          },
+          {
+            "name": "If your Nest Thermostat rises above ___\u00b0 then turn off a WeMo Switch",
+            "description": "If your Nest Thermostat rises above ___\u00b0 then turn off a WeMo Switch"
+          },
+          {
+            "name": "If your Nest Thermostat drops below ___\u00b0 then turn on a WeMo Switch",
+            "description": "If your Nest Thermostat drops below ___\u00b0 then turn on a WeMo Switch"
+          },
+          {
+            "name": "Set to Away and turn your WeMo Switch on",
+            "description": "Set to Away and turn your WeMo Switch on"
+          },
+          {
+            "name": "Nest Cam Turns On WEMO ",
+            "description": "Sound or motion events trigger the WEMO switch."
+          },
+          {
+            "name": "Switch on Smarthings device when doorbell pressed",
+            "description": "This recipie links the Ring Doorbell and SmartThings so that if the door bell Is pressed a Smarthings device is activated"
+          },
+          {
+            "name": "Turn off Hue and Wemo connected lights",
+            "description": "Uses google assistant to turn off Hue lights and Wemo Smart Plugs based on the command phrases \"Turn off the lights\" and \"Turn everything off\". (Command phrases are configurable)"
+          },
+          {
+            "name": "Turn on Hue and Wemo connected lights",
+            "description": "Uses google assistant to turn on Hue lights and Wemo Smart Plugs based on the command phrases \"I'm home\" and \"Turn on the lights\". (Command phrases are configurable)"
+          },
+          {
+            "name": "Turn on Wemo Light if Arlo detects motion",
+            "description": "Integrate Arlo motion dection camera and Wemo Light switch"
+          },
+          {
+            "name": "Turn on a Wemo Light when Nest detects a smoke emergency",
+            "description": "Turns on a Wemo light bulb during a smoke alarm emergency"
+          },
+          {
+            "name": "Switch on a SmartThings device when motion is detected by SkyBell HD",
+            "description": "Switch on a SmartThings device when motion is detected by SkyBell HD"
+          },
+          {
+            "name": "When motion is detected by Blink, turn WeMo smart plug on",
+            "description": "When motion is detected by a Blink camera, turn WeMo smart plug on."
+          },
+          {
+            "name": "Blink your LIFX light when MyQ garage door opens",
+            "description": "Automatically blink your LIFX light when your MyQ garage door is opened.\n\nThis applet requires an active account linking subscription."
+          },
+          {
+            "name": "Turn on a Hubitat device when Ring detects motion",
+            "description": "Turns on a Hubitat switch, light, etc. when the Ring Doorbell detects motion."
+          },
+          {
+            "name": "If Wyze Cam detects motion, Blink LIFX lights",
+            "description": "Set which cameras detects motion to blink your LIFX lights any color"
+          },
+          {
+            "name": "Turn on Hue lights when Nest detects motion",
+            "description": "When the motion sensor on the nest is activated, lights can be set to predefined scenes. This essentially turns your nest thermostat into a hue motion sensor."
+          },
+          {
+            "name": "Arlo Motion Detection",
+            "description": "When ARLO Camera detects motion, then switch on HUE Light, and Start Recoding"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "categories": [
+      {
+        "name": "smart lights",
+        "scenarios": [
+          {
+            "name": "Creepy Halloween ",
+            "description": "Turns on all lights and changes the color to red on Halloween at 6pm"
+          },
+          {
+            "name": "Blink hue light at certain date and time",
+            "description": "On \"days of week\" if it's \"Time\" then \"blink\" my hue light"
+          },
+          {
+            "name": "Merry Christmas ",
+            "description": "run lights on a color loop Christmas morning "
+          },
+          {
+            "name": "Hue dim for bed",
+            "description": "Dim hue for bed time "
+          },
+          {
+            "name": "Dim down the lights",
+            "description": "A one-tap Applet for setting the mood."
+          },
+          {
+            "name": "Turn off color loop",
+            "description": "Turn off color loop with button press"
+          },
+          {
+            "name": "It's Friday. It's 10pm. Color loop the lights. #DaftParty",
+            "description": "Daft Punk Daft Party"
+          },
+          {
+            "name": "LIFX changes color when temperature drops",
+            "description": "Lifx bulbs change color when temperature drops"
+          },
+          {
+            "name": "Turn your lights on automatically as you arrive home",
+            "description": "Center the map on your home's location, and you'll always walk in to a bright home."
+          },
+          {
+            "name": "Natural sunset",
+            "description": "Natural sunset"
+          }
+        ]
+      },
+      {
+        "name": "thermostats and HVAC",
+        "scenarios": [
+          {
+            "name": "When you enter a specific area set your Heatmiser Thermostat to  __\u00b0 ",
+            "description": "Automatically turn your heating on when you return home"
+          },
+          {
+            "name": "When outside temp rises, change Mysa setpoint ",
+            "description": "Automatically change the Mysa setpoint (Only Celsius Available from Mysa) based on an outside temperature rise. "
+          },
+          {
+            "name": "When outside temp drops, change setpoint ",
+            "description": "Automatically change the Mysa setpoint (Only Celsius Available from Mysa) based on an outside temperature drop. "
+          },
+          {
+            "name": "Set a thermostat zone temperature",
+            "description": "Quickly set the target temperature of a zone on your Honeywell Single-zone Thermostat. Be sure to only input digits."
+          },
+          {
+            "name": "If sunrise, then set a zone temperature ",
+            "description": "If sunrise, then set a zone temperature"
+          },
+          {
+            "name": "Change temperature at this time",
+            "description": "Change temperature at a certain time"
+          },
+          {
+            "name": "Verwarming aan als ik bijna thuis ben",
+            "description": "Pas de lokatie aan"
+          },
+          {
+            "name": "Set a thermostat to a specific temperature (Nest)",
+            "description": "Going away for the weekend? Press your Kronaby pusher to set the Nest thermostat at the desired \"away\" temperature. "
+          },
+          {
+            "name": "At sunset set your Nest Thermostat to ___\u00b0",
+            "description": "At sunset set your Nest Thermostat to ___\u00b0"
+          },
+          {
+            "name": "If the temperature outside drops below ___\u00b0, then set your Nest to ___\u00b0 ",
+            "description": "If the temperature outside drops below ___\u00b0, then set your Nest to ___\u00b0 "
+          }
+        ]
+      },
+      {
+        "name": "security cameras and doorbells",
+        "scenarios": [
+          {
+            "name": "Send email when there's motion at my door",
+            "description": "Let folks know via email when there is motion at my door."
+          },
+          {
+            "name": "Arlo Low Battery Email",
+            "description": "This recipe sends an e-mail to you when your battery is low on a camera."
+          },
+          {
+            "name": "Disarm Blink at Time",
+            "description": "Set a time to disable a Blink system"
+          },
+          {
+            "name": "Push Button to Disarm Blink",
+            "description": "Button applet used to disarm Blink system."
+          },
+          {
+            "name": "Disarm Blink System When You Arrive Home",
+            "description": "Set your Blink system to automatically disarm when you return home to your property. "
+          },
+          {
+            "name": "Get an Email When Blink Detects Motion",
+            "description": "When a camera you select detects motion, you'll receive an email to your inbox. "
+          },
+          {
+            "name": "Blink Hue lights when SkyBell HD button is pressed",
+            "description": "Set your Hue lights to blink when a visitor presses your SkyBell HD's button."
+          },
+          {
+            "name": "Record 60 seconds of video when doorbell is pressed",
+            "description": "If the doorbell is pressed then record 60 seconds of video."
+          }
+        ]
+      },
+      {
+        "name": "security systems and sensors",
+        "scenarios": [
+          {
+            "name": "Disarm abode when you arrive home",
+            "description": "Changes abode to standby mode when entering your home zone"
+          },
+          {
+            "name": "Disable Abode each morning",
+            "description": "Sets Abode mode to Standby each morning"
+          },
+          {
+            "name": "Disarm my Scout Alarm at a Specific Time Everyday ",
+            "description": "Disarm your Scout Alarm at the same time you wake up. Schedule this at the same time as your alarm clock."
+          },
+          {
+            "name": "Disarm All Modes",
+            "description": "Disarm any mode you have armed"
+          },
+          {
+            "name": "Arm a Mode",
+            "description": "Arm a mode with DO"
+          },
+          {
+            "name": "If system detects an intrusion, then send me an SMS",
+            "description": "If system detects an intrusion, then send me an SMS"
+          },
+          {
+            "name": "If any new SMS received, then add row to spreadsheet for Notion door event",
+            "description": "Automatically send yourself a text message when Notion detects a door opens, closes or moves."
+          },
+          {
+            "name": "Text me when Notion detects a water leak",
+            "description": "Automatically send yourself a text message when Notion detects a Water Leak."
+          },
+          {
+            "name": "If your Nest detects a carbon monoxide emergency, send android SMS to family.",
+            "description": "Likely if we're in the house with a carbon monoxide emergency, we may not hear any notifications, so send an SMS to family living nearby."
+          },
+          {
+            "name": "Receive a notification if my CO2 levels get high",
+            "description": "Keep your room well ventilated with this Applet, which fires whenever your AirVisual device's CO2 concentration exceeds 1000 ppm."
+          }
+        ]
+      },
+      {
+        "name": "locks and access control",
+        "scenarios": [
+          {
+            "name": "Receive a notification whenever Sesame is unlocked",
+            "description": "Open Sesame! Receive a notification from IFTTT whenever Sesame is unlocked."
+          },
+          {
+            "name": "Disarm SkylinkNet",
+            "description": "Disarm SkylinkNet with a press of button!"
+          },
+          {
+            "name": "Set the privacy shutter on Myfox camera",
+            "description": "Close the Myfox Security Camera privacy shutter"
+          }
+        ]
+      },
+      {
+        "name": "garage doors and gates",
+        "scenarios": [
+          {
+            "name": "Open garage when I get home",
+            "description": "Opens garage door when you enter a specific location."
+          },
+          {
+            "name": "MYQ Garage Close",
+            "description": "Close garage door when you leave area "
+          },
+          {
+            "name": "Close the Garage Door",
+            "description": "This applet creates a button widget to close your MyQ garage door or gate."
+          },
+          {
+            "name": "Close your garage at a selected time",
+            "description": "Close your Garage automatically "
+          },
+          {
+            "name": "When I press a button, close my garage door",
+            "description": "Press the button to close your GarageWiFi & Gates door."
+          },
+          {
+            "name": "Close Garage at Sunset",
+            "description": "Automatically close garage door at sunset."
+          },
+          {
+            "name": "Close all your garage doors at sunset",
+            "description": "Close all your Tailwind garage doors at sunset"
+          },
+          {
+            "name": "Notify when Garage Opens",
+            "description": "Receive a notification when garage door opens."
+          },
+          {
+            "name": "When garage door is closed, register the time in Google Sheets",
+            "description": "When garage door is closed, register the time in Google Sheets"
+          }
+        ]
+      },
+      {
+        "name": "robot vacuums and mowers",
+        "scenarios": [
+          {
+            "name": "Start Roomba",
+            "description": "Starts Roomba with button press"
+          },
+          {
+            "name": "When you leave home, start Braava jet\u00ae",
+            "description": "Start Braava jet\u00ae robot mop when you leave the house, so you can come home to clean."
+          },
+          {
+            "name": "Start robot vacuum cleaner when you leave home",
+            "description": "Start robot vacuum cleaner when you leave home. Available for Android phones only."
+          },
+          {
+            "name": "Start cleaning when you leave an area",
+            "description": "Neato vacuum starts a cleaning cycle when you leave a specified area"
+          },
+          {
+            "name": "When event starts, pause Roomba",
+            "description": "Whenever an event starts in Calendar, pause Roomba"
+          },
+          {
+            "name": "Park mower if weather forecast predicts frost or heavy rain",
+            "description": "Protect the lawn by ensuring your mower is parked when the weather forecast predicts frost or heavy rain."
+          },
+          {
+            "name": "Send robot mower Robolinho\u00ae home (stop mowing) when it starts raining",
+            "description": "Send your robot mower Robolinho\u00ae home when rain is detected at the mowing location"
+          }
+        ]
+      },
+      {
+        "name": "sprinklers and irrigation",
+        "scenarios": [
+          {
+            "name": "If it starts to rain, stop the RainMachine",
+            "description": "Snooze or skip watering with your RainMachine sprinklers when rain is first detected. "
+          },
+          {
+            "name": "If the outside temperature rises above a threshold, start a RainMachine zone",
+            "description": "Start a zone for a desired amount of time when it gets hot."
+          },
+          {
+            "name": "Start Rachio if Temperature Exceeds 100",
+            "description": "Starts a selected Rachio watering cycle if outside temperature exceeds a certain level."
+          },
+          {
+            "name": "If watering starts, notify me.",
+            "description": "add, save, run enjoy!"
+          },
+          {
+            "name": "Turn off the Rachio sprinklers when the Ambient Weather Station detects rain",
+            "description": "Turn off the sprinklers and send a Gmail alert when rain is detected."
+          }
+        ]
+      },
+      {
+        "name": "window shades and blinds",
+        "scenarios": [
+          {
+            "name": "Press a button to launch a Connexoon scenario",
+            "description": "Press a button widget on your smartphone home screen to launch a Connexoon scenario you chose."
+          },
+          {
+            "name": "Close your blind at sunset",
+            "description": "When it's sunset, close my blind."
+          },
+          {
+            "name": "Automatically close your awning when it rains",
+            "description": "Use Weather Underground to close your awning when it's raining to protect it from damage."
+          }
+        ]
+      },
+      {
+        "name": "air purifiers and air quality monitors",
+        "scenarios": [
+          {
+            "name": "Set air purifier to a higher gear when air quality drops to Moderate",
+            "description": "Automatically set air purifier to a higher level when air quality drops to Moderate to keep the room air always clean."
+          },
+          {
+            "name": "Turn off air purifier when you are out",
+            "description": "Automatically turns off your air purifier when you leave, both convenient and energy-saving."
+          },
+          {
+            "name": "Receive a notification if my air gets too dry",
+            "description": "This Applet fires whenever your AirVisual device's relative humidity drops below 30%."
+          },
+          {
+            "name": "Receive a notification if my air gets too humid",
+            "description": "This Applet fires whenever your AirVisual device's relative humidity rises above 60%."
+          },
+          {
+            "name": "VOCs - track data in Google sheet",
+            "description": "Track your VOCs in a spreadsheet. "
+          }
+        ]
+      },
+      {
+        "name": "smart appliances",
+        "scenarios": [
+          {
+            "name": "When a cycle is done, receive a notification",
+            "description": "When a wash cycle is done, receive a notification. "
+          },
+          {
+            "name": "Receive a notification if fridge door is left open",
+            "description": "Keep your fridge cool, receive a notification if you leave the fridge door open too long."
+          },
+          {
+            "name": "Receive a notification if my fridge filter needs replacing",
+            "description": "Get a notification when filter change alerts."
+          },
+          {
+            "name": "Receive Email When Zone Changes Mode (Mitsubishi Electric)",
+            "description": "Send an email when a Mitsubishi Electric kumo cloud zone changes mode."
+          }
+        ]
+      },
+      {
+        "name": "multi-device scenarios",
+        "scenarios": [
+          {
+            "name": "If Garage door is opened after 10pm, then set scene",
+            "description": "Turns on a Lutron scene if a garage door is opened after 10pm."
+          },
+          {
+            "name": "Lumos Lights",
+            "description": "Turn on your lights with a basic spell using Amazon Alexa and Philips Hue."
+          },
+          {
+            "name": "Nightlight",
+            "description": "Say phrase on Alexa to turn on Hue to specific dim and color"
+          },
+          {
+            "name": "Lights Up",
+            "description": "Turns General Lights On with LIFX and Amazon Alexa"
+          },
+          {
+            "name": "Alexa Dim All lights",
+            "description": "dim All lights using Amazon Alexa and Philips Hue"
+          },
+          {
+            "name": "Alexa goodnight turns off Hue and Nest",
+            "description": "Works with Nest and Hue"
+          },
+          {
+            "name": "Each time Alexa plays a new song change the color of your Hue light",
+            "description": "Does not apply to Pandora, podcasts and sample clips."
+          },
+          {
+            "name": "If Ring detects a visitor, turn off your music via Harmony",
+            "description": "If you get a person at your front door, turn off your music so you can hear your door chime and talk to the person."
+          },
+          {
+            "name": "If Nest is set to Away, start Roomba\u00ae",
+            "description": "Trigger your robot to start cleaning once Nest is set to Away."
+          },
+          {
+            "name": "Tell Alexa to start Automower\u00ae",
+            "description": "Say a code phrase to start Automower\u00ae for the specified duration."
+          },
+          {
+            "name": "Alexa turn off Lightwave RF light",
+            "description": "Use Alexa to turn on a Lightwave RF light"
+          },
+          {
+            "name": "Disarm Arlo",
+            "description": "Quick way to disarm your Arlo system when you need to ask Alexa to."
+          },
+          {
+            "name": "Say \"OK Google, turn off the living room lights\" (Telldus Live!)",
+            "description": "Say \"OK Google, turn off the living room lights\" to control Telldus Live! lights"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "categories": [
+      {
+        "name": "smart lights",
+        "scenarios": [
+          {
+            "name": "If making the call, then blink all lights",
+            "description": "Remind you of making the phone call right now!"
+          },
+          {
+            "name": "Change Philips Hue to latest FIFA world cup photo",
+            "description": "Change Philips Hue to latest FIFA world cup photo"
+          },
+          {
+            "name": "Turn off my Nanoleaf lights when I leave home",
+            "description": "Turn off your Nanoleaf lights when you leave home, just in case you forget =)"
+          },
+          {
+            "name": "Turn off Hue light at 30 minutes past the hour",
+            "description": "Publishing so that I can clone"
+          },
+          {
+            "name": "Blink lights yellow every hour",
+            "description": "Sometimes I need a little reminder how much time has gone by"
+          },
+          {
+            "name": "Turn off lights when you exit an area",
+            "description": "Turn lights when you exit an area"
+          },
+          {
+            "name": "When you leave an area, turn off Hue lights",
+            "description": "Turn off Philips Hue lights when you leave a place."
+          },
+          {
+            "name": "Turn off your lights at midnight",
+            "description": "Turn off your lights when it is time for bed"
+          },
+          {
+            "name": "Turn off your bulb when you leave an area",
+            "description": "Choose a bulb from the list of devices to turn it off when you leave an area."
+          },
+          {
+            "name": "Night, Night",
+            "description": "Night, Night"
+          },
+          {
+            "name": "Every hour, randomize my hue lights.",
+            "description": "It would be good to have a timelimit for the beginning and the end of the action."
+          },
+          {
+            "name": "Turn off all your Hue lights at night",
+            "description": "Turn off all your Hue lights at night"
+          }
+        ]
+      },
+      {
+        "name": "thermostats and HVAC",
+        "scenarios": [
+          {
+            "name": "Set your home to away mode",
+            "description": "Quickly set your Netamo Home to away mode"
+          },
+          {
+            "name": "Set your home to default schedule",
+            "description": "Quickly set your home to default schedule"
+          },
+          {
+            "name": "Set to Home and set your Nest Thermostat to ___\u00b0",
+            "description": "Set to Home and set your Nest Thermostat to ___\u00b0"
+          },
+          {
+            "name": "Set to Away and set your Nest Thermostat to ___\u00b0 ",
+            "description": "Set to Away and set your Nest Thermostat to ___\u00b0 "
+          },
+          {
+            "name": "When you are leaving home set your thermostat to __\u00b0",
+            "description": "Enables you to set your thermostat's set temperature when leaving your home zone."
+          },
+          {
+            "name": "When you are almost home set your thermostat to __\u00b0",
+            "description": "Enables you to set your thermostat's set temperature when entering your home zone."
+          },
+          {
+            "name": "Get an email when your room temperature rises above __\u00b0",
+            "description": "Enables you to receive an email when the temperature in your room rises above a certain value."
+          },
+          {
+            "name": "Notification from IFTTT when indoor humidity is too high.",
+            "description": "Receive a notification from your IFTTT app when indoor humidity measured by your EasyControl of Bosch exceeds a chosen maximum value."
+          },
+          {
+            "name": "Return to tado\u00ba automatic control",
+            "description": "Return the control of your hot water to tado\u2060\u00b0\u201a using your user-defined settings (e.g. location and Smart Schedule) to automatically determine the right room temperature and settings."
+          },
+          {
+            "name": "Boost air conditioning to ___ \u00b0",
+            "description": "Want to give your air conditioning a quick boost? Now it's just a bttn push away."
+          },
+          {
+            "name": "Turn my Nuheat Signature thermostat off when I leave home",
+            "description": "Automatically turn your thermostat off when you leave home."
+          },
+          {
+            "name": "Set my Nuheat Signature thermostats to Away mode when I leave home",
+            "description": "Automatically set your thermostat group to Away mode when you leave home."
+          },
+          {
+            "name": "Caleo follows Nest away!",
+            "description": "This recipe is useful to let your Caleos at home know, as soon as your Nest turn on away mode, to follow and set to `away` as well!"
+          }
+        ]
+      },
+      {
+        "name": "security cameras and doorbells",
+        "scenarios": [
+          {
+            "name": "Enable motion detection when I leave home",
+            "description": "Enables motion detection when you leave your home."
+          },
+          {
+            "name": "Turn off push notifications when I am home",
+            "description": "Turns off push notifications when you arrive at home."
+          },
+          {
+            "name": "Turn off camera when I am home",
+            "description": "Turns off the camera when you arrive at home."
+          },
+          {
+            "name": "Turn camera notifications off when you come home",
+            "description": "Turn camera notifications off when you come home"
+          },
+          {
+            "name": "Turn camera off when you come home",
+            "description": "Turn camera off when you come home (Android)"
+          },
+          {
+            "name": "Return Home",
+            "description": "Turn off"
+          },
+          {
+            "name": "Call your phone when Ring detects motion at home",
+            "description": "Get alerted when Ring detects motion at your front door."
+          },
+          {
+            "name": "Arlo call at night",
+            "description": "Calls your phone via VoIp after 9pm until 8am."
+          },
+          {
+            "name": "Arm Blink System When You Leave Home",
+            "description": "Set your Blink system to automatically arm when you leave your property. "
+          },
+          {
+            "name": "Arm Blink when Hubitat's mode changes",
+            "description": "Arms Blink Security System when the Hubitat mode changes."
+          },
+          {
+            "name": "Disarm Blink when Hubitat's mode changes",
+            "description": "Disarms Blink Security System when the Hubitat mode changes."
+          },
+          {
+            "name": "\"Alexa, trigger SpotCam snapshot\"",
+            "description": "Use Alexa to trigger SpotCam snapshot"
+          },
+          {
+            "name": "Send Line message and snapshot when SpotCam Ring video doorbell is pressed",
+            "description": "Send a Line message and snapshot link automatically to designated account when someone press your SpotCam Ring video doorbell"
+          }
+        ]
+      },
+      {
+        "name": "smart locks",
+        "scenarios": [
+          {
+            "name": "Get IFTTT notification when nuki is opened",
+            "description": "Sends an IFTTT notification on the smartphones status bar when the nuki door lock is opened, including name of the door, name of the user and a timestamp"
+          },
+          {
+            "name": "Auto-lock door",
+            "description": "Let the Danalock automatically lock your door when you leave your property. For Android phones only."
+          },
+          {
+            "name": "Auto-unlock door",
+            "description": "Let your door unlock automatically when approaches your property. For Android phones only."
+          },
+          {
+            "name": "Lock door",
+            "description": "Lock your door remotely"
+          },
+          {
+            "name": "Unlock door",
+            "description": "Unlock your door remotely"
+          },
+          {
+            "name": "Leaving the house? Make sure the front door is locked.",
+            "description": "If you get far enough away from your house, make sure the front door is locked. "
+          }
+        ]
+      },
+      {
+        "name": "robot vacuums and home robots",
+        "scenarios": [
+          {
+            "name": "Schedule everyday cleaning",
+            "description": "Set an everyday cleaning cycle for your Neato Robot using your calendar"
+          },
+          {
+            "name": "When I enter an Area, send command to my robot.",
+            "description": "When I enter an area, send a command to my robot."
+          },
+          {
+            "name": "When I exit an Area, send command to my robot",
+            "description": "When I exit and area, send a command to my robot."
+          },
+          {
+            "name": "When your Braava jet\u00ae docks, send reminder to prep robot for it's next cleaning job",
+            "description": "This applet ensures your Braava jet\u00ae robot mop is ready for its next cleaning job. Don't forget to refill the tank and insert a new pad. "
+          }
+        ]
+      },
+      {
+        "name": "smart plugs, switches and IR hubs",
+        "scenarios": [
+          {
+            "name": "Turn your audio and TV appliances off while activating your Niko Home Control routine",
+            "description": "Turn your audio and TV appliances of via Logitec Harmony while activating your NIko Home Control routines"
+          },
+          {
+            "name": "Power down socket at set time",
+            "description": "Power down socket at set time"
+          },
+          {
+            "name": "Power up socket at set time",
+            "description": "Power up socket at set time"
+          },
+          {
+            "name": "When Octopus Energy prices change set my TP Link Kasa",
+            "description": "This applet turns a TP Link Kasa device on according to the Octopus Energy price."
+          },
+          {
+            "name": "Turn off Meross",
+            "description": "Turn off your Meross by pressing DO button"
+          },
+          {
+            "name": "Turn off your AC and TV when you leave home",
+            "description": "Make sure to turn off your AC and TV when you leave home!"
+          }
+        ]
+      },
+      {
+        "name": "garage doors and gates",
+        "scenarios": [
+          {
+            "name": "I'm arriving! Open the door!",
+            "description": "If I'm arriving, open the door"
+          },
+          {
+            "name": "Open garage door when presence detected",
+            "description": "Open garage door when presence detected"
+          },
+          {
+            "name": "Open Main Gate at 6am",
+            "description": "Select Days and Time to Open Door or Gate"
+          },
+          {
+            "name": "Time sensitive garage",
+            "description": "Closes garage at specific time"
+          },
+          {
+            "name": "Time sensitive garage 2",
+            "description": "Closes garage at specific time"
+          }
+        ]
+      },
+      {
+        "name": "alarm systems and sirens",
+        "scenarios": [
+          {
+            "name": "When you leave home, activate security mode",
+            "description": "When you leave your home, automatically activate your Myfox Home Alarm security mode."
+          },
+          {
+            "name": "Sound the 110dB siren",
+            "description": "Sound the Myfox Home Alarm 110dB siren"
+          },
+          {
+            "name": "Si le Myfox Home Alarm re\u00e7oit une alerte alors d\u00e9clencher la sir\u00e8ne imm\u00e9diatement",
+            "description": "Les alertes peuvent \u00eatre des d\u00e9tections intelliTAG, des notifications de mouvement par la cam\u00e9ra,...\nLa temporisation entre la d\u00e9tection et le d\u00e9clenchement de la sir\u00e8ne est r\u00e9duite \u00e0 0 (nativement \u00e0 30s)."
+          },
+          {
+            "name": "Arm Scout Alarm when you leave home",
+            "description": "Keep your home and family safe by automatically activating your Scout alarm system when you leave home."
+          },
+          {
+            "name": "Door Opening Notification",
+            "description": "Every Time a Door Panel is opened, receive and IF Notification"
+          },
+          {
+            "name": "Turn off Siren",
+            "description": "This is the best way to turn off your siren. If your alarm has been triggered, please use the \"Disarm\" function in your Scout app. "
+          },
+          {
+            "name": "Arm Your Blue by ADT System When You Leave Your Home",
+            "description": "Automatically arm your Blue by ADT system when you leave your home. "
+          }
+        ]
+      },
+      {
+        "name": "speakers and audio",
+        "scenarios": [
+          {
+            "name": "Stop Sonos when I leave the house",
+            "description": "Sonos stopt als ik weg ga"
+          },
+          {
+            "name": "Volume Down",
+            "description": "Volume Down"
+          }
+        ]
+      },
+      {
+        "name": "environmental and safety sensors",
+        "scenarios": [
+          {
+            "name": "Send me an email when my radon is high",
+            "description": "Send an email when the radon levels reaches a given threshold, notifying me of the potential issue"
+          },
+          {
+            "name": "Text Me When Too Hot",
+            "description": "When temperature exceeds upper limit, notify by SMS text message. "
+          },
+          {
+            "name": "Text Me When Door Is Open",
+            "description": "When tag in door mode or Reed sensor detects open, notify by text message."
+          },
+          {
+            "name": "Text Me When Motion Stops",
+            "description": "When infra-red sensor detects no movement or motion sensor tag stops moving after configured time-out, receive a text message."
+          },
+          {
+            "name": "Receive an SMS when CO alarm occurs",
+            "description": "Be safe and get an SMS when your FIBARO device detects CO."
+          },
+          {
+            "name": "Receive an SMS when smoke alarm occurs",
+            "description": "Be safe and get an SMS when FIBARO device detects smoke."
+          },
+          {
+            "name": "iHome Control - Leak Sensor Email",
+            "description": "Enable your iHome Control Leak Sensor to send an email when a change in status is detected."
+          },
+          {
+            "name": "iHome Control - Motion Detected Text",
+            "description": "Enable your iHome Control Motion Sensor to send a text when a change in status is detected."
+          }
+        ]
+      },
+      {
+        "name": "multi-device scenarios",
+        "scenarios": [
+          {
+            "name": "Flash lights when your Ring doorbell rings",
+            "description": "Get alerted of new visitors by flashing LIFX lights if your Ring doorbell is pressed."
+          },
+          {
+            "name": "Flash lights when your SkyBell doorbell rings",
+            "description": "Get alerted of new visitors by flashing LIFX lights if your SkyBell HD video doorbell is pressed."
+          },
+          {
+            "name": "Pulse your LIFX lights when Skybell detects motion",
+            "description": "Position the lights near your door and have them pulse red or orange for a perfectly spooky Halloween greeting to all your trick-or-treaters! \ud83c\udf83"
+          },
+          {
+            "name": "When someone rings your doorbell, blink the lights",
+            "description": "This uses the Ring Doorbell and Philips Hue to blink your lights whenever someone rings the doorbell. Great to have if you're hard of hearing or in a room where the doorbell chime is difficult to hear."
+          },
+          {
+            "name": "Arlo motion, set light to red, blink",
+            "description": "If Arlo detects motion, applet changes light to color then blinks light. "
+          },
+          {
+            "name": "When Ring detects someone at the front door blink your Hue lights",
+            "description": "Blink your Hue Lights when Ring detects someone is at your front door."
+          },
+          {
+            "name": "Blink Hue Lights (Europe)",
+            "description": "Flash your chosen Hue lights when motions is detected by Blink"
+          },
+          {
+            "name": "Blink your Hue lights when your coffee is ready",
+            "description": "Set your Hue lights to blink when your Smarter Coffee - 2nd Generation has finished brewing."
+          },
+          {
+            "name": "Blink your Hue lights when your iKettle has boiled",
+            "description": "Set your Hue lights to blink when your iKettle has finished boiling."
+          },
+          {
+            "name": "Turn off my Hue light when I get into bed",
+            "description": "This applet turns off your Hue light when Withings Sleep detects that you get into bed.\n"
+          },
+          {
+            "name": "Turn off my Yeelight when I get into bed",
+            "description": "This applet turns off your Yeelight when Withings Sleep detects that you get into bed."
+          },
+          {
+            "name": "Dim your lights after you leave home",
+            "description": "Dim a Lutron light after a particular person locks a designated August Smart Lock and leaves home."
+          },
+          {
+            "name": "Set your Scout alarm when you leave home and lock your August Smart Lock",
+            "description": "Arm your Scout alarm after a specific person locks a particular August Smart Lock and leaves home."
+          },
+          {
+            "name": "Abode Home Mode, Arm Blink Cameras",
+            "description": "When Abode Security System is set to Home mode, Change Blink Cameras to Armed."
+          },
+          {
+            "name": "Disarm Your Blink System When Your Nest is Set to Home",
+            "description": "When Nest knows you're home, disarm your Blink system. "
+          },
+          {
+            "name": "Arm Your Blink System When Your Nest is Set to Away ",
+            "description": "When your Nest knows you aren't home, arm your Blink Cameras!"
+          },
+          {
+            "name": "Activate 'Home' scene when your Nest is set to Home mode",
+            "description": "Activate a scene according to the Nest's mode"
+          },
+          {
+            "name": "Turn off your lights when Nest is set to Away mode",
+            "description": "Turn off your lights and appliances when Nest is set to Away mode"
+          },
+          {
+            "name": "Turn off Hue lights when Nest is in away mode",
+            "description": "Turn off Hue lights when Nest is in away mode"
+          },
+          {
+            "name": "Tell Alexa to dock your Roomba",
+            "description": "Dock your robot when you tell Alexa to \"Stop iRobot\". Perfect if you have your hands full or are about to start a task that requires a quiet space."
+          },
+          {
+            "name": "Tell Alexa to press your bot",
+            "description": "Say \"Alexa, press your bot\" to press your bot. "
+          },
+          {
+            "name": "Alexa and Lightwave Light Timer",
+            "description": "When your Alexa timer goes off turn on your LightwaveRF Light"
+          },
+          {
+            "name": "Set YeeLight Scene, when Alexa timer goes off.",
+            "description": "Awesome applet.\nWhen alexa alarm goes off you can set a scene. Creating a flashing scene is a good idea."
+          },
+          {
+            "name": "Blink lights when Alexa timer goes off",
+            "description": "Could be good for #nye"
+          },
+          {
+            "name": "Alexa Turn Lights Orange",
+            "description": "Tell Amazon Echo to \"Trigger Orange\" to turn all of your lights orange"
+          },
+          {
+            "name": "Tell Alexa to lock your door",
+            "description": "Simply say, \"Alexa, trigger lock door\" to lock your SmartThings connected lock."
+          },
+          {
+            "name": "Tell Alexa to arm your Arlo",
+            "description": "Just say \"Alexa, trigger Arlo\" to arm your device. "
+          },
+          {
+            "name": "Tell Amazon Alexa to Open Garage",
+            "description": "Open garage door using Amazon Alexa voice command. Also please consider Garadget's native Alexa Skill."
+          },
+          {
+            "name": "Ferme le Velux et Volet par Tahoma",
+            "description": "Permet de fermer un Velux et son Volet dans une chambre en demandant \u00e0 Alexa de commander Tahoma."
+          },
+          {
+            "name": "Ring Sonos ",
+            "description": "When doorbell rings the sonos plays tune "
+          },
+          {
+            "name": "Pause cleaning when someone rings doorbell",
+            "description": "Neato vacuum pauses cleaning cycle when your Ring Doorbell is accessed\n\n"
+          },
+          {
+            "name": "Nanoleaf Doorbell Notifier",
+            "description": "This applet notifies you when a new ring is detected by blinking your Nanoleaf Canvas"
+          },
+          {
+            "name": "When the Litter-Robot cycles, send over the Roomba to vacuum",
+            "description": "When the Litter-Robot cycles, send over the Roomba to vacuum"
+          },
+          {
+            "name": "When the Litter-Robot is full, turn the Philips Hue lighting to purple",
+            "description": "When the Litter-Robot is full, turn the Philips Hue lighting to purple"
+          },
+          {
+            "name": "Arlo and dlink alarm",
+            "description": "It links Arlo to sirene system"
+          },
+          {
+            "name": "If System is Armed turn off All Lights",
+            "description": "Eteindre toutes les ampoules Hue lorsque Myfox est arm\u00e9"
+          }
+        ]
+      }
+    ]
+  }
+]

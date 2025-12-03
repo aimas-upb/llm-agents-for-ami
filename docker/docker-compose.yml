@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # RD5 Orchestrator - LangGraph workflow service
+  orchestrator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.orchestrator
+    ports:
+      - "8080:8080"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - OPENAI_TEMPERATURE=${OPENAI_TEMPERATURE:-0.2}
+      - WEAVIATE_HOST=weaviate
+      - WEAVIATE_PORT=8080
+      - WEAVIATE_GRPC_PORT=50051
+      - RD4_API_URL=http://signifier-api:8000
+      - HMAS_BASE_URL=${HMAS_BASE_URL:-http://host.docker.internal:8090}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      weaviate:
+        condition: service_healthy
+      signifier-api:
+        condition: service_started
+    networks:
+      - rd5_network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # For spawning sandbox containers
+    restart: unless-stopped
+
+  # Weaviate vector database
+  weaviate:
+    image: semitechnologies/weaviate:1.24.1
+    ports:
+      - "8081:8080"
+      - "50051:50051"
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'text2vec-transformers'
+      ENABLE_MODULES: 'text2vec-transformers'
+      TRANSFORMERS_INFERENCE_API: 'http://t2v-transformers:8080'
+      CLUSTER_HOSTNAME: 'node1'
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    networks:
+      - rd5_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/.well-known/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Transformer model for embeddings
+  t2v-transformers:
+    image: semitechnologies/transformers-inference:sentence-transformers-all-MiniLM-L6-v2
+    environment:
+      ENABLE_CUDA: '0'
+    networks:
+      - rd5_network
+    restart: unless-stopped
+
+  # RD4 Signifier API (colleague's service)
+  signifier-api:
+    build:
+      context: ../signifiers
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - STORAGE_DIR=/data/signifiers
+    volumes:
+      - signifier_data:/data/signifiers
+    networks:
+      - rd5_network
+    restart: unless-stopped
+
+networks:
+  rd5_network:
+    driver: bridge
+
+  # Isolated network for sandbox containers
+  rd5_sandbox_net:
+    driver: bridge
+    internal: true  # No external access
+
+volumes:
+  weaviate_data:
+  signifier_data:

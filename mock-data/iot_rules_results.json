@@ -1,0 +1,354 @@
+[
+  {
+    "categories": [
+      {
+        "name": "smart lights",
+        "scenarios": [
+          {
+            "name": "Automatically turn your lights on at sunset",
+            "description": "Never be left in the dark. Whenever the sun starts to set, your Philips Hue bulbs will automatically turn on. "
+          },
+          {
+            "name": "Turn your lights on automatically as you arrive home",
+            "description": "Center the map on your home's location, and you'll always walk in to a bright home."
+          },
+          {
+            "name": "Turn on the lights when you arrive home",
+            "description": "Enter your home address on the map and when you enter the radius your LIFX lights will turn on! This Applet uses the IFTTT mobile app's location service."
+          },
+          {
+            "name": "Toggle Yeelight on/off",
+            "description": "Toggle your Yeelight by pressing DO button."
+          },
+          {
+            "name": "Dim down the lights",
+            "description": "A one-tap Applet for setting the mood."
+          },
+          {
+            "name": "Turn lights out for bed with Alexa and hue",
+            "description": "When you say \"Alexa, trigger bedtime\", this Applet will turn off all Philips Hue lights."
+          }
+        ]
+      },
+      {
+        "name": "thermostats and climate control",
+        "scenarios": [
+          {
+            "name": "Tell Alexa to adjust your Nest Thermostat to a certain temperature",
+            "description": "Choose a phrase and temperature. When you say \"Alexa, trigger [custom phrase]\" your Nest will set. The default is \"Alexa, trigger nest to 72\""
+          },
+          {
+            "name": "Set your Nest thermostat to a certain temperature with Button widget",
+            "description": "One push of a Button widget on your phone, your Nest thermostat is set to a certain temperature!"
+          },
+          {
+            "name": "Switch your ecobee to your chosen comfort profile as you arrive home",
+            "description": "Automatically activate your ecobee to your chosen comfort profile as you approach home."
+          },
+          {
+            "name": "Use Google Assistant to run Nest fan",
+            "description": "Choose a phrase to turn on the Nest fan using the Google Assistant.  The fan will run for the amount of time you specify in your Nest fan timer setting."
+          },
+          {
+            "name": "Set your Honeywell thermostat to a specific temperature if the temperature outside drops",
+            "description": "You can customize the external and internal temperatures for this Applet to make sure it's always perfect in your home. "
+          }
+        ]
+      },
+      {
+        "name": "security cameras and video doorbells",
+        "scenarios": [
+          {
+            "name": "Automatically arm your Blink System when you leave home",
+            "description": "Locate your home on the map when you configure it, and this Applet will arm your Blink System when you leave. This Applet requires the IFTTT app and works for both Android or iOS. "
+          },
+          {
+            "name": "Disarm your Blink System when you get home",
+            "description": "When you get home, this applet will disarm your Blink System."
+          },
+          {
+            "name": "Turn your camera on when you leave home",
+            "description": "Turn off the Sleep mode when you leave home. For Android phones."
+          },
+          {
+            "name": "If somebody rings your doorbell during working hours, get an email and start recording",
+            "description": "For peace of mind while you're at work, this Applet will start recording and send you an email if somebody rings the doorbell during the week between 9am and 5pm."
+          },
+          {
+            "name": "Automatically start recording via Arlo when it detects motion",
+            "description": "When your Arlo device detects motion the selected camera will automatically start recording. "
+          }
+        ]
+      },
+      {
+        "name": "robot vacuums and mops",
+        "scenarios": [
+          {
+            "name": "Start Roomba\u00ae with the press of a button",
+            "description": "Use this applet to create a button that triggers your robot to start. Ideal for starting your robot straight from your smart watch or home screen on your phone!"
+          },
+          {
+            "name": "When I leave home, start a cleaning job",
+            "description": "This Applet will start your Roomba\u00ae when you leave home."
+          },
+          {
+            "name": "When I arrive home, stop my Roomba\u00ae",
+            "description": "This Applet will stop your Roomba\u00ae when you get home."
+          },
+          {
+            "name": "Dock the iRobot with Google Assistant",
+            "description": "Say \"Ok Google, Dock the Robot\".\nIf this works, send a video to me on Twitter at @VanboeJosh, or just mention me please. Any issues DM me."
+          }
+        ]
+      },
+      {
+        "name": "smart plugs and switches",
+        "scenarios": [
+          {
+            "name": "Toggle Insight switch on/off with one tap",
+            "description": "This Applet turns your Belkin Insight switch on and off. Note: IFTTT app is needed for this Applet."
+          },
+          {
+            "name": "Turn off your outlet at sunrise",
+            "description": "Turn off your outlet within 15 minutes of the sunrise at your location."
+          },
+          {
+            "name": "Turn on your WeMo switch at sunset ",
+            "description": "When the sun sets, your WeMo switch will turn on. A great way to automatically control your lights."
+          },
+          {
+            "name": "Toggle your lights on/off",
+            "description": "Quickly toggle your WeMo Light Switch on and off with this Button Widget. Note: IFTTT app is needed for this Applet."
+          },
+          {
+            "name": "Turn off your lights at midnight",
+            "description": "Turn off your lights when it is time for bed"
+          }
+        ]
+      },
+      {
+        "name": "smart locks",
+        "scenarios": [
+          {
+            "name": "Tell Alexa to lock your door",
+            "description": "Simply say, \"Alexa, trigger lock door\" to lock your SmartThings connected lock."
+          },
+          {
+            "name": "Auto-unlock door",
+            "description": "Let your door unlock automatically when approaches your property. For Android phones only."
+          },
+          {
+            "name": "Make sure your door is locked every day at a specific time",
+            "description": "Configure that your door is automatically locked at a specific time eg. at 10pm every day."
+          }
+        ]
+      },
+      {
+        "name": "garage door controllers",
+        "scenarios": [
+          {
+            "name": "Close your MyQ garage nightly",
+            "description": "Every day, at 9 PM, close the garage door.\n\nThis applet requires an active account linking subscription."
+          },
+          {
+            "name": "Open your garage door",
+            "description": "This DO Button Recipe will open your garage door. If the garage door is already open, it will remain open. "
+          },
+          {
+            "name": "Close Garage Door with Button Widget",
+            "description": "Close garage door with button widget on your smartphone"
+          },
+          {
+            "name": "When You Leave Home, Garage Door Closes",
+            "description": "When you disconnect from your home wifi network, your MyQ will close the garage door by itself."
+          }
+        ]
+      },
+      {
+        "name": "window shades and blinds",
+        "scenarios": [
+          {
+            "name": "Use Alexa to open your window shades",
+            "description": "Choose a phrase to set the scene. When you say \"Alexa, trigger + [ your phrase]\" your PowerView shades will open. \n\nTip: You can adjust this Recipe to run any PowerView scene!"
+          },
+          {
+            "name": "Open your Somfy-powered shades with voice control (using Google Assistant)",
+            "description": "Talk to your Google Assistant to open your Somfy-powered shades with simple customized commands."
+          },
+          {
+            "name": "Close the shades at sunset ",
+            "description": "Activate any Automate scene at sunset to close shades."
+          }
+        ]
+      },
+      {
+        "name": "lawn and garden irrigation",
+        "scenarios": [
+          {
+            "name": "Tell Alexa to start watering",
+            "description": "Alexa will open a water valve for a specified time to water your plants."
+          },
+          {
+            "name": "Delay watering if it's going to rain",
+            "description": "If the weather looks like it's going to rain, automatically pause your sprinkler system for a day to help conserve wastage and save money."
+          },
+          {
+            "name": "Tell\u0000a0Google Assistant\u0000a0to start watering",
+            "description": "The Google Assistant will open a water valve for a specified time to water your plants."
+          }
+        ]
+      },
+      {
+        "name": "robot lawn mowers",
+        "scenarios": [
+          {
+            "name": "Park mower if weather forecast predicts frost or heavy rain",
+            "description": "Protect the lawn by ensuring your mower is parked when the weather forecast predicts frost or heavy rain."
+          },
+          {
+            "name": "Tell Google Assistant to park Automower\u0000ae",
+            "description": "Say a code phrase to send Automower\u0000ae to the charging station until the next scheduled mowing."
+          },
+          {
+            "name": "Tell Alexa to start Automower\u0000ae",
+            "description": "Say a code phrase to start Automower\u0000ae for the specified duration."
+          }
+        ]
+      },
+      {
+        "name": "smart appliances (kitchen & laundry)",
+        "scenarios": [
+          {
+            "name": "Tell Google Assistant to preheat your oven",
+            "description": "Get ready for cooking. With a simple phrase Google Assistant will preheat your oven using the fast preheat option. Just set your preferred temperature, duration and program.\n"
+          },
+          {
+            "name": "Turn off oven",
+            "description": "Your oven with Home Connect will turn off when you press the Button widget.\n"
+          },
+          {
+            "name": "Start your favorite dishwasher program",
+            "description": "Start your favorite dishwasher program with your preferred settings using the Button widget."
+          },
+          {
+            "name": "Ask Alexa to turn off your GE oven",
+            "description": "When you say \"Alexa, trigger oven off\" your GE oven will shut down. Dinner time! "
+          }
+        ]
+      },
+      {
+        "name": "air purifiers",
+        "scenarios": [
+          {
+            "name": "Turn on air purifier when you are in",
+            "description": "Automatically turns on your air purifier when you are home."
+          },
+          {
+            "name": "Turn off air purifier when you are out",
+            "description": "Automatically turns off your air purifier when you leave, both convenient and energy-saving."
+          },
+          {
+            "name": "Set air purifier to a higher gear when air quality drops to Moderate",
+            "description": "Automatically set air purifier to a higher level when air quality drops to Moderate to keep the room air always clean."
+          }
+        ]
+      },
+      {
+        "name": "home security systems",
+        "scenarios": [
+          {
+            "name": "Arm Scout Alarm when you leave home",
+            "description": "Keep your home and family safe by automatically activating your Scout alarm system when you leave home."
+          },
+          {
+            "name": "Arm abode at a certain time each night",
+            "description": "Set a time to arm abode into home or away mode each evening"
+          },
+          {
+            "name": "Armer Somfy Protect par la voix (powered by Google Assistant)",
+            "description": "Parler avec votre Google Assistant pour armer votre syst\u0000e8me Somfy Protect.\n\nDites simplement \u0000e0 votre assistant \"Active l'alarme\", \"Arme le syst\u0000e8me\" ou \"Active la protection\".\n\n\nFonctionne avec Somfy One/One(+), Somfy Home Alarm (Link) ou Somfy Security Camera.\nFonctionne sur smartphone, tablette, Google Home. Google Assistant doit \u0000eatre activ\u0000e9 et configur\u0000e9."
+          },
+          {
+            "name": "Disarm abode when you arrive home",
+            "description": "Changes abode to standby mode when entering your home zone"
+          }
+        ]
+      },
+      {
+        "name": "button bots and actuators",
+        "scenarios": [
+          {
+            "name": "Toggle a SwitchBot",
+            "description": "Use the button widget as a remote control for your home, turning on or off lights, coffee machines, fans, or anything else. This Applet requires special hardware, the SwitchBot and the SwitchBot Hub."
+          },
+          {
+            "name": "Turn on your SwitchBot with one tap on your phone",
+            "description": "Turn on your SwitchBot with one tap on your phone"
+          },
+          {
+            "name": "Tell Alexa to press your bot",
+            "description": "Say \"Alexa, press your bot\" to press your bot. "
+          }
+        ]
+      },
+      {
+        "name": "entertainment and AV control",
+        "scenarios": [
+          {
+            "name": "Tell Alexa to start a Harmony activity",
+            "description": "Choose a phrase to control your Harmony Home with Alexa. When you say \"Alexa, trigger + [ your phrase]\" you can start any Harmony activity you choose below. "
+          },
+          {
+            "name": "Control your TV with Alexa",
+            "description": "Trigger activities on your Harmony Home with Alexa. Simply say \"Alexa, trigger + [your phrase]\" to start an activity."
+          },
+          {
+            "name": "Google Assistant start Harmony Activity",
+            "description": "Start a harmony activity with Google Assistant"
+          }
+        ]
+      },
+      {
+        "name": "multi-device scenarios",
+        "scenarios": [
+          {
+            "name": "Wake Up to TV and Lighting",
+            "description": "When Amazon Alexa's Alarm goes off this app will start a Harmony activity and turn on light(s) through Philips Hue. For example, the alarm sounds and your room will light up along with turning on your TV at the same time. "
+          },
+          {
+            "name": "Use Alexa To Run My Shades And Turn Off My Lights",
+            "description": "Tell Alexa to operate the Hunter Douglas PowerView Scene of your choice and turn off your Philips Hue lights."
+          },
+          {
+            "name": "Setup your sleep environment with Eight Night Mode",
+            "description": "Setup your bedroom for a quality night sleep by dimming your Hue lights, turning down the room temperature with Nest Thermostat, and silence your Android phone. "
+          },
+          {
+            "name": "Turn your lights off when Nest is set to Away mode",
+            "description": "Save energy and money! Every time your Nest Thermostat is set to away, your Philips Hue lightbulbs will automatically turn off."
+          },
+          {
+            "name": "When the doorbell rings, pause cleaning",
+            "description": "Expecting someone? When the doorbell rings, this applet will pause your robot.\n"
+          },
+          {
+            "name": "Arlo Motion Turns on Hue Lights",
+            "description": "Select the arlo camera that you would want to use as a trigger, and then select a hue light to blink when motion is detected from that camera. \n\nThis can be used as an additional security measure (for example, blinking all the outdoor lights when motion is detected could scare an intruder away), or can be also used as a visual notification in the house when motion is detected outside (for example, you may not notice the notification on your phone, but may notice when your desk lamp starts b..."
+          },
+          {
+            "name": "Turn on your lights when Arlo detects motion",
+            "description": "When Arlo detects motion, turn on your lights."
+          },
+          {
+            "name": "If Ring doorbell is rung, then Arlo records for 30 seconds",
+            "description": "This helps when your Arlo is set up near your doorbell but is not activating quickly enough to catch the full event on it's own. Instead of waiting for Arlo's motion sensor to catch the movement or raising it and risking false alarms, you're using the doorbell as that trigger.\n\nYou'll be able to select which doorbell triggers this (in the event you have multiple doorbells) and which Arlo camera to record with. You can also choose to record for 10, 30, or 60 seconds."
+          },
+          {
+            "name": "Blink your Philips Hue lights when your dishwasher cycle is complete",
+            "description": "Have your Philips Hue lights blink to let you know that your dishwasher cycle is complete."
+          }
+        ]
+      }
+    ]
+  }
+]

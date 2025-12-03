@@ -1,0 +1,338 @@
+[
+  {
+    "categories": [
+      {
+        "name": "smart lights",
+        "scenarios": [
+          {
+            "name": "Automatically turn your lights on at sunset",
+            "description": "Never be left in the dark. Whenever the sun starts to set, your Philips Hue bulbs will automatically turn on. "
+          },
+          {
+            "name": "Turn your lights on automatically as you arrive home",
+            "description": "Center the map on your home's location, and you'll always walk in to a bright home."
+          },
+          {
+            "name": "Tell Google Assistant to dim the lights",
+            "description": "Say your phrase and Assistant will turn your Hue bulbs down low. Mood lighting on lock."
+          },
+          {
+            "name": "Wake up gently by using Yeelight sunrise ",
+            "description": "Simulate a natural and gentle sunrise. The brightness gradually increases within 15 minutes from dim yellow until your room is filled with bright yellow light. "
+          },
+          {
+            "name": "Turn off all your Hue lights at night",
+            "description": "Turn off all your Hue lights at night"
+          },
+          {
+            "name": "Turn off the light at Sunrise",
+            "description": "This will automatically turn off the WiZ light(s) of your choice a few minutes before Sunrise."
+          }
+        ]
+      },
+      {
+        "name": "thermostats & HVAC",
+        "scenarios": [
+          {
+            "name": "Tell Alexa to adjust your Nest Thermostat to a certain temperature",
+            "description": "Choose a phrase and temperature. When you say \"Alexa, trigger [custom phrase]\" your Nest will set. The default is \"Alexa, trigger nest to 72\""
+          },
+          {
+            "name": "Set your Nest thermostat to a certain temperature with Button widget",
+            "description": "One push of a Button widget on your phone, your Nest thermostat is set to a certain temperature!"
+          },
+          {
+            "name": "Set the temperature on your Nest Thermostat when you are close to home",
+            "description": "Great for getting your home cozy and warm before you arrive! Keep in mind that it only works when Nest is already set to Home."
+          },
+          {
+            "name": "Switch your ecobee to your chosen comfort profile as you arrive home",
+            "description": "Automatically activate your ecobee to your chosen comfort profile as you approach home."
+          },
+          {
+            "name": "Use Google Assistant to run Nest fan",
+            "description": "Choose a phrase to turn on the Nest fan using the Google Assistant.  The fan will run for the amount of time you specify in your Nest fan timer setting."
+          },
+          {
+            "name": "Hive heating boost",
+            "description": "Saying \"OK Google, Boost my heating\"  boosts heating to 22c for 1 hour"
+          }
+        ]
+      },
+      {
+        "name": "security cameras & doorbells",
+        "scenarios": [
+          {
+            "name": "Automatically arm your Blink System when you leave home",
+            "description": "Locate your home on the map when you configure it, and this Applet will arm your Blink System when you leave. This Applet requires the IFTTT app and works for both Android or iOS. "
+          },
+          {
+            "name": "Disarm your Blink System when you get home",
+            "description": "When you get home, this applet will disarm your Blink System."
+          },
+          {
+            "name": "Tell Google Assistant to arm your Arlo",
+            "description": "Just say \"Ok Google, arm Arlo\" and it'll do the deed. You can choose your own custom phrase when you set up the Applet, if you'd like. "
+          },
+          {
+            "name": "Turn on your camera when you leave home",
+            "description": "Turn off the Sleep mode when you leave home. For Android phones."
+          },
+          {
+            "name": "Turn on Sleep mode when I arrive home (for iOS)",
+            "description": "Turn on the Sleep mode when you arrive home to protect your privacy. Note: Must have IF app for iOS installed"
+          },
+          {
+            "name": "Arm Blink at Time",
+            "description": "Set a time to arm a Blink system"
+          }
+        ]
+      },
+      {
+        "name": "robot vacuums",
+        "scenarios": [
+          {
+            "name": "Start Roomba\u00ae with the press of a button",
+            "description": "Use this applet to create a button that triggers your robot to start. Ideal for starting your robot straight from your smart watch or home screen on your phone!"
+          },
+          {
+            "name": "When I leave home, start a cleaning job",
+            "description": "This Applet will start your Roomba\u00ae when you leave home."
+          },
+          {
+            "name": "Dock the iRobot with Google Assistant",
+            "description": "Say \"Ok Google, Dock the Robot\". If this works, send a video to me on Twitter at @VanboeJosh, or just mention me please. Any issues DM me."
+          },
+          {
+            "name": "When I arrive home from work, dock Roomba\u00ae",
+            "description": "This applet will send your robot back to the dock when you get home after 5pm. "
+          },
+          {
+            "name": "Tell Alexa to start your Roomba ",
+            "description": "Just say \"Alexa, trigger start roomba\" and watch your iRobot vacuum get to work!"
+          },
+          {
+            "name": "Start Roomba",
+            "description": "Starts Roomba with button press"
+          }
+        ]
+      },
+      {
+        "name": "smart plugs, switches & dimmers",
+        "scenarios": [
+          {
+            "name": "Toggle your Kasa lights on/off with Button widget",
+            "description": "This Action will toggle your Kasa lights on or off"
+          },
+          {
+            "name": "Toggle Insight switch on/off with one tap",
+            "description": "This Applet turns your Belkin Insight switch on and off. Note: IFTTT app is needed for this Applet."
+          },
+          {
+            "name": "Turn on a SmartThings device with one tap",
+            "description": "Here is a quick way to turn on one of your SmartThings devices. Note: IFTTT app is needed for the Applet."
+          },
+          {
+            "name": "Toggle your WeMo Light Switch on and off with Google Home",
+            "description": "Simply say \"OK Google, Toggle Wemo\" to turn your Wemo Switch on or off."
+          },
+          {
+            "name": "Turn on your WeMo switch at sunset ",
+            "description": "When the sun sets, your WeMo switch will turn on. A great way to automatically control your lights."
+          },
+          {
+            "name": "Turn on, change or dim the light with a single tap",
+            "description": "This enables you to use a single button to quickly control your WiZ light(s) with the action you have chosen."
+          }
+        ]
+      },
+      {
+        "name": "smart locks",
+        "scenarios": [
+          {
+            "name": "Tell Alexa to lock your door",
+            "description": "Simply say, \"Alexa, trigger lock door\" to lock your SmartThings connected lock."
+          },
+          {
+            "name": "Press a button to unlock Sesame",
+            "description": "Add a widget to your homescreen to press a button and unlock Sesame."
+          },
+          {
+            "name": "Auto-unlock door",
+            "description": "Let your door unlock automatically when approaches your property. For Android phones only."
+          },
+          {
+            "name": "Unlock your door by voice via an Amazon Echo, Tap and Dot",
+            "description": "Say \"Alexa, trigger lock\" to lock your door. You can customize the passphrase when you set up the Applet. "
+          },
+          {
+            "name": "Ask Google to unlock your Sesame smart lock by saying, \"Ok Google, Open Sesame!\"",
+            "description": "Use Google Assistant to control your Sesame smart lock. Say, \"Ok Google, Open Sesame!\" and Sesame will unlock for you!"
+          },
+          {
+            "name": "When you arrive home, this will turn on your Hue lights",
+            "description": "As soon as you arrive home and unlock your door via Auto Unlock, your lights will automatically be turned on."
+          }
+        ]
+      },
+      {
+        "name": "garage doors & gates",
+        "scenarios": [
+          {
+            "name": "Close your MyQ garage when you leave home",
+            "description": "Let MyQ automatically close the garage when you leave the area of your home. \n\nThis applet requires an active account linking subscription."
+          },
+          {
+            "name": "Close Car Garage Door",
+            "description": "Close Car Garage Door"
+          },
+          {
+            "name": "Open garage door using Google Assistant",
+            "description": "Open your garage door or gate when you say a simple phrase."
+          },
+          {
+            "name": "Open your garage door",
+            "description": "This DO Button Recipe will open your garage door. If the garage door is already open, it will remain open. "
+          },
+          {
+            "name": "Be sure that your garage is closed every night at 10:30pm",
+            "description": "Have peace of mind that your house is secure every night! This Recipe will attempt to close your garage at 10:30pm every night. If the garage door is already closed, it will remain closed."
+          },
+          {
+            "name": "When I leave my house, close my garage door",
+            "description": "This Recipe is for Android devices. Remote Access must be enabled in your gogogate 2."
+          }
+        ]
+      },
+      {
+        "name": "window coverings & shades",
+        "scenarios": [
+          {
+            "name": "Use Alexa to open your window shades",
+            "description": "Choose a phrase to set the scene. When you say \"Alexa, trigger + [ your phrase]\" your PowerView shades will open."
+          },
+          {
+            "name": "Lower your Somfy-powered shades with voice control (using Google Assistant)",
+            "description": "Talk to your Google Assistant to lower your Somfy-powered shades with simple customized commands."
+          },
+          {
+            "name": "Open your Somfy-powered shades with voice control (using Google Assistant)",
+            "description": "Talk to your Google Assistant to open your Somfy-powered shades with simple customized commands."
+          },
+          {
+            "name": "Close your blind at sunset",
+            "description": "When it's sunset, close my blind."
+          },
+          {
+            "name": "Open your blind at sunrise",
+            "description": "When it's sunrise, open my blind."
+          },
+          {
+            "name": "Launch a Connexoon scenario when it starts raining.",
+            "description": "Launch a TaHoma/Connexoon scenario when it starts raining. For example, have your roller shutters closed to protect your windows from the rain."
+          }
+        ]
+      },
+      {
+        "name": "lawn & garden (sprinklers and mowers)",
+        "scenarios": [
+          {
+            "name": "Tell Alexa to start watering",
+            "description": "Alexa will open a water valve for a specified time to water your plants."
+          },
+          {
+            "name": "Tell Google Assistant to start watering",
+            "description": "The Google Assistant will open a water valve for a specified time to water your plants."
+          },
+          {
+            "name": "Delay watering if it's going to rain",
+            "description": "If the weather looks like it's going to rain, automatically pause your sprinkler system for a day to help conserve wastage and save money."
+          },
+          {
+            "name": "Park mower if weather forecast predicts frost or heavy rain",
+            "description": "Protect the lawn by ensuring your mower is parked when the weather forecast predicts frost or heavy rain."
+          },
+          {
+            "name": "Tell Google Assistant to start Automower\u00ae",
+            "description": "Say a code phrase to start Automower\u00ae for the specified duration."
+          },
+          {
+            "name": "Park Automower\u00ae when rainy",
+            "description": "If today's weather condition is rain, Husqvarna Automower\u00ae will park until next scheduled restart. Useful to prevent grass damage."
+          }
+        ]
+      },
+      {
+        "name": "appliances (oven, washer, dishwasher, coffee, hood)",
+        "scenarios": [
+          {
+            "name": "Tell Google Assistant to preheat your oven",
+            "description": "Get ready for cooking. With a simple phrase Google Assistant will preheat your oven using the fast preheat option. Just set your preferred temperature, duration and program."
+          },
+          {
+            "name": "Start your favorite dishwasher program",
+            "description": "Start your favorite dishwasher program with your preferred settings using the Button widget."
+          },
+          {
+            "name": "Tell Google Assistant to start your favorite washer program",
+            "description": "With a simple phrase Google Assistant will start your washer immediately with your favorite program."
+          },
+          {
+            "name": "Tell Google Assistant to prepare your favorite coffee",
+            "description": "With a simple phrase Google Assistant will start your favorite coffee program with your preferred settings."
+          },
+          {
+            "name": "Ask Alexa to turn off your hood",
+            "description": "With a simple phrase Alexa will turn off your hood and hood light."
+          },
+          {
+            "name": "Turn on the coffee machine",
+            "description": "Your coffee machine with Home Connect will turn on and run the rinsing program when you press the Button widget."
+          }
+        ]
+      },
+      {
+        "name": "air purifiers",
+        "scenarios": [
+          {
+            "name": "Turn off air purifier when you are out",
+            "description": "Automatically turns off your air purifier when you leave, both convenient and energy-saving."
+          },
+          {
+            "name": "Set your air purifier to Sleep Mode at night",
+            "description": "Automatically set your air purifier to sleep mode at night and enjoy its quietness and air-cleaning capability."
+          }
+        ]
+      },
+      {
+        "name": "multi-device scenarios",
+        "scenarios": [
+          {
+            "name": "Turn off your lights when your Nest is set to Away mode",
+            "description": "Save energy and money! Every time your Nest Thermostat is set to away, your Philips Hue lightbulbs will automatically turn off."
+          },
+          {
+            "name": "Blink your lights when your doorbell rings",
+            "description": "Your Hue lights will blink whenever somebody rings your doorbell."
+          },
+          {
+            "name": "When Arlo detects motion, turn on your lights",
+            "description": "When Arlo detects motion, turn on your TP-Link Kasa lights."
+          },
+          {
+            "name": "When I answer a call, pause Roomba\u00ae",
+            "description": "This Applet will pause your Roomba\u00ae when answering a call."
+          },
+          {
+            "name": "Turn on your lights whenever your lock is unlocked",
+            "description": "Whenever anyone unlocks your lock, the selected Hue lights will turn on."
+          },
+          {
+            "name": "Turn on your WeMo switch when motion is detected",
+            "description": "Turn on a WeMo Switch when motion is detected by your Nest Cam."
+          }
+        ]
+      }
+    ]
+  }
+]
