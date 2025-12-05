@@ -1,0 +1,67 @@
+@prefix cashmere: <https://aimas.cs.pub.ro/ont/cashmere#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+<#increase-light-intensity-signifier> a cashmere:Signifier ;
+    cashmere:signifies <http://example.org/affordances/lighting-system-increase> ;
+    cashmere:hasIntentionDescription [
+        a cashmere:IntentionDescription ;
+        cashmere:hasStructuredDescription """
+{
+    "intent": "increase light intensity in a dim room"
+}
+"""^^xsd:string ;
+    ] ;
+    cashmere:recommendsContext [
+        a cashmere:IntentContext ;
+        cashmere:hasStructuredDescription """
+{
+    "conditions": [
+        {
+            "artifact": "http://example.org/artifacts/internal_light_sensor",
+            "propertyAffordance": "http://example.org/LightSensor#hasLuminosityLevel",
+            "valueConditions": [
+                {
+                    "operator": "greaterEqual",
+                    "value": 100
+                },
+                {
+                    "operator": "lessThan",
+                    "value": 300
+                }
+            ]
+        },
+        {
+            "artifact": "http://example.org/artifacts/person_counter",
+            "propertyAffordance": "http://example.org/PersonCounter#hasPersonCount",
+            "valueConditions": [
+                {
+                    "operator": "greaterEqual",
+                    "value": 1
+                }
+            ]
+        }
+    ]
+}
+"""^^xsd:string ;
+        cashmere:hasShaclCondition [
+            a sh:NodeShape ;
+            sh:targetNode <http://example.org/artifacts/internal_light_sensor> ;
+            sh:property [
+                sh:path <http://example.org/LightSensor#hasLuminosityLevel> ;
+                sh:datatype xsd:integer ;
+                sh:minInclusive 100 ;
+                sh:maxExclusive 300 ;
+            ] ;
+        ] ;
+        cashmere:hasShaclCondition [
+            a sh:NodeShape ;
+            sh:targetNode <http://example.org/artifacts/person_counter> ;
+            sh:property [
+                sh:path <http://example.org/PersonCounter#hasPersonCount> ;
+                sh:datatype xsd:integer ;
+                sh:minInclusive 1 ;
+            ] ;
+        ] ;
+    ] .

@@ -1,0 +1,81 @@
+@prefix cashmere: <https://aimas.cs.pub.ro/ont/cashmere#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+<#lower-blinds-hot-occupied-signifier> a cashmere:Signifier ;
+    cashmere:signifies <http://example.org/affordances/blinds-lower-thermal-comfort> ;
+    cashmere:hasIntentionDescription [
+        a cashmere:IntentionDescription ;
+        cashmere:hasStructuredDescription """
+{
+    "intent": "lower blinds to reduce heat for occupants comfort"
+}
+"""^^xsd:string ;
+    ] ;
+    cashmere:recommendsContext [
+        a cashmere:IntentContext ;
+        cashmere:hasStructuredDescription """
+{
+    "conditions": [
+        {
+            "artifact": "http://example.org/artifacts/external_light_sensor",
+            "propertyAffordance": "http://example.org/LightSensor#hasLuminosityLevel",
+            "valueConditions": [
+                {
+                    "operator": "greaterThan",
+                    "value": 5000
+                }
+            ]
+        },
+        {
+            "artifact": "http://example.org/artifacts/temperature_sensor",
+            "propertyAffordance": "http://example.org/TemperatureSensor#hasTemperatureLevel",
+            "valueConditions": [
+                {
+                    "operator": "greaterThan",
+                    "value": 25
+                }
+            ]
+        },
+        {
+            "artifact": "http://example.org/artifacts/person_counter",
+            "propertyAffordance": "http://example.org/PersonCounter#hasPersonCount",
+            "valueConditions": [
+                {
+                    "operator": "greaterEqual",
+                    "value": 1
+                }
+            ]
+        }
+    ]
+}
+"""^^xsd:string ;
+        cashmere:hasShaclCondition [
+            a sh:NodeShape ;
+            sh:targetNode <http://example.org/artifacts/external_light_sensor> ;
+            sh:property [
+                sh:path <http://example.org/LightSensor#hasLuminosityLevel> ;
+                sh:datatype xsd:integer ;
+                sh:minExclusive 5000 ;
+            ] ;
+        ] ;
+        cashmere:hasShaclCondition [
+            a sh:NodeShape ;
+            sh:targetNode <http://example.org/artifacts/temperature_sensor> ;
+            sh:property [
+                sh:path <http://example.org/TemperatureSensor#hasTemperatureLevel> ;
+                sh:datatype xsd:integer ;
+                sh:minExclusive 25 ;
+            ] ;
+        ] ;
+        cashmere:hasShaclCondition [
+            a sh:NodeShape ;
+            sh:targetNode <http://example.org/artifacts/person_counter> ;
+            sh:property [
+                sh:path <http://example.org/PersonCounter#hasPersonCount> ;
+                sh:datatype xsd:integer ;
+                sh:minInclusive 1 ;
+            ] ;
+        ] ;
+    ] .

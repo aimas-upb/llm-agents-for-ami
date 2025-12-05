@@ -1,0 +1,63 @@
+@prefix cashmere: <https://aimas.cs.pub.ro/ont/cashmere#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+<#heat-room-empty-signifier> a cashmere:Signifier ;
+    cashmere:signifies <http://example.org/affordances/heating-system-eco> ;
+    cashmere:hasIntentionDescription [
+        a cashmere:IntentionDescription ;
+        cashmere:hasStructuredDescription """
+{
+    "intent": "increase temperature in an empty room"
+}
+"""^^xsd:string ;
+    ] ;
+    cashmere:recommendsContext [
+        a cashmere:IntentContext ;
+        cashmere:hasStructuredDescription """
+{
+    "conditions": [
+        {
+            "artifact": "http://example.org/artifacts/temperature_sensor",
+            "propertyAffordance": "http://example.org/TemperatureSensor#hasTemperatureLevel",
+            "valueConditions": [
+                {
+                    "operator": "lessThan",
+                    "value": 20
+                }
+            ]
+        },
+        {
+            "artifact": "http://example.org/artifacts/person_counter",
+            "propertyAffordance": "http://example.org/PersonCounter#hasPersonCount",
+            "valueConditions": [
+                {
+                    "operator": "equals",
+                    "value": 0
+                }
+            ]
+        }
+    ]
+}
+"""^^xsd:string ;
+        cashmere:hasShaclCondition [
+            a sh:NodeShape ;
+            sh:targetNode <http://example.org/artifacts/temperature_sensor> ;
+            sh:property [
+                sh:path <http://example.org/TemperatureSensor#hasTemperatureLevel> ;
+                sh:datatype xsd:integer ;
+                sh:maxExclusive 20 ;
+            ] ;
+        ] ;
+        cashmere:hasShaclCondition [
+            a sh:NodeShape ;
+            sh:targetNode <http://example.org/artifacts/person_counter> ;
+            sh:property [
+                sh:path <http://example.org/PersonCounter#hasPersonCount> ;
+                sh:datatype xsd:integer ;
+                sh:minInclusive 0 ;
+                sh:maxInclusive 0 ;
+            ] ;
+        ] ;
+    ] .

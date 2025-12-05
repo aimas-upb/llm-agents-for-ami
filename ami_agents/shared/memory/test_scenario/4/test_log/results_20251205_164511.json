@@ -1,0 +1,1530 @@
+{
+  "1": {
+    "query_id": "query-1-cold-crowded-dark-sunny",
+    "description": "Cold room (18\u00b0C), 5 people, dark inside (50 lux), sunny outside (15000 lux) - many matches expected",
+    "intent": "make the room more comfortable",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 18
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 5
+      },
+      "http://example.org/artifacts/internal_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 50
+      },
+      "http://example.org/artifacts/external_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 15000
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.7865,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.7752,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.771,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.7687,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-crowded-signifier",
+        "intent_similarity": 0.7682,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.7583,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.7431,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.7393,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)",
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "increase-light-intensity-signifier",
+        "intent_similarity": 0.7197,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"100\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "decrease-light-intensity-signifier",
+        "intent_similarity": 0.7195,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"400\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "heat-room-occupied-signifier",
+      "heat-room-generic-signifier",
+      "heat-room-crowded-signifier"
+    ]
+  },
+  "2": {
+    "query_id": "query-2-hot-occupied-bright-sunny",
+    "description": "Hot room (28\u00b0C), 2 people, bright inside (600 lux), very sunny (20000 lux)",
+    "intent": "cool down the room",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 28
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 2
+      },
+      "http://example.org/artifacts/internal_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 600
+      },
+      "http://example.org/artifacts/external_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 20000
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.7988,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.7967,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.779,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.7741,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.7718,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.7583,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-crowded-signifier",
+        "intent_similarity": 0.7458,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)",
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.745,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)",
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "decrease-light-intensity-signifier",
+        "intent_similarity": 0.725,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "raise-blinds-dark-inside-signifier",
+        "intent_similarity": 0.7129,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"100\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "cool-room-occupied-signifier",
+      "cool-room-generic-signifier",
+      "decrease-light-intensity-signifier"
+    ]
+  },
+  "3": {
+    "query_id": "query-3-cold-empty-dark-cloudy",
+    "description": "Cold room (19\u00b0C), 0 people, dark inside (80 lux), cloudy (3000 lux) - eco modes",
+    "intent": "prepare the room",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 19
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 0
+      },
+      "http://example.org/artifacts/internal_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 80
+      },
+      "http://example.org/artifacts/external_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 3000
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.7757,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"1\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.7706,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"1\", datatype=xsd:integer)",
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.7609,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.7527,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)",
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.7519,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-crowded-signifier",
+        "intent_similarity": 0.7501,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.7326,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "turn-off-lights-bright-signifier",
+        "intent_similarity": 0.73,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"500\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-dark-inside-signifier",
+        "intent_similarity": 0.7295,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"5000\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.7271,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "heat-room-generic-signifier",
+      "heat-room-empty-signifier"
+    ]
+  },
+  "4": {
+    "query_id": "query-4-hot-crowded-bright-sunny",
+    "description": "Hot room (27\u00b0C), 4 people, very bright inside (900 lux), sunny (12000 lux) - glare + cooling",
+    "intent": "reduce heat and brightness",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 27
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 4
+      },
+      "http://example.org/artifacts/internal_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 900
+      },
+      "http://example.org/artifacts/external_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 12000
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "decrease-light-intensity-signifier",
+        "intent_similarity": 0.8116,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "lower-blinds-hot-signifier",
+        "intent_similarity": 0.8074,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "lower-blinds-hot-occupied-signifier",
+        "intent_similarity": 0.78,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.7641,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "increase-light-intensity-signifier",
+        "intent_similarity": 0.7632,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"300\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.756,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.7429,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.7372,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.7301,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)",
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-dark-inside-signifier",
+        "intent_similarity": 0.7274,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"100\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "decrease-light-intensity-signifier",
+      "lower-blinds-hot-signifier",
+      "lower-blinds-hot-occupied-signifier",
+      "cool-room-generic-signifier",
+      "cool-room-occupied-signifier",
+      "cool-room-crowded-signifier"
+    ]
+  },
+  "5": {
+    "query_id": "query-5-moderate-occupied-dark-evening",
+    "description": "Moderate temp (22\u00b0C), 1 person, very dark (30 lux), evening (500 lux) - lighting + privacy",
+    "intent": "improve lighting conditions",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 22
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 1
+      },
+      "http://example.org/artifacts/internal_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 30
+      },
+      "http://example.org/artifacts/external_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 500
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "decrease-light-intensity-signifier",
+        "intent_similarity": 0.797,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"400\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "increase-light-intensity-signifier",
+        "intent_similarity": 0.7915,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"100\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-dark-inside-signifier",
+        "intent_similarity": 0.7609,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"5000\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "lower-blinds-hot-signifier",
+        "intent_similarity": 0.7518,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)",
+          "Value is not > Literal(\"5000\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-sunny-signifier",
+        "intent_similarity": 0.748,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"10000\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-sunny-occupied-signifier",
+        "intent_similarity": 0.7363,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"10000\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "lower-blinds-glare-signifier",
+        "intent_similarity": 0.7323,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"800\", datatype=xsd:integer)",
+          "Value is not > Literal(\"8000\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-on-lights-very-dark-signifier",
+        "intent_similarity": 0.7271,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "lower-blinds-privacy-signifier",
+        "intent_similarity": 0.7214,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "lower-blinds-hot-occupied-signifier",
+        "intent_similarity": 0.7123,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)",
+          "Value is not > Literal(\"5000\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "turn-on-lights-very-dark-signifier",
+      "lower-blinds-privacy-signifier"
+    ]
+  },
+  "6": {
+    "query_id": "query-6-cold-occupied-dim-sunny",
+    "description": "Cold room (18\u00b0C), 2 people, dim (200 lux), sunny outside (15000 lux) - heating + raise blinds",
+    "intent": "warm up the room and let light in",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 18
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 2
+      },
+      "http://example.org/artifacts/internal_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 200
+      },
+      "http://example.org/artifacts/external_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 15000
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "turn-off-lights-bright-signifier",
+        "intent_similarity": 0.7922,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"500\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-on-lights-very-dark-signifier",
+        "intent_similarity": 0.7912,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"50\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "decrease-light-intensity-signifier",
+        "intent_similarity": 0.775,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"400\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-on-lights-dark-signifier",
+        "intent_similarity": 0.7726,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"100\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-dark-inside-signifier",
+        "intent_similarity": 0.7684,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"100\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-off-lights-empty-signifier",
+        "intent_similarity": 0.7684,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "increase-light-intensity-signifier",
+        "intent_similarity": 0.7665,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "turn-on-lights-dark-crowded-signifier",
+        "intent_similarity": 0.7539,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)",
+          "Value is not < Literal(\"100\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.7413,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.7359,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      }
+    ],
+    "final_matches": [
+      "increase-light-intensity-signifier",
+      "heat-room-occupied-signifier",
+      "heat-room-generic-signifier"
+    ]
+  },
+  "7": {
+    "query_id": "query-7-moderate-empty-dark-night",
+    "description": "Moderate (22\u00b0C), empty (0 people), dark (40 lux), night (100 lux) - only eco modes",
+    "intent": "save energy",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 22
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 0
+      },
+      "http://example.org/artifacts/internal_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 40
+      },
+      "http://example.org/artifacts/external_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 100
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.7698,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.7638,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "lower-blinds-hot-signifier",
+        "intent_similarity": 0.6662,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)",
+          "Value is not > Literal(\"5000\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.6545,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.6466,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"1\", datatype=xsd:integer)",
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "lower-blinds-hot-occupied-signifier",
+        "intent_similarity": 0.646,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)",
+          "Value is not > Literal(\"5000\", datatype=xsd:integer)",
+          "Value is not >= Literal(\"1\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.6433,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"1\", datatype=xsd:integer)",
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.6427,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.6339,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)",
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-sunny-signifier",
+        "intent_similarity": 0.63,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"10000\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": []
+  },
+  "8": {
+    "query_id": "query-8-hot-single-glare",
+    "description": "Hot (26\u00b0C), 1 person, very bright inside (850 lux), intense sun (9000 lux) - glare scenario",
+    "intent": "reduce the glare",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 26
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 1
+      },
+      "http://example.org/artifacts/internal_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 850
+      },
+      "http://example.org/artifacts/external_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 9000
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "lower-blinds-glare-signifier",
+        "intent_similarity": 0.8331,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "raise-blinds-dark-inside-signifier",
+        "intent_similarity": 0.7374,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"100\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "decrease-light-intensity-signifier",
+        "intent_similarity": 0.7356,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "lower-blinds-hot-signifier",
+        "intent_similarity": 0.7129,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "increase-light-intensity-signifier",
+        "intent_similarity": 0.6951,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"300\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "lower-blinds-privacy-signifier",
+        "intent_similarity": 0.6909,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"1000\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-sunny-signifier",
+        "intent_similarity": 0.6884,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"10000\", datatype=xsd:integer)",
+          "Value is not < Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "lower-blinds-hot-occupied-signifier",
+        "intent_similarity": 0.6737,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "lower-blinds-empty-signifier",
+        "intent_similarity": 0.6627,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-sunny-occupied-signifier",
+        "intent_similarity": 0.6586,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"10000\", datatype=xsd:integer)",
+          "Value is not < Literal(\"25\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "lower-blinds-glare-signifier",
+      "decrease-light-intensity-signifier",
+      "lower-blinds-hot-signifier",
+      "lower-blinds-hot-occupied-signifier"
+    ]
+  },
+  "9": {
+    "query_id": "query-9-cold-crowded-very-dark",
+    "description": "Very cold (15\u00b0C), 5 people, pitch dark (20 lux), overcast (2000 lux)",
+    "intent": "turn on the heating and lights",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 15
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 5
+      },
+      "http://example.org/artifacts/internal_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 20
+      },
+      "http://example.org/artifacts/external_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 2000
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "turn-on-lights-very-dark-signifier",
+        "intent_similarity": 0.7251,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "turn-off-lights-bright-signifier",
+        "intent_similarity": 0.7224,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"500\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-on-lights-dark-signifier",
+        "intent_similarity": 0.7221,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "turn-off-lights-empty-signifier",
+        "intent_similarity": 0.6984,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-on-lights-dark-crowded-signifier",
+        "intent_similarity": 0.6871,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.6762,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.6652,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)",
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-sunny-signifier",
+        "intent_similarity": 0.6619,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"10000\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "lower-blinds-hot-signifier",
+        "intent_similarity": 0.6603,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"5000\", datatype=xsd:integer)",
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.6577,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      }
+    ],
+    "final_matches": [
+      "turn-on-lights-very-dark-signifier",
+      "turn-on-lights-dark-signifier",
+      "turn-on-lights-dark-crowded-signifier",
+      "heat-room-occupied-signifier"
+    ]
+  },
+  "10": {
+    "query_id": "query-10-hot-empty-bright-sunny",
+    "description": "Hot (29\u00b0C), empty (0 people), bright (700 lux), sunny (18000 lux) - eco cooling",
+    "intent": "cool down the empty room",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 29
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 0
+      },
+      "http://example.org/artifacts/internal_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 700
+      },
+      "http://example.org/artifacts/external_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 18000
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.8105,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.8013,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-off-lights-empty-signifier",
+        "intent_similarity": 0.7878,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.7851,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"1\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.7637,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.7568,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"1\", datatype=xsd:integer)",
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.7546,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "lower-blinds-empty-signifier",
+        "intent_similarity": 0.7456,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.7241,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-crowded-signifier",
+        "intent_similarity": 0.7179,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)",
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "cool-room-empty-signifier",
+      "turn-off-lights-empty-signifier",
+      "cool-room-generic-signifier",
+      "lower-blinds-empty-signifier"
+    ]
+  },
+  "11": {
+    "query_id": "query-11-moderate-crowded-dim",
+    "description": "Moderate (23\u00b0C), 4 people, dim (150 lux), partly cloudy (6000 lux) - adjust lighting",
+    "intent": "improve the light",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 23
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 4
+      },
+      "http://example.org/artifacts/internal_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 150
+      },
+      "http://example.org/artifacts/external_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 6000
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "decrease-light-intensity-signifier",
+        "intent_similarity": 0.8192,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"400\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "increase-light-intensity-signifier",
+        "intent_similarity": 0.8188,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "raise-blinds-dark-inside-signifier",
+        "intent_similarity": 0.769,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"100\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-sunny-signifier",
+        "intent_similarity": 0.7597,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"10000\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-on-lights-very-dark-signifier",
+        "intent_similarity": 0.75,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"50\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-off-lights-bright-signifier",
+        "intent_similarity": 0.7333,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"500\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-on-lights-dark-crowded-signifier",
+        "intent_similarity": 0.7325,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"100\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-on-lights-dark-signifier",
+        "intent_similarity": 0.7294,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"100\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-sunny-occupied-signifier",
+        "intent_similarity": 0.726,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"10000\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-off-lights-empty-signifier",
+        "intent_similarity": 0.7014,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "increase-light-intensity-signifier"
+    ]
+  },
+  "12": {
+    "query_id": "query-12-cold-single-bright-sunny",
+    "description": "Cold (17\u00b0C), 1 person, bright inside (450 lux), very sunny (25000 lux) - heating only",
+    "intent": "warm up the room",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 17
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 1
+      },
+      "http://example.org/artifacts/internal_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 450
+      },
+      "http://example.org/artifacts/external_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 25000
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.8004,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.7998,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.7795,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-crowded-signifier",
+        "intent_similarity": 0.7783,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.7713,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.7677,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)",
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.7625,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.7473,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)",
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-dark-inside-signifier",
+        "intent_similarity": 0.7168,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"100\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-off-lights-bright-signifier",
+        "intent_similarity": 0.7017,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"500\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "heat-room-occupied-signifier",
+      "heat-room-generic-signifier"
+    ]
+  },
+  "13": {
+    "query_id": "query-13-moderate-occupied-very-bright",
+    "description": "Moderate (24\u00b0C), 2 people, very bright (550 lux), bright outside (7000 lux) - decrease light",
+    "intent": "dim the lights a bit",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 24
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 2
+      },
+      "http://example.org/artifacts/internal_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 550
+      },
+      "http://example.org/artifacts/external_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 7000
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "increase-light-intensity-signifier",
+        "intent_similarity": 0.7563,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"300\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-off-lights-bright-signifier",
+        "intent_similarity": 0.7539,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "turn-on-lights-very-dark-signifier",
+        "intent_similarity": 0.7519,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"50\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "decrease-light-intensity-signifier",
+        "intent_similarity": 0.7435,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "turn-on-lights-dark-signifier",
+        "intent_similarity": 0.7304,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"100\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-off-lights-empty-signifier",
+        "intent_similarity": 0.7262,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-dark-inside-signifier",
+        "intent_similarity": 0.7259,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"100\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-on-lights-dark-crowded-signifier",
+        "intent_similarity": 0.7204,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)",
+          "Value is not < Literal(\"100\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-sunny-signifier",
+        "intent_similarity": 0.6936,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"10000\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-sunny-occupied-signifier",
+        "intent_similarity": 0.6682,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"10000\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "turn-off-lights-bright-signifier",
+      "decrease-light-intensity-signifier"
+    ]
+  },
+  "14": {
+    "query_id": "query-14-edge-temp-occupied",
+    "description": "Edge temp (20\u00b0C), 3 people, moderate (300 lux), sunny (11000 lux) - boundary test",
+    "intent": "adjust the environment",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 20
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 3
+      },
+      "http://example.org/artifacts/internal_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 300
+      },
+      "http://example.org/artifacts/external_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 11000
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "raise-blinds-sunny-signifier",
+        "intent_similarity": 0.6769,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "raise-blinds-sunny-occupied-signifier",
+        "intent_similarity": 0.6671,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.6652,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.6588,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.6584,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.6541,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)",
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "raise-blinds-dark-inside-signifier",
+        "intent_similarity": 0.6528,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"100\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.6512,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)",
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.6453,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "decrease-light-intensity-signifier",
+        "intent_similarity": 0.6398,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"400\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "raise-blinds-sunny-signifier",
+      "raise-blinds-sunny-occupied-signifier"
+    ]
+  },
+  "15": {
+    "query_id": "query-15-all-extreme-occupied",
+    "description": "Very hot (30\u00b0C), 6 people, extremely bright (1000 lux), intense sun (30000 lux) - maximum matches",
+    "intent": "make the room cooler and less bright",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 30
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 6
+      },
+      "http://example.org/artifacts/internal_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 1000
+      },
+      "http://example.org/artifacts/external_light_sensor": {
+        "http://example.org/LightSensor#hasLuminosityLevel": 30000
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "decrease-light-intensity-signifier",
+        "intent_similarity": 0.864,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "increase-light-intensity-signifier",
+        "intent_similarity": 0.8315,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"300\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.8077,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "raise-blinds-dark-inside-signifier",
+        "intent_similarity": 0.8001,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"100\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "turn-off-lights-bright-signifier",
+        "intent_similarity": 0.7965,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.7937,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.7807,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.7804,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.779,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.7744,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "decrease-light-intensity-signifier",
+      "cool-room-generic-signifier",
+      "turn-off-lights-bright-signifier",
+      "cool-room-occupied-signifier",
+      "cool-room-crowded-signifier"
+    ]
+  }
+}

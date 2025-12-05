@@ -1,0 +1,67 @@
+@prefix cashmere: <https://aimas.cs.pub.ro/ont/cashmere#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix hmas: <https://aimas.cs.pub.ro/ont/cashmere#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+# Signifier for lowering the blinds
+
+<#lower-blinds-signifier> a cashmere:Signifier ;
+	cashmere:signifies <#adjust-blinds-action-affordance> ;
+	cashmere:recommendsAbility [
+    	a hmas:LLMReasoningAbility ;
+	] ;
+	cashmere:hasIntentionDescription [
+    	a cashmere:IntentionDescription ;
+    	cashmere:hasStructuredDescription """{
+            	"intent": "decrease luminosity in a room"
+        	}"""^^xsd:string ;
+	] ;
+	cashmere:recommendsContext [
+    	a cashmere:IntentContext ;
+    	cashmere:hasStructuredDescription """{
+            	"conditions": [
+                	{
+                    	"artifact": "http://example.org/precis/workspaces/lab308/artifacts/external_light_sensing308",
+                    	"propertyAffordance": "http://example.org/LightSensor#hasLuminosityLevel",
+                    	"valueConditions": [
+                        	{
+                            	"operator": "greaterThan",
+                            	"value": 50000
+                        	}
+                    	]
+                	},
+                	{
+                    	"artifact": "http://example.org/precis/workspaces/lab308/artifacts/temperature_sensor308",
+                    	"propertyAffordance": "http://example.org/TemperatureSensor#hasTemperatureLevel",
+                    	"valueConditions": [
+                        	{
+                            	"operator": "greaterThan",
+                            	"value": 25
+                        	}
+                    	]
+                	}
+            	]
+        	}"""^^xsd:string ;
+
+    	cashmere:hasShaclCondition [
+        	a sh:NodeShape ;
+        	sh:targetNode <http://example.org/precis/workspaces/lab308/artifacts/external_light_sensing308> ;
+        	sh:targetClass <http://example.org/LightSensor> ;
+        	sh:property [
+            	sh:path <http://example.org/LightSensor#hasLuminosityLevel> ;
+            	sh:datatype xsd:integer ;
+            	sh:minInclusive 50000 ;
+        	]
+    	] ;
+    	cashmere:hasShaclCondition [
+        	a sh:NodeShape ;
+        	sh:targetNode <http://example.org/precis/workspaces/lab308/artifacts/temperature_sensor308> ;
+        	sh:targetClass <http://example.org/TemperatureSensor> ;
+        	sh:property [
+            	sh:path <http://example.org/TemperatureSensor#hasTemperatureLevel> ;
+            	sh:datatype xsd:integer ;
+            	sh:minExclusive 25 ;
+        	]
+    	]
+	] .

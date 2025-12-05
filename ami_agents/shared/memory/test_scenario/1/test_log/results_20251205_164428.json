@@ -1,0 +1,60 @@
+{
+  "1": {
+    "query_id": "query-1-heat",
+    "description": "Room is cold (18\u00b0C), user wants to increase temperature",
+    "intent": "increase the temperature in the room.",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 18
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "heat-room-signifier",
+        "intent_similarity": 0.8433,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-signifier",
+        "intent_similarity": 0.8253,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "heat-room-signifier"
+    ]
+  },
+  "2": {
+    "query_id": "query-2-cool",
+    "description": "Room is hot (28\u00b0C), user wants to decrease temperature",
+    "intent": "decrease temperature",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 28
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "cool-room-signifier",
+        "intent_similarity": 0.8948,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "heat-room-signifier",
+        "intent_similarity": 0.7917,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "cool-room-signifier"
+    ]
+  }
+}

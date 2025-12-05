@@ -1,0 +1,225 @@
+Great question. Here’s a clear, code-free view of **what the SHACL Validator does**, **how it operates step-by-step**, and **a concrete example of the data** it validates.
+
+---
+
+# What the SHACL Validator (SV) does
+
+**Purpose:**
+Given a **current context** (your environment as RDF data) and a **signifier’s SHACL constraints** (its expected context), the SHACL Validator answers:
+
+* **Does this context conform to this signifier’s requirements?**
+* If **no**, **why not** (which constraint failed, on which node/property, how)?
+
+**Why it matters:**
+
+* It’s the **precise** (non-probabilistic) gate in the retrieval pipeline.
+* It prevents false positives that might slip through string/embedding intent filters or quick numeric pre-filters.
+
+**When it runs:**
+
+* After you generate candidate signifiers by **intent**, and (optionally) after a **fast structured subsumption** pre-check.
+* It can run on **one** signifier or **a batch** of candidates against the **same context**.
+
+**How the result is used:**
+
+* If a signifier **has shapes** and **conforms=false**, retrieval **must reject** it (hard gate), unless policy explicitly relaxes this.
+
+---
+
+# Inputs & Outputs (conceptual)
+
+**Inputs**
+
+1. **Data Graph (Context):**
+   The current environment as RDF (e.g., the lab’s sensors and their values).
+2. **Shapes Graph (Per-Signifier):**
+   The SHACL node shapes defined in the signifier (e.g., “external light sensor’s luminosity ≥ 10000”).
+3. **Validation Options (Policy):**
+
+   * Reasoning: none | RDFS | OWL-RL
+   * Abort strategy: stop at first failure vs. collect all
+   * Max violations to return, time/size limits
+
+**Outputs**
+
+* `conforms`: **true/false**
+* `violations`: a **structured list** (each has shape, focus node, path, expected constraint, actual value/evidence, message)
+* `summary`: counts (checked shapes, failures), timings, cache key hints
+* `diagnostics`: parsing/shape errors (if any)
+
+---
+
+# End-to-End Flow (no code)
+
+1. **Receive Request**
+
+   * From the Retrieval Orchestrator: `context_graph` + `candidate_signifier_ids`.
+
+2. **Assemble Shapes**
+
+   * For each candidate signifier, collect its **`hasShaclCondition`** blocks into a **shapes graph**.
+   * (Optional) Overlay **ontology** graphs if reasoning is enabled.
+
+3. **Normalize Context**
+
+   * Ensure data uses **typed literals** (e.g., `xsd:integer`), correct IRIs, and consistent units.
+   * If the caller sent a KV map earlier, it was already converted to RDF by the Context Graph Builder.
+
+4. **Select Targets**
+
+   * For each shape, identify the **focus nodes** based on `sh:targetNode`, `sh:targetClass`, etc.
+   * Example: the focus node is the specific external light sensor instance.
+
+5. **Evaluate Constraints**
+
+   * For each **property shape**, check rules like `sh:datatype`, `sh:minInclusive`, `sh:maxInclusive`, etc.
+   * Gather **all violations** (or stop early if policy says abort on first failure).
+
+6. **Aggregate Result**
+
+   * If **no violations** ⇒ `conforms=true`.
+   * Else ⇒ `conforms=false` and attach violation details.
+
+7. **Cache Result** (optimization)
+
+   * Cache by `(signifier_id, rdf_hash, options)` so repeated validations on the same context are fast.
+
+8. **Return Result**
+
+   * To the Orchestrator/Ranker, including enough **explanation** to act and log.
+
+---
+
+# Concrete Example (your data)
+
+## Example Signifier — “Raise Blinds”
+
+**Intent:** “increase luminosity in a room”
+**Key SHACL requirements (conceptually):**
+
+* **External light sensor** node
+
+  * `ex:hasLuminosityLevel` is **xsd:integer**
+  * `ex:hasLuminosityLevel` **≥ 10000**
+* **Temperature sensor** node
+
+  * `ex:hasTemperatureLevel` is **xsd:integer**
+  * `ex:hasTemperatureLevel` **≤ 25**
+
+*(Note: use `sh:datatype` not `sh:dataType` in the shape; your content already aligns with that after the small fix.)*
+
+## Data Graph (Context) the validator receives
+
+Imagine the current environment says:
+
+* External light sensor reading: **15000**
+* Temperature sensor reading: **23**
+
+*(These are RDF triples; conceptually it’s the same as your KV map converted to typed literals.)*
+
+## Validation Walkthrough
+
+1. **Target the external light sensor node**
+
+   * Check its `ex:hasLuminosityLevel` value: **15000**
+   * Verify type: it’s an **integer** (ok)
+   * Check `minInclusive 10000`: **15000 ≥ 10000** (ok)
+
+2. **Target the temperature sensor node**
+
+   * Check its `ex:hasTemperatureLevel` value: **23**
+   * Verify type: **integer** (ok)
+   * Check `maxInclusive 25`: **23 ≤ 25** (ok)
+
+3. **Aggregate**
+
+   * No violations → `conforms = true`
+
+**Outcome:**
+
+* **Raise-blinds signifier** **conforms** under this context.
+* It stays in the candidate set and likely ranks high if intent matches.
+
+---
+
+## Counter-Example (to see failure)
+
+**Context variant:**
+
+* External light = **6000** (too dim)
+* Temperature = **23**
+
+**Validation result:**
+
+* Fails at the external light shape: `minInclusive 10000` violated.
+* `conforms = false`, with a violation entry like:
+
+  * focus node: `<…/external_light_sensing308>`
+  * path: `ex:hasLuminosityLevel`
+  * expected: `≥ 10000 (xsd:integer)`
+  * actual: `6000`
+  * message: “Value 6000 is below minInclusive 10000”.
+
+**Effect:**
+
+* The validator rejects this signifier (hard gate), so the orchestrator drops it.
+
+---
+
+## Another Signifier — “Turn Light On”
+
+**Key SHACL requirements:**
+
+* **Internal light sensor**: `ex:hasLuminosityLevel` **≤ 100** (integer)
+* **Person counter**: `ex:hasPersonCount` **≥ 1** (integer)
+
+**Context (example):**
+
+* Internal light = **50**, Person count = **1**
+
+**Validation:**
+
+* Internal light 50 ≤ 100 → ok
+* Person count 1 ≥ 1 → ok
+* `conforms = true`
+
+This means both **Raise Blinds** and **Turn Light On** could conform under different realities; the Ranker then decides which affordance better fits (often guided by intent similarity and specificity).
+
+---
+
+# Typical Violation Types You’ll See
+
+* **Missing focus node:** target node absent from context.
+* **Missing property:** e.g., no `ex:hasLuminosityLevel` triple.
+* **Wrong datatype:** got string “15000” instead of integer `15000^^xsd:int`.
+* **Boundary failure:** `minInclusive`, `maxInclusive`, `minExclusive`, `maxExclusive`.
+* **Cardinality failure:** `sh:minCount`, `sh:maxCount` (if you use them).
+* **Class mismatch:** `sh:targetClass` not met (useful with ontology reasoning).
+
+---
+
+# Policy & Ops Notes
+
+* **Hard gate:** If a signifier **defines shapes** and `conforms=false`, score=0 (drop).
+* **Soft gate (optional):** Allow “unknown” if required data is missing; you can choose to defer to LLM Judge later—**not recommended** for safety-critical flows.
+* **Reasoning:** If you load your ontology, enable **RDFS/OWL-RL** so `sh:targetClass` checks can use subclass entailments.
+* **Batching:** Validate many candidates against the **same** context in one go to reduce overhead.
+* **Caching:** Hash the data graph; cache results per signifier to avoid re-work during the same query.
+* **Telemetry:** Count passes/fails, record common violation types to improve data quality.
+
+---
+
+# Where it fits in the pipeline
+
+1. **Intent Matcher** picks likely signifiers (string/embedding).
+2. **(Optional) Structured Subsumption** does fast numeric checks on your JSON conditions.
+3. **SHACL Validator** performs the **precise** check on the **actual RDF context**.
+4. **Ranker** fuses signals and returns the final set (with explanations).
+
+---
+
+## TL;DR
+
+* The **SHACL Validator** is your **truth check**: it deterministically verifies that a **current context** satisfies a signifier’s **formal constraints**.
+* It outputs **conforms / violations** with clear **why** and **where**.
+* In your system, it’s the **hard gate** that ensures only **truly applicable signifiers** proceed.

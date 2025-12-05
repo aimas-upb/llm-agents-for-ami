@@ -1,0 +1,385 @@
+Got it. Here’s a **lean, iterative PRD** you can hand to Claude Code, reordered to build **Storage → SHACL → Intent Matching → rest**, with **plug-and-play modules**, **versionable components**, and built-in **ablation/A/B** controls. No code—just what to build, how it behaves, and clean APIs/configs so you can iterate fast.
+
+---
+
+# PRD — RD4 (Iterative, Modular)
+
+**Formula:** Signifier = **Intent** + **Context** + **Affordance**
+**Objective:** Persist signifiers; retrieve those that match **intent + context**; support **multiple algorithm versions** per module, live **A/B**, and **ablation**.
+
+## 0) Guiding Principles
+
+* **Modular by design:** each capability is a swap-able module behind a stable interface.
+* **Versionable modules:** e.g., `intent_matcher:v0-string`, `v1-embed`, etc.
+* **Config-driven pipelines:** choose which modules/versions run for a request.
+* **Small shippable steps:** usable system after each phase.
+* **Explainability:** every decision returns signals/evidence.
+
+---
+
+## 1) Phased Roadmap (build order)
+
+### Phase 1 — Storage (MVP)
+
+* Persist signifiers with dual representation (NL + structured), context metadata, SHACL shapes, and affordance.
+* Named-graph RDF store + JSON document store; basic listing/lookup APIs.
+* No matching yet.
+
+### Phase 2 — SHACL Constraints (Precise validator)
+
+* Validate **context snapshots** against **per-signifier SHACL**.
+* Add a validator API (batch per candidate).
+* Add **authoring SHACL** (signifier object shape) for ingest.
+
+### Phase 3 — Intent Matcher (replaceable)
+
+* Start with **string contains** (v0), then enable **embedding similarity** (v1).
+* Pluggable: choose `v0` or `v1` per request/config for A/B.
+
+### Phase 4 — Retrieval Orchestrator (Auto pipeline)
+
+* Normalize context → Candidate by intent → (optional) Structured subsumption → SHACL validation → Rank → Return.
+* Feature flags to enable/disable steps for ablation.
+
+### Phase 5 — Structured Subsumption (Fast numeric pre-filter)
+
+* Evaluate JSON conditions (`>=`, `<=`, etc.) against context features before SHACL.
+
+### Phase 6 — Ranking & Policy
+
+* Weighted fusion of signals; hard gates for SHACL; explainability.
+
+### Phase 7 — Telemetry, Eval, A/B
+
+* End-to-end logs, metrics, labeled datasets, experiment configs, and report endpoints.
+
+### Phase 8 — Optional KG Reasoning & LLM Judge
+
+* KG Reasoner (RDFS/OWL-RL) and LLM Judge as optional modules (swappable, budgeted).
+
+---
+
+## 2) System Modules & Interfaces (stable)
+
+* **SR — Signifier Registry**
+  CRUD, versioning, provenance, status.
+
+* **RS — Representation Service**
+  Normalizes NL/structured fields; (optional) derives missing representation.
+
+* **MS — Memory Store**
+  RDF store (named graphs) + JSON doc store + property indexes.
+
+* **SV — SHACL Validator**
+  Authoring shape (signifier object) + runtime shapes (per signifier vs context).
+
+* **CGB — Context Graph Builder**
+  KV or RDF → canonical RDF + extracted features `(artifact, property) → value`.
+
+* **IM — Intent Matcher (versioned)**
+  `v0-string`, `v1-embed`, future `v2-hybrid`.
+
+* **SSE — Structured Subsumption Engine**
+  Fast operator checks on structured conditions.
+
+* **RP — Ranker & Policy**
+  Score fusion, gates, thresholds; returns explanation.
+
+* **ORCH — Retrieval Orchestrator**
+  Executes pipeline according to request/policy; gathers signals.
+
+* **TE — Telemetry & Evaluation**
+  Metrics, traces, datasets, A/B controller.
+
+* **APIGW — API Gateway**
+  Public REST; auth, quotas, experiment routing.
+
+*All modules MUST declare `name`, `version`, `inputs`, `outputs`, `latency_budget_ms`.*
+
+---
+
+## 3) Data Contracts (concise)
+
+### 3.1 Canonical Signifier (stored)
+
+* `signifier_id` (string), `version` (int), `status` (active|deprecated)
+* `intent`
+
+  * `nl_text` (string)
+  * `structured` (JSON with `verb`, `object`, `modifiers[]`)
+* `context`
+
+  * `structured_conditions[]` (artifact, property, op, value, datatype)
+  * `shacl_shapes` (RDF/Turtle or JSON-LD SHACL)
+* `affordance`
+
+  * `uri` (IRI), `nl_text` (optional)
+* `provenance` (created_at, created_by, source)
+* `indexes` (system): `intent_embedding?`, `context_feature_keys[]`, `range_index_hints[]`
+* `validation` (at ingest): `authoring_conforms`, `last_validated_at`
+
+### 3.2 Context Snapshot (query)
+
+* `intent_query` { `nl_text` and/or `structured` }
+* `context_input` { `rdf_graph` OR `kv` map }
+* `pipeline` { enabled modules/versions, topN, latency budgets }
+
+### 3.3 Match Result
+
+* `signifier_id`, `version`, `affordance_uri`, `score`
+* `signals` (intent_sim, sse_pass, shacl_conforms, kg_score?, llm_score?)
+* `explanation[]` (short bullets)
+* `evidence` (optional triples, violated constraints)
+
+---
+
+## 4) External APIs (public)
+
+### Storage (Phase 1)
+
+* `POST /signifiers` → canonical signifier (after authoring validation disabled by default in P1)
+* `PUT /signifiers/{id}` → updated signifier (new version if breaking)
+* `GET /signifiers/{id}`
+* `GET /signifiers?status=&affordance_uri=&q=&limit=&offset=`
+* `POST /signifiers/validate-authoring` (Phase 2 enable)
+
+### Context (Phase 2+)
+
+* `POST /context/normalize` → `{ rdf_graph, context_features }`
+
+### SHACL Validate (Phase 2)
+
+* `POST /validate/shacl` → per signifier or batch: `conforms`, `violations[]`
+
+### Retrieve (Phase 4+)
+
+* `POST /retrieve/match`
+  **Req:** `intent_query`, `context_input`, `pipeline` (module versions, topN)
+  **Resp:** `[Match Result]`
+
+### Admin/Telemetry (Phase 7)
+
+* `GET /admin/stats`
+* `POST /eval/run`, `POST /datasets`, `GET /datasets/{id}`
+* `POST /experiments` (create routing rules), `GET /experiments`
+
+---
+
+## 5) Configuration & Experimentation
+
+### 5.1 Global Config (feature flags)
+
+* `modules.enabled`: `["im:v0-string","sse:v1","sv:v1","rp:v1"]`
+* `retrieval.default_pipeline`: `["im","sse","sv","rp"]`
+* `weights`: `{ similarity:0.4, sse:0.3, kg:0.2, llm:0.1 }`
+* `hard_gates`: `{ shacl_conforms_if_shapes:true }`
+* `latency_budgets_ms`: `{ total:150, im:30, sse:20, sv:80, rp:10 }`
+
+### 5.2 Per-Request Overrides
+
+* Request may specify `pipeline.modules = ["im:v0-string","sv:v1","rp:v1"]`
+* Request may set `ablation = { sse:false, kg:false, llm:false }`
+
+### 5.3 A/B & Ablation
+
+* **Experiments** define **traffic splits** and **pipelines**:
+
+  * `exp_id`, `segment` (hash on user/session), `arms[]` with `pipeline`, `weight%`
+* **Ablation** sets modules off: e.g., disable SHACL to measure lift/loss.
+* **Version trials:** run `im:v0-string` vs `im:v1-embed` 50/50.
+
+---
+
+## 6) Phase Requirements & Acceptance
+
+### Phase 1 — Storage (MVP)
+
+**Requirements**
+
+* Save and fetch signifiers (RDF named graphs + JSON doc store).
+* Ensure **IDs**, **versions**, **status**, **provenance** are persisted.
+* Accept raw SHACL shapes but do not validate yet.
+* Build minimal property indexes: `(artifact_uri, property_uri)` catalog per signifier.
+
+**Acceptance**
+
+* CRUD works; round-trip fidelity.
+* Listing filters by `status`, `affordance_uri`.
+* Index catalog can list signifiers touching a given `(artifact, property)`.
+
+---
+
+### Phase 2 — SHACL Constraints
+
+**Requirements**
+
+* **Authoring SHACL** for signifier object (ingest-time). Toggle via flag.
+* **Runtime SHACL**: validate a **context graph** vs **signifier’s shapes**.
+* Batch validation endpoint (takes candidate list and one context graph).
+* Cache results keyed by `(signifier_id, rdf_hash)`.
+
+**Acceptance**
+
+* Invalid shapes rejected at ingest with diagnostics (when authoring flag on).
+* Runtime validation returns `conforms` + top violations; cache hit rate visible.
+
+---
+
+### Phase 3 — Intent Matcher (versionable)
+
+**IM v0 — String Contains**
+
+* Search `intent.nl_text` and/or the structured JSON literal for tokens.
+  **IM v1 — Embedding Similarity**
+* Vector index of `intent.nl_text`; cosine similarity.
+
+**Requirements**
+
+* Same **input/output** contract for all IM versions:
+
+  * **In:** `intent_query {nl_text|structured}`, `k`
+  * **Out:** `[{signifier_id, similarity}]`
+* Configurable default version; per-request override.
+
+**Acceptance**
+
+* A/B: route 50/50; collect similarity distributions and latency.
+* Deterministic behavior given same input/version.
+
+---
+
+### Phase 4 — Retrieval Orchestrator
+
+**Requirements**
+
+* Pipeline executor honoring `pipeline.modules` order.
+* Minimal default pipeline: `["im","sv","rp"]` (SSE off initially).
+* If SHACL shapes exist and `hard_gates.shacl=true`, reject non-conforming.
+* Return **signals** + **explanations**.
+
+**Acceptance**
+
+* End-to-end success on your three signifiers with realistic contexts.
+* Per-module latency reporting; total within `latency_budgets_ms`.
+
+---
+
+### Phase 5 — Structured Subsumption Engine (SSE)
+
+**Requirements**
+
+* Evaluate `structured_conditions[]` ops: `=, !=, <, <=, >, >=`.
+* Use extracted `context_features` KV; tolerate missing values by policy.
+* Output: `sse_pass: true|false`, `reasons[]`.
+
+**Acceptance**
+
+* Correct pass/fail on edge cases (boundaries: 10000 vs ≥10000).
+* Ablation: measure effect of enabling SSE before SHACL (candidate reduction).
+
+---
+
+### Phase 6 — Ranking & Policy
+
+**Requirements**
+
+* Combine: `similarity`, `sse_pass`, `shacl_conforms`, (`kg_score`, `llm_score` if enabled).
+* **Hard gate**: if shapes present and `shacl_conforms=false` ⇒ score=0.
+* Explainability: emit weights & contributions.
+
+**Acceptance**
+
+* Stable ordering given fixed weights.
+* Ties broken by specificity (more constraints → small boost).
+
+---
+
+### Phase 7 — Telemetry, Eval, A/B
+
+**Requirements**
+
+* Metrics: per-module latency, candidate counts, pass rates, precision@K on labeled sets.
+* Eval harness: upload datasets `(intent, context, expected_ids, notes)`.
+* A/B manager: create experiment, arms (pipelines), percentages; summary report.
+
+**Acceptance**
+
+* Reproducible eval runs; stored configs + results; dashboard endpoints.
+
+---
+
+### Phase 8 — Optional Modules
+
+**KG Reasoner (KGR)**
+
+* RDFS/OWL-RL; boosts candidates whose SHACL targets/classes are entailed.
+
+**LLM Judge (LLMJ)**
+
+* Last-mile semantic score; never overrides a failed SHACL.
+* Budgeted (#candidates, timeout). Redaction policy.
+
+**Acceptance**
+
+* Off by default; measurable lift when enabled on curated tests.
+
+---
+
+## 7) Minimal Authoring SHACL (ingest policy)
+
+* Validate presence of `signifies`, `hasIntentionDescription`, `recommendsContext`.
+* Optional checks: SHACL property paths use valid IRIs; datatypes set.
+
+*(This is a requirement text, not code—implementation follows Phase 2.)*
+
+---
+
+## 8) Storage Design (Phase 1 specifics)
+
+* **RDF store:** one **named graph** per signifier version: `graph:signifier/{id}/{version}`.
+* **JSON doc store:** canonical signifier document by `signifier_id`; latest version flagged.
+* **Index catalog:** `(artifact, property) → [signifier_id…]` for fast candidate prefilter (materialized at ingest).
+
+**Reliability:** WAL or transactional writes; idempotent ingest on repeated payloads with same `signifier_id` + `version`.
+
+---
+
+## 9) Non-Functional
+
+* **Latency targets (P50):** `im≤30 ms`, `sse≤20 ms`, `sv≤80 ms`, `rp≤10 ms`, end-to-end ≤150 ms (without LLM/KG).
+* **Scalability:** 5k signifiers, small graphs (<5k triples) baseline.
+* **Security:** input size caps, RDF parser limits, JSON validation, auth roles (`writer`, `reader`, `admin`).
+* **Explainability:** human-readable bullets, plus machine signals.
+
+---
+
+## 10) Deliverables to Implement (per phase)
+
+* **OpenAPI** spec (all public endpoints).
+* **Module manifests**: `name`, `version`, `inputs`, `outputs`, `budgets`, `flags`.
+* **Authoring SHACL profile** (P2).
+* **Experiment config schema** (P7).
+* **Seed eval dataset**: 6–10 scenarios covering your three signifiers.
+
+---
+
+## 11) Example Experiment Setups (no code, just what to support)
+
+* **Ablation-1:** `["im:v0-string","sv:v1","rp:v1"]` vs `["im:v0-string","sse:v1","sv:v1","rp:v1"]`
+* **Version-IM:** `["im:v0-string","sse:v1","sv:v1","rp:v1"]` vs `["im:v1-embed","sse:v1","sv:v1","rp:v1"]`
+* **Gate test:** `hard_gates.shacl=true` vs `false` on noisy contexts.
+
+Each experiment must produce:
+
+* Latency distribution, pass/fail counts per stage, precision@K, and top error examples with reasons.
+
+---
+
+### TL;DR
+
+1. Build **Storage** first;
+2. add **SHACL** authoring + runtime;
+3. plug **Intent Matcher** (v0 string, v1 embeddings) with versioned interface;
+4. wire **Orchestrator** to run chosen modules;
+5. layer **SSE**, **Ranker**, **Telemetry/Eval**, then optional **KG/LLM**.
+   Everything is **configurable**, **versionable**, and ready for **A/B & ablation**.

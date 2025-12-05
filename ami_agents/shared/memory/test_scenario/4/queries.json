@@ -1,0 +1,287 @@
+{
+    "1": {
+        "query_id": "query-1-cold-crowded-dark-sunny",
+        "description": "Cold room (18°C), 5 people, dark inside (50 lux), sunny outside (15000 lux) - many matches expected",
+        "intent": "make the room more comfortable",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 18
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 5
+            },
+            "http://example.org/artifacts/internal_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 50
+            },
+            "http://example.org/artifacts/external_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 15000
+            }
+        }
+    },
+    "2": {
+        "query_id": "query-2-hot-occupied-bright-sunny",
+        "description": "Hot room (28°C), 2 people, bright inside (600 lux), very sunny (20000 lux)",
+        "intent": "cool down the room",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 28
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 2
+            },
+            "http://example.org/artifacts/internal_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 600
+            },
+            "http://example.org/artifacts/external_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 20000
+            }
+        }
+    },
+    "3": {
+        "query_id": "query-3-cold-empty-dark-cloudy",
+        "description": "Cold room (19°C), 0 people, dark inside (80 lux), cloudy (3000 lux) - eco modes",
+        "intent": "prepare the room",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 19
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 0
+            },
+            "http://example.org/artifacts/internal_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 80
+            },
+            "http://example.org/artifacts/external_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 3000
+            }
+        }
+    },
+    "4": {
+        "query_id": "query-4-hot-crowded-bright-sunny",
+        "description": "Hot room (27°C), 4 people, very bright inside (900 lux), sunny (12000 lux) - glare + cooling",
+        "intent": "reduce heat and brightness",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 27
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 4
+            },
+            "http://example.org/artifacts/internal_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 900
+            },
+            "http://example.org/artifacts/external_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 12000
+            }
+        }
+    },
+    "5": {
+        "query_id": "query-5-moderate-occupied-dark-evening",
+        "description": "Moderate temp (22°C), 1 person, very dark (30 lux), evening (500 lux) - lighting + privacy",
+        "intent": "improve lighting conditions",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 22
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 1
+            },
+            "http://example.org/artifacts/internal_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 30
+            },
+            "http://example.org/artifacts/external_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 500
+            }
+        }
+    },
+    "6": {
+        "query_id": "query-6-cold-occupied-dim-sunny",
+        "description": "Cold room (18°C), 2 people, dim (200 lux), sunny outside (15000 lux) - heating + raise blinds",
+        "intent": "warm up the room and let light in",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 18
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 2
+            },
+            "http://example.org/artifacts/internal_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 200
+            },
+            "http://example.org/artifacts/external_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 15000
+            }
+        }
+    },
+    "7": {
+        "query_id": "query-7-moderate-empty-dark-night",
+        "description": "Moderate (22°C), empty (0 people), dark (40 lux), night (100 lux) - only eco modes",
+        "intent": "save energy",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 22
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 0
+            },
+            "http://example.org/artifacts/internal_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 40
+            },
+            "http://example.org/artifacts/external_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 100
+            }
+        }
+    },
+    "8": {
+        "query_id": "query-8-hot-single-glare",
+        "description": "Hot (26°C), 1 person, very bright inside (850 lux), intense sun (9000 lux) - glare scenario",
+        "intent": "reduce the glare",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 26
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 1
+            },
+            "http://example.org/artifacts/internal_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 850
+            },
+            "http://example.org/artifacts/external_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 9000
+            }
+        }
+    },
+    "9": {
+        "query_id": "query-9-cold-crowded-very-dark",
+        "description": "Very cold (15°C), 5 people, pitch dark (20 lux), overcast (2000 lux)",
+        "intent": "turn on the heating and lights",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 15
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 5
+            },
+            "http://example.org/artifacts/internal_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 20
+            },
+            "http://example.org/artifacts/external_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 2000
+            }
+        }
+    },
+    "10": {
+        "query_id": "query-10-hot-empty-bright-sunny",
+        "description": "Hot (29°C), empty (0 people), bright (700 lux), sunny (18000 lux) - eco cooling",
+        "intent": "cool down the empty room",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 29
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 0
+            },
+            "http://example.org/artifacts/internal_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 700
+            },
+            "http://example.org/artifacts/external_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 18000
+            }
+        }
+    },
+    "11": {
+        "query_id": "query-11-moderate-crowded-dim",
+        "description": "Moderate (23°C), 4 people, dim (150 lux), partly cloudy (6000 lux) - adjust lighting",
+        "intent": "improve the light",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 23
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 4
+            },
+            "http://example.org/artifacts/internal_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 150
+            },
+            "http://example.org/artifacts/external_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 6000
+            }
+        }
+    },
+    "12": {
+        "query_id": "query-12-cold-single-bright-sunny",
+        "description": "Cold (17°C), 1 person, bright inside (450 lux), very sunny (25000 lux) - heating only",
+        "intent": "warm up the room",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 17
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 1
+            },
+            "http://example.org/artifacts/internal_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 450
+            },
+            "http://example.org/artifacts/external_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 25000
+            }
+        }
+    },
+    "13": {
+        "query_id": "query-13-moderate-occupied-very-bright",
+        "description": "Moderate (24°C), 2 people, very bright (550 lux), bright outside (7000 lux) - decrease light",
+        "intent": "dim the lights a bit",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 24
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 2
+            },
+            "http://example.org/artifacts/internal_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 550
+            },
+            "http://example.org/artifacts/external_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 7000
+            }
+        }
+    },
+    "14": {
+        "query_id": "query-14-edge-temp-occupied",
+        "description": "Edge temp (20°C), 3 people, moderate (300 lux), sunny (11000 lux) - boundary test",
+        "intent": "adjust the environment",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 20
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 3
+            },
+            "http://example.org/artifacts/internal_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 300
+            },
+            "http://example.org/artifacts/external_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 11000
+            }
+        }
+    },
+    "15": {
+        "query_id": "query-15-all-extreme-occupied",
+        "description": "Very hot (30°C), 6 people, extremely bright (1000 lux), intense sun (30000 lux) - maximum matches",
+        "intent": "make the room cooler and less bright",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 30
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 6
+            },
+            "http://example.org/artifacts/internal_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 1000
+            },
+            "http://example.org/artifacts/external_light_sensor": {
+                "http://example.org/LightSensor#hasLuminosityLevel": 30000
+            }
+        }
+    }
+}

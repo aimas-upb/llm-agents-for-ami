@@ -1,0 +1,80 @@
+{
+    "1": {
+        "query_id": "query-1-heat-occupied",
+        "description": "Room is cold (18°C) with 2 people, user wants to increase temperature",
+        "intent": "increase the temperature in the room.",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 18
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 2
+            }
+        }
+    },
+    "2": {
+        "query_id": "query-2-heat-empty",
+        "description": "Room is cold (18°C) with 0 people, user wants to increase temperature",
+        "intent": "increase the temperature in the room.",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 18
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 0
+            }
+        }
+    },
+    "3": {
+        "query_id": "query-3-cool-occupied",
+        "description": "Room is hot (28°C) with 3 people, user wants to decrease temperature",
+        "intent": "decrease the temperature in the room.",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 28
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 3
+            }
+        }
+    },
+    "4": {
+        "query_id": "query-4-cool-empty",
+        "description": "Room is hot (28°C) with 0 people, user wants to decrease temperature",
+        "intent": "decrease the temperature in the room.",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 28
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 0
+            }
+        }
+    },
+    "5": {
+        "query_id": "query-5-moderate-temp-occupied",
+        "description": "Room is moderate (22°C) with 2 people - no signifier should match temperature constraints",
+        "intent": "adjust the temperature in the room.",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 22
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 2
+            }
+        }
+    },
+    "6": {
+        "query_id": "query-6-heat-edge-case",
+        "description": "Room is cold (19°C) with exactly 1 person - edge case for boundary conditions",
+        "intent": "increase the temperature in the room.",
+        "context": {
+            "http://example.org/artifacts/temperature_sensor": {
+                "http://example.org/TemperatureSensor#hasTemperatureLevel": 19
+            },
+            "http://example.org/artifacts/person_counter": {
+                "http://example.org/PersonCounter#hasPersonCount": 1
+            }
+        }
+    }
+}

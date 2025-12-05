@@ -1,0 +1,411 @@
+openapi: 3.0.3
+info:
+  title: RD4 Signifier System - Memory Engine API
+  description: |
+    FastAPI-based Memory Engine for the RD4 Signifier System (Phase 3: Intent Matcher).
+
+    This API provides endpoints for:
+    - Managing signifiers in memory (create, list, delete)
+    - Matching user intents against stored signifiers
+    - Validating context constraints using SHACL
+
+    The system uses semantic similarity for intent matching and SHACL validation
+    for context-based filtering of signifiers.
+  version: 1.0.0
+  contact:
+    name: RD4 Signifier System
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: http://0.0.0.0:8000
+    description: Docker container server
+
+tags:
+  - name: health
+    description: Health check and status endpoints
+  - name: simple-signifiers
+    description: Simplified signifier management and matching
+
+paths:
+  /:
+    get:
+      summary: Root endpoint
+      description: Returns basic API information and status
+      tags:
+        - health
+      responses:
+        '200':
+          description: API information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: "RD4 Signifier System"
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  phase:
+                    type: string
+                    example: "Phase 3 - Intent Matcher"
+                  status:
+                    type: string
+                    example: "operational"
+
+  /health:
+    get:
+      summary: Health check
+      description: Returns health status of the API
+      tags:
+        - health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  version:
+                    type: string
+                    example: "1.0.0"
+
+  /signifiers:
+    get:
+      summary: List all signifiers
+      description: Retrieves all signifiers currently stored in memory
+      tags:
+        - simple-signifiers
+      responses:
+        '200':
+          description: List of signifiers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignifierListResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      summary: Create signifier from RDF
+      description: |
+        Creates a new signifier from RDF data in Turtle format.
+        The RDF data should contain the signifier definition including intent and affordance.
+      tags:
+        - simple-signifiers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSignifierRequest'
+            example:
+              rdf_data: |
+                @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+                @prefix signifier: <http://example.org/signifier#> .
+
+                <http://example.org/signifier/create-task> a signifier:Signifier ;
+                    signifier:hasIntent "Create a new task" ;
+                    signifier:signifies <http://example.org/affordance/createTask> .
+      responses:
+        '201':
+          description: Signifier created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateSignifierResponse'
+        '400':
+          description: Invalid RDF data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete all signifiers
+      description: |
+        Clears all signifiers from memory by deleting the storage directory.
+        This operation cannot be undone.
+      tags:
+        - simple-signifiers
+      responses:
+        '200':
+          description: All signifiers deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteAllResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /signifiers/match:
+    get:
+      summary: Match signifiers by intent and context
+      description: |
+        Performs two-phase matching:
+        1. Intent matching using semantic similarity (returns top-k matches)
+        2. SHACL validation against context constraints
+
+        Returns all intent matches with their similarity scores and SHACL validation status.
+        Final matches are those that passed both intent similarity and SHACL validation.
+      tags:
+        - simple-signifiers
+      parameters:
+        - name: intent
+          in: query
+          required: true
+          description: Natural language intent query
+          schema:
+            type: string
+            minLength: 1
+          example: "Create a new task"
+        - name: context
+          in: query
+          required: false
+          description: |
+            Optional JSON string containing context data.
+            Format: {"artifact_uri": {"property_uri": "value"}}
+          schema:
+            type: string
+          example: '{"http://example.org/task1": {"http://example.org/property/status": "active"}}'
+      responses:
+        '200':
+          description: Matching results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchResponse'
+              examples:
+                with_matches:
+                  summary: Successful match with results
+                  value:
+                    matches:
+                      - signifier_id: "sig_001"
+                        intent_similarity: 0.9234
+                        shacl_conforms: true
+                        shacl_violations: []
+                      - signifier_id: "sig_002"
+                        intent_similarity: 0.8567
+                        shacl_conforms: false
+                        shacl_violations:
+                          - "Required property missing: status"
+                    final_matches:
+                      - "sig_001"
+                    total_signifiers: 10
+                no_matches:
+                  summary: No matches found
+                  value:
+                    matches: []
+                    final_matches: []
+                    total_signifiers: 10
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    SignifierResponse:
+      type: object
+      description: Represents a single signifier
+      required:
+        - signifier_id
+        - version
+        - status
+        - intent
+        - affordance_uri
+      properties:
+        signifier_id:
+          type: string
+          description: Unique identifier for the signifier
+          example: "sig_001"
+        version:
+          type: integer
+          description: Version number of the signifier
+          example: 1
+        status:
+          type: string
+          description: Status of the signifier
+          enum:
+            - active
+            - deprecated
+          example: "active"
+        intent:
+          type: string
+          description: Natural language intent description
+          example: "Create a new task"
+        affordance_uri:
+          type: string
+          format: uri
+          description: URI of the signified affordance
+          example: "http://example.org/affordance/createTask"
+
+    SignifierListResponse:
+      type: object
+      description: Response containing list of signifiers
+      required:
+        - signifiers
+        - total
+      properties:
+        signifiers:
+          type: array
+          description: Array of signifier objects
+          items:
+            $ref: '#/components/schemas/SignifierResponse'
+        total:
+          type: integer
+          description: Total number of signifiers
+          example: 10
+
+    CreateSignifierRequest:
+      type: object
+      description: Request to create a signifier from RDF data
+      required:
+        - rdf_data
+      properties:
+        rdf_data:
+          type: string
+          description: RDF data in Turtle format
+          minLength: 1
+          example: |
+            @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+            @prefix signifier: <http://example.org/signifier#> .
+
+            <http://example.org/signifier/create-task> a signifier:Signifier ;
+                signifier:hasIntent "Create a new task" ;
+                signifier:signifies <http://example.org/affordance/createTask> .
+
+    CreateSignifierResponse:
+      type: object
+      description: Response after creating a signifier
+      required:
+        - signifier_id
+        - message
+      properties:
+        signifier_id:
+          type: string
+          description: ID of the created signifier
+          example: "sig_001"
+        message:
+          type: string
+          description: Success message
+          example: "Signifier sig_001 created successfully"
+
+    DeleteAllResponse:
+      type: object
+      description: Response after deleting all signifiers
+      required:
+        - success
+        - message
+        - deleted_count
+      properties:
+        success:
+          type: boolean
+          description: Whether the operation succeeded
+          example: true
+        message:
+          type: string
+          description: Status message
+          example: "Successfully deleted all signifiers from memory"
+        deleted_count:
+          type: integer
+          description: Number of signifiers that were deleted
+          example: 15
+
+    MatchResult:
+      type: object
+      description: Single match result with similarity and validation info
+      required:
+        - signifier_id
+        - intent_similarity
+        - shacl_conforms
+        - shacl_violations
+      properties:
+        signifier_id:
+          type: string
+          description: ID of the matched signifier
+          example: "sig_001"
+        intent_similarity:
+          type: number
+          format: float
+          description: Semantic similarity score between query intent and signifier intent
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.9234
+        shacl_conforms:
+          type: boolean
+          description: Whether the context passed SHACL validation
+          example: true
+        shacl_violations:
+          type: array
+          description: List of SHACL violation messages (empty if conforms is true)
+          items:
+            type: string
+          example: []
+
+    MatchResponse:
+      type: object
+      description: Response for match query with all results
+      required:
+        - matches
+        - final_matches
+        - total_signifiers
+      properties:
+        matches:
+          type: array
+          description: All matches ordered by intent similarity (includes those that failed SHACL)
+          items:
+            $ref: '#/components/schemas/MatchResult'
+        final_matches:
+          type: array
+          description: List of signifier IDs that passed both intent matching and SHACL validation
+          items:
+            type: string
+          example:
+            - "sig_001"
+            - "sig_003"
+        total_signifiers:
+          type: integer
+          description: Total number of signifiers in memory
+          example: 10
+
+    ErrorResponse:
+      type: object
+      description: Error response
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: Error message
+          example: "Invalid RDF data: Parse error at line 5"

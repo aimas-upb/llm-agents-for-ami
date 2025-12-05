@@ -1,0 +1,518 @@
+@prefix : <https://aimas.cs.pub.ro/ont/cashmere#> .
+@prefix v2: <https://aimas.cs.pub.ro/ont/cashmere/2.0.0#> .
+@prefix acl: <http://www.w3.org/ns/auth/acl#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix shacl: <http://www.w3.org/ns/shacl#> .
+@base <https://aimas.cs.pub.ro/ont/cashmere#> .
+
+<https://aimas.cs.pub.ro/ont/cashmere> rdf:type owl:Ontology ;
+                                        owl:versionIRI <https://aimas.cs.pub.ro/ont/cashmere/2.0.0> .
+
+#################################################################
+#    Annotation properties
+#################################################################
+
+###  http://purl.org/dc/elements/1.1/describes
+<http://purl.org/dc/elements/1.1/describes> rdf:type owl:AnnotationProperty .
+
+
+###  http://purl.org/dc/elements/1.1/title
+<http://purl.org/dc/elements/1.1/title> rdf:type owl:AnnotationProperty .
+
+
+###  http://purl.org/dc/terms/title
+<http://purl.org/dc/terms/title> rdf:type owl:AnnotationProperty .
+
+
+###  http://www.w3.org/ns/auth/acl#accessControl
+acl:accessControl rdfs:comment """The Access Control file for this information resource.
+        This may of course be a virtual resource implemented by the access control system.
+        Note also HTTP's header  Link:  foo.meta ;rel=meta can be used for this.""" ,
+                               """The Access Control file for this information resource.
+        This may of course be a virtual resource implemented by the access control system.
+        Note that HTTP header `Link: <foo.acl>; rel=\"acl\"` can also be used for this.""" ;
+                  rdfs:label "access control" ;
+                  rdfs:seeAlso <https://solidproject.org/TR/wac#acl-link-relation> ;
+                  rdf:type owl:AnnotationProperty ;
+                  rdfs:subPropertyOf rdfs:seeAlso ;
+                  rdfs:range <http://www.w3.org/2006/gen/ont#InformationResource> ;
+                  rdfs:domain <http://www.w3.org/2006/gen/ont#InformationResource> .
+
+
+###  http://www.w3.org/ns/auth/acl#default
+acl:default rdfs:comment """If a resource has no ACL file (it is 404),
+        then access to the resource if given by the ACL of the immediately
+        containing directory, or failing that (404) the ACL of the recursively next
+        containing directory which has an ACL file.
+        Within that ACL file,
+        any Authentication which has that directory as its acl:default applies to the
+        resource. (The highest directory must have an ACL file.)
+""" ,
+                         """If a resource has no ACL file (it is 404),
+        then access to the resource is given by the ACL of the immediately
+        containing directory, or failing that (404) the ACL of the recursively next
+        containing directory which has an ACL file.
+        Within that ACL file,
+        any Authorization which has that directory as its acl:default applies to the
+        resource. (The highest directory must have an ACL file.)
+""" ;
+            rdfs:label "default access for things in this" ;
+            rdf:type owl:AnnotationProperty ;
+            rdfs:domain acl:Authorization .
+
+
+###  http://www.w3.org/ns/auth/acl#defaultForNew
+acl:defaultForNew rdfs:comment """THIS IS OBSOLETE AS OF 2017-08-01.   See 'default'.
+        Was: A directory for which this authorization is used for new files in the directory.""" ;
+                  rdfs:label "default access for new things in the object" ;
+                  rdf:type owl:AnnotationProperty ;
+                  rdfs:domain acl:Authorization .
+
+
+###  http://www.w3.org/ns/auth/acl#label
+acl:label rdf:type owl:AnnotationProperty .
+
+
+###  http://xmlns.com/foaf/0.1/topic
+<http://xmlns.com/foaf/0.1/topic> rdf:type owl:AnnotationProperty .
+
+
+#################################################################
+#    Object Properties
+#################################################################
+
+###  http://www.w3.org/ns/auth/acl#accessTo
+acl:accessTo rdf:type owl:ObjectProperty ;
+             rdfs:domain acl:Authorization ;
+             rdfs:range <http://www.w3.org/2006/gen/ont#InformationResource> ;
+             rdfs:comment "The information resource to which access is being granted." ;
+             rdfs:label "to" .
+
+
+###  http://www.w3.org/ns/auth/acl#accessToClass
+acl:accessToClass rdf:type owl:ObjectProperty ;
+                  rdfs:domain acl:Authorization ;
+                  rdfs:range rdfs:Class ;
+                  rdfs:comment "A class of information resources to which access is being granted." ;
+                  rdfs:label "to all in" .
+
+
+###  http://www.w3.org/ns/auth/acl#agent
+acl:agent rdf:type owl:ObjectProperty ;
+          rdfs:domain acl:Authorization ;
+          rdfs:range <http://xmlns.com/foaf/0.1/Agent> ;
+          rdfs:comment "A person or social entity to being given the right" ;
+          rdfs:label "agent" .
+
+
+###  http://www.w3.org/ns/auth/acl#agentClass
+acl:agentClass rdf:type owl:ObjectProperty ;
+               rdfs:domain acl:Authorization ;
+               rdfs:range rdfs:Class ;
+               rdfs:comment "A class of persons or social entities to being given the right" ;
+               rdfs:label "agent class" .
+
+
+###  http://www.w3.org/ns/auth/acl#agentGroup
+acl:agentGroup rdf:type owl:ObjectProperty ;
+               rdfs:domain acl:Authorization ;
+               rdfs:range <http://www.w3.org/2006/vcard/ns#Group> ;
+               rdfs:comment """A group of persons or social entities to being given the right.
+          The right is given to any entity which is a vcard:member of the group,
+          as defined by the document received when the Group is dereferenced.""" ;
+               rdfs:label "agent group" .
+
+
+###  http://www.w3.org/ns/auth/acl#delegates
+acl:delegates rdf:type owl:ObjectProperty ;
+              rdfs:range <http://xmlns.com/foaf/0.1/Agent> ;
+              rdfs:comment """Delegates a person or another agent to act on behalf of the agent.
+    For example, Alice delegates Bob to act on behalf of Alice for ACL purposes.""" ;
+              rdfs:label "delegates"@en .
+
+
+###  http://www.w3.org/ns/auth/acl#mode
+acl:mode rdf:type owl:ObjectProperty ;
+         rdfs:domain acl:Authorization ;
+         rdfs:range rdfs:Class ;
+         rdfs:comment "A mode of access such as read or write." ;
+         rdfs:label "access mode" .
+
+
+###  http://www.w3.org/ns/auth/acl#origin
+acl:origin rdf:type owl:ObjectProperty ;
+           rdfs:domain acl:Authorization ;
+           rdfs:range acl:Origin ;
+           rdfs:comment """A web application, identified by its Origin, such as
+        <https://scripts.example.com>, being given the right.
+        When a user of the web application at a certain origin accesses the server,
+        then the browser sets the Origin: header to warn that a possibly untrusted webapp
+        is being used.
+        Then, BOTH the user AND the origin must have the required access.""" ;
+           rdfs:label "origin" ;
+           rdfs:seeAlso <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Origin> .
+
+
+###  http://www.w3.org/ns/auth/acl#owner
+acl:owner rdf:type owl:ObjectProperty ;
+          rdfs:range <http://xmlns.com/foaf/0.1/Agent> ;
+          rdfs:comment """The person or other agent which owns this.
+    For example, the owner of a file in a filesystem.
+    There is a sense of \"right to control\".   Typically defaults to the agent who created
+    something, but can be changed.""" ,
+                       """The person or other agent which owns this.
+    For example, the owner of a file in a filesystem.
+    There is a sense of right to control.   Typically defaults to the agent who craeted
+    something but can be changed.""" ;
+          rdfs:label "owner"@en .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#definesGroup
+:definesGroup rdf:type owl:ObjectProperty ;
+              owl:inverseOf :groupFor ;
+              rdfs:domain :ContextDomain ;
+              rdfs:range :ContextDomainGroup .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#groupFor
+:groupFor rdf:type owl:ObjectProperty ;
+          rdfs:domain :ContextDomainGroup ;
+          rdfs:range :ContextDomain .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#hasAccessAuthorization
+:hasAccessAuthorization rdf:type owl:ObjectProperty ;
+                        rdfs:domain :ContextAuthorizedResource ;
+                        rdfs:range :ContextBasedAccessAuthorization .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#hasAccessCondition
+:hasAccessCondition rdf:type owl:ObjectProperty ;
+                    rdfs:domain :ContextBasedAuthorization ;
+                    rdfs:range :ContextBasedAccessCondition ;
+                    rdfs:comment "Property linking a ContextBasedAuthorization to the ContextBasedAccessCondition (a SHACL NodeShape) that defines the context-based conditions that need to be matched in order to access the resource protected by the ContextBasedAuthorization." .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#hasContextDimension
+:hasContextDimension rdf:type owl:ObjectProperty ;
+                     rdfs:subPropertyOf owl:topObjectProperty ;
+                     rdfs:domain :ContextDomain ;
+                     rdfs:range <http://pervasive.semanticweb.org/ont/2017/07/consert/core#ContextAssertion> .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#hasControlAuthorization
+:hasControlAuthorization rdf:type owl:ObjectProperty ;
+                         rdfs:domain :ContextAuthorizedResource ;
+                         rdfs:range :ContextBasedControlAuthorization .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#hasIntentionDescription
+:hasIntentionDescription rdf:type owl:ObjectProperty ;
+                         rdfs:domain :Signifier ;
+                         rdfs:range :IntentionDescription .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#hasShaclCondition
+:hasShaclCondition rdf:type owl:ObjectProperty ;
+                   rdfs:domain :IntentContext ;
+                   rdfs:range shacl:NodeShape .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#managesDomain
+:managesDomain rdf:type owl:ObjectProperty ;
+               rdfs:subPropertyOf owl:topObjectProperty ;
+               rdfs:domain :ContextManagementService ;
+               rdfs:range :ContextDomain .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#managesStream
+:managesStream rdf:type owl:ObjectProperty ;
+               rdfs:domain :ContextManagementService ;
+               rdfs:range :ContextStream .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#memberIn
+:memberIn rdf:type owl:ObjectProperty ;
+          rdfs:domain <http://xmlns.com/foaf/0.1/Agent> ;
+          rdfs:range :ContextDomainGroup ;
+          rdfs:comment "Property specifying the membership of an agent identified by a WebID in a ContextDomainGroup." .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#recommendsAbility
+:recommendsAbility rdf:type owl:ObjectProperty ;
+                   rdfs:domain :Signifier ;
+                   rdfs:range :AgentAbility .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#recommendsContext
+:recommendsContext rdf:type owl:ObjectProperty ;
+                   rdfs:domain :Signifier ;
+                   rdfs:range :IntentContext .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#signifies
+:signifies rdf:type owl:ObjectProperty ;
+           rdfs:subPropertyOf owl:topObjectProperty ;
+           rdfs:domain :Signifier ;
+           rdfs:range rdfs:Resource .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#streams
+:streams rdf:type owl:ObjectProperty ;
+         rdfs:domain :ContextStream ;
+         rdfs:range <http://pervasive.semanticweb.org/ont/2017/07/consert/core#ContextAssertion> .
+
+
+#################################################################
+#    Data properties
+#################################################################
+
+###  https://aimas.cs.pub.ro/ont/cashmere#contextGraphURI
+:contextGraphURI rdf:type owl:DatatypeProperty ;
+                 rdfs:domain :ProfiledContextCondition ;
+                 rdfs:range xsd:anyURI ;
+                 rdfs:comment "A property of a Static- or Profiled- ContextCondition SHACL NodeShape identifying the RDF Named Graphs managed in the HyperAgents Environment against which the SHACL shape has to be validated." .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#hasStructuredDescription
+:hasStructuredDescription rdf:type owl:DatatypeProperty ;
+                          rdfs:domain [ rdf:type owl:Class ;
+                                        owl:unionOf ( :IntentContext
+                                                      :IntentionDescription
+                                                    )
+                                      ] ;
+                          rdfs:range xsd:string ;
+                          rdfs:comment "The property indicating the structured natural language description of a recommended context or the agent intention." .
+
+
+#################################################################
+#    Classes
+#################################################################
+
+###  http://pervasive.semanticweb.org/ont/2017/07/consert/core#ContextAssertion
+<http://pervasive.semanticweb.org/ont/2017/07/consert/core#ContextAssertion> rdf:type owl:Class .
+
+
+###  http://www.w3.org/2000/01/rdf-schema#Class
+rdfs:Class rdf:type owl:Class .
+
+
+###  http://www.w3.org/2000/01/rdf-schema#Resource
+rdfs:Resource rdf:type owl:Class .
+
+
+###  http://www.w3.org/2006/gen/ont#InformationResource
+<http://www.w3.org/2006/gen/ont#InformationResource> rdf:type owl:Class .
+
+
+###  http://www.w3.org/2006/vcard/ns#Group
+<http://www.w3.org/2006/vcard/ns#Group> rdf:type owl:Class .
+
+
+###  http://www.w3.org/ns/auth/acl#Access
+acl:Access rdf:type owl:Class ;
+           rdfs:comment "Any kind of access to a resource. Don't use this, use R W and RW" ;
+           rdfs:label "access"@en ;
+           acl:label "access"@en .
+
+
+###  http://www.w3.org/ns/auth/acl#Append
+acl:Append rdf:type owl:Class ;
+           rdfs:subClassOf acl:Access ,
+                           acl:Write ;
+           rdfs:comment """Append accesses are specific write access which only add information, and do not remove information.
+    For text files, for example, append access allows bytes to be added onto the end of the file.
+    For RDF graphs, Append access allows adds triples to the graph but does not remove any.
+    Append access is useful for dropbox functionality.
+    Dropbox can be used for link notification, which the information added is a notification
+    that a some link has been made elsewhere relevant to the given resource.
+    """ ;
+           rdfs:label "append"@en .
+
+
+###  http://www.w3.org/ns/auth/acl#AuthenticatedAgent
+acl:AuthenticatedAgent rdf:type owl:Class ;
+                       rdfs:subClassOf <http://xmlns.com/foaf/0.1/Agent> ;
+                       rdfs:comment """A class of agents who have been authenticated.
+In other words, anyone can access this resource, but not anonymously.
+The social expectation is that the authentication process will provide an
+identify and a name, or pseudonym.
+(A new ID should not be minted for every access: the intent is that the user
+is able to continue to use the ID for continues interactions with peers,
+and for example to develop a reputation)
+""" ;
+                       rdfs:label "Anyone authenticated" .
+
+
+###  http://www.w3.org/ns/auth/acl#Authorization
+acl:Authorization rdf:type owl:Class ;
+                  rdfs:comment """An element of access control,
+    allowing agent to agents access of some kind to resources or classes of resources""" ;
+                  rdfs:label "authorization" .
+
+
+###  http://www.w3.org/ns/auth/acl#Control
+acl:Control rdf:type owl:Class ;
+            rdfs:subClassOf acl:Access ;
+            rdfs:comment "Allows read/write access to the ACL for the resource(s)" ;
+            rdfs:label "control"@en .
+
+
+###  http://www.w3.org/ns/auth/acl#Origin
+acl:Origin rdf:type owl:Class ;
+           rdfs:comment """An Origin is basically a web site
+        (Note WITHOUT the trailing slash after the domain name and port in its URI)
+        and is the basis for controlling access to data by web apps
+        in the Same Origin Model of web security.
+        All scripts from the same origin are given the same right.""" ;
+           rdfs:label "Origin" ;
+           rdfs:seeAlso <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Origin> .
+
+
+###  http://www.w3.org/ns/auth/acl#Read
+acl:Read rdf:type owl:Class ;
+         rdfs:subClassOf acl:Access ;
+         rdfs:comment "The class of read operations" ;
+         rdfs:label "read"@en .
+
+
+###  http://www.w3.org/ns/auth/acl#Write
+acl:Write rdf:type owl:Class ;
+          rdfs:subClassOf acl:Access ;
+          rdfs:label "write"@en .
+
+
+###  http://www.w3.org/ns/shacl#NodeShape
+shacl:NodeShape rdf:type owl:Class .
+
+
+###  http://xmlns.com/foaf/0.1/Agent
+<http://xmlns.com/foaf/0.1/Agent> rdf:type owl:Class .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#AgentAbility
+:AgentAbility rdf:type owl:Class ;
+              rdfs:comment "An agent ability that can be recommended by an affordance signifier" .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#ContextAuthorizedResource
+:ContextAuthorizedResource rdf:type owl:Class ;
+                           rdfs:comment "A Resource in a HyperAgents Environment for which Context-Based Access is enabled." .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#ContextBasedAccessAuthorization
+:ContextBasedAccessAuthorization rdf:type owl:Class ;
+                                 rdfs:subClassOf :ContextBasedAuthorization ;
+                                 owl:disjointWith :ContextBasedControlAuthorization .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#ContextBasedAccessCondition
+:ContextBasedAccessCondition rdf:type owl:Class ;
+                             rdfs:subClassOf shacl:NodeShape ;
+                             rdfs:comment """The top-level SHACL NodeShape which specifies the conditions for accessing a resource in a HyperAgents Environment.
+
+The NodeShape will be a disjunction of conjunctions of NodeShapes, identifying ContextDomain (dynamic), Profiled- or Static- context information available in the HyperAgents Environment, that condition the access.""" .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#ContextBasedAuthorization
+:ContextBasedAuthorization rdf:type owl:Class ;
+                           rdfs:subClassOf acl:Authorization ;
+                           rdfs:comment """The Shared Context Authorization base concept identifying the resource for which authorization is given, the type of authorization and the individual / class of individuals to which authorization is given.
+Can be further subclassed into access and control (right to alter authorizations) authorizations."""@en .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#ContextBasedControlAuthorization
+:ContextBasedControlAuthorization rdf:type owl:Class ;
+                                  rdfs:subClassOf :ContextBasedAuthorization .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#ContextDomain
+:ContextDomain rdf:type owl:Class ;
+               owl:disjointWith :ContextStream .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#ContextDomainCondition
+:ContextDomainCondition rdf:type owl:Class ;
+                        rdfs:subClassOf shacl:NodeShape ;
+                        rdfs:comment "The SHACL NodeShape that specifies membership in a ContextDomain as a condition for accessing a resource in a Hyperagents Environment." .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#ContextDomainGroup
+:ContextDomainGroup rdf:type owl:Class ;
+                    rdfs:comment """A group denoting the dyanmic \"membership\" in a ContextDomain, that is resources and agents who are determined to satisfy the RSP (RDF Stream Processing) query describing the membership.
+
+The RSP query will involve processing a Stream of dynamic ContextAssertions which define a ContextDimension of a given application (e.g. location), while the ContextDomains are given by the possible role fillers (objects) of the ContextDimension.""" .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#ContextManagementService
+:ContextManagementService rdf:type owl:Class .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#ContextStream
+:ContextStream rdf:type owl:Class .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#IntentContext
+:IntentContext rdf:type owl:Class ;
+               rdfs:comment """The IntentContext is part of the structure of a Signifier and refers to the recommended context for the successful use of a signified affordance.
+The IntentContext is given as a list of conditions expressed either as SHACL NodeShape conditions applied to artifact nodes, where the matched-for properties are Literals and the tested conditions include numerical equalities or inequalities, string and substring matches or datetime operations.""" ;
+               rdfs:label "Intent Context" .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#IntentionDescription
+:IntentionDescription rdf:type owl:Class ;
+                      rdfs:comment "The structured language (usually under a JSON form) description of the intention (goal) for which an affordance in exploited, as signalled in a Signifier." .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#LLMReasoningAbility
+:LLMReasoningAbility rdf:type owl:Class ;
+                     rdfs:subClassOf :AgentAbility ;
+                     rdfs:comment "The ability of an agent to perform LLM-based reasoning." .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#ProfiledContextCondition
+:ProfiledContextCondition rdf:type owl:Class ;
+                          rdfs:subClassOf shacl:NodeShape ;
+                          rdfs:comment "The SHACL NodeShape that specifies profiled context information as a condition for accessing a resource in a Hyperagents Environment." .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#Signifier
+:Signifier rdf:type owl:Class ;
+           rdfs:comment "A Signifier is a modeling element that binds together a Hypermedia MAS resource affordance with the intent of an agent, and the recommended abilities of the agent and the context of the affordance use / invocation." .
+
+
+###  https://aimas.cs.pub.ro/ont/cashmere#StaticContextCondition
+:StaticContextCondition rdf:type owl:Class ;
+                        rdfs:subClassOf shacl:NodeShape ;
+                        rdfs:comment "The SHACL NodeShape that specifies profiled context information as a condition for accessing a resource in a Hyperagents Environment." .
+
+
+#################################################################
+#    Annotations
+#################################################################
+
+<http://www.w3.org/ns/auth/acl> <http://purl.org/dc/elements/1.1/title> "Basic Access Control ontology" ;
+                                rdfs:comment """Defines the class Authorization and its essential properties,
+    and also some classes of access such as read and write. """ .
+
+
+<https://github.com/solid/web-access-control-spec> <http://purl.org/dc/elements/1.1/describes> <http://www.w3.org/ns/auth/acl> .
+
+
+<https://solidproject.org/TR/wac> <http://xmlns.com/foaf/0.1/topic> <urn:default:baseUri:> .
+
+
+<https://www.w3.org/wiki/WebAccessControl> <http://purl.org/dc/elements/1.1/describes> <http://www.w3.org/ns/auth/acl> ;
+                                           <http://xmlns.com/foaf/0.1/topic> <urn:default:baseUri:> .
+
+
+<urn:default:baseUri:> <http://purl.org/dc/terms/title> "Basic Access Control ontology" ;
+                       rdfs:comment """Defines the class Authorization and its essential properties,
+    and also some classes of access such as read and write. """ .
+
+
+###  Generated by the OWL API (version 4.5.29.2024-05-13T12:11:03Z) https://github.com/owlcs/owlapi

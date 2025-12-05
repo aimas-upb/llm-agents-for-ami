@@ -1,0 +1,645 @@
+{
+  "1": {
+    "query_id": "query-1-heat-crowded",
+    "description": "Cold room (18\u00b0C) with 5 people - should match 3 heat signifiers (generic, occupied, crowded)",
+    "intent": "increase the temperature in the room.",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 18
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 5
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.8433,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.8304,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.8253,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.8161,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-crowded-signifier",
+        "intent_similarity": 0.8092,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.8075,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.8046,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.794,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)",
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "heat-room-generic-signifier",
+      "heat-room-occupied-signifier",
+      "heat-room-crowded-signifier"
+    ]
+  },
+  "2": {
+    "query_id": "query-2-heat-occupied",
+    "description": "Cold room (18\u00b0C) with 2 people - should match 2 heat signifiers (generic, occupied)",
+    "intent": "increase the temperature in the room.",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 18
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 2
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.8433,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.8304,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.8253,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.8161,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-crowded-signifier",
+        "intent_similarity": 0.8092,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.8075,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)",
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.8046,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.794,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)",
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "heat-room-generic-signifier",
+      "heat-room-occupied-signifier"
+    ]
+  },
+  "3": {
+    "query_id": "query-3-heat-empty",
+    "description": "Cold room (18\u00b0C) with 0 people - should match 2 heat signifiers (generic, empty)",
+    "intent": "increase the temperature in the room.",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 18
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 0
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.8433,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.8304,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"1\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.8253,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.8161,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)",
+          "Value is not >= Literal(\"1\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-crowded-signifier",
+        "intent_similarity": 0.8092,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.8075,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)",
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.8046,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.794,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "heat-room-generic-signifier",
+      "heat-room-empty-signifier"
+    ]
+  },
+  "4": {
+    "query_id": "query-4-cool-crowded",
+    "description": "Hot room (28\u00b0C) with 4 people - should match 3 cool signifiers (generic, occupied, crowded)",
+    "intent": "decrease the temperature in the room.",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 28
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 4
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.8437,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.8231,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.8104,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.8001,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.7973,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.7898,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.7738,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)",
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-crowded-signifier",
+        "intent_similarity": 0.7655,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "cool-room-generic-signifier",
+      "cool-room-occupied-signifier",
+      "cool-room-crowded-signifier"
+    ]
+  },
+  "5": {
+    "query_id": "query-5-cool-occupied",
+    "description": "Hot room (28\u00b0C) with 1 person - should match 2 cool signifiers (generic, occupied)",
+    "intent": "decrease the temperature in the room.",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 28
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 1
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.8437,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.8231,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.8104,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.8001,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.7973,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.7898,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.7738,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)",
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-crowded-signifier",
+        "intent_similarity": 0.7655,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)",
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "cool-room-generic-signifier",
+      "cool-room-occupied-signifier"
+    ]
+  },
+  "6": {
+    "query_id": "query-6-cool-empty",
+    "description": "Hot room (28\u00b0C) with 0 people - should match 2 cool signifiers (generic, empty)",
+    "intent": "decrease the temperature in the room.",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 28
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 0
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.8437,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.8231,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"1\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.8104,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.8001,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.7973,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.7898,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"1\", datatype=xsd:integer)",
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.7738,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-crowded-signifier",
+        "intent_similarity": 0.7655,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not >= Literal(\"3\", datatype=xsd:integer)",
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "cool-room-generic-signifier",
+      "cool-room-empty-signifier"
+    ]
+  },
+  "7": {
+    "query_id": "query-7-moderate-temp",
+    "description": "Moderate room (22\u00b0C) with 3 people - no signifier should pass SHACL (temp not extreme enough)",
+    "intent": "adjust the temperature in the room.",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 22
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 3
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.8299,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.8203,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.8161,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.8097,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.7966,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.7954,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)",
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.7891,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)",
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-crowded-signifier",
+        "intent_similarity": 0.7799,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not < Literal(\"20\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": []
+  },
+  "8": {
+    "query_id": "query-8-heat-edge-crowded",
+    "description": "Cold room (19\u00b0C) with exactly 3 people - edge case for crowded threshold",
+    "intent": "increase the temperature in the room.",
+    "context": {
+      "http://example.org/artifacts/temperature_sensor": {
+        "http://example.org/TemperatureSensor#hasTemperatureLevel": 19
+      },
+      "http://example.org/artifacts/person_counter": {
+        "http://example.org/PersonCounter#hasPersonCount": 3
+      }
+    },
+    "matches": [
+      {
+        "signifier_id": "heat-room-generic-signifier",
+        "intent_similarity": 0.8433,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "heat-room-occupied-signifier",
+        "intent_similarity": 0.8304,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-generic-signifier",
+        "intent_similarity": 0.8253,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-occupied-signifier",
+        "intent_similarity": 0.8161,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-crowded-signifier",
+        "intent_similarity": 0.8092,
+        "shacl_conforms": true,
+        "shacl_violations": []
+      },
+      {
+        "signifier_id": "cool-room-crowded-signifier",
+        "intent_similarity": 0.8075,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "heat-room-empty-signifier",
+        "intent_similarity": 0.8046,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)"
+        ]
+      },
+      {
+        "signifier_id": "cool-room-empty-signifier",
+        "intent_similarity": 0.794,
+        "shacl_conforms": false,
+        "shacl_violations": [
+          "Value is not <= Literal(\"0\", datatype=xsd:integer)",
+          "Value is not > Literal(\"25\", datatype=xsd:integer)"
+        ]
+      }
+    ],
+    "final_matches": [
+      "heat-room-generic-signifier",
+      "heat-room-occupied-signifier",
+      "heat-room-crowded-signifier"
+    ]
+  }
+}
