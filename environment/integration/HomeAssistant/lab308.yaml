@@ -4,8 +4,10 @@ devices:
   lights_308:
     - platform: light
       support_brightness: true
+      support_color: true
       initial_value: 'off'        # on / off
       initial_brightness: 128     # 0-255 ≈ 50 %
+      initial_hs_color: [30, 100]  # [hue (0-360), saturation (0-100)]
 
   blinds_308:
     - platform: cover

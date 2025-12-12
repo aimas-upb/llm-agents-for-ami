@@ -17,7 +17,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
 
 from http import HTTPStatus
-from ha_utils import HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST
+from ha_utils import (HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST,
+                      get_supported_service_fields)
 
 # Namespaces
 BASE_FALLBACK = "http://localhost:8080/"
@@ -334,6 +335,24 @@ def _pick_entity(device_entities: List[Dict[str, Any]], domain: str) -> Optional
     return None
 
 # ---------------- Endpoints -----------------
+@app.get("/", response_class=Response,
+         responses={200: {"content": {"text/turtle": {}}}})
+async def get_platform(request: Request):
+    """Get the HypermediaMASPlatform representation."""
+    try:
+        areas = await ha_client.get_areas()
+        # Filter areas based on AREAS configuration
+        if AREAS:
+            filtered_areas = [a for a in areas if _workspace_allowed(a.get("area_id"))]
+        else:
+            filtered_areas = areas
+
+        rdf = HomeAssistantRDF(str(request.base_url))
+        rdf.platform_to_rdf(filtered_areas)
+        return Response(rdf.serialize(), media_type="text/turtle")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
 @app.get("/workspaces", response_class=Response,
          responses={200: {"content": {"text/turtle": {}}}})
 async def list_workspaces(request: Request):
@@ -676,6 +695,12 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
 
         for domain in sorted(domains):
             domain_svcs = svc_by_domain.get(domain, {})
+
+            # Get a representative entity for this domain to check capabilities
+            domain_entity = _pick_entity(device_entities, domain)
+            domain_entity_state = state_map.get(domain_entity, {}) if domain_entity else {}
+            domain_entity_attrs = domain_entity_state.get("attributes", {}) if isinstance(domain_entity_state, dict) else {}
+
             for svc_name, definition in domain_svcs.items():
                 legacy_applies = "entity_id" in (definition.get("fields") or {})
                 modern_applies = any(
@@ -686,6 +711,22 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                     continue
                 # CamelCase action name for HA services, keep URL stable under /ha/{domain}/{service}
                 action_name = f"{_camel_token(domain)}{_camel_token(svc_name)}"
+
+                # Filter service fields to only those supported by this entity
+                all_service_fields = definition.get("fields", {})
+                supported_fields = get_supported_service_fields(domain, domain_entity_attrs, all_service_fields)
+
+                # Skip this service if no fields are supported (after filtering)
+                # But keep entity_id-only services
+                if not supported_fields and "entity_id" not in all_service_fields:
+                    continue
+
+                # Build input schema from supported service fields only
+                input_schema = rdf._build_input_schema_from_fields(supported_fields)
+
+                # Get service description
+                service_description = definition.get("description")
+
                 rdf._add_action(
                     art,
                     action_name,
@@ -693,6 +734,8 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                     "POST",
                     URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/ha/{urllib.parse.quote(domain, safe='')}/{urllib.parse.quote(svc_name, safe='')}"),
                     "application/json",
+                    input_schema=input_schema,
+                    description=service_description,
                 )
 
         # Sensor-specific value action
@@ -700,12 +743,15 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
             sensor_ent = _pick_entity(device_entities, "sensor")
             st = state_map.get(sensor_ent, {}) if sensor_ent else {}
             attrs = st.get("attributes", {}) if isinstance(st, dict) else {}
-            action_names = _sensor_action_names(
-                attrs.get("device_class"),
-                attrs.get("unit_of_measurement"),
-            )
+            device_class = attrs.get("device_class")
+            unit = attrs.get("unit_of_measurement")
+            action_names = _sensor_action_names(device_class, unit)
             if action_names:
                 action_name = action_names[0]
+
+                # Build output schema
+                output_schema = rdf._build_sensor_output_schema(device_class, unit)
+
                 rdf._add_action(
                     art,
                     action_name,
@@ -713,6 +759,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                     "POST",
                     URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/{urllib.parse.quote(action_name, safe='')}"),
                     "application/json",
+                    output_schema=output_schema,
                 )
 
         if "binary_sensor" in domains:
@@ -722,6 +769,10 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
             action_names = _binary_sensor_action_names(attrs.get("device_class"))
             if action_names:
                 action_name = action_names[0]
+
+                # Build output schema
+                output_schema = rdf._build_binary_sensor_output_schema()
+
                 rdf._add_action(
                     art,
                     action_name,
@@ -729,11 +780,15 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                     "POST",
                     URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/{urllib.parse.quote(action_name, safe='')}"),
                     "application/json",
+                    output_schema=output_schema,
                 )
 
         if "climate" in domains:
             climate_ent = _pick_entity(device_entities, "climate")
             if climate_ent and climate_ent in state_map:
+                # Build output schema
+                output_schema = rdf._build_climate_output_schema()
+
                 rdf._add_action(
                     art,
                     "getThermostatState",
@@ -741,7 +796,102 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                     "POST",
                     URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/getThermostatState"),
                     "application/json",
+                    output_schema=output_schema,
                 )
+
+        # Property Affordances: Add properties for each entity's state attributes
+        for entity in device_entities:
+            entity_id = entity.get("entity_id")
+            if not entity_id:
+                continue
+
+            entity_state = state_map.get(entity_id, {})
+            if not entity_state:
+                continue
+
+            # Get entity attributes
+            entity_attrs = entity_state.get("attributes", {}) if isinstance(entity_state, dict) else {}
+
+            # Add property for the state itself
+            state_value = entity_state.get("state")
+            if state_value and state_value not in ("unknown", "unavailable"):
+                # Get entity domain for type detection
+                entity_domain = entity_id.split(".")[0] if "." in entity_id else ""
+
+                # Parse numeric state values for sensor domains or entities with unit_of_measurement
+                unit = entity_attrs.get("unit_of_measurement")
+                schema_value = state_value
+
+                # Check if this is a sensor domain or has a unit of measurement
+                if (entity_domain == "sensor" or unit) and isinstance(state_value, str):
+                    # Try to parse as number for schema generation
+                    try:
+                        if '.' not in state_value:
+                            schema_value = int(state_value)
+                        else:
+                            schema_value = float(state_value)
+                    except ValueError:
+                        # If parsing fails, keep as string
+                        pass
+
+                property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/state")
+                # Pass domain to schema builder for context-aware schema generation
+                schema = rdf._build_property_schema("state", schema_value, entity_attrs, entity_domain=entity_domain)
+                rdf._add_property(
+                    art,
+                    "state",
+                    property_uri,
+                    output_schema=schema,
+                    description=f"Current state of {entity_id}",
+                    observable=True
+                )
+
+            # Add properties for each attribute (filtering out metadata)
+            if entity_attrs:
+                from ha_utils import get_operational_attributes, get_metadata_attributes
+                domain = entity_id.split(".")[0] if "." in entity_id else ""
+                operational_attrs = get_operational_attributes(domain, entity_attrs)
+
+                for attr_name, attr_value in operational_attrs.items():
+                    # Skip None values
+                    if attr_value is None:
+                        continue
+
+                    # Build property URI
+                    property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/{urllib.parse.quote(attr_name, safe='')}")
+
+                    # Build schema for this property
+                    schema = rdf._build_property_schema(attr_name, attr_value, entity_attrs)
+
+                    # Add the property affordance
+                    rdf._add_property(
+                        art,
+                        attr_name,
+                        property_uri,
+                        output_schema=schema,
+                        description=f"{attr_name} of {entity_id}",
+                        observable=True
+                    )
+
+                # Add special "metadata" property affordance
+                # Include both attributes and state-level metadata (timestamps)
+                metadata_attrs = get_metadata_attributes(entity_attrs)
+                # Add timestamps from state object
+                for ts_field in ("last_changed", "last_reported", "last_updated"):
+                    if ts_field in entity_state:
+                        metadata_attrs[ts_field] = entity_state[ts_field]
+
+                if metadata_attrs:
+                    metadata_property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/metadata")
+                    metadata_schema = rdf._build_metadata_schema(metadata_attrs)
+                    rdf._add_property(
+                        art,
+                        "metadata",
+                        metadata_property_uri,
+                        output_schema=metadata_schema,
+                        description=f"Metadata attributes of {entity_id}",
+                        observable=False  # Metadata is typically not observable
+                    )
 
         # Generic Jacamo/WebSub affordances
         rdf._add_action(art, "getArtifactRepresentation", JACAMO.PerceiveArtifact, "GET",
@@ -812,6 +962,86 @@ async def _ensure_entity(workspace_id: str, artifact_name: str, domain: str) -> 
     if not ent:
         raise HTTPException(status_code=404, detail=f"No {domain} entity on artifact")
     return ent
+
+# Property affordance endpoint - read property value
+@app.get("/workspaces/{workspace_id}/artifacts/{artifact_name}/properties/{property_name}")
+async def read_property(workspace_id: str, artifact_name: str, property_name: str):
+    """Read the current value of a property from a Home Assistant entity."""
+    try:
+        # Resolve the artifact to get its entities
+        _, device_entities, _, _ = await _resolve_device_and_entities(workspace_id, artifact_name)
+
+        # Get current states
+        states = await ha_rest.get_states()
+        state_map = {s["entity_id"]: s for s in states}
+
+        # Decode the property name
+        decoded_property_name = urllib.parse.unquote(property_name)
+
+        # Search through all entities in this artifact for the requested property
+        for entity in device_entities:
+            entity_id = entity.get("entity_id")
+            if not entity_id:
+                continue
+
+            entity_state = state_map.get(entity_id, {})
+            if not entity_state:
+                continue
+
+            entity_attrs = entity_state.get("attributes", {}) if isinstance(entity_state, dict) else {}
+
+            # Check if this is the special "metadata" property
+            if decoded_property_name == "metadata":
+                from ha_utils import get_metadata_attributes
+                metadata_attrs = get_metadata_attributes(entity_attrs)
+                # Add timestamps from state object
+                for ts_field in ("last_changed", "last_reported", "last_updated"):
+                    if ts_field in entity_state:
+                        metadata_attrs[ts_field] = entity_state[ts_field]
+
+                if metadata_attrs:
+                    # Return the metadata object, matching the ObjectSchema
+                    return JSONResponse(metadata_attrs)
+
+            # Check if this is the "state" property
+            if decoded_property_name == "state":
+                state_value = entity_state.get("state")
+                if state_value and state_value not in ("unknown", "unavailable"):
+                    # Get entity domain for type detection
+                    entity_domain = entity_id.split(".")[0] if "." in entity_id else ""
+
+                    # Parse numeric state values for sensor domains or entities with unit_of_measurement
+                    unit = entity_attrs.get("unit_of_measurement")
+
+                    # Check if this is a sensor domain or has a unit of measurement
+                    if (entity_domain == "sensor" or unit) and isinstance(state_value, str):
+                        # Try to parse as number
+                        try:
+                            # Try integer first
+                            if '.' not in state_value:
+                                state_value = int(state_value)
+                            else:
+                                state_value = float(state_value)
+                        except ValueError:
+                            # If parsing fails, keep as string
+                            pass
+                    # Return the value, matching the output schema
+                    return JSONResponse(state_value)
+
+            # Check in entity attributes
+            if decoded_property_name in entity_attrs:
+                attr_value = entity_attrs[decoded_property_name]
+                if attr_value is not None:
+                    # Return the raw value, matching the output schema
+                    return JSONResponse(attr_value)
+
+        # Property not found in any entity
+        raise HTTPException(status_code=404, detail=f"Property '{decoded_property_name}' not found on artifact")
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 # Generic HA service forwarder for dynamically discovered actions
 @app.post("/workspaces/{workspace_id}/artifacts/{artifact_name}/ha/{domain}/{service}")

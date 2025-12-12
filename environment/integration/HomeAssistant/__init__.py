@@ -1,0 +1,1 @@
+# HomeAssistant integration package

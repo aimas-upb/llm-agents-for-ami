@@ -1,7 +1,8 @@
 #!/bin/bash
-export MONITOR_URL="http://localhost:8081"
-export EXPLORER_URL="http://localhost:8082"
+# export MONITOR_URL="http://localhost:8081"
+# export EXPLORER_URL="http://localhost:8082"
 export AREAS="lab308"
-export BASE_WS_URI="http://localhost:8080/"
-export HA_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI1MmNiMWI5ZjUzYzc0ZjVmOTI5MGIyMDJlZTJhN2NlMyIsImlhdCI6MTc1NjU2MzA5MSwiZXhwIjoyMDcxOTIzMDkxfQ.RXxR4ZAHJ3CWDkELL4P9bFybjymoe8A7UOFOg5O4igc"
+export BASE_WS_URI="http://localhost:8008/"
+# export HA_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI1MmNiMWI5ZjUzYzc0ZjVmOTI5MGIyMDJlZTJhN2NlMyIsImlhdCI6MTc1NjU2MzA5MSwiZXhwIjoyMDcxOTIzMDkxfQ.RXxR4ZAHJ3CWDkELL4P9bFybjymoe8A7UOFOg5O4igc"
+export HA_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiMDRlZDE2MTlhMGY0OGFlOWY3NjdkZGNkNzc1ZDYyNyIsImlhdCI6MTc2NTUzNzk2NywiZXhwIjoyMDgwODk3OTY3fQ.7f2Gsr741druDOmW45rICji_VafaHH0DTfkSNLr6Y2g"
 export HA_URL="ws://localhost:8123/api/websocket"
