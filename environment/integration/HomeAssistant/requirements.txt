@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+httpx
+websockets
+rdflib
+requests
+pydantic
+pytest
+pytest-asyncio
+pytest-cov
