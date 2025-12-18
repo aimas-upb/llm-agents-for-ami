@@ -4,23 +4,57 @@ UserAssistant Agent - Main implementation.
 Dual implementation with user-facing chat and system-facing plan management.
 """
 
+import asyncio
+import json
+import logging
+import os
 from typing import Any, Dict, List, Optional
-from spade.agent import Agent
+from spade_llm import LLMAgent
+from spade_llm.providers import LLMProvider
 from spade.behaviour import CyclicBehaviour
+from spade.message import Message as SpadeMessage
 
 from ...shared.protocols.agent_protocol import IAgent, IMessageRouter
-from ...shared.models.messages import Message, MessageType, MessageClassification, GoalRequest
+from ...shared.models.messages import (
+    Message,
+    MessageType,
+    MessageClassification,
+    GoalRequest,
+    META_CORRELATION_ID,
+    META_CONVERSATION_ID,
+    ensure_correlation_id,
+    extract_conversation_id,
+    serialize_body,
+)
+from ...shared.utils.spade_rpc import send_via_router
+from ...shared.utils.config_resolver import resolve_yggdrasil_url
 from ...shared.models.plan import Plan, PlanType, PlanStatus
 
+from ...shared.models.messages import MessageType
+from .behaviours import ResponseListenerBehaviour
 
-class UserAssistantAgent(Agent, IAgent):
+from .prompts import USER_ASSISTANT_SYSTEM_PROMPT
+from .tools import (
+    QueryCapabilitiesTool,
+    QueryEnvironmentStateTool,
+    RequestInteractionPlanTool,
+    StoreLatestPlanTool,
+    RetrieveAndClearLatestPlanTool,
+    ExecutePlanTool,
+)
+
+from ...environment.integration.integration_engine import YggdrasilIntegration
+
+logger = logging.getLogger("UserAssistant")
+
+class UserAssistantAgent(LLMAgent, IAgent):
     """
     UserAssistant agent with dual functionality:
     1. User-facing: ChatAgent for conversation management
     2. System-facing: Plan management and execution
     """
 
-    def __init__(self, jid: str, password: str, config: Dict[str, Any]):
+    def __init__(self, jid: str, password: str, config: Dict[str, Any], target_jids: Dict[str, str]):
         """
         Initialize UserAssistant agent.
 
@@ -29,12 +63,140 @@ class UserAssistantAgent(Agent, IAgent):
             password: SPADE password.
             config: Agent configuration.
         """
-        super().__init__(jid, password)
+        # 1) Setup Provider (OpenAI by default, following agents.yaml structure)
+        llm_root = config.get("llm", {}) or {}
+        provider_name = llm_root.get("default_provider", "openai")
+        provider_cfg = (llm_root.get("providers", {}) or {}).get(provider_name, {}) or {}
+
+        api_key = provider_cfg.get("api_key") or llm_root.get("api_key") or os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("Missing OpenAI API key. Set OPENAI_API_KEY or llm.providers.openai.api_key in agents.yaml.")
+
+        model = provider_cfg.get("model") or "gpt-4o-mini"
+        temperature = provider_cfg.get("temperature", 0.7)
+        max_tokens = provider_cfg.get("max_tokens", None)
+        base_url = provider_cfg.get("base_url") or llm_root.get("base_url") or "https://api.openai.com/v1"
+
+        kwargs: Dict[str, Any] = {"base_url": base_url}
+        if max_tokens is not None:
+            kwargs["max_tokens"] = int(max_tokens)
+
+        provider = LLMProvider.create_openai(
+            api_key=str(api_key),
+            model=str(model),
+            temperature=float(temperature),
+            **kwargs,
+        )
+ 
+        # --- Execution engine (YggdrasilIntegration) ---
+        # Used by ExecutePlanTool to apply plans to the environment.
+        self.yggdrasil_url = resolve_yggdrasil_url(config)
+        self.execution_engine = YggdrasilIntegration(self.yggdrasil_url)
+        self._execution_engine_ready = False
+        self._execution_engine_lock = asyncio.Lock()
+
+        # --- Per-conversation plan state (approval gating) ---
+        self._active_conversation_id: str | None = None
+        self._plans_by_thread: Dict[str, Dict[str, str]] = {}
+        self._approved_plan_hash_by_thread: Dict[str, str] = {}
+
+        # 2. Setup Tools
+        explorer_jid = target_jids.get("explorer")
+        self.capabilities_tool = QueryCapabilitiesTool(target_jid=explorer_jid)
+        self.state_tool = QueryEnvironmentStateTool(target_jid=explorer_jid)
+        self.plan_tool = RequestInteractionPlanTool()
+        self.store_plan_tool = StoreLatestPlanTool()
+        self.retrieve_plan_tool = RetrieveAndClearLatestPlanTool()
+        self.execute_plan_tool = ExecutePlanTool()
+
+        # 3. Initialize Parent (ChatAgent)
+        super().__init__(
+            jid=jid,
+            password=password,
+            provider=provider,
+            system_prompt=USER_ASSISTANT_SYSTEM_PROMPT,
+            tools=[
+                self.capabilities_tool,
+                self.state_tool,
+                self.plan_tool,
+                self.store_plan_tool,
+                self.retrieve_plan_tool,
+                self.execute_plan_tool,
+            ],
+            verify_security=False
+        )
+
+        # 4. Bind Tools
+        self.capabilities_tool.set_agent(self)
+        self.state_tool.set_agent(self)
+        self.plan_tool.set_agent(self)
+        self.store_plan_tool.set_agent(self)
+        self.retrieve_plan_tool.set_agent(self)
+        self.execute_plan_tool.set_agent(self)
+        
+        # Config & State
         self.config = config
-        self.router = None
-        self.chat_agent = None
-        self.plan_manager = None
-        self.memory_manager = None
+        self.target_jids = target_jids
+
+    # --- Conversation context helpers (used by tools) ---
+    @property
+    def active_conversation_id(self) -> str | None:
+        return self._active_conversation_id
+
+    def store_latest_plan(self, thread: str, plan_json: str, plan_hash: str) -> None:
+        self._plans_by_thread[str(thread)] = {"plan_json": plan_json, "plan_hash": plan_hash}
+
+    def retrieve_and_clear_latest_plan(self, thread: str, *, approve: bool) -> Dict[str, str] | None:
+        record = self._plans_by_thread.pop(str(thread), None)
+        if not record:
+            return None
+        if approve:
+            self._approved_plan_hash_by_thread[str(thread)] = record["plan_hash"]
+        return record
+
+    def peek_approved_plan_hash(self, thread: str) -> str | None:
+        return self._approved_plan_hash_by_thread.get(str(thread))
+
+    def clear_approved_plan_hash(self, thread: str) -> None:
+        self._approved_plan_hash_by_thread.pop(str(thread), None)
+
+    async def ensure_execution_engine_ready(self) -> None:
+        """
+        Initialize and hydrate the YggdrasilIntegration engine (workspace/artifact/affordance maps).
+        Cached so it only runs once per agent lifecycle.
+        """
+        if self._execution_engine_ready:
+            return
+
+        async with self._execution_engine_lock:
+            if self._execution_engine_ready:
+                return
+
+            ok = await self.execution_engine.initialize({})
+            if not ok:
+                raise RuntimeError(f"Failed to initialize YggdrasilIntegration at {self.yggdrasil_url}")
+            await self.execution_engine.explore_hmas_environment()
+            self._execution_engine_ready = True
+
+    class ConversationTrackerBehaviour(CyclicBehaviour):
+        """
+        Tracks the most recent LLM conversation thread for tool calls.
+
+        SPADE dispatches each incoming message to matching behaviours independently,
+        so this does not interfere with SPADE-LLM's internal LLMBehaviour.
+        """
+
+        async def run(self):
+            msg = await self.receive(timeout=1)
+            if not msg:
+                return
+            if msg.get_metadata("message_type") != "llm":
+                return
+            thread = getattr(msg, "thread", None)
+            if thread:
+                self.agent._active_conversation_id = str(thread)
+
+
 
     async def setup(self):
         """
@@ -49,9 +211,36 @@ class UserAssistantAgent(Agent, IAgent):
         6. Subscribe to message topics
         7. Log agent ready
         """
-        pass
+        await super().setup()
 
-    async def start(self) -> None:
+        # Track active conversation thread so tools can route messages and store plans per-conversation.
+        from spade.template import Template
+
+        t = Template()
+        t.set_metadata("message_type", "llm")
+        self.add_behaviour(self.ConversationTrackerBehaviour(), template=t)
+
+        # --- DEBUG: Log Registered Behaviors and Templates ---
+        logger.info("=== DEBUG: Inspecting UserAssistant Behaviors ===")
+        if not self.behaviours:
+            logger.warning("No behaviors registered! LLMAgent might have failed to init.")
+
+        for behaviour in self.behaviours:
+            logger.info(f"Behaviour: {type(behaviour).__name__}")
+            t = getattr(behaviour, "template", None)
+            if t:
+                logger.info("  Template Rules:")
+                logger.info(f"    Sender: {t.sender}")
+                logger.info(f"    Thread: {t.thread}")
+                logger.info(f"    Metadata: {t.metadata}")
+            else:
+                logger.info("  Template: None (Should match EVERYTHING)")
+        logger.info("===============================================")
+        # -----------------------------------------------------
+
+        logger.info("UserAssistantAgent initialized (Intent Extraction Mode).")
+
+    async def start(self, *args, **kwargs) -> None:
         """
         Start the UserAssistant agent.
 
@@ -61,7 +250,7 @@ class UserAssistantAgent(Agent, IAgent):
         3. Trigger setup
         4. Notify other agents that UserAssistant is ready
         """
-        pass
+        return await super().start(*args, **kwargs)
 
     async def stop(self) -> None:
         """
@@ -73,9 +262,9 @@ class UserAssistantAgent(Agent, IAgent):
         3. Disconnect from SPADE server
         4. Cleanup resources
         """
-        pass
+        return await super().stop()
 
-    async def send_message(self, message: Message) -> bool:
+    async def send_message(self, message: Message | SpadeMessage) -> bool:
         """
         Send a message to another agent.
 
@@ -86,7 +275,35 @@ class UserAssistantAgent(Agent, IAgent):
         4. Log sent message
         5. Return success status
         """
-        pass
+        # If caller already passed a SPADE message, send it directly.
+        if isinstance(message, SpadeMessage):
+            await send_via_router(self, message)
+            return True
+
+        # Convert internal Message dataclass to SPADE Message.
+        spade_msg = SpadeMessage(to=message.receiver)
+        spade_msg.set_metadata("type", message.message_type.value)
+
+        # Propagate optional metadata (e.g., correlation_id).
+        for key, value in (message.metadata or {}).items():
+            if value is not None:
+                spade_msg.set_metadata(key, str(value))
+
+        # Ensure correlation_id (request/response pairing).
+        corr_id = ensure_correlation_id(message.metadata)
+        spade_msg.set_metadata(META_CORRELATION_ID, str(corr_id))
+
+        # Map conversation_id -> XMPP thread (and also keep metadata copy).
+        conv_id = extract_conversation_id(message.conversation_id, message.metadata)
+        if conv_id:
+            spade_msg.thread = conv_id
+            spade_msg.set_metadata(META_CONVERSATION_ID, conv_id)
+
+        # Serialize content (prefer JSON for agent-to-agent).
+        spade_msg.body = serialize_body(message.content)
+
+        await send_via_router(self, spade_msg)
+        return True
 
     async def receive_message(self, message: Message) -> None:
         """
@@ -112,123 +329,6 @@ class MessageReceiveBehaviour(CyclicBehaviour):
         2. Deserialize message
         3. Pass to agent's receive_message method
         4. Handle any errors
-        """
-        pass
-
-
-class ChatAgent:
-    """
-    User-facing chat functionality with conversation management.
-    """
-
-    def __init__(self, config: Dict[str, Any], memory_manager, message_router):
-        """
-        Initialize ChatAgent.
-
-        Args:
-            config: Chat configuration.
-            memory_manager: Memory manager instance.
-            message_router: Message router instance.
-        """
-        self.config = config
-        self.memory_manager = memory_manager
-        self.router = message_router
-        self.classifier = None
-        self.intent_extractor = None
-        self.active_conversations = {}
-
-    async def handle_user_message(self, user_id: str, message: str,
-                                  conversation_id: Optional[str] = None) -> str:
-        """
-        Handle a message from the user.
-
-        Args:
-            user_id: User identifier.
-            message: User message.
-            conversation_id: Optional conversation ID.
-
-        Returns:
-            Response to the user.
-
-        TODO: Implementation steps:
-        1. Create or retrieve conversation
-        2. Store user message in memory
-        3. Classify message
-        4. Route based on classification
-        5. Generate and return response
-        """
-        pass
-
-    async def classify_message(self, message: str,
-                              context: Dict[str, Any]) -> MessageClassification:
-        """
-        Classify a user message.
-
-        TODO: Implementation steps:
-        1. Prepare classification context
-        2. Call LLM classifier
-        3. Validate confidence threshold
-        4. Return classification
-        """
-        pass
-
-    async def route_request(self, classification: MessageClassification,
-                           message: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Route request based on classification.
-
-        TODO: Implementation steps:
-        1. Based on classification type:
-           - ENV_CAPABILITIES: Query EnvExplorer
-           - ENV_STATE: Query EnvExplorer
-           - GOAL_REQUEST: Process goal request
-           - PLAN_MANAGEMENT: Delegate to PlanManager
-           - PREFERENCE_STATEMENT: Store preference
-        2. Wait for response
-        3. Return result
-        """
-        pass
-
-    async def process_goal_request(self, message: str,
-                                   context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Process a goal request from the user.
-
-        TODO: Implementation steps:
-        1. Extract intent using IntentExtractor
-        2. If extraction fails, explain to user why goal cannot be achieved
-        3. Compare intent to:
-           a. Already RUNNING goals (check for duplicates)
-           b. PREVIOUSLY RUN goals (check for re-iteration)
-        4. If match found, handle accordingly (inform user or re-execute)
-        5. If no match, send GoalRequest to InteractionSolver
-        6. Return result to user
-        """
-        pass
-
-    async def compare_to_running_goals(self, intent: str,
-                                      context: Dict[str, Any]) -> Optional[Plan]:
-        """
-        Compare intent to currently running goals.
-
-        TODO: Implementation steps:
-        1. Retrieve all running plans
-        2. Use intent matching to find similar goals
-        3. If match found with high confidence, return plan
-        4. Otherwise return None
-        """
-        pass
-
-    async def compare_to_previous_goals(self, intent: str,
-                                       context: Dict[str, Any]) -> Optional[Plan]:
-        """
-        Compare intent to previously executed goals.
-
-        TODO: Implementation steps:
-        1. Retrieve completed/past plans
-        2. Use intent and context matching
-        3. If match found with high confidence, return plan
-        4. Otherwise return None
         """
         pass
 

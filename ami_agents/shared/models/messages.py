@@ -1,12 +1,78 @@
 """
 Message models for inter-agent communication.
-Defines the message types and structures used across the AMI agent system.
+
+## Wire protocol (Phase 1)
+All inter-agent XMPP messages MUST use:
+- metadata["type"] == one of MessageType values (string)
+- metadata["correlation_id"] for request/response correlation (string UUID)
+- XMPP "thread" to carry conversation_id when available
+
+Bodies SHOULD be JSON (agent-to-agent). During the transition we keep backwards
+compatibility with some plain-text bodies, but new code should prefer dict/list
+payloads serialized to JSON.
 """
 
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+import json
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
+
+
+# --- Standard metadata keys used in SPADE messages (wire protocol) ---
+META_TYPE = "type"
+META_CORRELATION_ID = "correlation_id"
+META_CONVERSATION_ID = "conversation_id"
+
+
+def new_correlation_id() -> str:
+    """Create a new correlation id for request/response pairs."""
+    return str(uuid4())
+
+
+def ensure_correlation_id(metadata: Optional[Dict[str, Any]] = None) -> str:
+    """
+    Ensure metadata contains a correlation id; create one if missing.
+    Returns the correlation id as a string.
+    """
+    if metadata is None:
+        return new_correlation_id()
+    existing = metadata.get(META_CORRELATION_ID)
+    if existing is None or existing == "":
+        existing = new_correlation_id()
+        metadata[META_CORRELATION_ID] = existing
+    return str(existing)
+
+
+def extract_conversation_id(conversation_id: Optional[str], metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    """
+    Resolve a conversation id from explicit field or metadata. Intended to be
+    mapped to XMPP message.thread.
+    """
+    if conversation_id:
+        return str(conversation_id)
+    if metadata:
+        cid = metadata.get(META_CONVERSATION_ID)
+        return str(cid) if cid else None
+    return None
+
+
+def serialize_body(content: Any) -> str:
+    """
+    Serialize message body for inter-agent messages.
+
+    Transition behaviour:
+    - dict/list/number/bool/None -> JSON
+    - string -> returned as-is (legacy); prefer sending dict/list going forward
+    """
+    if isinstance(content, str):
+        return content
+    try:
+        return json.dumps(content)
+    except TypeError:
+        # Last resort: string fallback
+        return str(content)
 
 
 class MessageType(Enum):
