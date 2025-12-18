@@ -55,9 +55,13 @@ class OntologyLoader:
         try:
             logger.info(f"Loading ontology from: {ontology_path}")
 
-            # Load the ontology using owlready2
-            # Convert to file:// URI format
-            file_uri = ontology_path.as_uri()
+            # FIX: Handle Windows paths for owlready2
+            if os.name == 'nt':
+                # On Windows, we need 'file://D:/path' so that when owlready2 strips 'file://',
+                # we get 'D:/path' (valid) instead of '/D:/path' (invalid)
+                file_uri = f"file://{ontology_path.as_posix()}"
+            else:
+                file_uri = ontology_path.as_uri()
 
             # owlready2 supports: OWL/XML (.owl), RDF/XML (.rdf), and NTriples (.nt)
             # Turtle, N3, and other formats are NOT supported

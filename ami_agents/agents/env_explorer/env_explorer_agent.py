@@ -4,17 +4,25 @@ EnvExplorer Agent - Environment discovery and monitoring.
 Classical SPADE agent that crawls, monitors, and manages environment knowledge.
 """
 
+import asyncio
+import logging
+import json
 from typing import Any, Dict, List, Optional
 from spade.agent import Agent
-from spade.behaviour import CyclicBehaviour, PeriodicBehaviour
+from spade.behaviour import CyclicBehaviour, PeriodicBehaviour, OneShotBehaviour
+from spade.message import Message as SpadeMessage
+from spade.template import Template
 
 from ...shared.protocols.agent_protocol import IAgent
 from ...shared.models.messages import Message, MessageType, AffordanceMatchRequest, AffordanceMatchResponse
+from ...shared.models.messages import META_CORRELATION_ID, META_CONVERSATION_ID, ensure_correlation_id
 from ...shared.models.environment import (
-    Workspace, Artifact, Affordance, Signifier, ChangeEvent, ChangeEventType
+    Workspace, Artifact, Affordance, Signifier, ChangeEvent, ChangeEventType, AffordanceType
 )
 from ...shared.models.plan import BehaviorTreePlan
+from ...shared.utils.config_resolver import resolve_yggdrasil_url
 from ...environment.connection.hmas_client import IHMASClient
+from ...environment.integration.integration_engine import YggdrasilIntegration
 
 
 class EnvExplorerAgent(Agent, IAgent):
@@ -41,49 +49,198 @@ class EnvExplorerAgent(Agent, IAgent):
             hmas_client: HMAS client for environment interaction.
         """
         super().__init__(jid, password)
-        self.config = config
+        self.config = config or {}
         self.hmas_client = hmas_client
-        self.environment_map = {}  # workspace_id -> Workspace
-        self.artifacts = {}  # artifact_id -> Artifact
-        self.affordances = {}  # affordance_id -> Affordance
+        self.environment_map = {}
+        self.artifacts = {}
+        self.affordances = {}
         self.signifiers_store = None
+        self.yggdrasil_url = resolve_yggdrasil_url(self.config)
+        self.integration_engine = YggdrasilIntegration(self.yggdrasil_url)
         self.discovery_complete = False
+        self.logger = logging.getLogger(__name__)
 
     async def setup(self):
         """
         Setup the agent (SPADE lifecycle method).
 
-        TODO: Implementation steps:
-        1. Initialize signifier storage
-        2. Register behaviors:
-           - InitialDiscoveryBehaviour (one-time)
-           - ChangeMonitoringBehaviour (periodic)
-           - AffordanceMatchBehaviour (on-demand)
-           - MessageReceiveBehaviour (cyclic)
-        3. Connect HMAS client to environment
-        4. Log agent ready
+        Connects to the Yggdrasil HMAS instance and performs an initial
+        environment crawl to populate workspace/artifact/affordance maps.
         """
-        
-        ## Step1: TODO: Initialize signifier storage
-        
-        ## Step2: Register the initial discovery behavior
-        initial_discovery_behaviour = InitialDiscoveryBehaviour()
-        self.add_behaviour(initial_discovery_behaviour)
+        self.logger.info(f"EnvExplorerAgent starting...")
+        self.add_behaviour(InitialDiscoveryBehaviour())
 
-        # run
-        
+        # Route environment capability/state requests to the handler using templates
+        cap_template = Template()
+        cap_template.set_metadata("type", MessageType.ENV_CAPABILITIES_REQUEST.value)
+        state_template = Template()
+        state_template.set_metadata("type", MessageType.ENV_STATE_REQUEST.value)
 
-    async def start(self) -> None:
+        self.add_behaviour(EnvironmentRequestHandler(), template=cap_template)
+        self.add_behaviour(EnvironmentRequestHandler(), template=state_template)
+
+        self.add_behaviour(EventProcessingBehaviour(self.integration_engine))
+
+    def _generate_capabilities_summary(self) -> str:
+        """
+        Formats the internal artifact map into a detailed string for the LLM.
+        Includes Forms and Input Schemas so the LLM understands parameters.
+        """
+        # 1. Check readiness
+        if not self.discovery_complete:
+            return "Environment discovery is still in progress. Please try again later."
+
+        # 2. Read from Agent Memory (populated by InitialDiscoveryBehaviour)
+        artifacts = self.artifacts.values()
+        
+        if not artifacts:
+            return "No artifacts found in the environment."
+
+        summary = "Available Environment Capabilities:\n"
+        
+        for artifact in artifacts:
+            # 3. Retrieve actions
+            # We use the engine's helper to filter affordances for this artifact ID
+            actions = self.integration_engine.get_affordances_for_artifact(artifact.artifact_id)
+            
+            # Filter for ACTION types (we only care about what we can DO)
+            action_affordances = [a for a in actions if a.affordance_type.value == "action"]
+            
+            if action_affordances:
+                summary += f"Artifact: {artifact.name}\n"
+                summary += f"  ID: {artifact.artifact_id}\n"
+                summary += f"  Capabilities:\n"
+                
+                for action in action_affordances:
+                    summary += f"    - Action: {action.name}\n"
+                    
+                    # Include Form Details (Method + URL)
+                    # This helps the LLM distinguish between GET (read) and POST (write)
+                    if action.form:
+                        summary += f"      Target: [{action.form.method}] {action.form.href}\n"
+                    
+                    # Include Input Schema (Parameters)
+                    # This tells the LLM what arguments (e.g. brightness level) are required
+                    if action.input_schema:
+                        summary += f"      Schema: {json.dumps(action.input_schema)}\n"
+                
+                summary += "\n"
+        
+        return summary
+
+    def _generate_capabilities_payload(self) -> Dict[str, Any]:
+        """
+        Machine-readable capabilities payload for other agents (planning, etc.).
+        Includes a human-friendly 'summary' field for convenience.
+        """
+        if not self.discovery_complete:
+            return {
+                "discovery_complete": False,
+                "error": "discovery_in_progress",
+                "summary": "Environment discovery is still in progress. Please try again later.",
+                "workspaces": [],
+                "artifacts": [],
+                "affordances": [],
+            }
+
+        artifacts = list(self.artifacts.values())
+        if not artifacts:
+            return {
+                "discovery_complete": True,
+                "summary": "No artifacts found in the environment.",
+                "workspaces": [],
+                "artifacts": [],
+                "affordances": [],
+            }
+
+        # Workspaces (for multi-workspace UX and scoping)
+        workspaces_out: List[Dict[str, Any]] = []
+        try:
+            for ws in (self.environment_map or {}).values():
+                workspaces_out.append(
+                    {
+                        "workspace_id": ws.workspace_id,
+                        "name": ws.name,
+                        "workspace_type": getattr(ws.workspace_type, "value", str(ws.workspace_type)),
+                        "parent_workspace_id": getattr(ws, "parent_workspace_id", None),
+                        "sub_workspaces": list(getattr(ws, "sub_workspaces", []) or []),
+                        "artifacts": list(getattr(ws, "artifacts", []) or []),
+                    }
+                )
+        except Exception:
+            workspaces_out = []
+
+        affordances_out: List[Dict[str, Any]] = []
+        artifacts_out: List[Dict[str, Any]] = []
+
+        for artifact in artifacts:
+            affs = self.integration_engine.get_affordances_for_artifact(artifact.artifact_id)
+            action_affordances = [a for a in affs if a.affordance_type == AffordanceType.ACTION]
+
+            actions_out: List[Dict[str, Any]] = []
+            for action in action_affordances:
+                form = action.form
+                actions_out.append(
+                    {
+                        "affordance_id": action.affordance_id,
+                        "name": action.name,
+                        "description": action.description,
+                        "artifact_id": action.artifact_id,
+                        "affordance_type": action.affordance_type.value,
+                        "semantic_types": list(action.semantic_types or []),
+                        "form": {
+                            "href": getattr(form, "href", None),
+                            "method": getattr(form, "method", None),
+                            "content_type": getattr(form, "content_type", None),
+                            "operation_type": getattr(form, "operation_type", None),
+                            "additional_fields": getattr(form, "additional_fields", None) or {},
+                        }
+                        if form
+                        else None,
+                        "input_schema": action.input_schema,
+                        "output_schema": action.output_schema,
+                    }
+                )
+
+                affordances_out.append(
+                    {
+                        "artifact_id": artifact.artifact_id,
+                        "artifact_name": artifact.name,
+                        "workspace_id": getattr(artifact, "workspace_id", None),
+                        "affordance_id": action.affordance_id,
+                        "affordance_type": action.affordance_type.value,
+                        "action_name": action.name,
+                        "method": getattr(action.form, "method", None) if action.form else None,
+                        "target": getattr(action.form, "href", None) if action.form else None,
+                        "content_type": getattr(action.form, "content_type", None) if action.form else None,
+                        "input_schema": action.input_schema,
+                    }
+                )
+
+            artifacts_out.append(
+                {
+                    "artifact_id": artifact.artifact_id,
+                    "name": artifact.name,
+                    "workspace_id": getattr(artifact, "workspace_id", None),
+                    "actions": actions_out,
+                }
+            )
+
+        return {
+            "discovery_complete": True,
+            "summary": self._generate_capabilities_summary(),
+            "workspaces": workspaces_out,
+            "artifacts": artifacts_out,
+            "affordances": affordances_out,
+        }
+
+    async def start(self, *args, **kwargs) -> None:
         """
         Start the EnvExplorer agent.
 
-        TODO: Implementation steps:
-        1. Call SPADE start method
-        2. Wait for connection to SPADE server
-        3. Trigger setup
-        4. Begin initial discovery
+        Uses SPADE's start to trigger setup/discovery.
         """
-        pass
+        return await super().start(*args, **kwargs)
 
     async def stop(self) -> None:
         """
@@ -96,7 +253,9 @@ class EnvExplorerAgent(Agent, IAgent):
         4. Close signifier storage
         5. Cleanup resources
         """
-        pass
+        if self.integration_engine:
+            await self.integration_engine.stop_notification_listener()
+        await super().stop()
 
     async def send_message(self, message: Message) -> bool:
         """
@@ -123,7 +282,7 @@ class EnvExplorerAgent(Agent, IAgent):
         pass
 
 
-class InitialDiscoveryBehaviour(CyclicBehaviour):
+class InitialDiscoveryBehaviour(OneShotBehaviour):
     """Behavior for initial environment discovery."""
 
     async def run(self):
@@ -142,24 +301,42 @@ class InitialDiscoveryBehaviour(CyclicBehaviour):
         9. Notify UserAssistant and InteractionSolver
         10. Stop this behavior (one-time only)
         """
-        pass
+        self.agent.logger.info("Starting Initial Discovery...")
+        
+        success = await self.agent.integration_engine.initialize({})
+        if not success:
+            self.agent.logger.error("Failed to initialize Integration Engine.")
+            return
 
-    async def crawl_environment(self, root_workspace_id: str) -> None:
-        """
-        Recursively crawl the environment.
+        # Start webhook listener for event notifications before subscribing
+        callback_url = await self.agent.integration_engine.start_notification_listener()
+        
+        try:
+            await self.agent.integration_engine.explore_hmas_environment()
+            
+            self.agent.environment_map = self.agent.integration_engine.workspace_map
+            self.agent.artifacts = self.agent.integration_engine.artifact_map
+            self.agent.affordances = self.agent.integration_engine.affordance_map
 
-        TODO: Implementation steps:
-        1. Start from root workspace
-        2. Retrieve workspace details
-        3. Store workspace in environment_map
-        4. Retrieve all artifacts in workspace
-        5. For each artifact:
-           a. Get Thing Description
-           b. Extract affordances
-           c. Store artifact and affordances
-        6. Get sub-workspaces
-        7. Recursively crawl each sub-workspace
-        """
+            self.agent.logger.info("Subscribing to artifact events...")
+            for artifact_id, artifact in self.agent.artifacts.items():
+                # The engine uses the internal listener automatically (callback_url=None)
+                success = await self.agent.integration_engine.subscribe_to_artifact(
+                    artifact_id, callback_url=callback_url
+                )
+                if success:
+                    self.agent.logger.debug(f"Subscribed to {artifact.name}")
+                else:
+                    self.agent.logger.warning(f"Could not subscribe to {artifact.name} (might be static)")
+            
+            self.agent.discovery_complete = True
+            self.agent.logger.info(f"Discovery Complete. Found {len(self.agent.artifacts)} artifacts.")
+            
+            await self.notify_discovery_complete()
+            
+        except Exception as e:
+            self.agent.logger.error(f"Error during discovery: {e}", exc_info=True)
+
         pass
 
     async def subscribe_to_changes(self) -> None:
@@ -183,8 +360,83 @@ class InitialDiscoveryBehaviour(CyclicBehaviour):
         3. Send to InteractionSolver
         4. Log notification sent
         """
-        pass
+        discovery_cfg = (self.agent.config or {}).get("discovery", {}) or {}
+        if not discovery_cfg.get("notify_on_discovery_complete", True):
+            return
 
+        notify_agents = discovery_cfg.get("notify_agents") or []
+        if not notify_agents:
+            self.agent.logger.info("Discovery complete: no notify_agents configured.")
+            return
+
+        payload = {
+            "discovery_complete": True,
+            "artifacts_count": len(self.agent.artifacts or {}),
+            "affordances_count": len(self.agent.affordances or {}),
+            "yggdrasil_url": getattr(self.agent, "yggdrasil_url", None),
+        }
+
+        sent = 0
+        for jid in notify_agents:
+            try:
+                msg = SpadeMessage(to=str(jid))
+                msg.set_metadata("type", MessageType.ENV_DISCOVERY_COMPLETE.value)
+                msg.set_metadata(META_CORRELATION_ID, ensure_correlation_id({}))
+                msg.body = json.dumps(payload)
+                await self.send(msg)
+                sent += 1
+            except Exception as e:
+                self.agent.logger.warning(f"Failed to notify {jid} of discovery complete: {e}")
+
+        self.agent.logger.info(f"Discovery complete notification sent to {sent}/{len(notify_agents)} agents.")
+
+class EventProcessingBehaviour(CyclicBehaviour):
+    """
+    Behavior for processing asynchronous environment events from the mailbox.
+    """
+    def __init__(self, integration_engine):
+        super().__init__()
+        self.integration = integration_engine
+
+    async def run(self):
+        # 1. Block until an event arrives (efficient)
+        try:
+            # Check if listener is running
+            if not self.integration.notification_listener:
+                await asyncio.sleep(1) # Wait for setup
+                return
+
+            event_data = await self.integration.event_queue.get()
+            
+            # 2. Extract Identity
+            # Yggdrasil sends "artifactUri" in the payload
+            artifact_uri = event_data.get("artifactUri")
+            if not artifact_uri:
+                return
+
+            # 3. Find Local Artifact
+            # Handle potential suffix mismatch (http://.../light vs http://.../light#artifact)
+            artifact = self.integration.artifact_map.get(artifact_uri)
+            if not artifact:
+                # Try fuzzy match if exact match fails
+                artifact = next((a for a in self.integration.artifact_map.values() 
+                                    if artifact_uri in a.artifact_id or a.artifact_id in artifact_uri), None)
+            
+            if not artifact:
+                self.agent.logger.warning(f"Received event for unknown artifact: {artifact_uri}")
+                return
+
+            # 4. Update State (Digital Twin)
+            property_uri = event_data.get("propertyUri")
+            value = event_data.get("value")
+            
+            if property_uri and value is not None:
+                # Update Internal State
+                artifact.current_state[property_uri] = value
+                self.agent.logger.info(f"STATE UPDATE: {artifact.name} -> {property_uri} = {value}")
+                
+        except Exception as e:
+            self.agent.logger.error(f"Error processing event: {e}")
 
 class ChangeMonitoringBehaviour(PeriodicBehaviour):
     """Behavior for monitoring environment changes."""
@@ -232,8 +484,8 @@ class ChangeMonitoringBehaviour(PeriodicBehaviour):
         pass
 
 
-class AffordanceMatchBehaviour(CyclicBehaviour):
-    """Behavior for matching affordances to goals."""
+class EnvironmentRequestHandler(CyclicBehaviour):
+    """Generic handler for incoming environment requests."""
 
     async def run(self):
         """
@@ -244,6 +496,100 @@ class AffordanceMatchBehaviour(CyclicBehaviour):
         2. Process request
         3. Send AffordanceMatchResponse back
         """
+        msg = await self.receive(timeout=1)
+        if msg:
+            msg_type = msg.get_metadata("type")
+            
+            # Check for capabilities request
+            if msg_type == MessageType.ENV_CAPABILITIES_REQUEST.value:
+                self.agent.logger.info(f"Received capabilities request from {msg.sender}")
+                
+                # Generate Response (machine-readable JSON payload + summary)
+                response_payload = self.agent._generate_capabilities_payload()
+                
+                # Send Reply
+                reply = msg.make_reply()
+                reply.body = json.dumps(response_payload)
+                reply.set_metadata("type", MessageType.ENV_CAPABILITIES_RESPONSE.value)
+                
+                # Preserve Correlation ID
+                correlation_id = msg.get_metadata(META_CORRELATION_ID)
+                if correlation_id:
+                    reply.set_metadata(META_CORRELATION_ID, correlation_id)
+                # Preserve thread as conversation id carrier (if set)
+                if msg.thread:
+                    reply.thread = msg.thread
+                    
+                await self.send(reply)
+            
+            # Check for state request (full snapshot or filtered)
+            elif msg_type == MessageType.ENV_STATE_REQUEST.value:
+                self.agent.logger.info(f"Received state request from {msg.sender}")
+
+                try:
+                    payload = json.loads(msg.body or "{}")
+                except json.JSONDecodeError:
+                    payload = {}
+
+                artifact_id = (
+                    payload.get("artifact_id")
+                    or payload.get("artifact")
+                    or payload.get("artifact_uri")
+                )
+                property_uri = payload.get("property_uri") or payload.get("property")
+
+                response_payload = {}
+
+                if artifact_id:
+                    artifact = self.agent.artifacts.get(artifact_id)
+                    if not artifact:
+                        response_payload = {
+                            "error": "artifact_not_found",
+                            "artifact_id": artifact_id,
+                        }
+                    else:
+                        state = dict(artifact.current_state)
+                        if property_uri:
+                            if property_uri in state:
+                                response_payload = {
+                                    "artifact_id": artifact_id,
+                                    "property_uri": property_uri,
+                                    "value": state.get(property_uri),
+                                }
+                            else:
+                                response_payload = {
+                                    "error": "property_not_found",
+                                    "artifact_id": artifact_id,
+                                    "property_uri": property_uri,
+                                }
+                        else:
+                            response_payload = {
+                                "artifact_id": artifact_id,
+                                "name": artifact.name,
+                                "workspace_id": getattr(artifact, "workspace_id", None),
+                                "state": state,
+                            }
+                else:
+                    artifacts_snapshot = {}
+                    for aid, artifact in self.agent.artifacts.items():
+                        artifacts_snapshot[aid] = {
+                            "name": artifact.name,
+                            "workspace_id": getattr(artifact, "workspace_id", None),
+                            "state": dict(artifact.current_state),
+                        }
+                    response_payload = {"artifacts": artifacts_snapshot}
+
+                reply = msg.make_reply()
+                reply.body = json.dumps(response_payload)
+                reply.set_metadata("type", MessageType.ENV_STATE_RESPONSE.value)
+
+                correlation_id = msg.get_metadata("correlation_id")
+                if correlation_id:
+                    reply.set_metadata("correlation_id", correlation_id)
+                if msg.thread:
+                    reply.thread = msg.thread
+
+                await self.send(reply)
         pass
 
     async def match_affordances(self, request: AffordanceMatchRequest) -> AffordanceMatchResponse:

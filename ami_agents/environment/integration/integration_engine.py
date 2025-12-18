@@ -8,6 +8,10 @@ deployments into ThingDescription-based HMAS environments.
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 import logging
+import asyncio
+import aiohttp
+import json
+from aiohttp import web
 
 from rdflib import Graph, URIRef, Namespace, BNode
 from rdflib.namespace import RDF, RDFS
@@ -17,7 +21,68 @@ from ...shared.models.environment import WorkspaceCategory, ArtifactCategory
 from ...shared.ontologies import get_hmas_ontology, get_td_ontology, get_hctl_ontology, get_http_ontology
 from ...shared.utils import parse_jsonschema_from_rdf, extract_subgraph
 
+EXCLUDED_ACTION_NAMES = {
+    "getArtifactRepresentation",
+    "updateArtifactRepresentation",
+    "deleteArtifactRepresentation",
+    "subscribeToArtifact",
+    "unsubscribeFromArtifact",
+}
+
 logger = logging.getLogger(__name__)
+
+
+class NotificationListener:
+    """
+    Background HTTP server that receives WebSub notifications and buffers them into an asyncio Queue.
+    Acts as the 'Mailbox' for the Agent.
+    """
+
+    def __init__(self, port: int = 8086):
+        self.port = port
+        self.event_queue = asyncio.Queue()
+        self.app = web.Application()
+        self.app.router.add_post('/webhook', self._handle_webhook)
+        self.runner = None
+        self.site = None
+        self.base_url = None
+
+    async def _handle_webhook(self, request):
+        """Handle incoming POST requests from Yggdrasil."""
+        try:
+            data = await request.json()
+            await self.event_queue.put(data)
+            logger.debug(f"Received notification: {data}")
+            return web.Response(text="OK")
+        except Exception as e:
+            logger.error(f"Webhook error: {e}")
+            return web.Response(status=500)
+
+    async def start(self):
+        """Start the HTTP server."""
+        self.runner = web.AppRunner(self.app)
+        await self.runner.setup()
+        self.site = web.TCPSite(self.runner, '0.0.0.0', self.port)
+        await self.site.start()
+
+        # Auto-detect local IP for the callback URL
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(('10.255.255.255', 1))
+            ip = s.getsockname()[0]
+        except Exception:
+            ip = '127.0.0.1'
+        finally:
+            s.close()
+
+        self.base_url = f"http://{ip}:{self.port}/webhook"
+        logger.info(f"Notification listener started at {self.base_url}")
+
+    async def stop(self):
+        """Stop the HTTP server."""
+        if self.runner:
+            await self.runner.cleanup()
 
 
 class IIntegrationEngine(ABC):
@@ -309,6 +374,11 @@ class IIntegrationEngine(ABC):
             affordance_form = IIntegrationEngine.extract_hctl_form_details(td_graph, affordance_form_iri)
             if affordance_form is None:
                 logger.warning(f"Failed to extract form for action affordance {affordance_uri}, skipping")
+                continue
+
+            # Skip infrastructure actions not meant for user-facing plans
+            if affordance_name in EXCLUDED_ACTION_NAMES:
+                logger.debug(f"Skipping infrastructure action affordance {affordance_name}")
                 continue
 
             # Extract input schema if present
@@ -733,6 +803,7 @@ class YggdrasilIntegration(IIntegrationEngine):
 
         self.yggdrasil_url = yggdrasil_url
         self.platform_graph: Optional[Graph] = None
+        self.notification_listener: Optional[NotificationListener] = None
 
     async def initialize(self, config: Dict[str, Any]) -> bool:
         """
@@ -1041,25 +1112,17 @@ class YggdrasilIntegration(IIntegrationEngine):
         logger.info(f"Total artifacts found: {len(artifact_map)}")
         return artifact_map
 
-
     async def _map_affordances(self) -> Dict[str, Affordance]:
         """
         Find all affordances in the Yggdrasil HMAS platform.
 
-        Loops through the artifact map, loads the rdf graphs and finds affordances
-        (properties, actions, events) for each artifact.
-
-        Returns:
-            Dictionary mapping affordance URIs to Affordance model instances.
         """
         affordance_map: Dict[str, Affordance] = {}
 
         for artifact_id, artifact in self.artifact_map.items():
             if artifact.thing_description.rdf is None:
-                logger.warning(f"Artifact {artifact_id} has no RDF representation, skipping affordance search")
                 continue
 
-            # Load the artifact RDF into a graph
             artifact_graph = Graph()
             try:
                 artifact_graph.parse(data=artifact.thing_description.rdf, format="turtle")
@@ -1068,26 +1131,148 @@ class YggdrasilIntegration(IIntegrationEngine):
                 continue
 
             # Extract property, action and event affordances
-            affordance_map.update(IIntegrationEngine.extract_property_affordances(artifact_graph, artifact))
-            affordance_map.update(IIntegrationEngine.extract_action_affordances(artifact_graph, artifact))
-            affordance_map.update(IIntegrationEngine.extract_event_affordances(artifact_graph, artifact))
+            artifact_affordances = {}
+            artifact_affordances.update(IIntegrationEngine.extract_property_affordances(artifact_graph, artifact))
+            artifact_affordances.update(IIntegrationEngine.extract_action_affordances(artifact_graph, artifact))
+            artifact_affordances.update(IIntegrationEngine.extract_event_affordances(artifact_graph, artifact))
+            
+            affordance_map.update(artifact_affordances)
 
             artifact.thing_description.properties = [
-                aff.affordance_id for aff in affordance_map.values()
-                if aff.artifact_id == artifact_id and aff.affordance_type == AffordanceType.PROPERTY
+                aff.affordance_id for aff in artifact_affordances.values()
+                if aff.affordance_type == AffordanceType.PROPERTY
             ]
             artifact.thing_description.actions = [
-                aff.affordance_id for aff in affordance_map.values()
-                if aff.artifact_id == artifact_id and aff.affordance_type == AffordanceType.ACTION
+                aff.affordance_id for aff in artifact_affordances.values()
+                if aff.affordance_type == AffordanceType.ACTION
             ]
             artifact.thing_description.events = [
-                aff.affordance_id for aff in affordance_map.values()
-                if aff.artifact_id == artifact_id and aff.affordance_type == AffordanceType.EVENT
+                aff.affordance_id for aff in artifact_affordances.values()
+                if aff.affordance_type == AffordanceType.EVENT
             ]
-            
+
         logger.info(f"Total affordances found: {len(affordance_map)}")
         return affordance_map
         
+
+    async def _fetch_initial_state(self, artifact: Artifact, affordances: Dict[str, Affordance]) -> Dict[str, Any]:
+        """
+        Actively fetches state by invoking 'getStatus' (or similar) action.
+        Maps keys to Property URIs using strict construction.
+        """
+        target_affordance = None
+
+        for aff in affordances.values():
+            if aff.affordance_type == AffordanceType.ACTION:
+                name_lower = aff.name.lower()
+                if "getstatus" in name_lower or "getstate" in name_lower:
+                    target_affordance = aff
+                    break
+
+        if not target_affordance:
+            return {}
+
+        logger.info(f"Active Discovery: Invoking {target_affordance.name} for {artifact.name}...")
+
+        try:
+            response_text = await self.execute_affordance(target_affordance.affordance_id, {})
+
+            if not response_text:
+                return {}
+
+            try:
+                raw_state = json.loads(response_text)
+                if isinstance(raw_state, dict):
+                    mapped_state = {}
+                    # Normalize base uri once: strip fragment and trailing slash
+                    base_uri = artifact.artifact_id.split("#")[0].rstrip("/")
+                    props_prefix = f"{base_uri}/props/"
+
+                    for key, value in raw_state.items():
+                        # Direct mapping: Append /props/{key}
+                        # This aligns with the WebSub notification format.
+                        if isinstance(key, str) and key.startswith("http"):
+                            mapped_state[key] = value
+                        else:
+                            # Strict construction: artifact_uri/props/key
+                            prop_uri = f"{props_prefix}{key}"
+                            mapped_state[prop_uri] = value
+                    
+                    return mapped_state
+            except json.JSONDecodeError:
+                logger.warning(f"State response for {artifact.name} was not JSON.")
+
+        except Exception as e:
+            logger.warning(f"Failed active state fetch for {artifact.name}: {e}")
+
+        return {}
+
+
+    async def refresh_artifact_state(self, artifact_id: str) -> Dict[str, Any]:
+        """
+        Polls the artifact to get its latest state using getStatus action.
+        """
+        artifact = self.artifact_map.get(artifact_id)
+        if not artifact:
+            return {}
+
+        artifact_affordances = {
+            aff_id: self.affordance_map[aff_id]
+            for aff_id in (artifact.thing_description.actions + artifact.thing_description.properties)
+            if aff_id in self.affordance_map
+        }
+
+        new_state = await self._fetch_initial_state(artifact, artifact_affordances)
+
+        if new_state:
+            artifact.current_state.update(new_state)
+
+        return new_state
+
+
+    async def execute_affordance(self, affordance_id: str, payload: Dict[str, Any] = None) -> Optional[str]:
+        """
+        Executes the HCTL Form associated with an affordance.
+        """
+        affordance = self.affordance_map.get(affordance_id)
+        if not affordance:
+            logger.error(f"Affordance {affordance_id} not found")
+            return None
+
+        form = affordance.form
+        target_uri = form.href
+        method = form.method.upper()
+        content_type = form.content_type or "application/json"
+
+        async with aiohttp.ClientSession() as session:
+            try:
+                # Yggdrasil requires an Agent WebID to perform actions.
+                # We use 'alex' as the default system agent for the integrator.
+                headers = {
+                    "Content-Type": content_type,
+                    "X-Agent-WebID": "http://localhost:8080/agents/alex",
+                    "X-Agent-LocalName": "alex"
+                }
+
+                data = None
+                if payload is not None:
+                    if "json" in content_type:
+                        data = json.dumps(payload)
+                    else:
+                        data = str(payload)
+
+                logger.debug(f"Executing {method} {target_uri} with headers {headers}")
+
+                async with session.request(method, target_uri, headers=headers, data=data) as response:
+                    if response.status >= 400:
+                        error_text = await response.text()
+                        logger.error(f"Action failed [{response.status}]: {error_text}")
+                        return None
+                    return await response.text()
+            except Exception as e:
+                logger.error(f"Failed to execute affordance {affordance_id}: {e}")
+                return None
+
 
     async def explore_hmas_environment(self):
         """
@@ -1107,12 +1292,116 @@ class YggdrasilIntegration(IIntegrationEngine):
         # Step 3: For each artifact, find its affordances
         self.affordance_map = await self._map_affordances()
 
+        # Step 4: Actively fetch and map initial state for all artifacts
+        await self._map_states()
+
+    async def _map_states(self) -> None:
+        """
+        Phase 4: State Mapping.
+        Iterate through all discovered artifacts and actively fetch their initial state.
+        """
+        logger.info("Mapping artifact states...")
+        for artifact_id in self.artifact_map:
+            await self.refresh_artifact_state(artifact_id)
+
     async def get_td_directory_url(self) -> str:
         """
         Get the URL of the TD Directory.
         :return: The Yggdrasil URL (it acts as TD Directory)
         """
         return self.yggdrasil_url
+
+    async def start_notification_listener(self, port: int = 8086) -> str:
+        """
+        Starts the background notification listener.
+        Returns the public callback URL.
+        """
+        if self.notification_listener:
+            await self.notification_listener.stop()
+
+        self.notification_listener = NotificationListener(port)
+        await self.notification_listener.start()
+        return self.notification_listener.base_url
+
+    async def stop_notification_listener(self):
+        """Stops the background notification listener."""
+        if self.notification_listener:
+            await self.notification_listener.stop()
+            self.notification_listener = None
+
+    @property
+    def event_queue(self) -> asyncio.Queue:
+        """Access the mailbox queue."""
+        if not self.notification_listener:
+            raise RuntimeError("Notification listener not started")
+        return self.notification_listener.event_queue
+
+    async def subscribe_to_artifact(self, artifact_id: str, callback_url: Optional[str] = None) -> bool:
+        """
+        Subscribes to changes for a specific artifact.
+        If callback_url is None, tries to use the internal listener's URL.
+        """
+        if not callback_url:
+            if self.notification_listener and self.notification_listener.base_url:
+                callback_url = self.notification_listener.base_url
+            else:
+                logger.error("Cannot subscribe: No callback_url provided and no listener running.")
+                return False
+
+        artifact = self.artifact_map.get(artifact_id)
+        if not artifact:
+            logger.error(f"Cannot subscribe: Artifact {artifact_id} not found.")
+            return False
+
+        focus_affordance_id = None
+        for action_aff_id in artifact.thing_description.actions:
+            aff = self.affordance_map.get(action_aff_id)
+            if aff and ("focus" in aff.name.lower()):
+                focus_affordance_id = action_aff_id
+                break
+        
+        if focus_affordance_id:
+            logger.info(f"Using CArtAgO Focus for {artifact.name}...")
+            payload = {
+                "artifactName": artifact.name,
+                "callbackIri": callback_url
+            }
+            result = await self.execute_affordance(focus_affordance_id, payload)
+            if result is not None:
+                logger.info(f"Successfully focused on {artifact.name}")
+                return True
+            else:
+                logger.warning(f"Focus failed for {artifact.name}, trying fallback...")
+
+        subscribe_affordance_id = None
+        
+        for event_aff_id in artifact.thing_description.events:
+            aff = self.affordance_map.get(event_aff_id)
+            if aff and ("subscribe" in aff.name.lower() or "observe" in aff.name.lower()):
+                subscribe_affordance_id = event_aff_id
+                break
+        
+        if not subscribe_affordance_id:
+            for action_aff_id in artifact.thing_description.actions:
+                aff = self.affordance_map.get(action_aff_id)
+                if aff and "subscribe" in aff.name.lower():
+                    subscribe_affordance_id = action_aff_id
+                    break
+
+        if not subscribe_affordance_id:
+            logger.warning(f"No subscription affordance found for {artifact.name}")
+            return False
+
+        payload = {
+            "hub.mode": "subscribe",
+            "hub.topic": artifact_id,
+            "hub.callback": callback_url
+        }
+
+        logger.info(f"Subscribing to {artifact.name} (WebSub) at {callback_url}...")
+        result = await self.execute_affordance(subscribe_affordance_id, payload)
+        
+        return result is not None
 
 
 class IntegrationEngineFactory:
