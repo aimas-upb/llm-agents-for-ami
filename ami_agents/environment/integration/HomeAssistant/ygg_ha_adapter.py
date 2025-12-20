@@ -434,9 +434,25 @@ async def distribute_to_websub_subscribers(http_client: httpx.AsyncClient, event
         print("WebSub distributor: Event payload missing artifactUri, skipping distribution.")
         return
 
+    # Derive workspace URI from artifact URI for hierarchical matching
+    # Expected format: .../workspaces/{id}/artifacts/{name}#artifact
+    workspace_uri = None
+    if "/artifacts/" in artifact_uri:
+        workspace_uri = artifact_uri.split("/artifacts/")[0]
+
     # Iterate over a copy to prevent issues if subscriptions change during iteration
     for sub_id, sub in list(subscriptions.items()):
-        if sub.get("topic") == artifact_uri:
+        topic = sub.get("topic")
+        should_notify = False
+        
+        # 1. Exact match (Artifact subscription)
+        if topic == artifact_uri:
+            should_notify = True
+        # 2. Workspace match (Workspace subscription)
+        elif workspace_uri and (topic == workspace_uri or topic == f"{workspace_uri}#workspace"):
+             should_notify = True
+             
+        if should_notify:
             callback_url = sub.get("callback")
             if not callback_url:
                 print(f"WebSub distributor: Subscription {sub_id} missing callback URL.")
@@ -481,6 +497,7 @@ async def _event_forwarder_task():
                         continue
                     data = ev.get("data", {})
                     entity_id = data.get("entity_id")
+                    print(f"DEBUG: Received state_changed for {entity_id}") # Debug 1
                     new      = data.get("new_state") or {}
                     state    = new.get("state")
                     attrs    = new.get("attributes", {})
@@ -489,6 +506,7 @@ async def _event_forwarder_task():
                         continue
                     area_id = ent_to_area.get(entity_id)
                     if not area_id or (AREAS and area_id not in AREAS):
+                        print(f"Dropped event for {entity_id}: area_id={area_id} (Allowed: {AREAS})")
                         continue
                     # Determine artifact name from device name; fallback to object_id
                     entity_meta = ent_by_id.get(entity_id)
@@ -509,6 +527,7 @@ async def _event_forwarder_task():
                         "triggerUri": trigger_uri,
                     }
                     
+                    print(f"DEBUG: Forwarding event for {entity_id} to WebSub. Topic: {artifact_uri}") # Debug 2
                     # Distribute to WebSub subscribers
                     await distribute_to_websub_subscribers(http, payload)
             except asyncio.CancelledError:
