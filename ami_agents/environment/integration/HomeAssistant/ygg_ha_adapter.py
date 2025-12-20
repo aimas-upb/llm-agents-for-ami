@@ -53,8 +53,6 @@ if not HA_BASE_URL:
     HA_BASE_URL = HA_URL.replace("ws://", "http://").replace("wss://", "https://").split("/api/websocket")[0]
 
 # Event forwarder configuration
-MONITOR_URL = os.getenv("MONITOR_URL", os.getenv("FORWARD_URL", ""))  # destination to POST event JSON / reset
-EXPLORER_URL = os.getenv("EXPLORER_URL", "")  # Environment Explorer base URL for admin reset
 AREAS = {a.strip() for a in os.getenv("AREAS", "").split(",") if a.strip()}  # allowed area_ids
 BASE_WS_URI = os.getenv("BASE_WS_URI", BASE_FALLBACK)  # e.g., https://example.org/ws/lab
 
@@ -83,15 +81,6 @@ async def _shutdown():
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError, Exception):
             await task
-    # Reset external monitors/explorers on shutdown
-    try:
-        await _post_monitor_reset()
-    except Exception as e:
-        print("Shutdown monitor reset failed:", e)
-    try:
-        await _post_explorer_reset()
-    except Exception as e:
-        print("Shutdown explorer reset failed:", e)
     await ha_client.close()
     await ha_rest.close()
 
@@ -474,9 +463,6 @@ async def distribute_to_websub_subscribers(http_client: httpx.AsyncClient, event
                 print(f"WebSub distributor: An unexpected error occurred while delivering event to {callback_url}: {e}")
 
 async def _event_forwarder_task():
-    if not MONITOR_URL:
-        print("Forwarder disabled: MONITOR_URL is not set")
-        return  # forwarding disabled
     ent_to_area, ent_to_device, dev_by_id, ent_by_id = await _build_entity_area_map()
     print("Starting event forwarder task; areas=", (sorted(AREAS) if AREAS else "ALL"))
     async with httpx.AsyncClient(timeout=10) as http:
@@ -522,21 +508,6 @@ async def _event_forwarder_task():
                         "timestamp": tstamp,
                         "triggerUri": trigger_uri,
                     }
-                    # If MONITOR_URL is set, forward to monitor
-                    if MONITOR_URL:
-                        try:
-                            #print("Forwarder posting to", MONITOR_URL, "payload:", payload)
-                            r = await http.post(
-                                MONITOR_URL,
-                                json=payload,
-                                headers={
-                                    "X-Notification-Type": "ArtifactObsPropertyUpdated",
-                                    "Content-Type": "application/json",
-                                },
-                            )
-                            r.raise_for_status()
-                        except Exception as e:
-                            print(f"Forwarding to MONITOR_URL failed for {entity_id}: {e}")
                     
                     # Distribute to WebSub subscribers
                     await distribute_to_websub_subscribers(http, payload)
@@ -551,113 +522,23 @@ async def _event_forwarder_task():
                     with contextlib.suppress(Exception):
                         await ws.close()
 
-async def _post_with_retries(url: str, what: str, max_retries: int = 5):
-    delays = [0, 1, 2, 4, 8]
-    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-        for attempt in range(max_retries):
-            try:
-                if delays[attempt]:
-                    await asyncio.sleep(delays[attempt])
-                print(f"POST {what} attempt {attempt+1}/{max_retries} → {url}")
-                r = await client.post(url)
-                print(f"{what} status: {r.status_code} body: {r.text[:200]}")
-                r.raise_for_status()
-                return True
-            except Exception as e:
-                print(f"{what} failed on attempt {attempt+1}: {e}")
-        return False
 
-async def _post_monitor_reset():
-    if not MONITOR_URL:
-        return
-    reset_url = MONITOR_URL if MONITOR_URL.rstrip('/').endswith('/reset') else MONITOR_URL.rstrip('/') + '/reset'
-    await _post_with_retries(reset_url, "monitor reset")
-
-async def _post_explorer_reset():
-    if not EXPLORER_URL:
-        return
-    reset_url = EXPLORER_URL if EXPLORER_URL.rstrip('/').endswith('/admin/reset') else EXPLORER_URL.rstrip('/') + '/admin/reset'
-    await _post_with_retries(reset_url, "explorer reset")
-
-async def _register_known_artifacts_to_monitor():
-    """On startup, send current known artifact property values to the monitor.
-    Filters by AREAS; uses same payload shape and headers as the forwarder.
-    """
-    if not MONITOR_URL or not AREAS:
-        return
-    try:
-        ent_to_area, ent_to_device, dev_by_id, ent_by_id = await _build_entity_area_map()
-        states = await ha_rest.get_states()
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            for st in states:
-                entity_id = st.get("entity_id")
-                area_id = ent_to_area.get(entity_id)
-                if not area_id or area_id not in AREAS:
-                    continue
-                state = st.get("state")
-                if state in (None, "unknown", "unavailable"):
-                    continue
-                attrs = st.get("attributes", {}) or {}
-                entity_meta = ent_by_id.get(entity_id)
-                artifact_label = _entity_display_name(entity_meta, dev_by_id)
-                artifact_name = urllib.parse.quote(artifact_label, safe="")
-                prop = attrs.get("device_class") or "state"
-                value, xtype = _infer_value_and_type(state)
-                artifact_profile = f"{BASE_WS_URI.rstrip('/')}/workspaces/{area_id}/artifacts/{artifact_name}"
-                artifact_uri = f"{artifact_profile}#artifact"
-                property_uri = f"{artifact_profile}/props/{prop}"
-                trigger_uri = f"{artifact_profile}/actions/read"
-                payload = {
-                    "artifactUri": artifact_uri,
-                    "propertyUri": property_uri,
-                    "value": value,
-                    "valueTypeUri": xtype,
-                    "timestamp": st.get("last_changed") or st.get("last_updated") or "",
-                    "triggerUri": trigger_uri,
-                }
-                try:
-                    print("Initial monitor register posting to", MONITOR_URL, "payload:", payload)
-                    r = await client.post(
-                        MONITOR_URL,
-                        json=payload,
-                        headers={
-                            "X-Notification-Type": "ArtifactObsPropertyUpdated",
-                            "Content-Type": "application/json",
-                        },
-                    )
-                    r.raise_for_status()
-                except Exception as e:
-                    print("Initial monitor register failed for", entity_id, "error:", e)
-    except Exception as e:
-        print("Initial monitor registration failed:", e)
 
 @app.on_event("startup")
 async def _startup_forwarder():
-    print(f"App startup: MONITOR_URL={'set' if MONITOR_URL else 'unset'}, EXPLORER_URL={'set' if EXPLORER_URL else 'unset'}, AREAS={sorted(AREAS) if AREAS else 'ALL'}, BASE_WS_URI={BASE_WS_URI}")
-    # Fire-and-forget reset
-    asyncio.create_task(_post_monitor_reset())
-    asyncio.create_task(_post_explorer_reset())
-    asyncio.create_task(_register_known_artifacts_to_monitor())
-    # Fire-and-forget registration for requested areas
-    if EXPLORER_URL and AREAS:
-        for area_id in AREAS:
-            asyncio.create_task(_register_workspace_to_explorer(area_id))
-    if MONITOR_URL:
-        app.state.forward_task = asyncio.create_task(_event_forwarder_task())
-        print("Forwarder task scheduled")
-    else:
-        print("Forwarder not scheduled: MONITOR_URL is unset")
+    print(f"App startup: AREAS={sorted(AREAS) if AREAS else 'ALL'}, BASE_WS_URI={BASE_WS_URI}")
+    
+    app.state.forward_task = asyncio.create_task(_event_forwarder_task())
+    print("Forwarder task scheduled")
 
 # Simple status endpoint for debugging forwarder
 @app.get("/_forwarder/status")
 async def forwarder_status():
     task = getattr(app.state, "forward_task", None)
     return {
-        "enabled": bool(MONITOR_URL),
         "areas": sorted(AREAS) if AREAS else [],
         "baseWsUri": BASE_WS_URI,
         "taskRunning": bool(task) and not task.done(),
-        "monitorUrl": MONITOR_URL,
     }
 
 @app.get("/workspaces/{workspace_id}", response_class=Response,

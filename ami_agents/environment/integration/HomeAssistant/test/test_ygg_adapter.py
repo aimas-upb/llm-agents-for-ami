@@ -57,8 +57,6 @@ class FakeHAREST:
 @pytest.fixture(autouse=True)
 def no_forwarder(monkeypatch):
     # Prevent background tasks during tests
-    monkeypatch.setenv("MONITOR_URL", "")
-    monkeypatch.setenv("EXPLORER_URL", "")
     monkeypatch.setenv("AREAS", "")
     monkeypatch.setattr(appmod, "AREAS", set(), raising=False)
     # Replace startup hook to avoid scheduling tasks
@@ -251,13 +249,11 @@ def test_forwarder_status_endpoint(sample_data, monkeypatch):
         def done(self):
             return False
     appmod.app.state.forward_task = DummyTask()
-    monkeypatch.setenv("MONITOR_URL", "http://localhost:8081")
     client = TestClient(appmod.app)
     r = client.get("/_forwarder/status")
     assert r.status_code == 200
     data = r.json()
     assert "taskRunning" in data and data["taskRunning"] is True
-    assert data["enabled"] in (True, False)
 
 
 @pytest.mark.asyncio

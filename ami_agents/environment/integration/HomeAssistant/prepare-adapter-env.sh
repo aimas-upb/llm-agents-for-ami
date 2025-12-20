@@ -1,6 +1,4 @@
 #!/bin/bash
-# export MONITOR_URL="http://localhost:8081"
-# export EXPLORER_URL="http://localhost:8082"
 export AREAS="lab308"
 export BASE_WS_URI="http://localhost:8008/"
 # export HA_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI1MmNiMWI5ZjUzYzc0ZjVmOTI5MGIyMDJlZTJhN2NlMyIsImlhdCI6MTc1NjU2MzA5MSwiZXhwIjoyMDcxOTIzMDkxfQ.RXxR4ZAHJ3CWDkELL4P9bFybjymoe8A7UOFOg5O4igc"
