@@ -865,29 +865,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
         print(exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
-# -------- Utilities (Explorer registration) --------
-async def _register_workspace_to_explorer(area_id: str):
-    if not EXPLORER_URL:
-        return
-    try:
-        devices, entities = await _get_workspace_devices_and_entities(area_id)
-        base = BASE_WS_URI.rstrip("/")
-        artifact_uris = []
-        device_map = {d["id"]: d for d in devices}
-        for ent in entities:
-            label = ent.get("_artifact_label") or _entity_display_name(ent, device_map)
-            safe_name = ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
-            artifact_uris.append(f"{base}/workspaces/{area_id}/artifacts/{safe_name}#artifact")
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-            for uri in artifact_uris:
-                try:
-                    print("Explorer register: sending", uri, "to", EXPLORER_URL)
-                    r = await client.post(EXPLORER_URL, json={"uri": uri}, headers={"Content-Type": "application/json"})
-                    r.raise_for_status()
-                except Exception as e:
-                    print("Explorer register failed for", uri, "error:", e)
-    except Exception as exc:
-        print("Explorer registration failed for area", area_id, "error:", exc)
+
 
 async def _ensure_entity(workspace_id: str, artifact_name: str, domain: str) -> str:
     _, device_entities, _, _ = await _resolve_device_and_entities(workspace_id, artifact_name)
