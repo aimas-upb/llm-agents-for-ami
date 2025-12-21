@@ -1002,8 +1002,58 @@ async def action_ha_service(workspace_id: str, artifact_name: str, domain: str, 
 # Jacamo/WebSub stubs
 @app.post("/workspaces/{workspace_id}/focus")
 async def focus_workspace(workspace_id: str, request: Request):
-    _ = await request.json()
-    return Response(content="Action succeeded:")
+    """
+    Handle Jacamo Focus action by registering a WebSub subscription.
+    
+    Payload expected:
+    {
+        "artifactName": "optional, if focusing on specific artifact",
+        "callbackUrl": "required, where to send events"
+    }
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+        
+    callback_url = body.get("callbackUrl")
+    # if not callback_url:
+    #    raise HTTPException(status_code=400, detail="callbackUrl is required")
+        
+    artifact_name = body.get("artifactName")
+    
+    # Determine Topic URI using configured BASE_WS_URI
+    base = BASE_WS_URI.rstrip("/")
+    
+    if artifact_name:
+        # Resolve artifact URI
+        # Check if artifact exists in the workspace
+        try:
+            await _resolve_device_and_entities(workspace_id, artifact_name)
+        except HTTPException:
+             pass
+
+        safe_name = urllib.parse.quote(artifact_name, safe="")
+        topic = f"{base}/workspaces/{workspace_id}/artifacts/{safe_name}#artifact"
+    else:
+        # Workspace focus
+        topic = f"{base}/workspaces/{workspace_id}"
+        
+    if callback_url:
+        # Register subscription directly
+        subscription_id = f"{topic}-{callback_url}"
+        subscriptions[subscription_id] = {
+            "topic": topic,
+            "callback": callback_url,
+            "lease_seconds": None, # Infinite focus until explicit unfocus/unsubscribe
+            "timestamp": asyncio.get_event_loop().time(),
+            "type": "focus"
+        }
+        print(f"Agent focused on {topic} -> {callback_url}")
+    else:
+        print(f"Agent focused on {topic} (no callback)")
+
+    return Response(content="Focus succeeded")
 
 @app.post("/hub/")
 async def hub(request: Request):

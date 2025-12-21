@@ -504,42 +504,72 @@ def test_dynamic_sensor_action_invalid_and_mismatch(monkeypatch):
     assert r2.status_code == 404
 
 
-def test_focus_hub_update_delete(monkeypatch):
-    # Mock AsyncClient for the /hub/ endpoint intent verification
-    class MockResponse:
-        def __init__(self, text, status_code=200):
-            self.text = text
-            self.status_code = status_code
-        def raise_for_status(self):
-            pass
-
-    class MockAsyncClient:
-        def __init__(self, *args, **kwargs):
-            pass
-        async def __aenter__(self):
-            return self
-        async def __aexit__(self, exc_type, exc, tb):
-            pass
-        async def get(self, url, params=None):
-            if params and "hub.challenge" in params:
-                return MockResponse(params["hub.challenge"])
-            return MockResponse("Not Found", 404)
-
-    monkeypatch.setattr(appmod.httpx, "AsyncClient", MockAsyncClient)
-
+def test_focus_other_endpoints(monkeypatch):
     client = TestClient(appmod.app)
-    assert client.post("/workspaces/ws/focus", json={}).status_code == 200
-    
-    # Send valid WebSub subscription request
-    payload = {
-        "hub.mode": "subscribe",
-        "hub.topic": "http://test/topic",
-        "hub.callback": "http://test/cb"
-    }
-    assert client.post("/hub/", data=payload).status_code == 202
-    
+    # The actual focus logic is tested in specific focus API tests.
+    # This just checks other endpoints that were part of the old test.
     assert client.put("/workspaces/ws/artifacts/a", json={}).status_code == 200
     assert client.delete("/workspaces/ws/artifacts/a").status_code == 200
+
+@pytest.mark.asyncio
+async def test_focus_workspace_registers_subscription(monkeypatch):
+    appmod.subscriptions.clear()
+    client = TestClient(appmod.app)
+    workspace_id = "lab308"
+    callback_url = "http://agent/callback/ws"
+    
+    payload = {
+        "callbackUrl": callback_url
+    }
+    response = client.post(f"/workspaces/{workspace_id}/focus", json=payload)
+    assert response.status_code == 200
+    assert "Focus succeeded" in response.text
+    
+    # Verify subscription was registered
+    expected_topic = f"{appmod.BASE_WS_URI.rstrip('/')}/workspaces/{workspace_id}"
+    assert f"{expected_topic}-{callback_url}" in appmod.subscriptions
+    sub = appmod.subscriptions[f"{expected_topic}-{callback_url}"]
+    assert sub["topic"] == expected_topic
+    assert sub["callback"] == callback_url
+    assert sub["type"] == "focus"
+
+@pytest.mark.asyncio
+async def test_focus_artifact_registers_subscription(monkeypatch, sample_data):
+    appmod.subscriptions.clear()
+    client = TestClient(appmod.app)
+    workspace_id = "lab308"
+    artifact_name = "Lab308 Light System" # Assuming this artifact exists from sample_data
+    callback_url = "http://agent/callback/art"
+    
+    payload = {
+        "artifactName": artifact_name,
+        "callbackUrl": callback_url
+    }
+    response = client.post(f"/workspaces/{workspace_id}/focus", json=payload)
+    assert response.status_code == 200
+    assert "Focus succeeded" in response.text
+    
+    # Verify subscription was registered
+    safe_artifact_name = urllib.parse.quote(artifact_name, safe="")
+    expected_topic = f"{appmod.BASE_WS_URI.rstrip('/')}/workspaces/{workspace_id}/artifacts/{safe_artifact_name}#artifact"
+    assert f"{expected_topic}-{callback_url}" in appmod.subscriptions
+    sub = appmod.subscriptions[f"{expected_topic}-{callback_url}"]
+    assert sub["topic"] == expected_topic
+    assert sub["callback"] == callback_url
+    assert sub["type"] == "focus"
+
+@pytest.mark.asyncio
+async def test_focus_missing_callback_url_succeeds(monkeypatch):
+    appmod.subscriptions.clear()
+    client = TestClient(appmod.app)
+    workspace_id = "lab308"
+    
+    payload = {
+        "artifactName": "some_artifact"
+    }
+    response = client.post(f"/workspaces/{workspace_id}/focus", json=payload)
+    assert response.status_code == 200
+    assert "Focus succeeded" in response.text
 
 
 def test_import_requires_token(monkeypatch):
