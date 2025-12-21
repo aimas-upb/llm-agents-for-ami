@@ -518,7 +518,7 @@ class HomeAssistantRDF:
             areas: List of Home Assistant areas (which map to workspaces)
         """
         platform_uri = URIRef(f"{self.base}#platform")
-        profile_uri = URIRef(self.base.rstrip("/"))
+        profile_uri = URIRef(self.base)
 
         # Platform instance
         self.g.add((platform_uri, RDF.type, HMAS.HypermediaMASPlatform))
