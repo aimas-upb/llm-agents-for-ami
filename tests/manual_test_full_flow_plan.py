@@ -332,6 +332,18 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Hold at the end of startup-only mode until you press Enter (useful for demos).",
     )
     p.add_argument(
+        "--signifier-matcher",
+        choices=("v0", "v1"),
+        default="v1",
+        help="Intent matcher version for the embedded RD4 engine (default: v1).",
+    )
+    p.add_argument(
+        "--signifier-min-similarity",
+        type=float,
+        default=0.75,
+        help="Minimum intent similarity threshold for signifier reuse (default: 0.75).",
+    )
+    p.add_argument(
         "--demo",
         action="store_true",
         help="Show only log lines that include the [DEMO] prefix (filters all other logs).",
@@ -1151,7 +1163,11 @@ async def main():
         "discovery": {
             "notify_on_discovery_complete": True,
             "notify_agents": [solver_jid],
-        }
+        },
+        "signifiers": {
+            "matcher_version": args.signifier_matcher,
+            "min_similarity": float(args.signifier_min_similarity),
+        },
     }
 
     # UserAssistant and Solver configs (new agents.yaml-compatible structure)
