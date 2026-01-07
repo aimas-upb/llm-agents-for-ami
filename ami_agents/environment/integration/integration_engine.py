@@ -1157,9 +1157,13 @@ class YggdrasilIntegration(IIntegrationEngine):
 
     async def _fetch_initial_state(self, artifact: Artifact, affordances: Dict[str, Affordance]) -> Dict[str, Any]:
         """
-        Actively fetches state by invoking 'getStatus' (or similar) action.
-        Maps keys to Property URIs using strict construction.
+        Actively fetch the artifact state.
+
+        Preference order:
+        1. Invoke a getStatus/getState action if available (legacy flow).
+        2. Fall back to reading each property affordance directly.
         """
+        mapped_state: Dict[str, Any] = {}
         target_affordance = None
 
         for aff in affordances.values():
@@ -1169,43 +1173,112 @@ class YggdrasilIntegration(IIntegrationEngine):
                     target_affordance = aff
                     break
 
-        if not target_affordance:
+        if target_affordance:
+            logger.info(f"Active Discovery: Invoking {target_affordance.name} for {artifact.name}...")
+            try:
+                response_text = await self.execute_affordance(target_affordance.affordance_id, {})
+
+                if response_text:
+                    try:
+                        raw_state = json.loads(response_text)
+                        if isinstance(raw_state, dict):
+                            base_uri = artifact.artifact_id.split("#")[0].rstrip("/")
+                            props_prefix = f"{base_uri}/props/"
+
+                            for key, value in raw_state.items():
+                                if isinstance(key, str) and key.startswith("http"):
+                                    mapped_state[key] = value
+                                else:
+                                    prop_uri = f"{props_prefix}{key}"
+                                    mapped_state[prop_uri] = value
+                    except json.JSONDecodeError:
+                        logger.warning(f"State response for {artifact.name} was not JSON.")
+            except Exception as e:
+                logger.warning(f"Failed active state fetch for {artifact.name}: {e}")
+
+        if mapped_state:
+            return mapped_state
+
+        return await self._fetch_property_states(artifact, affordances)
+
+    async def _fetch_property_states(self, artifact: Artifact, affordances: Dict[str, Affordance]) -> Dict[str, Any]:
+        """
+        Poll individual property affordances when no consolidated getStatus action exists.
+        """
+        property_affordances = [
+            aff for aff in affordances.values() if aff.affordance_type == AffordanceType.PROPERTY
+        ]
+        if not property_affordances:
             return {}
 
-        logger.info(f"Active Discovery: Invoking {target_affordance.name} for {artifact.name}...")
+        logger.info(
+            "Active Discovery: Polling %d property endpoints for %s...",
+            len(property_affordances),
+            artifact.name,
+        )
 
-        try:
-            response_text = await self.execute_affordance(target_affordance.affordance_id, {})
-
-            if not response_text:
-                return {}
-
-            try:
-                raw_state = json.loads(response_text)
-                if isinstance(raw_state, dict):
-                    mapped_state = {}
-                    # Normalize base uri once: strip fragment and trailing slash
-                    base_uri = artifact.artifact_id.split("#")[0].rstrip("/")
-                    props_prefix = f"{base_uri}/props/"
-
-                    for key, value in raw_state.items():
-                        # Direct mapping: Append /props/{key}
-                        # This aligns with the WebSub notification format.
-                        if isinstance(key, str) and key.startswith("http"):
-                            mapped_state[key] = value
+        values: Dict[str, Any] = {}
+        async with aiohttp.ClientSession() as session:
+            for affordance in property_affordances:
+                form = affordance.form
+                href = getattr(form, "href", None)
+                if not href:
+                    continue
+                method = (form.method or "GET").upper()
+                if method not in ("GET", "POST"):
+                    method = "GET"
+                try:
+                    headers = {"Accept": "application/json"}
+                    async with session.request(method, href, headers=headers) as resp:
+                        if resp.status >= 400:
+                            logger.debug(
+                                "Property poll failed for %s (%s): HTTP %s",
+                                artifact.name,
+                                href,
+                                resp.status,
+                            )
+                            continue
+                        text = (await resp.text()).strip()
+                        if not text:
+                            value = None
                         else:
-                            # Strict construction: artifact_uri/props/key
-                            prop_uri = f"{props_prefix}{key}"
-                            mapped_state[prop_uri] = value
-                    
-                    return mapped_state
-            except json.JSONDecodeError:
-                logger.warning(f"State response for {artifact.name} was not JSON.")
+                            try:
+                                value = json.loads(text)
+                            except json.JSONDecodeError:
+                                value = text
 
-        except Exception as e:
-            logger.warning(f"Failed active state fetch for {artifact.name}: {e}")
+                        property_uri = affordance.affordance_id or href
+                        values[property_uri] = value
 
-        return {}
+                        alias_uri = self._property_alias_uri(artifact.artifact_id, property_uri)
+                        if alias_uri and alias_uri not in values:
+                            values[alias_uri] = value
+                except Exception as exc:
+                    logger.debug(
+                        "Property poll error for %s (%s): %s",
+                        artifact.name,
+                        href,
+                        exc,
+                    )
+
+        return values
+
+    @staticmethod
+    def _property_alias_uri(artifact_id: str, property_href: str) -> Optional[str]:
+        """
+        Normalize property URIs to the /props/ convention used in WebSub events.
+        """
+        if "/props/" in property_href:
+            return property_href
+
+        if "/properties/" not in property_href:
+            return None
+
+        base = artifact_id.split("#")[0].rstrip("/")
+        suffix = property_href.split("/properties/", 1)[-1]
+        if not suffix:
+            return None
+        return f"{base}/props/{suffix}"
 
 
     async def refresh_artifact_state(self, artifact_id: str) -> Dict[str, Any]:
