@@ -207,6 +207,10 @@ def test_sensor_dynamic_action_returns_state(sample_data):
     resp2 = client.post("/workspaces/lab308/artifacts/Lab308.Entry.Temperature/getInDegc")
     assert resp2.status_code == 200
     assert resp2.text == "21.5"
+    # GET should mirror POST behavior
+    resp_get = client.get(f"/workspaces/lab308/artifacts/Lab308.Entry.Temperature/{action}")
+    assert resp_get.status_code == 200
+    assert resp_get.text == "21.5"
 
 
 def test_binary_sensor_action_support(sample_data):
@@ -221,6 +225,9 @@ def test_binary_sensor_action_support(sample_data):
     resp2 = client.post("/workspaces/lab308/artifacts/Lab308.Entry.Motion/getBinarySensorState")
     assert resp2.status_code == 200
     assert resp2.text == "on"
+    resp_get = client.get("/workspaces/lab308/artifacts/Lab308.Entry.Motion/getOccupancyState")
+    assert resp_get.status_code == 200
+    assert resp_get.text == "on"
 
 
 def test_climate_dynamic_action_returns_state(sample_data):
@@ -533,6 +540,16 @@ async def test_focus_workspace_registers_subscription(monkeypatch):
     assert sub["callback"] == callback_url
     assert sub["type"] == "focus"
 
+    # GET should behave the same (query params instead of JSON)
+    get_callback = "http://agent/callback/ws_get"
+    response_get = client.get(
+        f"/workspaces/{workspace_id}/focus",
+        params={"callbackUrl": get_callback},
+    )
+    assert response_get.status_code == 200
+    assert "Focus succeeded" in response_get.text
+    assert f"{expected_topic}-{get_callback}" in appmod.subscriptions
+
 @pytest.mark.asyncio
 async def test_focus_artifact_registers_subscription(monkeypatch, sample_data):
     appmod.subscriptions.clear()
@@ -557,6 +574,16 @@ async def test_focus_artifact_registers_subscription(monkeypatch, sample_data):
     assert sub["topic"] == expected_topic
     assert sub["callback"] == callback_url
     assert sub["type"] == "focus"
+
+    # GET variant should also register the subscription
+    get_callback = "http://agent/callback/art_get"
+    response_get = client.get(
+        f"/workspaces/{workspace_id}/focus",
+        params={"artifactName": artifact_name, "callbackUrl": get_callback},
+    )
+    assert response_get.status_code == 200
+    assert "Focus succeeded" in response_get.text
+    assert f"{expected_topic}-{get_callback}" in appmod.subscriptions
 
 @pytest.mark.asyncio
 async def test_focus_missing_callback_url_succeeds(monkeypatch):

@@ -497,7 +497,8 @@ async def _event_forwarder_task():
                         continue
                     data = ev.get("data", {})
                     entity_id = data.get("entity_id")
-                    print(f"DEBUG: Received state_changed for {entity_id}") # Debug 1
+                    if entity_id != "sensor.clock_308":
+                        print(f"DEBUG: Received state_changed for {entity_id}") # Debug 1
                     new      = data.get("new_state") or {}
                     state    = new.get("state")
                     attrs    = new.get("attributes", {})
@@ -527,7 +528,9 @@ async def _event_forwarder_task():
                         "triggerUri": trigger_uri,
                     }
                     
-                    print(f"DEBUG: Forwarding event for {entity_id} to WebSub. Topic: {artifact_uri}") # Debug 2
+                    # Suppress noisy debug logs for the hardcoded lab clock sensor
+                    if entity_id != "sensor.clock_308":
+                        print(f"DEBUG: Forwarding event for {entity_id} to WebSub. Topic: {artifact_uri}") # Debug 2
                     # Distribute to WebSub subscribers
                     await distribute_to_websub_subscribers(http, payload)
             except asyncio.CancelledError:
@@ -1000,7 +1003,7 @@ async def action_ha_service(workspace_id: str, artifact_name: str, domain: str, 
     return Response(content="Action succeeded:")
 
 # Jacamo/WebSub stubs
-@app.post("/workspaces/{workspace_id}/focus")
+@app.api_route("/workspaces/{workspace_id}/focus", methods=["POST", "GET"])
 async def focus_workspace(workspace_id: str, request: Request):
     """
     Handle Jacamo Focus action by registering a WebSub subscription.
@@ -1011,10 +1014,13 @@ async def focus_workspace(workspace_id: str, request: Request):
         "callbackUrl": "required, where to send events"
     }
     """
-    try:
-        body = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
+    if request.method == "GET":
+        body = dict(request.query_params)
+    else:
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
         
     callback_url = body.get("callbackUrl")
     # if not callback_url:
@@ -1156,7 +1162,7 @@ async def delete_artifact_representation(workspace_id: str, artifact_name: str):
     return Response(content="Action succeeded:")
 
 # Dynamic sensor/binary sensor actions
-@app.post("/workspaces/{workspace_id}/artifacts/{artifact_name}/{action_name}")
+@app.api_route("/workspaces/{workspace_id}/artifacts/{artifact_name}/{action_name}", methods=["POST", "GET"])
 async def action_sensor_dynamic(workspace_id: str, artifact_name: str, action_name: str):
     _, device_entities, _, _ = await _resolve_device_and_entities(workspace_id, artifact_name)
     sensor_ent = _pick_entity(device_entities, "sensor")
