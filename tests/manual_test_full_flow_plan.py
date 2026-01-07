@@ -42,7 +42,9 @@ Sequences (recommended via CLI):
      --clear-signifiers
      --pause-for-sensor
      --hold
- 
+     --demo
+        Filters console logging so only `[DEMO]` messages are shown (useful during live demos).
+
  Optional env flags (legacy; CLI preferred):
      CLEAR_SIGNIFIERS=1
          Clears embedded RD4 signifier storage before starting (reproducible run).
@@ -133,6 +135,17 @@ class _DropHighFrequencyStateUpdateSpamFilter(logging.Filter):
         return True
 
 
+class _DemoOnlyLogFilter(logging.Filter):
+    """Allow only log entries containing the [DEMO] prefix."""
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+        try:
+            msg = record.getMessage()
+        except Exception:
+            return False
+        return "[DEMO]" in msg
+
+
 def _configure_console_logging() -> None:
     """
     Make the manual test output readable:
@@ -177,6 +190,15 @@ def _configure_console_logging() -> None:
     logging.getLogger("ami_agents.agents.env_explorer.env_explorer_agent").addFilter(filt)
     for h in list(getattr(root, "handlers", []) or []):
         h.addFilter(filt)
+
+
+def _enable_demo_only_logging() -> None:
+    """Install a filter that keeps only [DEMO]-tagged log records."""
+    demo_filter = _DemoOnlyLogFilter()
+    root = logging.getLogger()
+    root.addFilter(demo_filter)
+    for handler in list(getattr(root, "handlers", []) or []):
+        handler.addFilter(demo_filter)
 
 
 _configure_console_logging()
@@ -264,6 +286,11 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         "--hold",
         action="store_true",
         help="Hold at the end of startup-only mode until you press Enter (useful for demos).",
+    )
+    p.add_argument(
+        "--demo",
+        action="store_true",
+        help="Show only log lines that include the [DEMO] prefix (filters all other logs).",
     )
     return p.parse_args(argv)
 
@@ -1033,6 +1060,9 @@ class OrchestratorAgent(Agent):
 
 async def main():
     args = _parse_args(sys.argv[1:])
+    if args.demo:
+        _enable_demo_only_logging()
+
     xmpp_server = os.getenv("SPADE_SERVER", "localhost")
     password = os.getenv("SPADE_PASSWORD", "password")
 
