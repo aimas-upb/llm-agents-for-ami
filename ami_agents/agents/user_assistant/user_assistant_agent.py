@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from typing import Any, Dict, List, Optional
 from spade_llm import LLMAgent
 from spade_llm.providers import LLMProvider
@@ -28,6 +29,7 @@ from ...shared.models.messages import (
 )
 from ...shared.utils.spade_rpc import send_via_router
 from ...shared.utils.config_resolver import resolve_yggdrasil_url
+from ...shared.utils.demo_log import demo
 from ...shared.models.plan import Plan, PlanType, PlanStatus
 
 from ...shared.models.messages import MessageType
@@ -72,13 +74,47 @@ class UserAssistantAgent(LLMAgent, IAgent):
         if not api_key:
             raise ValueError("Missing OpenAI API key. Set OPENAI_API_KEY or llm.providers.openai.api_key in agents.yaml.")
 
-        model = provider_cfg.get("model") or "gpt-4o-mini"
+        model = provider_cfg.get("model") or "o4-mini"
         temperature = provider_cfg.get("temperature", 0.7)
         max_tokens = provider_cfg.get("max_tokens", None)
+        max_completion_tokens = provider_cfg.get("max_completion_tokens", None)
         base_url = provider_cfg.get("base_url") or llm_root.get("base_url") or "https://api.openai.com/v1"
+        raw_timeout = (llm_root.get("retry", {}) or {}).get("timeout", None)
+        try:
+            timeout = float(raw_timeout) if raw_timeout is not None else None
+        except Exception:
+            timeout = None
+        if str(model).startswith("o") and "openai.com" in str(base_url).lower():
+            # Reasoning models reject custom temperatures; force the default value.
+            temperature = 1.0
+            if timeout is None or timeout < 120.0:
+                timeout = 120.0
+
+        reasoning_effort = (
+            provider_cfg.get("reasoning_effort")
+            or llm_root.get("reasoning_effort")
+            or os.getenv("OPENAI_REASONING_EFFORT")
+        )
+        if reasoning_effort is None and str(model).startswith("o") and "openai.com" in str(base_url):
+            reasoning_effort = "high"
+
+        # Persist for demo logs (avoid leaking any secrets).
+        self.llm_model = str(model)
+        self.llm_base_url = str(base_url)
+        self.llm_temperature = float(temperature)
+        self.llm_reasoning_effort = str(reasoning_effort) if reasoning_effort else None
+        self.llm_max_completion_tokens = None
+        if str(model).startswith("o"):
+            if max_completion_tokens is not None:
+                try:
+                    self.llm_max_completion_tokens = int(max_completion_tokens)
+                except Exception:
+                    self.llm_max_completion_tokens = None
 
         kwargs: Dict[str, Any] = {"base_url": base_url}
-        if max_tokens is not None:
+        if timeout is not None:
+            kwargs["timeout"] = float(timeout)
+        if max_tokens is not None and not str(model).startswith("o"):
             kwargs["max_tokens"] = int(max_tokens)
 
         provider = LLMProvider.create_openai(
@@ -87,6 +123,32 @@ class UserAssistantAgent(LLMAgent, IAgent):
             temperature=float(temperature),
             **kwargs,
         )
+
+        # Ensure reasoning models use the configured effort level and correct token parameter.
+        # spade_llm's provider does not expose `reasoning_effort` or `max_completion_tokens`,
+        # so we patch the underlying OpenAI client call.
+        if str(model).startswith("o") and (self.llm_reasoning_effort or self.llm_max_completion_tokens is not None):
+            try:
+                completions = provider.client.chat.completions
+                original_create = completions.create
+
+                if not getattr(original_create, "_ami_reasoning_effort_injected", False):
+                    def _create_with_reasoning_effort(*args, **kwargs):  # type: ignore[no-redef]
+                        if self.llm_reasoning_effort:
+                            kwargs.setdefault("reasoning_effort", self.llm_reasoning_effort)
+                        # Reasoning models reject custom temperature; rely on default.
+                        kwargs.pop("temperature", None)
+                        if self.llm_max_completion_tokens is not None:
+                            kwargs.setdefault("max_completion_tokens", self.llm_max_completion_tokens)
+                        # Reasoning models reject `max_tokens`; ensure we never send it.
+                        kwargs.pop("max_tokens", None)
+                        return original_create(*args, **kwargs)
+
+                    setattr(_create_with_reasoning_effort, "_ami_reasoning_effort_injected", True)
+                    completions.create = _create_with_reasoning_effort  # type: ignore[assignment]
+            except Exception:
+                # Best-effort; if patching fails, the request will proceed without explicit reasoning_effort.
+                pass
  
         # --- Execution engine (YggdrasilIntegration) ---
         # Used by ExecutePlanTool to apply plans to the environment.
@@ -99,6 +161,7 @@ class UserAssistantAgent(LLMAgent, IAgent):
         self._active_conversation_id: str | None = None
         self._plans_by_thread: Dict[str, Dict[str, str]] = {}
         self._approved_plan_hash_by_thread: Dict[str, str] = {}
+        self._approved_plan_json_by_thread: Dict[str, str] = {}
 
         # 2. Setup Tools
         explorer_jid = target_jids.get("explorer")
@@ -152,13 +215,18 @@ class UserAssistantAgent(LLMAgent, IAgent):
             return None
         if approve:
             self._approved_plan_hash_by_thread[str(thread)] = record["plan_hash"]
+            self._approved_plan_json_by_thread[str(thread)] = record["plan_json"]
         return record
 
     def peek_approved_plan_hash(self, thread: str) -> str | None:
         return self._approved_plan_hash_by_thread.get(str(thread))
 
+    def peek_approved_plan_json(self, thread: str) -> str | None:
+        return self._approved_plan_json_by_thread.get(str(thread))
+
     def clear_approved_plan_hash(self, thread: str) -> None:
         self._approved_plan_hash_by_thread.pop(str(thread), None)
+        self._approved_plan_json_by_thread.pop(str(thread), None)
 
     async def ensure_execution_engine_ready(self) -> None:
         """
@@ -196,7 +264,58 @@ class UserAssistantAgent(LLMAgent, IAgent):
             if thread:
                 self.agent._active_conversation_id = str(thread)
 
+    class DemoRequestClassifierBehaviour(CyclicBehaviour):
+        """
+        Demo-only logging helper: classify user requests as EXPLICIT vs IMPLICIT.
 
+        This does not influence planning; it only emits a readable log line for thesis demos.
+        """
+
+        async def run(self):
+            msg = await self.receive(timeout=1)
+            if not msg:
+                return
+            if msg.get_metadata("message_type") != "llm":
+                return
+
+            text = (msg.body or "").strip()
+            low = text.lower()
+            if low in ("yes", "no", "ok", "okay", "proceed", "continue"):
+                return
+
+            # Basic categorization:
+            # - QUERY: listing/state questions (no plan expected)
+            # - EXPLICIT: direct device actions (e.g., "turn off light308", "open blinds to 50%")
+            # - IMPLICIT: comfort/goal statements (e.g., "it's dark", "I can't see on my desk")
+            kind = "IMPLICIT"
+            if low.startswith(("what", "show", "list", "which", "is", "are")) and (
+                "workspace" in low or "workspaces" in low or "device" in low or "devices" in low or "state" in low
+            ):
+                kind = "QUERY"
+            else:
+                has_action = any(
+                    kw in low
+                    for kw in (
+                        "turn ",
+                        "toggle",
+                        "open",
+                        "close",
+                        "set ",
+                        "raise",
+                        "lower",
+                        "increase",
+                        "decrease",
+                    )
+                )
+                mentions_device = (
+                    any(tok in low for tok in ("light", "blinds"))
+                    or re.search(r"\b\w+\d{3}\b", low) is not None
+                    or "%" in low
+                )
+                if has_action and mentions_device:
+                    kind = "EXPLICIT"
+
+            logger.info(demo("Request classified as %s: %r"), kind, text)
 
     async def setup(self):
         """
@@ -213,12 +332,22 @@ class UserAssistantAgent(LLMAgent, IAgent):
         """
         await super().setup()
 
+        temp_display = "default" if str(self.llm_model).startswith("o") else self.llm_temperature
+        logger.info(
+            demo("UserAssistant booting (model=%s, base_url=%s, temperature=%s, reasoning_effort=%s)"),
+            self.llm_model,
+            self.llm_base_url,
+            temp_display,
+            self.llm_reasoning_effort or "default",
+        )
+
         # Track active conversation thread so tools can route messages and store plans per-conversation.
         from spade.template import Template
 
         t = Template()
         t.set_metadata("message_type", "llm")
         self.add_behaviour(self.ConversationTrackerBehaviour(), template=t)
+        self.add_behaviour(self.DemoRequestClassifierBehaviour(), template=t)
 
         # --- DEBUG: Log Registered Behaviors and Templates ---
         logger.info("=== DEBUG: Inspecting UserAssistant Behaviors ===")

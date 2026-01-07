@@ -7,6 +7,7 @@ Classical SPADE agent that crawls, monitors, and manages environment knowledge.
 import asyncio
 import logging
 import json
+import uuid
 from typing import Any, Dict, List, Optional
 from spade.agent import Agent
 from spade.behaviour import CyclicBehaviour, PeriodicBehaviour, OneShotBehaviour
@@ -21,6 +22,7 @@ from ...shared.models.environment import (
 )
 from ...shared.models.plan import BehaviorTreePlan
 from ...shared.utils.config_resolver import resolve_yggdrasil_url
+from ...shared.utils.demo_log import demo
 from ...environment.connection.hmas_client import IHMASClient
 from ...environment.integration.integration_engine import YggdrasilIntegration
 
@@ -60,6 +62,17 @@ class EnvExplorerAgent(Agent, IAgent):
         self.discovery_complete = False
         self.logger = logging.getLogger(__name__)
 
+        # --- Embedded RD4 signifier engine (ami_agents/shared/memory) ---
+        self._rd4_engine_ready: bool = False
+        self._rd4_engine_lock: asyncio.Lock = asyncio.Lock()
+        self._rd4_storage_dir: Optional[str] = None
+        self._rd4_registry: Any = None
+        self._rd4_matcher_registry: Any = None
+        self._rd4_context_builder: Any = None
+        self._rd4_shacl_validator: Any = None
+        self._rd4_default_matcher_version: str = "v0"
+        self._rd4_default_min_similarity: float = 0.0
+
     async def setup(self):
         """
         Setup the agent (SPADE lifecycle method).
@@ -67,7 +80,8 @@ class EnvExplorerAgent(Agent, IAgent):
         Connects to the Yggdrasil HMAS instance and performs an initial
         environment crawl to populate workspace/artifact/affordance maps.
         """
-        self.logger.info(f"EnvExplorerAgent starting...")
+        self.logger.info(demo(f"EnvExplorer booting (yggdrasil_url={self.yggdrasil_url})"))
+        self.logger.info("EnvExplorerAgent starting...")
         self.add_behaviour(InitialDiscoveryBehaviour())
 
         # Route environment capability/state requests to the handler using templates
@@ -78,6 +92,18 @@ class EnvExplorerAgent(Agent, IAgent):
 
         self.add_behaviour(EnvironmentRequestHandler(), template=cap_template)
         self.add_behaviour(EnvironmentRequestHandler(), template=state_template)
+
+        # Signifier engine requests (embedded memory + matcher)
+        sign_match_template = Template()
+        sign_match_template.set_metadata("type", MessageType.SIGNIFIER_MATCH_REQUEST.value)
+        sign_record_template = Template()
+        sign_record_template.set_metadata("type", MessageType.SIGNIFIER_RECORD_EXECUTION_REQUEST.value)
+        sign_list_template = Template()
+        sign_list_template.set_metadata("type", MessageType.SIGNIFIER_LIST_REQUEST.value)
+
+        self.add_behaviour(SignifierRequestHandler(), template=sign_match_template)
+        self.add_behaviour(SignifierRequestHandler(), template=sign_record_template)
+        self.add_behaviour(SignifierRequestHandler(), template=sign_list_template)
 
         self.add_behaviour(EventProcessingBehaviour(self.integration_engine))
 
@@ -234,6 +260,384 @@ class EnvExplorerAgent(Agent, IAgent):
             "affordances": affordances_out,
         }
 
+    def _get_signifier_config(self) -> Dict[str, Any]:
+        return (self.config or {}).get("signifiers", {}) or {}
+
+    async def _ensure_rd4_engine_ready(self) -> None:
+        if self._rd4_engine_ready:
+            return
+
+        async with self._rd4_engine_lock:
+            if self._rd4_engine_ready:
+                return
+
+            from ...shared import memory as rd4_memory
+
+            rd4_memory.ensure_engine_on_path()
+
+            from src.matching.registry import IntentMatcherRegistry  # type: ignore[import-not-found]
+            from src.storage.registry import SignifierRegistry  # type: ignore[import-not-found]
+            from src.validation.context_builder import ContextGraphBuilder  # type: ignore[import-not-found]
+            from src.validation.shacl_validator import SHACLValidator  # type: ignore[import-not-found]
+
+            cfg = self._get_signifier_config()
+
+            storage_dir = cfg.get("storage_dir")
+            if not storage_dir:
+                storage_dir = str(rd4_memory.get_default_storage_dir())
+
+            enable_authoring_validation = bool(cfg.get("enable_authoring_validation", False))
+
+            self._rd4_storage_dir = str(storage_dir)
+            self._rd4_registry = SignifierRegistry(
+                storage_dir=self._rd4_storage_dir,
+                enable_authoring_validation=enable_authoring_validation,
+            )
+
+            # Default to v0 to avoid downloading embedding models unexpectedly.
+            matcher_registry = IntentMatcherRegistry(default_version="v0")
+            preferred_version = str(cfg.get("matcher_version") or "v0")
+            if preferred_version in matcher_registry.list_versions():
+                matcher_registry.set_default_version(preferred_version)
+            self._rd4_matcher_registry = matcher_registry
+            self._rd4_default_matcher_version = matcher_registry.get_default_version()
+
+            try:
+                self._rd4_default_min_similarity = float(cfg.get("min_similarity", 0.0))
+            except Exception:
+                self._rd4_default_min_similarity = 0.0
+
+            self._rd4_context_builder = ContextGraphBuilder()
+            self._rd4_shacl_validator = SHACLValidator(enable_caching=bool(cfg.get("enable_shacl_cache", False)))
+
+            self._rd4_engine_ready = True
+            self.logger.info(
+                demo("RD4 signifier engine ready (storage_dir=%s, matcher_default=%s)"),
+                self._rd4_storage_dir,
+                self._rd4_default_matcher_version,
+            )
+
+    def _ws_match(self, value: Any, workspace_id: str) -> bool:
+        if not workspace_id:
+            return True
+        if not value:
+            return False
+
+        ws = str(workspace_id).strip()
+        s = str(value)
+
+        if ws.startswith("http://") or ws.startswith("https://"):
+            return s == ws or ws in s
+
+        if s == ws:
+            return True
+        if f"/{ws}#" in s:
+            return True
+        if f"/{ws}/" in s:
+            return True
+        if s.endswith("/" + ws):
+            return True
+        return ws in s
+
+    def _build_rd4_context_snapshot(self, workspace_id: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+        context: Dict[str, Dict[str, Any]] = {}
+
+        for artifact in (self.artifacts or {}).values():
+            if workspace_id and not self._ws_match(getattr(artifact, "workspace_id", None), workspace_id):
+                continue
+
+            artifact_uri = str(getattr(artifact, "artifact_id", "") or "")
+            if not artifact_uri:
+                continue
+
+            state = getattr(artifact, "current_state", {}) or {}
+            if not isinstance(state, dict):
+                continue
+
+            # ContextGraphBuilder expects: {artifact_uri: {property_uri: value}}
+            context[artifact_uri] = {str(k): v for k, v in state.items()}
+
+        return context
+
+    async def _rd4_list_signifiers(self) -> Dict[str, Any]:
+        await self._ensure_rd4_engine_ready()
+
+        signifiers = self._rd4_registry.list_signifiers(limit=10000) if self._rd4_registry else []
+        out = []
+        for s in signifiers:
+            out.append(
+                {
+                    "signifier_id": s.signifier_id,
+                    "version": s.version,
+                    "status": getattr(s.status, "value", str(s.status)),
+                    "intent": getattr(s.intent, "nl_text", ""),
+                    "affordance_uri": s.affordance_uri,
+                }
+            )
+
+        return {"total": len(out), "signifiers": out}
+
+    async def _rd4_match_signifiers(
+        self,
+        *,
+        intent: str,
+        workspace_id: Optional[str] = None,
+        context: Optional[Dict[str, Dict[str, Any]]] = None,
+        k: int = 10,
+        matcher_version: Optional[str] = None,
+        min_similarity: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        await self._ensure_rd4_engine_ready()
+
+        intent = str(intent or "").strip()
+        if not intent:
+            return {"error": "missing_intent", "matches": [], "final_matches": [], "total_signifiers": 0}
+
+        if context is None:
+            context = self._build_rd4_context_snapshot(workspace_id=workspace_id)
+
+        all_signifiers = self._rd4_registry.list_signifiers(limit=10000) if self._rd4_registry else []
+        signifier_dicts = [s.model_dump() for s in all_signifiers]
+
+        if not signifier_dicts:
+            self.logger.info(demo("Signifier match: 0 stored signifiers (storage empty)."))
+            return {"matches": [], "final_matches": [], "total_signifiers": 0}
+
+        version_to_use = str(matcher_version or self._rd4_default_matcher_version or "v0")
+        if min_similarity is None:
+            min_similarity = self._rd4_default_min_similarity
+
+        self.logger.info(
+            demo("Signifier match: intent=%r matcher=%s min_similarity=%s k=%s"),
+            intent,
+            version_to_use,
+            min_similarity,
+            k,
+        )
+
+        try:
+            match_results = self._rd4_matcher_registry.match(
+                intent_query=intent,
+                signifiers=signifier_dicts,
+                k=int(k),
+                version=version_to_use,
+                min_similarity=float(min_similarity),
+            )
+        except Exception:
+            version_to_use = "v0"
+            match_results = self._rd4_matcher_registry.match(
+                intent_query=intent,
+                signifiers=signifier_dicts,
+                k=int(k),
+                version=version_to_use,
+            )
+
+        context_graph, _ = self._rd4_context_builder.normalize_context(context)
+
+        matches: List[Dict[str, Any]] = []
+        for match in match_results:
+            s = self._rd4_registry.get(match.signifier_id)
+            if not s:
+                continue
+
+            shacl_conforms = True
+            shacl_violations: List[str] = []
+
+            if getattr(getattr(s, "context", None), "shacl_shapes", None):
+                validation = self._rd4_shacl_validator.validate_signifier_context(
+                    context_graph,
+                    s.context.shacl_shapes,
+                    format="turtle",
+                )
+                shacl_conforms = bool(validation.conforms)
+                shacl_violations = [v.message for v in (validation.violations or [])]
+
+            structured = getattr(getattr(s, "intent", None), "structured", None)
+            payload_hint = structured.get("payload") if isinstance(structured, dict) else None
+
+            matches.append(
+                {
+                    "signifier_id": s.signifier_id,
+                    "affordance_uri": s.affordance_uri,
+                    "intent": getattr(s.intent, "nl_text", ""),
+                    "intent_similarity": round(float(match.similarity), 4),
+                    "matcher_version": version_to_use,
+                    "shacl_conforms": shacl_conforms,
+                    "shacl_violations": shacl_violations,
+                    "payload_hint": payload_hint,
+                }
+            )
+
+        final_matches = [m["signifier_id"] for m in matches if m.get("shacl_conforms")]
+
+        self.logger.info(
+            demo("Signifier match result: matches=%d final_matches=%d"),
+            len(matches),
+            len(final_matches),
+        )
+
+        return {
+            "intent": intent,
+            "matches": matches,
+            "final_matches": final_matches,
+            "total_signifiers": len(signifier_dicts),
+        }
+
+    async def _rd4_record_execution(
+        self,
+        *,
+        plan: Any,
+        execution_report: Any,
+        sender: Optional[str] = None,
+        thread: Optional[str] = None,
+        workspace_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        await self._ensure_rd4_engine_ready()
+
+        plan_obj = plan
+        if isinstance(plan_obj, str):
+            try:
+                plan_obj = json.loads(plan_obj)
+            except Exception:
+                plan_obj = None
+
+        if not isinstance(plan_obj, dict):
+            return {"ok": False, "error": "invalid_plan"}
+
+        steps = plan_obj.get("steps")
+        if not isinstance(steps, list) or not steps:
+            return {"ok": False, "error": "missing_steps"}
+
+        ok_step_ids: set[str] = set()
+        if isinstance(execution_report, dict):
+            results = execution_report.get("results")
+            if isinstance(results, list):
+                for r in results:
+                    if not isinstance(r, dict) or not r.get("ok"):
+                        continue
+                    sid = r.get("step_id")
+                    if sid is not None:
+                        ok_step_ids.add(str(sid))
+
+        from src.models.signifier import (  # type: ignore[import-not-found]
+            IntentContext,
+            IntentionDescription,
+            Provenance,
+            Signifier as RD4Signifier,
+            SignifierStatus,
+        )
+
+        created: List[str] = []
+        skipped: List[Dict[str, Any]] = []
+
+        for step in steps:
+            if not isinstance(step, dict):
+                skipped.append({"error": "invalid_step"})
+                continue
+
+            step_id = step.get("step_id")
+            if ok_step_ids and step_id is not None and str(step_id) not in ok_step_ids:
+                continue
+
+            intent = str(step.get("intent") or "").strip()
+            affordance_uri = str(step.get("affordance_uri") or step.get("affordance_id") or "").strip()
+            if not intent or not affordance_uri:
+                skipped.append({"step_id": step_id, "error": "missing_intent_or_affordance"})
+                continue
+
+            payload = step.get("payload") if isinstance(step.get("payload"), dict) else {}
+            action_name = step.get("action_name")
+            evidence = []
+            for reason in step.get("reasons") or []:
+                if not isinstance(reason, dict):
+                    continue
+                ev_list = reason.get("evidence") or []
+                if isinstance(ev_list, list):
+                    evidence.extend([ev for ev in ev_list if isinstance(ev, dict)])
+
+            signifier_id = f"exec-{uuid.uuid4().hex}"
+
+            # Best-effort SHACL context shape:
+            # Require that the artifact+property URIs referenced in evidence exist in the current context graph.
+            # This demonstrates "context match" while remaining stable across simple state resets (values may change,
+            # but the relevant artifacts/properties remain present).
+            shacl_shapes = None
+            try:
+                props_by_artifact: Dict[str, set[str]] = {}
+                for ev in evidence:
+                    art = ev.get("artifact")
+                    prop = ev.get("property")
+                    if not (isinstance(art, str) and art.startswith("http")):
+                        continue
+                    if not (isinstance(prop, str) and prop.startswith("http")):
+                        continue
+                    props_by_artifact.setdefault(art, set()).add(prop)
+
+                if props_by_artifact:
+                    ttl_lines = [
+                        "@prefix sh: <http://www.w3.org/ns/shacl#> .",
+                        "",
+                    ]
+                    shape_idx = 0
+                    for art_uri, prop_uris in props_by_artifact.items():
+                        shape_idx += 1
+                        shape_iri = f"<urn:ami:signifier:{signifier_id}:shape:{shape_idx}>"
+                        ttl_lines.append(f"{shape_iri} a sh:NodeShape ;")
+                        ttl_lines.append(f"  sh:targetNode <{art_uri}> ;")
+                        for p_uri in sorted(prop_uris):
+                            ttl_lines.append("  sh:property [")
+                            ttl_lines.append(f"    sh:path <{p_uri}> ;")
+                            ttl_lines.append("    sh:minCount 1 ;")
+                            ttl_lines.append("  ] ;")
+                        # Replace final ';' with '.' to end the shape.
+                        if ttl_lines and ttl_lines[-1].endswith(";"):
+                            ttl_lines[-1] = ttl_lines[-1].rstrip(";").rstrip() + "."
+                        ttl_lines.append("")
+
+                    shacl_shapes = "\n".join(ttl_lines).strip() or None
+            except Exception:
+                shacl_shapes = None
+
+            intent_structured = {"intent": intent, "payload": payload}
+            if action_name:
+                intent_structured["action_name"] = str(action_name)
+
+            ctx_meta = {
+                "workspace_id": workspace_id,
+                "thread": thread,
+                "step_id": step_id,
+                "evidence": evidence,
+            }
+
+            signifier = RD4Signifier(
+                signifier_id=signifier_id,
+                version=1,
+                status=SignifierStatus.ACTIVE,
+                intent=IntentionDescription(nl_text=intent, structured=intent_structured),
+                context=IntentContext(nl_description=json.dumps(ctx_meta), structured_conditions=[], shacl_shapes=shacl_shapes),
+                affordance_uri=affordance_uri,
+                provenance=Provenance(created_by=str(sender or self.jid), source="execution"),
+            )
+
+            try:
+                self._rd4_registry.create(signifier)
+                created.append(signifier_id)
+                self.logger.info(
+                    demo("Stored signifier (no SHACL context) %s: intent=%r -> affordance=%s"),
+                    signifier_id,
+                    intent,
+                    affordance_uri,
+                )
+            except Exception as e:
+                skipped.append({"step_id": step_id, "error": "create_failed", "detail": str(e)})
+
+        return {
+            "ok": True,
+            "created_count": len(created),
+            "created_ids": created,
+            "skipped": skipped,
+        }
+
     async def start(self, *args, **kwargs) -> None:
         """
         Start the EnvExplorer agent.
@@ -301,7 +705,7 @@ class InitialDiscoveryBehaviour(OneShotBehaviour):
         9. Notify UserAssistant and InteractionSolver
         10. Stop this behavior (one-time only)
         """
-        self.agent.logger.info("Starting Initial Discovery...")
+        self.agent.logger.info(demo("Starting EnvExplorer discovery..."))
         
         success = await self.agent.integration_engine.initialize({})
         if not success:
@@ -331,6 +735,12 @@ class InitialDiscoveryBehaviour(OneShotBehaviour):
             
             self.agent.discovery_complete = True
             self.agent.logger.info(f"Discovery Complete. Found {len(self.agent.artifacts)} artifacts.")
+            self.agent.logger.info(
+                demo("Discovery summary: workspaces=%d artifacts=%d affordances=%d"),
+                len(self.agent.environment_map or {}),
+                len(self.agent.artifacts or {}),
+                len(self.agent.affordances or {}),
+            )
             
             await self.notify_discovery_complete()
             
@@ -502,7 +912,7 @@ class EnvironmentRequestHandler(CyclicBehaviour):
             
             # Check for capabilities request
             if msg_type == MessageType.ENV_CAPABILITIES_REQUEST.value:
-                self.agent.logger.info(f"Received capabilities request from {msg.sender}")
+                self.agent.logger.info(demo("Received ENV_CAPABILITIES_REQUEST from %s"), str(msg.sender))
                 
                 # Generate Response (machine-readable JSON payload + summary)
                 response_payload = self.agent._generate_capabilities_payload()
@@ -524,7 +934,7 @@ class EnvironmentRequestHandler(CyclicBehaviour):
             
             # Check for state request (full snapshot or filtered)
             elif msg_type == MessageType.ENV_STATE_REQUEST.value:
-                self.agent.logger.info(f"Received state request from {msg.sender}")
+                self.agent.logger.info(demo("Received ENV_STATE_REQUEST from %s"), str(msg.sender))
 
                 try:
                     payload = json.loads(msg.body or "{}")
@@ -649,6 +1059,75 @@ class EnvironmentRequestHandler(CyclicBehaviour):
         5. Return ranked affordances
         """
         pass
+
+
+class SignifierRequestHandler(CyclicBehaviour):
+    """Handler for RD4 signifier engine requests (embedded in EnvExplorer)."""
+
+    async def run(self):
+        msg = await self.receive(timeout=1)
+        if not msg:
+            return
+
+        msg_type = msg.get_metadata("type")
+
+        if msg_type == MessageType.SIGNIFIER_LIST_REQUEST.value:
+            self.agent.logger.info(demo("Received SIGNIFIER_LIST_REQUEST from %s"), str(msg.sender))
+            response_payload = await self.agent._rd4_list_signifiers()
+            reply_type = MessageType.SIGNIFIER_LIST_RESPONSE.value
+
+        elif msg_type == MessageType.SIGNIFIER_MATCH_REQUEST.value:
+            self.agent.logger.info(demo("Received SIGNIFIER_MATCH_REQUEST from %s"), str(msg.sender))
+            try:
+                payload = json.loads(msg.body or "{}")
+            except json.JSONDecodeError:
+                payload = {}
+
+            intent = payload.get("intent") or payload.get("query") or payload.get("goal") or ""
+            workspace_id = payload.get("workspace_id")
+            k = payload.get("k", 10)
+            matcher_version = payload.get("matcher_version")
+            min_similarity = payload.get("min_similarity")
+
+            response_payload = await self.agent._rd4_match_signifiers(
+                intent=str(intent),
+                workspace_id=str(workspace_id) if workspace_id else None,
+                k=int(k) if str(k).isdigit() else 10,
+                matcher_version=str(matcher_version) if matcher_version else None,
+                min_similarity=float(min_similarity) if min_similarity is not None else None,
+            )
+            reply_type = MessageType.SIGNIFIER_MATCH_RESPONSE.value
+
+        elif msg_type == MessageType.SIGNIFIER_RECORD_EXECUTION_REQUEST.value:
+            self.agent.logger.info(demo("Received SIGNIFIER_RECORD_EXECUTION_REQUEST from %s"), str(msg.sender))
+            try:
+                payload = json.loads(msg.body or "{}")
+            except json.JSONDecodeError:
+                payload = {}
+
+            response_payload = await self.agent._rd4_record_execution(
+                plan=payload.get("plan"),
+                execution_report=payload.get("execution_report") or payload.get("execution") or {},
+                sender=str(msg.sender) if getattr(msg, "sender", None) else None,
+                thread=str(msg.thread) if getattr(msg, "thread", None) else None,
+                workspace_id=payload.get("workspace_id"),
+            )
+            reply_type = MessageType.SIGNIFIER_RECORD_EXECUTION_RESPONSE.value
+
+        else:
+            return
+
+        reply = msg.make_reply()
+        reply.body = json.dumps(response_payload)
+        reply.set_metadata("type", reply_type)
+
+        correlation_id = msg.get_metadata(META_CORRELATION_ID)
+        if correlation_id:
+            reply.set_metadata(META_CORRELATION_ID, str(correlation_id))
+        if msg.thread:
+            reply.thread = msg.thread
+
+        await self.send(reply)
 
 
 class SignifierManager:

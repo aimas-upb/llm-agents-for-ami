@@ -110,6 +110,14 @@ class MessageType(Enum):
     # Preference management
     PREFERENCE_STATEMENT = "preference_statement"
 
+    # Signifier engine (RD4 memory, embedded in EnvExplorer)
+    SIGNIFIER_MATCH_REQUEST = "signifier_match_request"
+    SIGNIFIER_MATCH_RESPONSE = "signifier_match_response"
+    SIGNIFIER_RECORD_EXECUTION_REQUEST = "signifier_record_execution_request"
+    SIGNIFIER_RECORD_EXECUTION_RESPONSE = "signifier_record_execution_response"
+    SIGNIFIER_LIST_REQUEST = "signifier_list_request"
+    SIGNIFIER_LIST_RESPONSE = "signifier_list_response"
+
 
 class MessageClassification(Enum):
     """Classification categories for user messages."""

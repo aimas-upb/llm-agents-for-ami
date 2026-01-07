@@ -225,6 +225,10 @@ models/
 *.pt
 *.pth
 
+# Allow RD4 signifier engine package models (embedded under ami_agents/shared/memory).
+!ami_agents/shared/memory/src/models/
+!ami_agents/shared/memory/src/models/**
+
 # Test artifacts
 .pytest_cache/
 test-results/

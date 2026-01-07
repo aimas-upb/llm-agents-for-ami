@@ -27,6 +27,7 @@ from ...shared.models.messages import (
     serialize_body,
 )
 from ...shared.utils.spade_rpc import rpc_call, RpcTimeoutError, send_via_router
+from ...shared.utils.demo_log import demo
 from ...shared.models.plan import BehaviorTreePlan, NodeTemplate, Plan
 from ...shared.protocols.llm_protocol import IPlanGenerator
 
@@ -63,15 +64,15 @@ PLAN FORMAT  JSON-Plan 1.2
         {
           "property":  "<property satisfied>",
           "direction": "<increase|decrease|set>",
-          "evidence": [
-            {
-              "artifact":  "<sensor-or-artifact URI>",
-              "property":  "<attribute name>",
-              "operator":  "<lessThan|lessEqual|greaterThan|greaterEqual|equals>",
-              "threshold": "<number|string>",
-              "reading":   "<number|string>"
-            }
-          ],
+            "evidence": [
+              {
+                "artifact":  "<sensor-or-artifact URI>",
+                "property":  "<attribute name>",
+                "operator":  "<lessThan|lessEqual|greaterThan|greaterEqual|equals>",
+                "threshold": "<number|string>",
+                "reading":   "<number|string>"
+              }
+            ],
           "why": "One or two sentences explaining why this step is needed."
         }
       ]
@@ -80,10 +81,11 @@ PLAN FORMAT  JSON-Plan 1.2
 }
 
 Rules:
-- Always set plan_version to "1.2".
- - Every step must include at least one reasons entry with at least one evidence item.
- - Use complete, non-fabricated URIs. If absent, clearly indicate placeholders.
- - Output only the JSON plan (no additional prose). If no plan is feasible, return a JSON with plan_version=1.2, error, detail, steps=[].
+ - Always set plan_version to "1.2".
+  - Every step must include at least one reasons entry with at least one evidence item.
+  - Use complete, non-fabricated URIs. If absent, clearly indicate placeholders.
+  - Use ASCII only in all string fields (no curly quotes, no em/en dashes, no ellipsis character).
+  - Output only the JSON plan (no additional prose). If no plan is feasible, return a JSON with plan_version=1.2, error, detail, steps=[].
 """
 
 DEFAULT_TIMEOUT = 10
@@ -121,21 +123,59 @@ class InteractionSolverAgent(Agent, IAgent):
         self.env_explorer_jid = None
         self.target_jids = target_jids or {}
 
+        # Cache the last known environment context so we can build plans from signifiers
+        # without querying EnvExplorer again for capabilities/state.
+        self._cached_affordances: List[Dict[str, Any]] = []
+        self._cached_state_payload: Dict[str, Any] = {}
+        self._cached_affordance_by_id: Dict[str, Dict[str, Any]] = {}
+
         # --- LLM client config (direct OpenAI call) ---
         llm_root = self.config.get("llm", {}) or {}
         provider_name = llm_root.get("default_provider", "openai")
         provider_cfg = (llm_root.get("providers", {}) or {}).get(provider_name, {}) or {}
         planning_llm = (self.config.get("planning", {}) or {}).get("llm_planning", {}) or {}
 
-        self.model = planning_llm.get("model") or provider_cfg.get("model") or "gpt-4"
+        self.model = planning_llm.get("model") or provider_cfg.get("model") or "o4-mini"
         self.temperature = planning_llm.get("temperature", provider_cfg.get("temperature", 0.7))
-        self.max_tokens = planning_llm.get("max_tokens", provider_cfg.get("max_tokens", 1500))
+        max_tokens_cfg = planning_llm.get("max_tokens", provider_cfg.get("max_tokens", None))
+        max_completion_tokens_cfg = planning_llm.get("max_completion_tokens", provider_cfg.get("max_completion_tokens", None))
+
+        self.max_tokens = None
+        self.max_completion_tokens = None
+        if str(self.model).startswith("o"):
+            # Reasoning models reject `max_tokens`; only use max_completion_tokens when explicitly provided.
+            if max_completion_tokens_cfg is not None:
+                try:
+                    self.max_completion_tokens = int(max_completion_tokens_cfg)
+                except Exception:
+                    self.max_completion_tokens = None
+        else:
+            raw_mt = max_tokens_cfg if max_tokens_cfg is not None else 1500
+            try:
+                self.max_tokens = int(raw_mt) if raw_mt is not None else None
+            except Exception:
+                self.max_tokens = 1500
+        self.reasoning_effort = (
+            planning_llm.get("reasoning_effort")
+            or provider_cfg.get("reasoning_effort")
+            or llm_root.get("reasoning_effort")
+            or os.getenv("OPENAI_REASONING_EFFORT")
+        )
 
         # Prefer explicit YAML config; fall back to environment variable.
         api_key = provider_cfg.get("api_key") or llm_root.get("api_key") or os.getenv("OPENAI_API_KEY")
         base_url = provider_cfg.get("base_url") or llm_root.get("base_url") or "https://api.openai.com/v1"
-        timeout = (llm_root.get("retry", {}) or {}).get("timeout", 30)
+        raw_timeout = (llm_root.get("retry", {}) or {}).get("timeout", None)
+        try:
+            timeout = float(raw_timeout) if raw_timeout is not None else 30.0
+        except Exception:
+            timeout = 30.0
+        if str(self.model).startswith("o") and "openai.com" in str(base_url).lower() and timeout < 120.0:
+            timeout = 120.0
 
+        self.base_url = str(base_url)
+        if self.reasoning_effort is None and str(self.model).startswith("o") and "openai.com" in self.base_url:
+            self.reasoning_effort = "high"
         self.llm_client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
 
     def mark_environment_ready(self, *, sender_jid: Optional[str] = None, payload: Optional[Dict[str, Any]] = None) -> None:
@@ -204,6 +244,14 @@ class InteractionSolverAgent(Agent, IAgent):
         goal_template.set_metadata("type", MessageType.GOAL_REQUEST.value)
         self.add_behaviour(GoalRequestBehaviour(), template=goal_template)
 
+        temp_display = "default" if str(self.model).startswith("o") else self.temperature
+        logger.info(
+            demo("InteractionSolver booting (model=%s, base_url=%s, temperature=%s, reasoning_effort=%s)"),
+            self.model,
+            self.base_url,
+            temp_display,
+            self.reasoning_effort or "default",
+        )
         logger.info("InteractionSolverAgent initialized (pure SPADE + direct LLM planning).")
 
     async def start(self, *args, **kwargs) -> None:
@@ -315,6 +363,16 @@ class InteractionSolverAgent(Agent, IAgent):
                 indent=2,
             )
 
+        # Fast-path: if there is a suitable signifier match for every intent, reuse it to build
+        # a plan directly, without querying EnvExplorer for capabilities/state and without calling the LLM.
+        reused_plan = await self._try_build_plan_from_signifiers(intents, workspace_id=workspace_id)
+        if reused_plan is not None:
+            logger.info(
+                demo("Plan recovered from signifiers (no EnvExplorer context queries, no LLM): steps=%d"),
+                len(reused_plan.get("steps") or []),
+            )
+            return json.dumps(reused_plan, indent=2)
+
         try:
             context = await self._gather_planning_context(intents, workspace_id=workspace_id)
         except Exception as e:
@@ -371,12 +429,20 @@ class InteractionSolverAgent(Agent, IAgent):
             return s
 
         try:
-            completion = await self.llm_client.chat.completions.create(
-                model=self.model,
-                messages=prompt_messages,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            )
+            completion_kwargs: Dict[str, Any] = {
+                "model": self.model,
+                "messages": prompt_messages,
+            }
+            if not str(self.model).startswith("o"):
+                completion_kwargs["temperature"] = self.temperature
+            if self.max_completion_tokens is not None:
+                completion_kwargs["max_completion_tokens"] = self.max_completion_tokens
+            elif self.max_tokens is not None:
+                completion_kwargs["max_tokens"] = self.max_tokens
+            if self.reasoning_effort and str(self.model).startswith("o"):
+                completion_kwargs["reasoning_effort"] = self.reasoning_effort
+
+            completion = await self.llm_client.chat.completions.create(**completion_kwargs)
             content = completion.choices[0].message.content or ""
             content = content.strip()
             json_text = _extract_json_text(content)
@@ -443,11 +509,129 @@ class InteractionSolverAgent(Agent, IAgent):
             }
             return json.dumps(fallback, indent=2)
 
+    async def _try_build_plan_from_signifiers(
+        self, intents: List[str], workspace_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Try to build a JSON-Plan 1.2 directly from signifier matches.
+
+        Notes:
+        - We still query EnvExplorer for SIGNIFIER_MATCH_REQUEST (it hosts the embedded RD4 engine).
+        - We MUST NOT query EnvExplorer for ENV_CAPABILITIES_REQUEST / ENV_STATE_REQUEST in this path.
+        - If any intent has no usable signifier match, return None.
+        """
+        try:
+            signifier_matches = await self._gather_signifier_matches(intents, workspace_id=workspace_id)
+        except Exception:
+            return None
+
+        if not isinstance(signifier_matches, dict) or not signifier_matches:
+            return None
+
+        def _pick_match(intent: str) -> Optional[Dict[str, Any]]:
+            payload = signifier_matches.get(intent)
+            if not isinstance(payload, dict):
+                return None
+            finals = payload.get("final_matches") or []
+            matches = payload.get("matches") or []
+            if not isinstance(finals, list) or not finals:
+                return None
+            if not isinstance(matches, list) or not matches:
+                return None
+
+            chosen_id = str(finals[0])
+            for m in matches:
+                if not isinstance(m, dict):
+                    continue
+                if str(m.get("signifier_id") or "") == chosen_id:
+                    return m
+            return None
+
+        steps: List[Dict[str, Any]] = []
+        for idx, intent in enumerate(intents, start=1):
+            match = _pick_match(intent)
+            if not match:
+                return None
+
+            affordance_uri = str(match.get("affordance_uri") or "").strip()
+            if not affordance_uri:
+                return None
+
+            payload_hint = match.get("payload_hint")
+            payload = payload_hint if isinstance(payload_hint, dict) else {}
+
+            signifier_id = str(match.get("signifier_id") or "").strip()
+            similarity = match.get("intent_similarity")
+
+            cached_aff = self._cached_affordance_by_id.get(affordance_uri)
+            action_name = ""
+            method = None
+            target = None
+            content_type = "application/json"
+            artifact_uri = ""
+
+            if isinstance(cached_aff, dict):
+                action_name = str(cached_aff.get("action_name") or "")
+                method = cached_aff.get("method")
+                target = cached_aff.get("target")
+                content_type = str(cached_aff.get("content_type") or "application/json")
+                artifact_uri = str(cached_aff.get("artifact_id") or "")
+
+            if not action_name:
+                action_name = affordance_uri.rstrip("/").rsplit("/", 1)[-1]
+
+            if not artifact_uri:
+                # Best-effort: derive artifact URI from the affordance URI.
+                try:
+                    prefix, rest = affordance_uri.split("/artifacts/", 1)
+                    artifact_name = rest.split("/", 1)[0]
+                    artifact_uri = f"{prefix}/artifacts/{artifact_name}#artifact"
+                except Exception:
+                    artifact_uri = ""
+
+            # If we don't have a cached affordance form, assume the affordance URI is callable.
+            if target is None:
+                target = affordance_uri
+            if method is None:
+                method = "POST"
+
+            step_meta: Dict[str, Any] = {"reused_from_signifier": True}
+            if signifier_id:
+                step_meta["used_signifier_id"] = signifier_id
+            if similarity is not None:
+                step_meta["used_signifier_similarity"] = similarity
+
+            steps.append(
+                {
+                    "step_id": idx,
+                    "intent": intent,
+                    "artifact_uri": artifact_uri,
+                    "affordance_uri": affordance_uri,
+                    "action_name": action_name,
+                    "method": method,
+                    "target": target,
+                    "content_type": content_type,
+                    "payload": payload,
+                    "metadata": step_meta,
+                    "reasons": [
+                        {
+                            "property": "reused_signifier",
+                            "direction": "set",
+                            "evidence": [],
+                            "why": "Recovered this step from a previously stored Signifier (intent/context match).",
+                        }
+                    ],
+                }
+            )
+
+        return {"plan_version": "1.2", "steps": steps}
+
     async def _gather_planning_context(self, intents: List[str], workspace_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Pull environment context once: affordances and state (from EnvExplorer).
         Returns a dict with capped affordances and optional state snapshot.
         """
+        logger.info(demo("Gathering context from EnvExplorer (workspace_id=%r)"), workspace_id)
         raw_aff, raw_state = await asyncio.gather(
             self._query_env_explorer(
                 message_type=MessageType.ENV_CAPABILITIES_REQUEST.value,
@@ -471,6 +655,17 @@ class InteractionSolverAgent(Agent, IAgent):
         state_payload = _parse_or_empty(raw_state)
 
         affordances = aff_payload.get("affordances") or aff_payload.get("capabilities") or []
+        try:
+            raw_artifacts = state_payload.get("artifacts") if isinstance(state_payload, dict) else None
+            artifacts_count = len(raw_artifacts) if isinstance(raw_artifacts, dict) else 0
+        except Exception:
+            artifacts_count = 0
+
+        logger.info(
+            demo("Context snapshot: affordances=%s artifacts_in_state=%s"),
+            len(affordances) if isinstance(affordances, list) else "?",
+            artifacts_count,
+        )
 
         # Optional workspace scoping (helps multi-workspace disambiguation)
         if workspace_id:
@@ -513,11 +708,106 @@ class InteractionSolverAgent(Agent, IAgent):
                         filtered_artifacts[aid] = ainfo
                 state_payload = {**state_payload, "artifacts": filtered_artifacts}
 
+            logger.info(
+                demo("Workspace scoping applied: affordances=%s artifacts_in_state=%s workspace_id=%r"),
+                len(affordances) if isinstance(affordances, list) else "?",
+                len(state_payload.get("artifacts") or {}) if isinstance(state_payload, dict) else "?",
+                workspace_id,
+            )
+
+        # Optional signifier suggestions (embedded RD4 memory hosted by EnvExplorer).
+        signifier_matches: Dict[str, Any] = {}
+        try:
+            signifier_matches = await self._gather_signifier_matches(intents, workspace_id=workspace_id)
+        except Exception:
+            signifier_matches = {}
+
+        # Cache the most recent context snapshot for future signifier-only planning.
+        # (Best-effort; does not affect normal planning if it fails.)
+        try:
+            self._cached_affordances = affordances if isinstance(affordances, list) else []
+            self._cached_state_payload = state_payload if isinstance(state_payload, dict) else {}
+            self._cached_affordance_by_id = {}
+            if isinstance(self._cached_affordances, list):
+                for a in self._cached_affordances:
+                    if not isinstance(a, dict):
+                        continue
+                    aid = str(a.get("affordance_id") or "").strip()
+                    if aid:
+                        self._cached_affordance_by_id[aid] = a
+        except Exception:
+            pass
+
         return {
             "intents": intents,
             "affordances": affordances,
             "state": state_payload.get("state") or state_payload,
+            "signifier_matches": signifier_matches,
         }
+
+    async def _gather_signifier_matches(self, intents: List[str], workspace_id: Optional[str] = None) -> Dict[str, Any]:
+        """Ask EnvExplorer for signifier matches per intent (best-effort)."""
+        explorer_jid = self.target_jids.get("explorer")
+        if not explorer_jid:
+            return {}
+
+        intents = [str(i).strip() for i in (intents or []) if str(i).strip()]
+        if not intents:
+            return {}
+
+        async def _one(intent: str) -> Dict[str, Any]:
+            raw = await self._query_env_explorer(
+                message_type=MessageType.SIGNIFIER_MATCH_REQUEST.value,
+                body={
+                    "intent": intent,
+                    **({"workspace_id": str(workspace_id)} if workspace_id else {}),
+                    "k": 5,
+                },
+                expect_type=MessageType.SIGNIFIER_MATCH_RESPONSE.value,
+            )
+            try:
+                data = json.loads(raw) if raw else {}
+                return data if isinstance(data, dict) else {}
+            except Exception:
+                return {}
+
+        results = await asyncio.gather(*[_one(i) for i in intents], return_exceptions=True)
+
+        out: Dict[str, Any] = {}
+        for intent, res in zip(intents, results):
+            if isinstance(res, Exception):
+                out[intent] = {"error": "signifier_query_failed", "detail": str(res)}
+            else:
+                out[intent] = res
+
+        # Demo-friendly summary logs (kept compact).
+        for intent, payload in out.items():
+            if not isinstance(payload, dict):
+                continue
+            if payload.get("error"):
+                logger.info(demo("Signifier search failed: intent=%r error=%s"), intent, payload.get("error"))
+                continue
+
+            matches = payload.get("matches") if isinstance(payload.get("matches"), list) else []
+            finals = payload.get("final_matches") if isinstance(payload.get("final_matches"), list) else []
+            total = payload.get("total_signifiers")
+
+            if finals:
+                logger.info(
+                    demo("Signifier search: intent=%r matches=%d final=%d top=%s"),
+                    intent,
+                    len(matches),
+                    len(finals),
+                    finals[0],
+                )
+            else:
+                logger.info(
+                    demo("Signifier search: intent=%r matches=%d final=0 stored_total=%s"),
+                    intent,
+                    len(matches),
+                    total if total is not None else "?",
+                )
+        return out
 
     def _build_planning_prompt(self, intents: List[str], context: Dict[str, Any], workspace_id: Optional[str] = None) -> List[Dict[str, str]]:
         """
@@ -542,8 +832,25 @@ class InteractionSolverAgent(Agent, IAgent):
             "   - Use the provided state snapshot to avoid redundant steps.\n"
             "   - If the current state already satisfies ALL intents, return a strict no-op JSON:\n"
             "     {\"plan_version\":\"1.2\",\"error\":\"already_satisfied\",\"detail\":\"...\",\"steps\":[]}\n"
+            "4b) Signifier-first planning (STRICT):\n"
+            "   - context.signifier_matches is a dict keyed by intent string.\n"
+            "   - Each entry has:\n"
+            "     - matches: list of {signifier_id, affordance_uri, intent_similarity, shacl_conforms, shacl_violations, payload_hint?}\n"
+            "     - final_matches: list of signifier_id (best-first) that passed SHACL.\n"
+            "   - For each intent:\n"
+            "     1) If final_matches is non-empty, pick signifier_id = final_matches[0].\n"
+            "     2) Find the corresponding entry in matches to get affordance_uri and payload_hint.\n"
+            "     3) Use that affordance_uri ONLY if it exists in context.affordances (affordance_id match) and method/target/content_type match.\n"
+            "     4) If payload_hint is present, use it only if it satisfies the selected affordance input_schema; otherwise construct a valid payload.\n"
+            "     5) If the signifier suggestion is unusable for any reason, ignore it and plan normally.\n"
+            "   - Traceability:\n"
+            "     - If you use a signifier for a step, include step.metadata.used_signifier_id and step.metadata.used_signifier_similarity.\n"
+            "     - If you ignore an available final_matches suggestion, include step.metadata.signifier_ignored_reason.\n"
             "5) Evidence:\n"
             "   - Every step must include at least one reasons entry with at least one evidence item grounded in the state.\n"
+            "   - evidence[].artifact MUST be a key from context.state.artifacts.\n"
+            "   - evidence[].property MUST be a full property URI key from that artifact's state dict.\n"
+            "   - evidence[].reading MUST equal the reading from the state snapshot.\n"
             "\n"
             "If you cannot satisfy ALL intents using ONLY the provided affordances, return:\n"
             "{\"plan_version\":\"1.2\",\"error\":\"infeasible\",\"detail\":\"...\",\"steps\":[]}\n"
@@ -564,6 +871,7 @@ class InteractionSolverAgent(Agent, IAgent):
             '      "target": "<hctl:hasTarget URI>",\n'
             '      "content_type": "application/json",\n'
             '      "payload": { },\n'
+            '      "metadata": { },\n'
             '      "reasons": [\n'
             "        {\n"
             '          "property": "<property satisfied>",\n'
@@ -571,7 +879,7 @@ class InteractionSolverAgent(Agent, IAgent):
             '          "evidence": [\n'
             "            {\n"
             '              "artifact": "<sensor-or-artifact URI>",\n'
-            '              "property": "<attribute name>",\n'
+            '              "property": "<property URI>",\n'
             '              "operator": "<lessThan|lessEqual|greaterThan|greaterEqual|equals>",\n'
             '              "threshold": "<number|string>",\n'
             '              "reading": "<number|string>"\n'
@@ -590,11 +898,15 @@ class InteractionSolverAgent(Agent, IAgent):
             **({"workspace_id": workspace_id} if workspace_id else {}),
             "affordances": context.get("affordances", []),
             "state": context.get("state", {}),
+            "signifier_matches": context.get("signifier_matches", {}),
             "instructions": [
                 "Use only provided affordance URIs and methods; do not invent or alter them.",
                 "If workspace_id is provided, only use affordances/artifacts from that workspace.",
+                "Use signifiers strictly: if signifier_matches[intent].final_matches is non-empty, prefer final_matches[0] for that intent when it is usable.",
+                "If you use a signifier, include step.metadata.used_signifier_id and step.metadata.used_signifier_similarity.",
                 "Cover ALL intents. Each step.intent must match exactly one provided intent.",
                 "Include at least one reason with evidence per step.",
+                "Evidence items must use full artifact URIs and full property URIs from the provided state snapshot.",
                 "If missing info, use placeholders but keep JSON valid.",
                 "Respond with JSON only, no markdown, no prose.",
             ],
@@ -696,6 +1008,13 @@ class GoalRequestBehaviour(CyclicBehaviour):
             await self.send(reply)
             return
 
+        logger.info(
+            demo("Received GOAL_REQUEST: intents=%s workspace_id=%r from=%s"),
+            intents,
+            workspace_id,
+            str(msg.sender),
+        )
+
         # Ensure environment is ready before planning.
         env_timeout = float(self.agent.config.get("planning", {}).get("context_gathering", {}).get("timeout", DEFAULT_TIMEOUT))
         ready = await self.agent.await_environment_ready(timeout=env_timeout)
@@ -720,6 +1039,20 @@ class GoalRequestBehaviour(CyclicBehaviour):
             return
 
         plan_json = await self.agent._generate_plan(intents, workspace_id=workspace_id)
+
+        try:
+            parsed_plan = json.loads(plan_json or "{}")
+            steps = parsed_plan.get("steps") if isinstance(parsed_plan, dict) else None
+            step_count = len(steps) if isinstance(steps, list) else 0
+            used_signifiers = 0
+            if isinstance(steps, list):
+                for s in steps:
+                    meta = s.get("metadata") if isinstance(s, dict) else None
+                    if isinstance(meta, dict) and meta.get("used_signifier_id"):
+                        used_signifiers += 1
+            logger.info(demo("Plan created: steps=%d used_signifiers=%d"), step_count, used_signifiers)
+        except Exception:
+            logger.info(demo("Plan created (failed to parse JSON for summary)."))
 
         reply = msg.make_reply()
         reply.set_metadata("type", MessageType.PLAN_CREATED.value)
