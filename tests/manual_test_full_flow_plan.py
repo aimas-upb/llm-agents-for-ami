@@ -164,9 +164,7 @@ class _StripDemoPrefixFilter(logging.Filter):
 
         for token in self._TOKENS:
             if token in msg:
-                new_msg = msg.replace(token, "", 1).lstrip()
-                record.msg = new_msg
-                record.args = ()
+                record.msg = msg.replace(token, "", 1).lstrip()
                 break
         return True
 
