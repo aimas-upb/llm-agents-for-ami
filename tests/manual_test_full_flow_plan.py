@@ -146,6 +146,31 @@ class _DemoOnlyLogFilter(logging.Filter):
         return "[DEMO]" in msg
 
 
+class _StripDemoPrefixFilter(logging.Filter):
+    """Remove the literal [DEMO] prefix (and ANSI variant) from log messages."""
+
+    _TOKENS = (
+        "[DEMO] ",
+        "[DEMO]",
+        "\x1b[1;36m[DEMO]\x1b[0m ",
+        "\x1b[1;36m[DEMO]\x1b[0m",
+    )
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+        try:
+            msg = str(record.msg)
+        except Exception:
+            return True
+
+        for token in self._TOKENS:
+            if token in msg:
+                new_msg = msg.replace(token, "", 1).lstrip()
+                record.msg = new_msg
+                record.args = ()
+                break
+        return True
+
+
 def _configure_console_logging() -> None:
     """
     Make the manual test output readable:
@@ -201,8 +226,28 @@ def _enable_demo_only_logging() -> None:
         handler.addFilter(demo_filter)
 
 
+def _strip_demo_prefix_from_logs() -> None:
+    """Attach a filter that strips the [DEMO] prefix after we've gated logs."""
+    strip_filter = _StripDemoPrefixFilter()
+    root = logging.getLogger()
+    root.addFilter(strip_filter)
+    for handler in list(getattr(root, "handlers", []) or []):
+        handler.addFilter(strip_filter)
+
+
 _configure_console_logging()
 logger = logging.getLogger("ManualFullFlowPlan")
+
+_NO_COLOR = os.getenv("AMI_NO_COLOR") or os.getenv("NO_COLOR")
+_RED = "" if _NO_COLOR else "\033[31m"
+_RESET = "" if _NO_COLOR else "\033[0m"
+
+
+def _print_red_line(text: str) -> None:
+    if _RED:
+        print(f"{_RED}{text}{_RESET}")
+    else:
+        print(str(text))
 
 
 class DummyHMASClient(IHMASClient):
@@ -422,6 +467,7 @@ class OrchestratorAgent(Agent):
             msg.set_metadata("message_type", "llm")
             msg.thread = self.agent.thread_id
             msg.body = text
+            _print_red_line(f"[User Query] {text}")
             await self.send(msg)
             return await self._wait_user_assistant_reply(timeout_s=timeout_s)
 
@@ -464,7 +510,7 @@ class OrchestratorAgent(Agent):
             print("\n" + "=" * 60)
             print("[UserAssistant Workspace Reply]")
             print("-" * 60)
-            print(self.agent.first_reply)
+            _print_red_line(self.agent.first_reply)
             print("=" * 60 + "\n")
 
             # 3) Send a workspace-scoped request (lab308 contains light308 in your environment)
@@ -478,7 +524,7 @@ class OrchestratorAgent(Agent):
             print("\n" + "=" * 60)
             print("[UserAssistant Plan Proposal]")
             print("-" * 60)
-            print(plan_proposal)
+            _print_red_line(plan_proposal)
             print("=" * 60 + "\n")
 
             # 5) Approve the proposed plan
@@ -496,7 +542,7 @@ class OrchestratorAgent(Agent):
             print("\n" + "=" * 60)
             print("[UserAssistant Execution Reply]")
             print("-" * 60)
-            print(self.agent.second_reply)
+            _print_red_line(self.agent.second_reply)
             print("=" * 60 + "\n")
 
             # 7) Query EnvExplorer for recorded signifiers
@@ -821,7 +867,7 @@ class OrchestratorAgent(Agent):
             print("\n" + "=" * 60)
             print("[UserAssistant IMPLICIT Plan Proposal (Reuse)]")
             print("-" * 60)
-            print(proposal)
+            _print_red_line(proposal)
             print("=" * 60 + "\n")
 
             # 4) Approve and execute recovered plan
@@ -835,7 +881,7 @@ class OrchestratorAgent(Agent):
             print("\n" + "=" * 60)
             print("[UserAssistant IMPLICIT Execution Reply (Reuse)]")
             print("-" * 60)
-            print(exec_reply)
+            _print_red_line(exec_reply)
             print("=" * 60 + "\n")
 
             # 5) Verify no new signifier was recorded for the reused plan
@@ -905,7 +951,7 @@ class OrchestratorAgent(Agent):
             print("\n" + "=" * 60)
             print("[UserAssistant Devices Reply]")
             print("-" * 60)
-            print(reply)
+            _print_red_line(reply)
             print("=" * 60 + "\n")
 
             # 2) State query (forces UA <-> EnvExplorer state conversation)
@@ -917,7 +963,7 @@ class OrchestratorAgent(Agent):
             print("\n" + "=" * 60)
             print("[UserAssistant State Reply]")
             print("-" * 60)
-            print(reply)
+            _print_red_line(reply)
             print("=" * 60 + "\n")
 
             # 3) EXPLICIT request (execute to create signifiers)
@@ -929,7 +975,7 @@ class OrchestratorAgent(Agent):
             print("\n" + "=" * 60)
             print("[UserAssistant EXPLICIT Plan Proposal]")
             print("-" * 60)
-            print(proposal)
+            _print_red_line(proposal)
             print("=" * 60 + "\n")
 
             logger.info('DEMO: Approving EXPLICIT plan ("yes")...')
@@ -942,7 +988,7 @@ class OrchestratorAgent(Agent):
             print("\n" + "=" * 60)
             print("[UserAssistant EXPLICIT Execution Reply]")
             print("-" * 60)
-            print(exec_reply)
+            _print_red_line(exec_reply)
             print("=" * 60 + "\n")
 
             # Show state changes via EnvExplorer (no external UI required).
@@ -995,7 +1041,7 @@ class OrchestratorAgent(Agent):
                 print("\n" + "=" * 60)
                 print("[UserAssistant IMPLICIT Plan Proposal]" if attempt == 1 else "[UserAssistant IMPLICIT Plan Proposal (Retry)]")
                 print("-" * 60)
-                print(proposal)
+                _print_red_line(proposal)
                 print("=" * 60 + "\n")
 
                 if _looks_like_plan_confirmation(proposal):
@@ -1026,7 +1072,7 @@ class OrchestratorAgent(Agent):
             print("\n" + "=" * 60)
             print("[UserAssistant IMPLICIT Execution Reply]")
             print("-" * 60)
-            print(exec_reply)
+            _print_red_line(exec_reply)
             print("=" * 60 + "\n")
  
             await self._print_selected_states(
@@ -1062,6 +1108,7 @@ async def main():
     args = _parse_args(sys.argv[1:])
     if args.demo:
         _enable_demo_only_logging()
+        _strip_demo_prefix_from_logs()
 
     xmpp_server = os.getenv("SPADE_SERVER", "localhost")
     password = os.getenv("SPADE_PASSWORD", "password")
