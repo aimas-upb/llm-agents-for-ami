@@ -7,6 +7,7 @@ Classical SPADE agent that crawls, monitors, and manages environment knowledge.
 import asyncio
 import logging
 import json
+import re
 import uuid
 from typing import Any, Dict, List, Optional
 from spade.agent import Agent
@@ -359,6 +360,95 @@ class EnvExplorerAgent(Agent, IAgent):
 
         return context
 
+    def _rd4_intent_compatible(
+        self,
+        *,
+        intent_query: str,
+        signifier_intent: str,
+        affordance_uri: str,
+        payload_hint: Any,
+    ) -> bool:
+        """
+        Heuristic guardrails to prevent obviously wrong signifier reuse.
+
+        Notes:
+        - Embedding similarity (v1) can over-match opposites (e.g., "turn on" vs "turn off")
+          and semantically related but incompatible intents (e.g., "set blinds closedPercentage"
+          vs "set lightIntensity").
+        - This function enforces lightweight lexical/structural checks on top of the matcher.
+        """
+        qi = str(intent_query or "").strip().lower()
+        si = str(signifier_intent or "").strip().lower()
+        au = str(affordance_uri or "").strip().lower()
+
+        # 1) Artifact token compatibility (best-effort).
+        # If both mention artifact-like tokens (e.g. light308, blinds308), require overlap.
+        def _artifact_tokens(s: str) -> set[str]:
+            return set(re.findall(r"\b[a-z_]+[0-9]{1,4}\b", s.lower()))
+
+        q_art = _artifact_tokens(qi)
+        s_art = _artifact_tokens(f"{si} {au}")
+        if q_art and s_art and not (q_art & s_art):
+            return False
+
+        # 2) Polarity guardrails for on/off.
+        if "turn on" in qi and "turn off" in si:
+            return False
+        if "turn off" in qi and "turn on" in si:
+            return False
+
+        # 3) Property-setting intents: require payload/affordance alignment.
+        payload_keys: set[str] = set()
+        if isinstance(payload_hint, dict):
+            # Keep original casing so we can token-split camelCase keys (e.g., lightIntensity).
+            payload_keys = {str(k).strip() for k in payload_hint.keys()}
+
+        is_set_intent = qi.startswith("set ") and " to " in qi
+        if is_set_intent:
+            # If we are "setting" something but the signifier has no payload keys AND
+            # the affordance URI doesn't hint at a setter, treat it as incompatible.
+            if not payload_keys and not any(x in au for x in ("set", "update")):
+                return False
+
+            # Generic property extraction: parse "set <...> <property> to <...>" and
+            # require that the inferred property appears in payload keys (preferred) or
+            # at least in the affordance URI.
+            #
+            # This avoids hardcoding environment-specific property names.
+            try:
+                mid = qi.split(" to ", 1)[0].removeprefix("set ").strip()
+            except Exception:
+                mid = ""
+
+            # Remove artifact-like tokens (e.g. light308) from the middle segment.
+            prop_phrase = " ".join([t for t in mid.split() if t and t not in q_art]).strip()
+
+            def _tokens_from_identifier(s: str) -> set[str]:
+                s = str(s or "").strip()
+                if not s:
+                    return set()
+                # Split camelCase boundaries, underscores, and non-alphanumerics.
+                s = re.sub(r"([a-z])([A-Z])", r"\1 \2", s)
+                s = s.replace("_", " ")
+                parts = re.findall(r"\b[a-z0-9]+\b", s.lower())
+                # Drop very short tokens to reduce noise.
+                return {p for p in parts if len(p) >= 3}
+
+            prop_tokens = _tokens_from_identifier(prop_phrase)
+            if prop_tokens:
+                # Compare against payload keys (best signal) and affordance URI as fallback.
+                aff_tokens = _tokens_from_identifier(au.rsplit("/", 1)[-1])
+                key_token_sets = [_tokens_from_identifier(k) for k in payload_keys] if payload_keys else []
+
+                if payload_keys:
+                    if not any(prop_tokens & ks for ks in key_token_sets):
+                        return False
+                else:
+                    if not (prop_tokens & aff_tokens):
+                        return False
+
+        return True
+
     async def _rd4_list_signifiers(self) -> Dict[str, Any]:
         await self._ensure_rd4_engine_ready()
 
@@ -455,11 +545,20 @@ class EnvExplorerAgent(Agent, IAgent):
             structured = getattr(getattr(s, "intent", None), "structured", None)
             payload_hint = structured.get("payload") if isinstance(structured, dict) else None
 
+            signifier_intent = getattr(s.intent, "nl_text", "")
+            if not self._rd4_intent_compatible(
+                intent_query=intent,
+                signifier_intent=signifier_intent,
+                affordance_uri=s.affordance_uri,
+                payload_hint=payload_hint,
+            ):
+                continue
+
             matches.append(
                 {
                     "signifier_id": s.signifier_id,
                     "affordance_uri": s.affordance_uri,
-                    "intent": getattr(s.intent, "nl_text", ""),
+                    "intent": signifier_intent,
                     "intent_similarity": round(float(match.similarity), 4),
                     "matcher_version": version_to_use,
                     "shacl_conforms": shacl_conforms,

@@ -94,6 +94,7 @@ env_explorer:
     # Signifier matching
     intent_similarity_threshold: 0.8
     context_matching_enabled: true
+    matcher_version: "v1"
 
     # Signifier extraction from plans
     extract_from_behavior_trees: true

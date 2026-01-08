@@ -74,7 +74,7 @@ class UserAssistantAgent(LLMAgent, IAgent):
         if not api_key:
             raise ValueError("Missing OpenAI API key. Set OPENAI_API_KEY or llm.providers.openai.api_key in agents.yaml.")
 
-        model = provider_cfg.get("model") or "o4-mini"
+        model = provider_cfg.get("model") or "o3"
         temperature = provider_cfg.get("temperature", 0.7)
         max_tokens = provider_cfg.get("max_tokens", None)
         max_completion_tokens = provider_cfg.get("max_completion_tokens", None)

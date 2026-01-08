@@ -79,7 +79,7 @@ Prereqs:
 - A running Yggdrasil instance (default http://localhost:8080/ or set YGGDRASIL_URL).
 
 Notes:
-- This test defaults to the OpenAI model `o4-mini` (unless overridden by OPENAI_MODEL).
+- This test defaults to the OpenAI model `o3` (unless overridden by OPENAI_MODEL).
 - For reasoning models (`o*`), this test sets `reasoning_effort=high` by default (override via OPENAI_REASONING_EFFORT).
 - If you are using a non-OpenAI provider, set OPENAI_BASE_URL + OPENAI_MODEL accordingly.
 """
@@ -89,6 +89,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import shutil
 import sys
 import uuid
@@ -308,6 +309,11 @@ def _env_flag(name: str) -> bool:
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Manual full-flow test runner (thesis demo friendly).")
+    env_min_similarity = os.getenv("SIGNIFIER_MIN_SIMILARITY", "").strip()
+    try:
+        env_min_similarity_f = float(env_min_similarity) if env_min_similarity else None
+    except Exception:
+        env_min_similarity_f = None
     p.add_argument(
         "--sequence",
         default=None,
@@ -334,14 +340,20 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument(
         "--signifier-matcher",
         choices=("v0", "v1"),
-        default="v1",
-        help="Intent matcher version for the embedded RD4 engine (default: v1).",
+        default=os.getenv("SIGNIFIER_MATCHER_VERSION", "").strip() or "v1",
+        help=(
+            "Intent matcher version for the embedded RD4 engine (default: v1). "
+            "Can also be set via SIGNIFIER_MATCHER_VERSION."
+        ),
     )
     p.add_argument(
         "--signifier-min-similarity",
         type=float,
-        default=0.75,
-        help="Minimum intent similarity threshold for signifier reuse (default: 0.75).",
+        default=env_min_similarity_f if env_min_similarity_f is not None else 0.75,
+        help=(
+            "Minimum intent similarity threshold for signifier matching/reuse "
+            "(default: 0.75). Can also be set via SIGNIFIER_MIN_SIMILARITY."
+        ),
     )
     p.add_argument(
         "--demo",
@@ -1044,7 +1056,13 @@ class OrchestratorAgent(Agent):
                 return
 
             def _looks_like_plan_confirmation(text: str) -> bool:
-                return "does this plan look good to you" in str(text or "").lower()
+                s = " ".join(str(text or "").strip().lower().split())
+                return bool(
+                    re.search(
+                        r"\bdoes\s+(this|that|the)\s+(plan\s+)?look\s+(good|ok|okay)(\s+to\s+you)?(?=\s*(?:[?.!]|$))",
+                        s,
+                    )
+                )
 
             # If UA returns an unexpected plan-management message (e.g., discarding a stale pending plan),
             # retry once so the demo can continue deterministically.
@@ -1169,10 +1187,15 @@ async def main():
             "min_similarity": float(args.signifier_min_similarity),
         },
     }
+    if args.signifier_matcher or args.signifier_min_similarity is not None:
+        env_config["signifiers"] = {
+            **({"matcher_version": args.signifier_matcher} if args.signifier_matcher else {}),
+            **({"min_similarity": float(args.signifier_min_similarity)} if args.signifier_min_similarity is not None else {}),
+        }
 
     # UserAssistant and Solver configs (new agents.yaml-compatible structure)
     # Default model requested by user:
-    model = os.getenv("OPENAI_MODEL", "o4-mini")
+    model = os.getenv("OPENAI_MODEL", "o3")
     # This model name is typically served via OpenRouter's OpenAI-compatible API.
     base_url = os.getenv("OPENAI_BASE_URL")
     if not base_url:
@@ -1219,7 +1242,7 @@ async def main():
                 **({} if model.startswith("o") else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS", "1500"))}),
                 **({"reasoning_effort": reasoning_effort} if reasoning_effort else {}),
             },
-            "context_gathering": {"timeout": 10},
+            "context_gathering": {"timeout": 60},
         },
     }
 

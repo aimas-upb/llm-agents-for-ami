@@ -46,7 +46,7 @@ XMPP_PORT = int(os.getenv("SPADE_PORT", "5222"))
 
 # LLM settings (OpenAI-compatible)
 LLM_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-LLM_MODEL = os.getenv("OPENAI_MODEL", "o4-mini")
+LLM_MODEL = os.getenv("OPENAI_MODEL", "o3")
 LLM_REASONING_EFFORT = os.getenv("OPENAI_REASONING_EFFORT", "").strip() or (
     "high" if LLM_MODEL.startswith("o") and "openai.com" in LLM_BASE_URL else ""
 )

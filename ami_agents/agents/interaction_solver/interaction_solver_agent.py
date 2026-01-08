@@ -41,9 +41,9 @@ You will be given environment context (affordances + state) in the user message.
 
 MULTI-INTENT RULE (STRICT):
 - The plan must satisfy ALL provided intents.
-- Each step.intent MUST match exactly one of the provided intents.
+- Each step.intent MUST match exactly one of the provided intents (do not rephrase, change case, or combine intents).        
 - If you cannot satisfy all intents using the provided affordances, return a strict failure JSON:
-  {"plan_version":"1.2","error":"infeasible","detail":"...","steps":[]}
+  {"plan_version":"1.2","error":"infeasible","detail":"...","steps":[]}   
 
 PLAN FORMAT  JSON-Plan 1.2
 ---------------------------
@@ -81,9 +81,11 @@ PLAN FORMAT  JSON-Plan 1.2
 }
 
 Rules:
- - Always set plan_version to "1.2".
+  - Always set plan_version to "1.2".
   - Every step must include at least one reasons entry with at least one evidence item.
   - Use complete, non-fabricated URIs. If absent, clearly indicate placeholders.
+  - Payload values MUST be valid JSON types: use numbers for numeric values (not quoted strings), booleans for true/false.
+  - When setting a parameter, the payload keys MUST match the affordance payload schema exactly (including casing).
   - Use ASCII only in all string fields (no curly quotes, no em/en dashes, no ellipsis character).
   - Output only the JSON plan (no additional prose). If no plan is feasible, return a JSON with plan_version=1.2, error, detail, steps=[].
 """
@@ -135,7 +137,7 @@ class InteractionSolverAgent(Agent, IAgent):
         provider_cfg = (llm_root.get("providers", {}) or {}).get(provider_name, {}) or {}
         planning_llm = (self.config.get("planning", {}) or {}).get("llm_planning", {}) or {}
 
-        self.model = planning_llm.get("model") or provider_cfg.get("model") or "o4-mini"
+        self.model = planning_llm.get("model") or provider_cfg.get("model") or "o3"
         self.temperature = planning_llm.get("temperature", provider_cfg.get("temperature", 0.7))
         max_tokens_cfg = planning_llm.get("max_tokens", provider_cfg.get("max_tokens", None))
         max_completion_tokens_cfg = planning_llm.get("max_completion_tokens", provider_cfg.get("max_completion_tokens", None))

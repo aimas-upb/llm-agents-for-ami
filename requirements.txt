@@ -37,6 +37,10 @@ pydantic>=2.12.0
 rdflib>=7.0.0
 owlready2>=0.46
 
+# Embedded RD4 signifier engine (SHACL + optional embedding matcher)
+pyshacl>=0.28.0
+sentence-transformers>=3.3.1  # required for matcher_version=v1
+
 # Logging and Monitoring
 structlog>=25.5.0
 
@@ -45,7 +49,7 @@ pytest>=8.0.0
 pytest-asyncio>=0.23.0
 pytest-cov>=4.1.0
 
-# # Development (optional)
-# black>=24.10.0
-# flake8>=7.1.1
-# mypy>=1.13.0
+# Development (optional)
+black>=24.10.0
+flake8>=7.1.1
+mypy>=1.13.0

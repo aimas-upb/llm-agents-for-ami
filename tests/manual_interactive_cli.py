@@ -307,7 +307,7 @@ async def main():
         },
     }
 
-    model = os.getenv("OPENAI_MODEL", "o4-mini")
+    model = os.getenv("OPENAI_MODEL", "o3")
     base_url = os.getenv("OPENAI_BASE_URL")
     if not base_url:
         base_url = "https://openrouter.ai/api/v1" if ":" in model or "/" in model else "https://api.openai.com/v1"
