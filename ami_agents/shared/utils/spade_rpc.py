@@ -139,7 +139,7 @@ async def rpc_call(
     request_type: str,
     body: Any,
     expect_type: str,
-    timeout: float = 10.0,
+    timeout: float = 30.0,
     thread: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
 ) -> RpcResult:
@@ -197,4 +197,3 @@ async def rpc_call(
         # ensure we don't leak pending entries if the awaiter is cancelled
         if future.cancelled():
             router.unregister(correlation_id)
-
