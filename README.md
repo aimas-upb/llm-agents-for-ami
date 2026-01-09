@@ -1,6 +1,14 @@
 # AMI Agents - LLM-Powered Ambient Intelligence
 
-LLM-powered agents in a Hypermedia Multi-Agent System (HMAS), focused on Ambient Intelligence (AmI) applications.
+AAMAS 2026 demo for LLM-powered agents in a Hypermedia Multi-Agent System (HMAS), focused on Ambient Intelligence (AmI) applications.
+
+This demonstrator presents an end-to-end interaction workflow that integrates a simulated HomeAssistant smart environment deployment, its hypermedia-based semantic representation, and the AmI HMAS framework agents supporting both explicit and implicit user requests. The HomeAssistant deployment is configured with a smart light, motorized blinds, and indoor / outdoor environmental sensors.
+
+With the HomeAssistant interface running, the mapping engine is launched, automatically translating the HomeAssistant configuration into a TD-based Hypermedia Environment. The resulting RDF model is inspected through a web browser, illustrating how devices, states, and affordances are exposed as navigable semantic resources.
+
+Next, the AmI HMAS agents are started. Logs illustrate agent initialization, exploration of the hypermedia environment, and discovery of available artifacts. User-driven interactions are then demonstrated. The user first queries the state of the smart light, revealing the interaction between UserAssistant and EnvExplorer for state retrieval. An explicit command to adjust the light and blinds is subsequently issued, classified as unambiguous, executed directly, and stored as a signifier linking the user goal to concrete affordances. 
+
+The handling of implicit requests is then showcased. With the room in a state of low light conditions, the user complains about insufficient illumination. In the absence of a prior Signifier, the system explores relevant affordances, proposes a plan to increase brightness, validates it with the user, executes it, and records the resulting Signifier. When a similar, but differently phrased, implicit request is later issued, the previously learned Signifier is reused to recover and execute the plan directly, demonstrating experience-based adaptation without additional environment exploration.
 
 [Reference document](https://docs.google.com/document/d/1JYpx-sBP1SLu42xdmnWWiPL_kFRihx7WUkXE6ZyaVy0/edit?tab=t.0) for the design of frameworks and TODOs.
 
