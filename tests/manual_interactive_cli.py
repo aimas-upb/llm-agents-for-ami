@@ -34,6 +34,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from ami_agents.shared.utils import spade_compat  # noqa: F401
 from ami_agents.agents.env_explorer.env_explorer_agent import EnvExplorerAgent
 from ami_agents.agents.interaction_solver.interaction_solver_agent import InteractionSolverAgent
 from ami_agents.agents.user_assistant.user_assistant_agent import UserAssistantAgent
