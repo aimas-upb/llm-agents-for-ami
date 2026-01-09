@@ -6,6 +6,9 @@ import json
 import asyncio
 import contextlib
 import urllib.parse
+import uuid
+import httpx
+import urllib.parse
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
@@ -32,6 +35,8 @@ HTV    = Namespace("http://www.w3.org/2011/http#")
 JACAMO = Namespace("https://purl.org/hmas/jacamo/")
 TD     = Namespace("https://www.w3.org/2019/wot/td#")
 
+WEBHOOK_VERIFY_TIMEOUT = 5.0 # seconds for webhook verification requests
+
 # XSD value type URIs for event payloads
 XSD_BOOL   = "http://www.w3.org/2001/XMLSchema#boolean"
 XSD_INT    = "http://www.w3.org/2001/XMLSchema#integer"
@@ -48,10 +53,12 @@ if not HA_BASE_URL:
     HA_BASE_URL = HA_URL.replace("ws://", "http://").replace("wss://", "https://").split("/api/websocket")[0]
 
 # Event forwarder configuration
-MONITOR_URL = os.getenv("MONITOR_URL", os.getenv("FORWARD_URL", ""))  # destination to POST event JSON / reset
-EXPLORER_URL = os.getenv("EXPLORER_URL", "")  # Environment Explorer base URL for admin reset
 AREAS = {a.strip() for a in os.getenv("AREAS", "").split(",") if a.strip()}  # allowed area_ids
 BASE_WS_URI = os.getenv("BASE_WS_URI", BASE_FALLBACK)  # e.g., https://example.org/ws/lab
+
+# In-memory store for WebSub subscriptions
+# In a production environment, this would be a persistent database
+subscriptions: Dict[str, Dict[str, Any]] = {}
 
 app = FastAPI(title="Yggdrasil to Home Assistant adapter")
 app.add_middleware(
@@ -74,15 +81,6 @@ async def _shutdown():
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError, Exception):
             await task
-    # Reset external monitors/explorers on shutdown
-    try:
-        await _post_monitor_reset()
-    except Exception as e:
-        print("Shutdown monitor reset failed:", e)
-    try:
-        await _post_explorer_reset()
-    except Exception as e:
-        print("Shutdown explorer reset failed:", e)
     await ha_client.close()
     await ha_rest.close()
 
@@ -426,10 +424,61 @@ async def _build_entity_area_map() -> Tuple[Dict[str, str], Dict[str, str], Dict
     finally:
         await ws.close()
 
+async def distribute_to_websub_subscribers(http_client: httpx.AsyncClient, event_payload: Dict[str, Any]):
+    """
+    Distributes an event payload to all active WebSub subscribers
+    whose topics match the event's artifact URI.
+    """
+    artifact_uri = event_payload.get("artifactUri")
+    if not artifact_uri:
+        print("WebSub distributor: Event payload missing artifactUri, skipping distribution.")
+        return
+
+    # Derive workspace URI from artifact URI for hierarchical matching
+    # Expected format: .../workspaces/{id}/artifacts/{name}#artifact
+    workspace_uri = None
+    if "/artifacts/" in artifact_uri:
+        workspace_uri = artifact_uri.split("/artifacts/")[0]
+
+    # Iterate over a copy to prevent issues if subscriptions change during iteration
+    for sub_id, sub in list(subscriptions.items()):
+        topic = sub.get("topic")
+        should_notify = False
+        
+        # 1. Exact match (Artifact subscription)
+        if topic == artifact_uri:
+            should_notify = True
+        # 2. Workspace match (Workspace subscription)
+        elif workspace_uri and (topic == workspace_uri or topic == f"{workspace_uri}#workspace"):
+             should_notify = True
+             
+        if should_notify:
+            callback_url = sub.get("callback")
+            if not callback_url:
+                print(f"WebSub distributor: Subscription {sub_id} missing callback URL.")
+                continue
+
+            try:
+                print(f"WebSub distributor: Posting event for {artifact_uri} to callback: {callback_url}")
+                r = await http_client.post(
+                    callback_url,
+                    json=event_payload,
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-WebSub-Topic": artifact_uri, # Custom header for context
+                    },
+                    timeout=5 # Short timeout for callbacks
+                )
+                r.raise_for_status()
+                print(f"WebSub distributor: Successfully delivered event to {callback_url} (Status: {r.status_code})")
+            except httpx.RequestError as e:
+                print(f"WebSub distributor: Failed to deliver event to {callback_url} for topic {artifact_uri}: Network error: {e}")
+            except httpx.HTTPStatusError as e:
+                print(f"WebSub distributor: Failed to deliver event to {callback_url} for topic {artifact_uri}: HTTP error: {e.response.status_code} - {e.response.text[:100]}")
+            except Exception as e:
+                print(f"WebSub distributor: An unexpected error occurred while delivering event to {callback_url}: {e}")
+
 async def _event_forwarder_task():
-    if not MONITOR_URL:
-        print("Forwarder disabled: MONITOR_URL is not set")
-        return  # forwarding disabled
     ent_to_area, ent_to_device, dev_by_id, ent_by_id = await _build_entity_area_map()
     print("Starting event forwarder task; areas=", (sorted(AREAS) if AREAS else "ALL"))
     async with httpx.AsyncClient(timeout=10) as http:
@@ -448,6 +497,8 @@ async def _event_forwarder_task():
                         continue
                     data = ev.get("data", {})
                     entity_id = data.get("entity_id")
+                    if entity_id != "sensor.clock_308":
+                        print(f"DEBUG: Received state_changed for {entity_id}") # Debug 1
                     new      = data.get("new_state") or {}
                     state    = new.get("state")
                     attrs    = new.get("attributes", {})
@@ -456,6 +507,7 @@ async def _event_forwarder_task():
                         continue
                     area_id = ent_to_area.get(entity_id)
                     if not area_id or (AREAS and area_id not in AREAS):
+                        print(f"Dropped event for {entity_id}: area_id={area_id} (Allowed: {AREAS})")
                         continue
                     # Determine artifact name from device name; fallback to object_id
                     entity_meta = ent_by_id.get(entity_id)
@@ -475,19 +527,12 @@ async def _event_forwarder_task():
                         "timestamp": tstamp,
                         "triggerUri": trigger_uri,
                     }
-                    try:
-                        #print("Forwarder posting to", MONITOR_URL, "payload:", payload)
-                        r = await http.post(
-                            MONITOR_URL,
-                            json=payload,
-                            headers={
-                                "X-Notification-Type": "ArtifactObsPropertyUpdated",
-                                "Content-Type": "application/json",
-                            },
-                        )
-                        r.raise_for_status()
-                    except Exception as e:
-                        print(f"Forwarding failed for {entity_id}: {e}")
+                    
+                    # Suppress noisy debug logs for the hardcoded lab clock sensor
+                    if entity_id != "sensor.clock_308":
+                        print(f"DEBUG: Forwarding event for {entity_id} to WebSub. Topic: {artifact_uri}") # Debug 2
+                    # Distribute to WebSub subscribers
+                    await distribute_to_websub_subscribers(http, payload)
             except asyncio.CancelledError:
                 print("Forwarder task cancelled; exiting loop")
                 break
@@ -499,113 +544,23 @@ async def _event_forwarder_task():
                     with contextlib.suppress(Exception):
                         await ws.close()
 
-async def _post_with_retries(url: str, what: str, max_retries: int = 5):
-    delays = [0, 1, 2, 4, 8]
-    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-        for attempt in range(max_retries):
-            try:
-                if delays[attempt]:
-                    await asyncio.sleep(delays[attempt])
-                print(f"POST {what} attempt {attempt+1}/{max_retries} → {url}")
-                r = await client.post(url)
-                print(f"{what} status: {r.status_code} body: {r.text[:200]}")
-                r.raise_for_status()
-                return True
-            except Exception as e:
-                print(f"{what} failed on attempt {attempt+1}: {e}")
-        return False
 
-async def _post_monitor_reset():
-    if not MONITOR_URL:
-        return
-    reset_url = MONITOR_URL if MONITOR_URL.rstrip('/').endswith('/reset') else MONITOR_URL.rstrip('/') + '/reset'
-    await _post_with_retries(reset_url, "monitor reset")
-
-async def _post_explorer_reset():
-    if not EXPLORER_URL:
-        return
-    reset_url = EXPLORER_URL if EXPLORER_URL.rstrip('/').endswith('/admin/reset') else EXPLORER_URL.rstrip('/') + '/admin/reset'
-    await _post_with_retries(reset_url, "explorer reset")
-
-async def _register_known_artifacts_to_monitor():
-    """On startup, send current known artifact property values to the monitor.
-    Filters by AREAS; uses same payload shape and headers as the forwarder.
-    """
-    if not MONITOR_URL or not AREAS:
-        return
-    try:
-        ent_to_area, ent_to_device, dev_by_id, ent_by_id = await _build_entity_area_map()
-        states = await ha_rest.get_states()
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            for st in states:
-                entity_id = st.get("entity_id")
-                area_id = ent_to_area.get(entity_id)
-                if not area_id or area_id not in AREAS:
-                    continue
-                state = st.get("state")
-                if state in (None, "unknown", "unavailable"):
-                    continue
-                attrs = st.get("attributes", {}) or {}
-                entity_meta = ent_by_id.get(entity_id)
-                artifact_label = _entity_display_name(entity_meta, dev_by_id)
-                artifact_name = urllib.parse.quote(artifact_label, safe="")
-                prop = attrs.get("device_class") or "state"
-                value, xtype = _infer_value_and_type(state)
-                artifact_profile = f"{BASE_WS_URI.rstrip('/')}/workspaces/{area_id}/artifacts/{artifact_name}"
-                artifact_uri = f"{artifact_profile}#artifact"
-                property_uri = f"{artifact_profile}/props/{prop}"
-                trigger_uri = f"{artifact_profile}/actions/read"
-                payload = {
-                    "artifactUri": artifact_uri,
-                    "propertyUri": property_uri,
-                    "value": value,
-                    "valueTypeUri": xtype,
-                    "timestamp": st.get("last_changed") or st.get("last_updated") or "",
-                    "triggerUri": trigger_uri,
-                }
-                try:
-                    print("Initial monitor register posting to", MONITOR_URL, "payload:", payload)
-                    r = await client.post(
-                        MONITOR_URL,
-                        json=payload,
-                        headers={
-                            "X-Notification-Type": "ArtifactObsPropertyUpdated",
-                            "Content-Type": "application/json",
-                        },
-                    )
-                    r.raise_for_status()
-                except Exception as e:
-                    print("Initial monitor register failed for", entity_id, "error:", e)
-    except Exception as e:
-        print("Initial monitor registration failed:", e)
 
 @app.on_event("startup")
 async def _startup_forwarder():
-    print(f"App startup: MONITOR_URL={'set' if MONITOR_URL else 'unset'}, EXPLORER_URL={'set' if EXPLORER_URL else 'unset'}, AREAS={sorted(AREAS) if AREAS else 'ALL'}, BASE_WS_URI={BASE_WS_URI}")
-    # Fire-and-forget reset
-    asyncio.create_task(_post_monitor_reset())
-    asyncio.create_task(_post_explorer_reset())
-    asyncio.create_task(_register_known_artifacts_to_monitor())
-    # Fire-and-forget registration for requested areas
-    if EXPLORER_URL and AREAS:
-        for area_id in AREAS:
-            asyncio.create_task(_register_workspace_to_explorer(area_id))
-    if MONITOR_URL:
-        app.state.forward_task = asyncio.create_task(_event_forwarder_task())
-        print("Forwarder task scheduled")
-    else:
-        print("Forwarder not scheduled: MONITOR_URL is unset")
+    print(f"App startup: AREAS={sorted(AREAS) if AREAS else 'ALL'}, BASE_WS_URI={BASE_WS_URI}")
+    
+    app.state.forward_task = asyncio.create_task(_event_forwarder_task())
+    print("Forwarder task scheduled")
 
 # Simple status endpoint for debugging forwarder
 @app.get("/_forwarder/status")
 async def forwarder_status():
     task = getattr(app.state, "forward_task", None)
     return {
-        "enabled": bool(MONITOR_URL),
         "areas": sorted(AREAS) if AREAS else [],
         "baseWsUri": BASE_WS_URI,
         "taskRunning": bool(task) and not task.done(),
-        "monitorUrl": MONITOR_URL,
     }
 
 @app.get("/workspaces/{workspace_id}", response_class=Response,
@@ -932,29 +887,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
         print(exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
-# -------- Utilities (Explorer registration) --------
-async def _register_workspace_to_explorer(area_id: str):
-    if not EXPLORER_URL:
-        return
-    try:
-        devices, entities = await _get_workspace_devices_and_entities(area_id)
-        base = BASE_WS_URI.rstrip("/")
-        artifact_uris = []
-        device_map = {d["id"]: d for d in devices}
-        for ent in entities:
-            label = ent.get("_artifact_label") or _entity_display_name(ent, device_map)
-            safe_name = ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
-            artifact_uris.append(f"{base}/workspaces/{area_id}/artifacts/{safe_name}#artifact")
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-            for uri in artifact_uris:
-                try:
-                    print("Explorer register: sending", uri, "to", EXPLORER_URL)
-                    r = await client.post(EXPLORER_URL, json={"uri": uri}, headers={"Content-Type": "application/json"})
-                    r.raise_for_status()
-                except Exception as e:
-                    print("Explorer register failed for", uri, "error:", e)
-    except Exception as exc:
-        print("Explorer registration failed for area", area_id, "error:", exc)
+
 
 async def _ensure_entity(workspace_id: str, artifact_name: str, domain: str) -> str:
     _, device_entities, _, _ = await _resolve_device_and_entities(workspace_id, artifact_name)
@@ -1070,15 +1003,153 @@ async def action_ha_service(workspace_id: str, artifact_name: str, domain: str, 
     return Response(content="Action succeeded:")
 
 # Jacamo/WebSub stubs
-@app.post("/workspaces/{workspace_id}/focus")
+@app.api_route("/workspaces/{workspace_id}/focus", methods=["POST", "GET"])
 async def focus_workspace(workspace_id: str, request: Request):
-    _ = await request.json()
-    return Response(content="Action succeeded:")
+    """
+    Handle Jacamo Focus action by registering a WebSub subscription.
+    
+    Payload expected:
+    {
+        "artifactName": "optional, if focusing on specific artifact",
+        "callbackUrl": "required, where to send events"
+    }
+    """
+    if request.method == "GET":
+        body = dict(request.query_params)
+    else:
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        
+    callback_url = body.get("callbackUrl")
+    # if not callback_url:
+    #    raise HTTPException(status_code=400, detail="callbackUrl is required")
+        
+    artifact_name = body.get("artifactName")
+    
+    # Determine Topic URI using configured BASE_WS_URI
+    base = BASE_WS_URI.rstrip("/")
+    
+    if artifact_name:
+        # Resolve artifact URI
+        # Check if artifact exists in the workspace
+        try:
+            await _resolve_device_and_entities(workspace_id, artifact_name)
+        except HTTPException:
+             pass
+
+        safe_name = urllib.parse.quote(artifact_name, safe="")
+        topic = f"{base}/workspaces/{workspace_id}/artifacts/{safe_name}#artifact"
+    else:
+        # Workspace focus
+        topic = f"{base}/workspaces/{workspace_id}"
+        
+    if callback_url:
+        # Register subscription directly
+        subscription_id = f"{topic}-{callback_url}"
+        subscriptions[subscription_id] = {
+            "topic": topic,
+            "callback": callback_url,
+            "lease_seconds": None, # Infinite focus until explicit unfocus/unsubscribe
+            "timestamp": asyncio.get_event_loop().time(),
+            "type": "focus"
+        }
+        print(f"Agent focused on {topic} -> {callback_url}")
+    else:
+        print(f"Agent focused on {topic} (no callback)")
+
+    return Response(content="Focus succeeded")
 
 @app.post("/hub/")
 async def hub(request: Request):
-    _ = await request.json()
-    return Response(content="Action succeeded:")
+    """
+    Handles WebSub subscribe and unsubscribe requests.
+    Implements the hub's side of the WebSub protocol for intent verification.
+    """
+    form_data = await request.form()
+    
+    hub_mode = form_data.get("hub.mode")
+    hub_topic = form_data.get("hub.topic")
+    hub_callback = form_data.get("hub.callback")
+    hub_lease_seconds = form_data.get("hub.lease_seconds")
+    hub_secret = form_data.get("hub.secret")
+
+    if not all([hub_mode, hub_topic, hub_callback]):
+        raise HTTPException(
+            status_code=400,
+            detail="Missing required WebSub parameters: hub.mode, hub.topic, hub.callback"
+        )
+
+    print(f"WebSub request: mode={hub_mode}, topic={hub_topic}, callback={hub_callback}")
+
+    # Intent Verification
+    challenge = str(uuid.uuid4())
+    verify_params = {
+        "hub.mode": hub_mode,
+        "hub.topic": hub_topic,
+        "hub.callback": hub_callback,
+        "hub.challenge": challenge,
+    }
+    if hub_lease_seconds:
+        verify_params["hub.lease_seconds"] = hub_lease_seconds
+
+    try:
+        async with httpx.AsyncClient(timeout=WEBHOOK_VERIFY_TIMEOUT) as client:
+            print(f"Sending intent verification GET to {hub_callback} with params: {verify_params}")
+            verify_response = await client.get(hub_callback, params=verify_params)
+            verify_response.raise_for_status()
+
+            if verify_response.text != challenge:
+                print(f"Intent verification failed: Challenge mismatch for callback {hub_callback}")
+                raise HTTPException(
+                    status_code=409, # Conflict
+                    detail="Intent verification challenge response mismatch"
+                )
+            print(f"Intent verification successful for callback {hub_callback}")
+
+    except httpx.RequestError as e:
+        print(f"Intent verification failed: Network error connecting to {hub_callback}: {e}")
+        raise HTTPException(
+            status_code=412, # Precondition Failed
+            detail=f"Intent verification failed: Network error connecting to callback URL: {e}"
+        )
+    except httpx.HTTPStatusError as e:
+        print(f"Intent verification failed: HTTP error from {hub_callback}: {e}")
+        raise HTTPException(
+            status_code=412, # Precondition Failed
+            detail=f"Intent verification failed: HTTP error from callback URL: {e}"
+        )
+
+    subscription_id = f"{hub_topic}-{hub_callback}" # Simple unique ID for now
+
+    if hub_mode == "subscribe":
+        subscriptions[subscription_id] = {
+            "topic": hub_topic,
+            "callback": hub_callback,
+            "lease_seconds": int(hub_lease_seconds) if hub_lease_seconds else None,
+            "secret": hub_secret,
+            "timestamp": asyncio.get_event_loop().time(), # Store subscription time
+        }
+        print(f"Subscription added for topic: {hub_topic}, callback: {hub_callback}")
+        return Response(status_code=202, content="Subscribed")
+
+    elif hub_mode == "unsubscribe":
+        if subscription_id in subscriptions:
+            del subscriptions[subscription_id]
+            print(f"Unsubscription successful for topic: {hub_topic}, callback: {hub_callback}")
+            return Response(status_code=202, content="Unsubscribed")
+        else:
+            print(f"Unsubscription failed: No active subscription found for topic: {hub_topic}, callback: {hub_callback}")
+            raise HTTPException(
+                status_code=404,
+                detail="No active subscription found for this topic and callback."
+            )
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid hub.mode. Must be 'subscribe' or 'unsubscribe'."
+        )
 
 # PUT/DELETE artifact representation stubs
 @app.put("/workspaces/{workspace_id}/artifacts/{artifact_name}")
@@ -1091,7 +1162,7 @@ async def delete_artifact_representation(workspace_id: str, artifact_name: str):
     return Response(content="Action succeeded:")
 
 # Dynamic sensor/binary sensor actions
-@app.post("/workspaces/{workspace_id}/artifacts/{artifact_name}/{action_name}")
+@app.api_route("/workspaces/{workspace_id}/artifacts/{artifact_name}/{action_name}", methods=["POST", "GET"])
 async def action_sensor_dynamic(workspace_id: str, artifact_name: str, action_name: str):
     _, device_entities, _, _ = await _resolve_device_and_entities(workspace_id, artifact_name)
     sensor_ent = _pick_entity(device_entities, "sensor")

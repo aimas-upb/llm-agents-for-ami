@@ -44,9 +44,6 @@ export HA_URL="ws://localhost:8123/api/websocket"
 export HA_TOKEN="<your-long-lived-access-token>"  # Profile → Security → Create Token
 export AREAS="lab308"                              # area_id created above
 export BASE_WS_URI="http://localhost:8080"        # public base for adapter URIs
-# Optional monitor/explorer endpoints
-export MONITOR_URL="http://localhost:8081"
-export EXPLORER_URL="http://localhost:8082"
 ```
 
 ## 6) Start the adapter
@@ -54,11 +51,6 @@ export EXPLORER_URL="http://localhost:8082"
 source prepare-adapter-env.sh
 uvicorn ygg_ha_adapter:app --reload --port 8080 --log-level debug
 ```
-
-On startup the adapter will:
-- Reset MONITOR_URL (/reset) and EXPLORER_URL (/admin/reset)
-- Register artifacts for AREAS to the Explorer
-- Begin forwarding HA state changes to MONITOR_URL
 
 Health check: `GET http://localhost:8080/_forwarder/status`.
 
