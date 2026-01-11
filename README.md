@@ -10,8 +10,6 @@ Next, the AmI HMAS agents are started. Logs illustrate agent initialization, exp
 
 The handling of implicit requests is then showcased. With the room in a state of low light conditions, the user complains about insufficient illumination. In the absence of a prior Signifier, the system explores relevant affordances, proposes a plan to increase brightness, validates it with the user, executes it, and records the resulting Signifier. When a similar, but differently phrased, implicit request is later issued, the previously learned Signifier is reused to recover and execute the plan directly, demonstrating experience-based adaptation without additional environment exploration.
 
-[Reference document](https://docs.google.com/document/d/1JYpx-sBP1SLu42xdmnWWiPL_kFRihx7WUkXE6ZyaVy0/edit?tab=t.0) for the design of frameworks and TODOs.
-
 ## Overview
 
 This project implements an agent-based system for goal-driven interaction with smart environments. Users can make natural language inquiries about environment state and express goals (both precise and under-specified) that the system will plan and execute.
