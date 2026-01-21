@@ -54,6 +54,10 @@ uvicorn ygg_ha_adapter:app --reload --port 8080 --log-level debug
 
 Health check: `GET http://localhost:8080/_forwarder/status`.
 
+### 7) Useful scripts
+./tick_clock.py will update the clock in lab_308 with the current time every second
+./adjust_lux_on_events.py will react to lights being turned on or off and to the blinds being moved by updating the value of the luminosity sensor
+
 ## Utilities
 set_property.py - set a property in HomeAssistant using the same environment varibles. Examples:
 - ./set-property.py person_counter_308 state 1
