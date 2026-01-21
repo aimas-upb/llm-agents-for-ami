@@ -102,26 +102,26 @@ git clone <repository-url>
 cd llm-agents-for-ami
 ```
 
-2. Install HomeAssistant following the instruction [here](./ami_agents/environment/integration/HomeAssistant/README.md) 
+2. Install HomeAssistant and the integration engine following the instruction [here](./ami_agents/environment/integration/HomeAssistant/README.md) 
 
-2. Create virtual environment:
+3. Create virtual environment:
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install dependencies:
+4. Install dependencies:
 ```bash
-pip install -r requirements.txt
+pip install -r agents-requirements.txt
 ```
 
-4. Configure environment:
+5. Configure environment:
 ```bash
 cp .env.example .env
 # Edit .env with your configuration
 ```
 
-5. Configure agents:
+6. Configure agents:
 ```bash
 # Edit configuration files in ami_agents/config/
 # - environment.yaml: Set discovery method and environment connection
@@ -131,9 +131,27 @@ cp .env.example .env
 
 ### Running the System
 
+1. Run SPADE server
 ```bash
-python -m ami_agents.main
+spade run
 ```
+
+2. Run the AAMAS 2026 demo
+First you need to export an API key, either OpenAI or OpenRouter:
+```bash
+export OPENAI_API_KEY=
+```
+Then, in order to run the AAMAS 2026 demo:
+```bash
+python tests/demo_with_home_assistant.py --sequence 3 --clear-signifiers --demo 
+python tests/demo_with_home_assistant.py --sequence 4
+```
+
+Or, if you want to play around with the system in interactive mode:
+```bash
+python tests/manual_interactive_cli.py --demo
+```
+
 
 ## Configuration
 
