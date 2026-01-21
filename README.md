@@ -102,6 +102,8 @@ git clone <repository-url>
 cd llm-agents-for-ami
 ```
 
+2. Install HomeAssistant following the instruction [here](./ami_agents/environment/integration/HomeAssistant/README.md) 
+
 2. Create virtual environment:
 ```bash
 python -m venv venv
