@@ -8,7 +8,9 @@ import asyncio
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
+import uuid
+from typing import Any, Dict, List, Optional, Coroutine
+from enum import Enum
 from spade.agent import Agent
 from spade.behaviour import CyclicBehaviour
 from spade.message import Message as SpadeMessage
@@ -93,6 +95,80 @@ Rules:
 DEFAULT_TIMEOUT = 10
 
 
+class PlanningPhase(Enum):
+    """Phases of plan construction."""
+    INITIATED = "initiated"
+    GATHERING_REUSED_PLAN = "gathering_reused_plan"
+    GENERATING_LOCAL_PLAN = "generating_local_plan"
+    QUERYING_COMMUNITY = "querying_community"
+    COMPLETED_SUCCESS = "completed_success"
+    COMPLETED_FAILURE = "completed_failure"
+
+
+class GoalStatus:
+    """Structure to track goal planning status and information."""
+
+    def __init__(self, goal_id: str, intents: List[str], workspace_id: Optional[str] = None):
+        self.goal_id = goal_id
+        self.intents = intents
+        self.workspace_id = workspace_id
+        self.phase = PlanningPhase.INITIATED
+        self.created_at = asyncio.get_event_loop().time()
+
+        # Plan information
+        self.reused_plan: Optional[Dict[str, Any]] = None
+        self.reused_plan_source: Optional[str] = None  # signifier_id or community agent
+
+        self.local_plan: Optional[Dict[str, Any]] = None
+        self.local_plan_complete: bool = False
+
+        # Community interaction
+        self.relevant_communities: List[str] = []
+        self.community_responses: Dict[str, Dict[str, Any]] = {}  # agent_jid -> response
+
+        # Best plan selection
+        self.best_plan: Optional[Dict[str, Any]] = None
+        self.best_plan_source: Optional[str] = None  # "reused", "local", or "community"
+
+        # Metadata
+        self.last_updated = self.created_at
+        self.error: Optional[str] = None
+        self.error_detail: Optional[str] = None
+
+    def update_status(self, phase: Optional[PlanningPhase] = None, **kwargs):
+        """Update goal status and metadata."""
+        if phase is not None:
+            self.phase = phase
+
+        self.last_updated = asyncio.get_event_loop().time()
+
+        # Update any provided fields
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert status to dictionary for serialization."""
+        return {
+            "goal_id": self.goal_id,
+            "intents": self.intents,
+            "workspace_id": self.workspace_id,
+            "phase": self.phase.value,
+            "created_at": self.created_at,
+            "last_updated": self.last_updated,
+            "reused_plan": self.reused_plan,
+            "reused_plan_source": self.reused_plan_source,
+            "local_plan": self.local_plan,
+            "local_plan_complete": self.local_plan_complete,
+            "relevant_communities": self.relevant_communities,
+            "community_responses": self.community_responses,
+            "best_plan": self.best_plan,
+            "best_plan_source": self.best_plan_source,
+            "error": self.error,
+            "error_detail": self.error_detail,
+        }
+
+
 class InteractionSolverAgent(Agent, IAgent):
     """
     InteractionSolver agent for planning and goal resolution.
@@ -124,6 +200,9 @@ class InteractionSolverAgent(Agent, IAgent):
         self._last_env_ready_payload: Optional[Dict[str, Any]] = None
         self.env_explorer_jid = None
         self.target_jids = target_jids or {}
+
+        # Goal tracking dictionary: goal_id -> GoalStatus
+        self.goal_list: Dict[str, GoalStatus] = {}
 
         # Cache the last known environment context so we can build plans from signifiers
         # without querying EnvExplorer again for capabilities/state.
@@ -230,6 +309,7 @@ class InteractionSolverAgent(Agent, IAgent):
         1. Register behaviors:
            - EnvironmentReadyBehaviour (wait for discovery)
            - GoalRequestBehaviour (handle goal requests)
+           - PlanningStatusBehaviour (handle status requests)
            - MessageReceiveBehaviour (general messages)
         2. Initialize plan execution monitor
         3. Log agent ready
@@ -245,6 +325,11 @@ class InteractionSolverAgent(Agent, IAgent):
         goal_template = Template()
         goal_template.set_metadata("type", MessageType.GOAL_REQUEST.value)
         self.add_behaviour(GoalRequestBehaviour(), template=goal_template)
+
+        # Register PLANNING_STATUS_REQUEST handler
+        status_template = Template()
+        status_template.set_metadata("type", MessageType.PLANNING_STATUS_REQUEST.value)
+        self.add_behaviour(PlanningStatusBehaviour(), template=status_template)
 
         temp_display = "default" if str(self.model).startswith("o") else self.temperature
         logger.info(
@@ -353,41 +438,71 @@ class InteractionSolverAgent(Agent, IAgent):
         except Exception as e:
             return json.dumps({"error": "rpc_failed", "detail": str(e)})
 
-    async def _generate_plan(self, intents: List[str], workspace_id: Optional[str] = None) -> str:
+    async def _generate_plan(self, intents: List[str], workspace_id: Optional[str] = None, goal_id: Optional[str] = None) -> tuple[str | None, str]:
         """
         Gather context programmatically (affordances + state) and ask the LLM once.
         If the LLM call fails or returns non-JSON, wrap a diagnostic JSON.
         """
         intents = [str(i).strip() for i in (intents or []) if str(i).strip()]
         if not intents:
-            return json.dumps(
+            return goal_id, json.dumps(
                 {"plan_version": "1.2", "error": "missing_intents", "detail": "No intents provided.", "steps": []},
                 indent=2,
             )
 
+        # Check if goal_id exists or create new one
+        if goal_id and goal_id in self.goal_list:
+            goal_status = self.goal_list[goal_id]
+            logger.info(demo("Reusing existing goal: goal_id=%s phase=%s"), goal_id, goal_status.phase.value)
+
+            goal_status.intents = intents
+            if workspace_id:
+                goal_status.workspace_id = workspace_id
+        else:
+            if not goal_id:
+                goal_id = str(uuid.uuid4())
+
+            goal_status = GoalStatus(goal_id=goal_id, intents=intents, workspace_id=workspace_id)
+            self.goal_list[goal_id] = goal_status
+            logger.info(demo("Created new goal: goal_id=%s intents=%s"), goal_id, intents)
+
         # Fast-path: if there is a suitable signifier match for every intent, reuse it to build
         # a plan directly, without querying EnvExplorer for capabilities/state and without calling the LLM.
+        goal_status.update_status(phase=PlanningPhase.GATHERING_REUSED_PLAN)
         reused_plan = await self._try_build_plan_from_signifiers(intents, workspace_id=workspace_id)
         if reused_plan is not None:
             logger.info(
-                demo("Plan recovered from signifiers (no EnvExplorer context queries, no LLM): steps=%d"),
+                demo("Plan recovered from signifiers (no EnvExplorer context queries, no LLM): steps=%d goal_id=%s"),
                 len(reused_plan.get("steps") or []),
+                goal_id,
             )
-            return json.dumps(reused_plan, indent=2)
+            goal_status.update_status(
+                phase=PlanningPhase.COMPLETED_SUCCESS,
+                reused_plan=reused_plan,
+                reused_plan_source="signifiers",
+                best_plan=reused_plan,
+                best_plan_source="reused"
+            )
+            return goal_id, json.dumps(reused_plan, indent=2)
+
+        goal_status.update_status(phase=PlanningPhase.GENERATING_LOCAL_PLAN)
 
         try:
             context = await self._gather_planning_context(intents, workspace_id=workspace_id)
         except Exception as e:
             logger.warning(f"Context gathering failed: {e}")
-            return json.dumps(
-                {
-                    "plan_version": "1.2",
-                    "error": "context_gathering_failed",
-                    "detail": str(e),
-                    "steps": [],
-                },
-                indent=2,
+            error_plan = {
+                "plan_version": "1.2",
+                "error": "context_gathering_failed",
+                "detail": str(e),
+                "steps": [],
+            }
+            goal_status.update_status(
+                phase=PlanningPhase.COMPLETED_FAILURE,
+                error="context_gathering_failed",
+                error_detail=str(e)
             )
+            return goal_id, json.dumps(error_plan, indent=2)
 
         prompt_messages = self._build_planning_prompt(intents, context, workspace_id=workspace_id)
 
@@ -457,14 +572,14 @@ class InteractionSolverAgent(Agent, IAgent):
                     raise ValueError("Plan response is not a JSON object")
 
                 if str(parsed.get("plan_version")) != "1.2":
-                    return json.dumps(
+                    return goal_id, json.dumps(
                         {"plan_version": "1.2", "error": "invalid_plan_version", "detail": "Expected plan_version=1.2", "steps": []},
                         indent=2,
                     )
 
                 steps = parsed.get("steps")
                 if not isinstance(steps, list):
-                    return json.dumps(
+                    return goal_id, json.dumps(
                         {"plan_version": "1.2", "error": "invalid_plan_format", "detail": "Missing steps list", "steps": []},
                         indent=2,
                     )
@@ -474,13 +589,13 @@ class InteractionSolverAgent(Agent, IAgent):
                     if "error" not in parsed:
                         parsed["error"] = "infeasible"
                         parsed["detail"] = parsed.get("detail") or "No feasible plan for all intents."
-                    return json.dumps(parsed, indent=2)
+                    return goal_id, json.dumps(parsed, indent=2)
 
                 # Coverage check: each input intent must appear at least once in step.intent
                 step_intents = {str(s.get("intent")) for s in steps if isinstance(s, dict) and s.get("intent") is not None}
                 missing = [i for i in intents if i not in step_intents]
                 if missing:
-                    return json.dumps(
+                    return goal_id, json.dumps(
                         {
                             "plan_version": "1.2",
                             "error": "infeasible",
@@ -489,10 +604,17 @@ class InteractionSolverAgent(Agent, IAgent):
                         },
                         indent=2,
                     )
-
-                return json.dumps(parsed, indent=2)
+                local_plan = json.dumps(parsed, indent=2)
+                goal_status.update_status(
+                    phase=PlanningPhase.COMPLETED_SUCCESS,
+                    local_plan=local_plan,
+                    local_plan_complete=True,
+                    best_plan=local_plan,
+                    best_plan_source="local"
+                )
+                return goal_id, local_plan
             except Exception:
-                return json.dumps(
+                return goal_id, json.dumps(
                     {
                         "plan_version": "1.2",
                         "error": "non_json_response",
@@ -509,7 +631,7 @@ class InteractionSolverAgent(Agent, IAgent):
                 "detail": str(e),
                 "steps": [],
             }
-            return json.dumps(fallback, indent=2)
+            return goal_id, json.dumps(fallback, indent=2)
 
     async def _try_build_plan_from_signifiers(
         self, intents: List[str], workspace_id: Optional[str] = None
@@ -922,6 +1044,108 @@ class InteractionSolverAgent(Agent, IAgent):
         ]
 
 
+class PlanningStatusBehaviour(CyclicBehaviour):
+    """Behavior for handling planning status requests."""
+
+    async def run(self):
+        """
+        Handle planning status requests.
+
+        Responds with current planning phase and best plan obtained so far.
+        Phases:
+        - initiated: Goal just created
+        - gathering_reused_plan: Searching for reusable signifier-based plan
+        - generating_local_plan: Generating plan with LLM
+        - querying_community: Querying community agents (future)
+        - completed_success: Plan successfully obtained
+        - completed_failure: Planning failed
+        """
+        msg = await self.receive(timeout=1)
+        if not msg:
+            return
+
+        if msg.get_metadata("type") != MessageType.PLANNING_STATUS_REQUEST.value:
+            return
+
+        goal_id: Optional[str] = None
+        try:
+            payload = json.loads(msg.body or "{}")
+            if isinstance(payload, dict):
+                goal_id = payload.get("goal_id")
+        except json.JSONDecodeError:
+            pass
+
+        logger.info(
+            demo("Received PLANNING_STATUS_REQUEST: goal_id=%s from=%s"),
+            goal_id or "missing",
+            str(msg.sender),
+        )
+
+        reply = msg.make_reply()
+        reply.set_metadata("type", MessageType.PLANNING_STATUS_RESPONSE.value)
+        corr = msg.get_metadata(META_CORRELATION_ID)
+        if corr:
+            reply.set_metadata(META_CORRELATION_ID, corr)
+        if msg.thread:
+            reply.thread = msg.thread
+
+        if not goal_id:
+            reply.body = json.dumps({
+                "error": "missing_goal_id",
+                "detail": "No goal_id provided in request"
+            })
+            await self.send(reply)
+            return
+
+        goal_status = self.agent.goal_list.get(str(goal_id))
+        if not goal_status:
+            reply.body = json.dumps({
+                "error": "goal_not_found",
+                "detail": f"No goal found with id: {goal_id}",
+                "goal_id": str(goal_id)
+            })
+            await self.send(reply)
+            return
+
+        response = {
+            "goal_id": goal_status.goal_id,
+            "phase": goal_status.phase.value,
+            "intents": goal_status.intents,
+            "workspace_id": goal_status.workspace_id,
+            "created_at": goal_status.created_at,
+            "last_updated": goal_status.last_updated,
+            "elapsed_time": goal_status.last_updated - goal_status.created_at,
+        }
+
+        if goal_status.reused_plan:
+            response["has_reused_plan"] = True
+            response["reused_plan_source"] = goal_status.reused_plan_source
+
+        if goal_status.local_plan:
+            response["has_local_plan"] = True
+            response["local_plan_complete"] = goal_status.local_plan_complete
+
+        if goal_status.relevant_communities:
+            response["relevant_communities"] = goal_status.relevant_communities
+
+        if goal_status.community_responses:
+            response["community_responses_count"] = len(goal_status.community_responses)
+
+        if goal_status.error:
+            response["error"] = goal_status.error
+            response["error_detail"] = goal_status.error_detail
+
+        logger.info(
+            demo("PLANNING_STATUS_RESPONSE: goal_id=%s phase=%s best_plan_source=%s"),
+            goal_id,
+            goal_status.phase.value,
+            goal_status.best_plan_source or "none",
+        )
+
+        reply.body = json.dumps(response, indent=2)
+        await self.send(reply)
+
+
 class EnvironmentReadyBehaviour(CyclicBehaviour):
     """Behavior for waiting for environment discovery to complete."""
 
@@ -979,12 +1203,18 @@ class GoalRequestBehaviour(CyclicBehaviour):
 
         intents: List[str] = []
         workspace_id: Optional[str] = None
+        goal_id: Optional[str] = None
         try:
             payload = json.loads(msg.body or "{}")
             if isinstance(payload, dict):
                 ws = payload.get("workspace_id") or payload.get("workspace")
                 if ws:
                     workspace_id = str(ws)
+
+                gid = payload.get("goal_id")
+                if gid:
+                    goal_id = str(gid)
+
             raw_intents = payload.get("intents")
             if isinstance(raw_intents, list):
                 intents = [str(i).strip() for i in raw_intents if str(i).strip()]
@@ -1011,9 +1241,10 @@ class GoalRequestBehaviour(CyclicBehaviour):
             return
 
         logger.info(
-            demo("Received GOAL_REQUEST: intents=%s workspace_id=%r from=%s"),
+            demo("Received GOAL_REQUEST: intents=%s workspace_id=%r goal_id=%s from=%s"),
             intents,
             workspace_id,
+            goal_id or "new",
             str(msg.sender),
         )
 
@@ -1040,8 +1271,16 @@ class GoalRequestBehaviour(CyclicBehaviour):
             await self.send(reply)
             return
 
-        plan_json = await self.agent._generate_plan(intents, workspace_id=workspace_id)
-
+        goal_id, plan_json = await self.agent._generate_plan(intents, workspace_id=workspace_id, goal_id=goal_id)
+        logger.info(
+            demo("GOAL_STATUS: intents=%s workspace_id=%r goal_id=%s from=%s"),
+            intents,
+            workspace_id,
+            goal_id or "new",
+            str(msg.sender)
+        )
+        logger.info(demo(f"Goal status dict: {self.agent.goal_list[goal_id].to_dict()}"))
+        logger.info(demo(f'PLAN: {plan_json}'))
         try:
             parsed_plan = json.loads(plan_json or "{}")
             steps = parsed_plan.get("steps") if isinstance(parsed_plan, dict) else None
