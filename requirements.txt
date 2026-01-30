@@ -9,6 +9,10 @@ spade-llm>=0.2.0
 # Web of Things / HTTP
 aiohttp>=3.10.4
 requests>=2.32.3
+httpx>=0.28.0
+
+# BehaviorTree execution
+py-trees>=2.4.0
 
 # LLM Integration
 openai>=2.8.1
