@@ -31,6 +31,7 @@ from ...shared.utils.spade_rpc import send_via_router
 from ...shared.utils.config_resolver import resolve_yggdrasil_url
 from ...shared.utils.demo_log import demo
 from ...shared.models.plan import Plan, PlanType, PlanStatus
+from ...shared.state_memory import StateMemoryCache
 
 from ...shared.models.messages import MessageType
 from .behaviours import ResponseListenerBehaviour
@@ -42,7 +43,8 @@ from .tools import (
     RequestInteractionPlanTool,
     StoreLatestPlanTool,
     RetrieveAndClearLatestPlanTool,
-    ExecutePlanTool,
+    ExecuteBTTool,
+    ExecutePlanTool,  # backward-compat alias for ExecuteBTTool
 )
 
 from ...environment.integration.integration_engine import YggdrasilIntegration
@@ -162,6 +164,18 @@ class UserAssistantAgent(LLMAgent, IAgent):
         self._plans_by_thread: Dict[str, Dict[str, str]] = {}
         self._approved_plan_hash_by_thread: Dict[str, str] = {}
         self._approved_plan_json_by_thread: Dict[str, str] = {}
+
+        # --- State memory cache (property_uri -> last_known_value) ---
+        self.state_memory = StateMemoryCache()
+
+        # --- Community signifier client (cross-environment sharing via ExecuteBTTool) ---
+        community_cfg = (config.get("planning", {}) or {}).get("community", {}) or {}
+        community_url = community_cfg.get("api_url") or os.getenv("COMMUNITY_API_URL")
+        self.community_client = None
+        if community_url:
+            from ...shared.community.community_client import CommunitySignifierClient
+            self.community_client = CommunitySignifierClient(api_url=community_url)
+            logger.info("Community signifier client enabled (url=%s)", community_url)
 
         # 2. Setup Tools
         explorer_jid = target_jids.get("explorer")

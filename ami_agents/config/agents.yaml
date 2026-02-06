@@ -116,10 +116,16 @@ interaction_solver:
     # Context gathering
     context_gathering:
       from_env_explorer: true
-      from_community: false  # For future multi-environment support
+      from_community: true  # Cross-environment signifier sharing
       timeout: 10  # seconds
 
-    # LLM-based planning
+    # Community signifier API (cross-environment sharing)
+    community:
+      enabled: true
+      api_url: null  # Set via COMMUNITY_API_URL env var or override here
+      timeout: 5.0  # seconds for community API requests
+
+    # LLM-based planning (BT JSON IR generation)
     llm_planning:
       model: "gpt-4"
       temperature: 0.7
@@ -127,7 +133,7 @@ interaction_solver:
 
       # Behavior Tree generation
       output_format: "behavior_tree"
-      include_node_templates: true
+      max_planning_attempts: 3  # retries for BT generation
 
       # Node template features
       node_template_features:
@@ -193,3 +199,34 @@ logging:
 
   console_logging:
     enabled: true
+
+# Multi-Environment Demo Configuration
+# Each environment gets its own agent trio, sharing one community signifier API.
+environments:
+  lab308:
+    name: "Lab308 (Yggdrasil)"
+    yggdrasil_url: "http://localhost:8080"
+    agents:
+      user_assistant:
+        jid: "user_assistant_308@localhost"
+      env_explorer:
+        jid: "env_explorer_308@localhost"
+      interaction_solver:
+        jid: "interaction_solver_308@localhost"
+
+  homebench:
+    name: "HomeBench Home 17"
+    yggdrasil_url: "http://localhost:8090"
+    agents:
+      user_assistant:
+        jid: "user_assistant_hb@localhost"
+      env_explorer:
+        jid: "env_explorer_hb@localhost"
+      interaction_solver:
+        jid: "interaction_solver_hb@localhost"
+
+# Community Signifier API (shared service)
+community:
+  api_url: "http://localhost:8085"
+  # The RD4 signifier API running as a standalone service
+  # Both environments publish and query signifiers through this endpoint

@@ -13,6 +13,10 @@ from spade_llm import LLMTool
 from ...shared.models.messages import MessageType
 from ...shared.utils.demo_log import demo
 from ...shared.utils.spade_rpc import rpc_call, RpcTimeoutError
+from ...bt_planning.execution.ir_executor import IRExecutor
+from ...bt_planning.execution.base import ExecutionResult
+from ...bt_planning.signifier_bridge import extract_signifiers_from_bt
+from ...shared.community.community_client import CommunitySignifierClient
 
 logger = logging.getLogger("UserAssistant")
 
@@ -102,6 +106,45 @@ def _canonicalize_plan_for_hash(plan: Dict[str, Any]) -> tuple[str, str]:
     return canonical, hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _count_bt_nodes(node: dict) -> int:
+    """Count nodes in a BT JSON IR tree."""
+    if not isinstance(node, dict):
+        return 0
+    count = 1
+    for child in node.get("children", []):
+        count += _count_bt_nodes(child)
+    return count
+
+
+def _bt_preview(node: dict, depth: int = 0) -> str:
+    """Generate a compact preview of a BT JSON IR tree."""
+    if not isinstance(node, dict):
+        return ""
+    name = node.get("name", "?")
+    ntype = node.get("type", "?")
+    parts = [f"{name}({ntype})"]
+    if ntype == "action":
+        url = node.get("action_url", "")
+        action_name = url.rstrip("/").rsplit("/", 1)[-1] if url else "?"
+        params = node.get("parameters", {})
+        parts = [f"{name}:action({action_name})"]
+        if params:
+            parts[0] += f" params={params}"
+    elif ntype == "condition":
+        prop = node.get("property_url", "")
+        prop_name = prop.rstrip("/").rsplit("/", 1)[-1] if prop else "?"
+        expected = node.get("expected_value", "?")
+        parts = [f"{name}:cond({prop_name}=={expected})"]
+    children = node.get("children", [])
+    if children and depth < 2:
+        child_previews = [_bt_preview(c, depth + 1) for c in children[:4]]
+        child_str = ", ".join(child_previews)
+        if len(children) > 4:
+            child_str += ", ..."
+        parts[0] += f" [{child_str}]"
+    return parts[0]
+
+
 class QueryCapabilitiesTool(LLMTool):
     """
     Tool to query the EnvExplorer via XMPP.
@@ -186,6 +229,17 @@ class QueryEnvironmentStateTool(LLMTool):
         if not self.agent:
             return "Error: Agent not initialized in tool."
 
+        # Check state memory cache for single-property lookups
+        state_memory = getattr(self.agent, "state_memory", None)
+        if property_uri and state_memory and state_memory.has(property_uri):
+            cached_value = state_memory.get(property_uri)
+            logger.info(
+                demo("State cache HIT: property_uri=%r value=%r"),
+                property_uri,
+                cached_value,
+            )
+            return json.dumps({"property_uri": property_uri, "value": cached_value, "source": "cache"})
+
         logger.info(
             demo(
                 "UA -> EnvExplorer ENV_STATE_REQUEST: to=%s artifact_id=%r property_uri=%r"
@@ -208,6 +262,22 @@ class QueryEnvironmentStateTool(LLMTool):
                 expect_type=MessageType.ENV_STATE_RESPONSE.value,
                 timeout=15.0,
             )
+
+            # Cache results in state memory
+            if state_memory:
+                try:
+                    body = result.body
+                    state_data = json.loads(body) if isinstance(body, str) else body
+                    if isinstance(state_data, dict):
+                        if property_uri and "value" in state_data:
+                            state_memory.store(property_uri, state_data["value"])
+                        elif "artifacts" in state_data and isinstance(state_data["artifacts"], dict):
+                            state_memory.store_bulk(state_data["artifacts"])
+                        else:
+                            state_memory.store_bulk(state_data)
+                except Exception:
+                    pass  # Best-effort caching
+
             return result.body
         except RpcTimeoutError:
             return "Error: Timeout waiting for reply."
@@ -217,7 +287,7 @@ class QueryEnvironmentStateTool(LLMTool):
 
 class RequestInteractionPlanTool(LLMTool):
     """
-    Request a JSON-Plan 1.2 from the InteractionSolver using a list of intents.
+    Request a behavior tree plan from the InteractionSolver using a list of intents.
 
     Under the hood this sends a GOAL_REQUEST message to the solver and waits for PLAN_CREATED.
     """
@@ -226,7 +296,7 @@ class RequestInteractionPlanTool(LLMTool):
         super().__init__(
             name="request_interaction_plan",
             description=(
-                "Send a list of user intents to the Interaction-Solver and return the JSON-Plan 1.2 response. "
+                "Send a list of user intents to the Interaction-Solver and return a behavior tree plan. "
                 "Use this after deriving intents and scanning environment capabilities."
             ),
             parameters={
@@ -303,13 +373,13 @@ class StoreLatestPlanTool(LLMTool):
         super().__init__(
             name="store_latest_plan",
             description=(
-                "Store the exact JSON-Plan 1.2 string as the latest proposed plan for this conversation. "
+                "Store the exact behavior tree plan JSON string as the latest proposed plan for this conversation. "
                 "Call this immediately after receiving a valid plan, before summarizing."
             ),
             parameters={
                 "type": "object",
                 "properties": {
-                    "plan_json": {"type": "string", "description": "Exact JSON-Plan 1.2 string to store."}
+                    "plan_json": {"type": "string", "description": "Exact behavior tree plan JSON string to store."}
                 },
                 "required": ["plan_json"],
             },
@@ -336,47 +406,27 @@ class StoreLatestPlanTool(LLMTool):
         canonical_plan_str, plan_hash = _canonicalize_plan_for_hash(plan_obj)
         self.agent.store_latest_plan(thread, canonical_plan_str, plan_hash)
 
-        step_count = None
-        step_preview = None
+        node_count = None
+        plan_preview = None
         try:
-            if isinstance(plan_obj.get("steps"), list):
-                steps = plan_obj.get("steps") or []
-                step_count = len(steps)
-
-                def _short_artifact(uri: str) -> str:
-                    s = str(uri or "")
-                    if not s:
-                        return "?"
-                    if "/artifacts/" in s:
-                        s = s.split("/artifacts/", 1)[1]
-                    if "#" in s:
-                        s = s.split("#", 1)[0]
-                    if "/" in s:
-                        s = s.rsplit("/", 1)[-1]
-                    return s or "?"
-
-                previews: List[str] = []
-                for step in steps:
-                    if not isinstance(step, dict):
-                        continue
-                    sid = step.get("step_id")
-                    action = step.get("action_name") or "?"
-                    artifact = _short_artifact(step.get("artifact_uri") or step.get("artifact_id") or "")
-                    payload = step.get("payload") if isinstance(step.get("payload"), dict) else {}
-                    previews.append(f"{sid}:{artifact}.{action} payload={payload}")
-                if previews:
-                    step_preview = "; ".join(previews[:4]) + ("; ..." if len(previews) > 4 else "")
+            tree = plan_obj.get("tree")
+            if isinstance(tree, dict) and tree:
+                node_count = _count_bt_nodes(tree)
+                plan_preview = _bt_preview(tree)
+            elif isinstance(plan_obj.get("steps"), list):
+                # Backward compat: JSON-Plan 1.2 format
+                node_count = len(plan_obj["steps"])
         except Exception:
-            step_count = None
+            node_count = None
 
         logger.info(
-            demo("Plan stored for approval: thread=%s plan_hash=%s steps=%s"),
+            demo("Plan stored for approval: thread=%s plan_hash=%s nodes=%s"),
             thread,
             plan_hash,
-            step_count if step_count is not None else "?",
+            node_count if node_count is not None else "?",
         )
-        if step_preview:
-            logger.info(demo("Plan step preview: %s"), step_preview)
+        if plan_preview:
+            logger.info(demo("BT plan preview: %s"), plan_preview)
         return json.dumps({"ok": True, "plan_hash": plan_hash}, indent=2)
 
 
@@ -433,19 +483,19 @@ class RetrieveAndClearLatestPlanTool(LLMTool):
         return json.dumps({"ok": True, "plan_json": record["plan_json"], "plan_hash": record["plan_hash"]}, indent=2)
 
 
-class ExecutePlanTool(LLMTool):
+class ExecuteBTTool(LLMTool):
     """
-    Execute a JSON-Plan 1.2 plan by invoking each step's affordance.
+    Execute a behavior tree plan by compiling JSON IR to py_trees and running the tick loop.
 
-    Uses `UserAssistantAgent.execution_engine` (YggdrasilIntegration) because it already
-    implements affordance execution via HCTL forms.
+    Uses IRExecutor to compile the BT JSON IR to a py_trees tree, then executes via tick loop.
+    After execution, extracts signifiers from leaf action nodes for recording.
     """
 
     def __init__(self):
         super().__init__(
             name="execute_plan",
             description=(
-                "Executes a JSON-Plan 1.2 by calling each step's affordance in the live environment. "
+                "Executes a behavior tree plan by compiling it and running the tick loop in the live environment. "
                 "Use ONLY when the user explicitly asks to execute/apply the plan."
             ),
             parameters={
@@ -453,17 +503,12 @@ class ExecutePlanTool(LLMTool):
                 "properties": {
                     "plan_json": {
                         "type": "string",
-                        "description": "The JSON-Plan 1.2 object serialized as a JSON string.",
+                        "description": "The behavior tree plan JSON string (containing 'tree' field with JSON IR).",
                     },
                     "dry_run": {
                         "type": "boolean",
-                        "description": "If true, validate and show what would run without executing.",
+                        "description": "If true, validate the tree structure without executing.",
                         "default": False,
-                    },
-                    "max_steps": {
-                        "type": "integer",
-                        "description": "Optional cap on number of steps to execute (from the start).",
-                        "minimum": 1,
                     },
                 },
                 "required": ["plan_json"],
@@ -471,11 +516,12 @@ class ExecutePlanTool(LLMTool):
             func=self.run_impl,
         )
         self.agent = None
+        self._executor = IRExecutor(max_ticks=50)
 
     def set_agent(self, agent):
         self.agent = agent
 
-    async def run_impl(self, plan_json: str, dry_run: bool = False, max_steps: int | None = None):
+    async def run_impl(self, plan_json: str, dry_run: bool = False):
         if not self.agent:
             return "Error: Agent not initialized in tool."
 
@@ -491,8 +537,6 @@ class ExecutePlanTool(LLMTool):
 
         plan_obj = _coerce_plan_dict(plan_json)
         if plan_obj is None and not dry_run and approved_plan_json:
-            # The caller passed an unparseable plan (common LLM serialization issue).
-            # Execute the approved plan instead (safer than executing an unapproved variant).
             logger.info(demo("Executing approved plan (input plan_json not parseable): thread=%s"), thread)
             plan_obj = _coerce_plan_dict(approved_plan_json)
 
@@ -510,163 +554,144 @@ class ExecutePlanTool(LLMTool):
                 return json.dumps({"error": "not_approved", "detail": "Approved plan hash mismatch (internal)."}, indent=2)
             plan_obj = approved_obj
 
-        plan = plan_obj
+        # Extract BT tree spec
+        tree_spec = plan_obj.get("tree")
+        intents = plan_obj.get("intents", [])
+        is_signifier_reuse = plan_obj.get("signifier_reuse", False)
 
-        if str(plan.get("plan_version")) != "1.2":
-            return json.dumps(
-                {"error": "invalid_plan_version", "detail": f"Expected plan_version=1.2, got {plan.get('plan_version')!r}"},
-                indent=2,
-            )
+        if not tree_spec or not isinstance(tree_spec, dict):
+            # Check for error in plan
+            error = plan_obj.get("error")
+            if error:
+                return json.dumps({
+                    "error": error,
+                    "detail": plan_obj.get("detail") or plan_obj.get("explanation", "Plan has no executable tree."),
+                }, indent=2)
+            return json.dumps({"error": "missing_tree", "detail": "Plan has no behavior tree to execute."}, indent=2)
 
-        steps = plan.get("steps")
-        if not isinstance(steps, list) or not steps:
-            return json.dumps({"error": "missing_steps", "detail": "Plan has no steps to execute."}, indent=2)
+        # Dry-run: validate tree structure
+        if dry_run:
+            validation_errors = self._executor.validate_tree(tree_spec)
+            node_count = _count_bt_nodes(tree_spec)
+            preview = _bt_preview(tree_spec)
+            return json.dumps({
+                "dry_run": True,
+                "valid": len(validation_errors) == 0,
+                "node_count": node_count,
+                "preview": preview,
+                "validation_errors": validation_errors,
+            }, indent=2)
 
-        if max_steps is not None:
-            try:
-                max_steps = int(max_steps)
-            except Exception:
-                max_steps = None
-        if max_steps:
-            steps = steps[:max_steps]
-
-        logger.info(demo("Executing plan: thread=%s steps=%d dry_run=%s"), thread, len(steps), bool(dry_run))
-
-        # Ensure engine ready (loads affordance_map required by execute_affordance)
-        try:
-            await self.agent.ensure_execution_engine_ready()
-        except Exception as e:
-            return json.dumps({"error": "engine_init_failed", "detail": str(e)}, indent=2)
-
-        results: List[Dict[str, Any]] = []
-        for idx, step in enumerate(steps, start=1):
-            if not isinstance(step, dict):
-                results.append({"index": idx, "ok": False, "error": "invalid_step", "detail": "Step is not an object."})
-                continue
-
-            step_id = step.get("step_id", idx)
-            affordance_id = step.get("affordance_uri") or step.get("target") or step.get("affordance_id")
-            payload = step.get("payload") if isinstance(step.get("payload"), dict) else {}
-
-            if not affordance_id:
-                results.append({"step_id": step_id, "ok": False, "error": "missing_affordance"})
-                continue
-
-            if dry_run:
-                results.append(
-                    {"step_id": step_id, "ok": True, "dry_run": True, "affordance_id": str(affordance_id), "payload": payload}
-                )
-                continue
-
-            try:
-                logger.info(demo("Step %s: invoking affordance=%s payload=%s"), step_id, str(affordance_id), payload)
-                response_text = await self.agent.execution_engine.execute_affordance(str(affordance_id), payload)
-                ok = response_text is not None
-                results.append(
-                    {
-                        "step_id": step_id,
-                        "ok": ok,
-                        "affordance_id": str(affordance_id),
-                        "payload": payload,
-                        "response": response_text,
-                    }
-                )
-                logger.info(demo("Step %s: ok=%s"), step_id, ok)
-            except Exception as e:
-                results.append(
-                    {
-                        "step_id": step_id,
-                        "ok": False,
-                        "affordance_id": str(affordance_id),
-                        "payload": payload,
-                        "error": "execution_failed",
-                        "detail": str(e),
-                    }
-                )
-                logger.info(demo("Step %s: ok=false error=%s"), step_id, str(e))
-
-            await asyncio.sleep(0)
-
-        if not dry_run:
-            self.agent.clear_approved_plan_hash(thread)
-
-            # Best-effort: record successful executions as signifiers in EnvExplorer (embedded RD4 engine).
-            explorer_jid = (getattr(self.agent, "target_jids", {}) or {}).get("explorer")
-            if explorer_jid:
-                try:
-                    # Do not re-record signifiers for steps that were explicitly recovered from prior signifiers.
-                    # (A reused plan should not create duplicate signifiers.)
-                    recordable_steps: List[Dict[str, Any]] = []
-                    recordable_step_ids: set[str] = set()
-                    for step in steps:
-                        if not isinstance(step, dict):
-                            continue
-                        meta = step.get("metadata") if isinstance(step.get("metadata"), dict) else {}
-                        if meta.get("used_signifier_id"):
-                            continue
-                        recordable_steps.append(step)
-                        sid = step.get("step_id")
-                        if sid is not None:
-                            recordable_step_ids.add(str(sid))
-
-                    if not recordable_steps:
-                        logger.info(demo("Skipping signifier recording: plan steps were recovered from existing signifiers."))
-                    else:
-                        ok_count = sum(
-                            1
-                            for r in results
-                            if isinstance(r, dict)
-                            and r.get("ok")
-                            and (not recordable_step_ids or str(r.get("step_id")) in recordable_step_ids)
-                        )
-                        logger.info(
-                            demo("Recording signifiers in EnvExplorer: ok_steps=%d total_steps=%d"),
-                            ok_count,
-                            len(recordable_steps),
-                        )
-                        plan_to_record: Any = plan
-                        try:
-                            if isinstance(plan, dict):
-                                plan_to_record = {**plan, "steps": recordable_steps}
-                        except Exception:
-                            plan_to_record = plan
-                        rec_res = await rpc_call(
-                            self.agent,
-                            to_jid=str(explorer_jid),
-                            request_type=MessageType.SIGNIFIER_RECORD_EXECUTION_REQUEST.value,
-                            body={
-                                "plan": plan_to_record,
-                                "execution_report": {"results": results},
-                            },
-                            expect_type=MessageType.SIGNIFIER_RECORD_EXECUTION_RESPONSE.value,
-                            timeout=15.0,
-                            thread=(thread if thread and thread != "__default__" else None),
-                        )
-                        created_count = None
-                        try:
-                            rec_payload = json.loads(rec_res.body or "{}")
-                            if isinstance(rec_payload, dict):
-                                created_count = rec_payload.get("created_count")
-                        except Exception:
-                            created_count = None
-
-                        logger.info(
-                            demo("Signifier recording completed: created_count=%s"),
-                            created_count if created_count is not None else "?",
-                        )
-                except Exception as e:
-                    logger.info(demo("Failed to record signifiers in EnvExplorer: %s"), e)
-
-        ok_count = sum(1 for r in results if isinstance(r, dict) and r.get("ok"))
-        logger.info(demo("Execution finished: ok_steps=%d total_steps=%d dry_run=%s"), ok_count, len(results), bool(dry_run))
-
-        return json.dumps(
-            {
-                "plan_version": "1.2",
-                "executed": not dry_run,
-                "dry_run": bool(dry_run),
-                "steps_executed": len(results),
-                "results": results,
-            },
-            indent=2,
+        logger.info(
+            demo("Executing BT plan: thread=%s nodes=%d signifier_reuse=%s"),
+            thread, _count_bt_nodes(tree_spec), is_signifier_reuse,
         )
+
+        # Execute BT in a thread executor (py_trees tick loop is synchronous)
+        loop = asyncio.get_event_loop()
+        try:
+            exec_result: ExecutionResult = await loop.run_in_executor(
+                None,
+                self._executor.execute_from_spec,
+                tree_spec,
+            )
+        except Exception as e:
+            logger.warning(demo("BT execution failed: %s"), e)
+            return json.dumps({
+                "error": "execution_failed",
+                "detail": str(e),
+            }, indent=2)
+
+        logger.info(
+            demo("BT execution complete: success=%s ticks=%d status=%s"),
+            exec_result.success, exec_result.ticks, exec_result.final_status,
+        )
+
+        # Clear approved plan hash after execution
+        self.agent.clear_approved_plan_hash(thread)
+
+        # Invalidate state cache (plan execution changes environment state)
+        state_memory = getattr(self.agent, "state_memory", None)
+        if state_memory:
+            state_memory.clear()
+            logger.info(demo("State memory cache cleared after BT execution"))
+
+        # Extract signifiers from executed BT and record in EnvExplorer
+        if exec_result.success and not is_signifier_reuse:
+            await self._record_signifiers(tree_spec, intents, exec_result, thread)
+
+        return json.dumps({
+            "plan_type": "behavior_tree",
+            "executed": True,
+            "success": exec_result.success,
+            "ticks": exec_result.ticks,
+            "final_status": exec_result.final_status,
+            "tick_history": exec_result.tick_history,
+            "error": exec_result.error,
+        }, indent=2)
+
+    async def _record_signifiers(
+        self, tree_spec: dict, intents: list, exec_result: ExecutionResult, thread: str
+    ) -> None:
+        """Extract signifiers from executed BT and record locally + publish to community."""
+        signifiers = extract_signifiers_from_bt(
+            tree_spec=tree_spec,
+            intents=intents,
+            was_successful=exec_result.success,
+        )
+
+        if not signifiers:
+            logger.info(demo("No signifiers extracted from BT"))
+            return
+
+        logger.info(demo("Recording %d signifiers from BT execution"), len(signifiers))
+
+        # 1. Record signifiers locally via EnvExplorer (embedded RD4 engine)
+        explorer_jid = (getattr(self.agent, "target_jids", {}) or {}).get("explorer")
+        if explorer_jid:
+            try:
+                rec_res = await rpc_call(
+                    self.agent,
+                    to_jid=str(explorer_jid),
+                    request_type=MessageType.SIGNIFIER_RECORD_EXECUTION_REQUEST.value,
+                    body={
+                        "plan_type": "behavior_tree",
+                        "tree": tree_spec,
+                        "signifiers": signifiers,
+                        "execution_result": exec_result.to_dict(),
+                    },
+                    expect_type=MessageType.SIGNIFIER_RECORD_EXECUTION_RESPONSE.value,
+                    timeout=15.0,
+                    thread=(thread if thread and thread != "__default__" else None),
+                )
+                created_count = None
+                try:
+                    rec_payload = json.loads(rec_res.body or "{}")
+                    if isinstance(rec_payload, dict):
+                        created_count = rec_payload.get("created_count")
+                except Exception:
+                    created_count = None
+
+                logger.info(
+                    demo("Local signifier recording: created_count=%s"),
+                    created_count if created_count is not None else "?",
+                )
+            except Exception as e:
+                logger.info(demo("Failed to record signifiers locally: %s"), e)
+
+        # 2. Publish signifiers to community (cross-environment sharing)
+        community_client = getattr(self.agent, "community_client", None)
+        if isinstance(community_client, CommunitySignifierClient):
+            published = 0
+            for sig in signifiers:
+                try:
+                    ok = await community_client.publish_signifier(sig)
+                    if ok:
+                        published += 1
+                except Exception:
+                    pass
+            logger.info(demo("Community signifier publishing: %d/%d published"), published, len(signifiers))
+
+
+# Keep backward-compatible alias
+ExecutePlanTool = ExecuteBTTool
