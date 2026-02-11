@@ -113,6 +113,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+venv_l/
 
 # Spyder project settings
 .spyderproject
@@ -247,3 +248,5 @@ agent_logs/
 *.ttl.tmp
 *.owl.tmp
 *.rdf.tmp
+
+.claude/

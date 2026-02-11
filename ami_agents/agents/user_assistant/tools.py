@@ -6,7 +6,7 @@ import asyncio
 import json
 import logging
 import hashlib
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from spade_llm import LLMTool
 
@@ -310,6 +310,19 @@ class RequestInteractionPlanTool(LLMTool):
                     "workspace_id": {
                         "type": "string",
                         "description": "Optional workspace identifier (or name) to scope planning to a single workspace.",
+                    },
+                    "intent_type": {
+                        "type": "string",
+                        "enum": ["implicit", "explicit"],
+                        "description": (
+                            "Intent type classification:\n"
+                            "- 'implicit': User is vague, does NOT specify artifact ID (e.g., 'turn on a light', 'turn on the light'). "
+                            "System must infer which artifact from context. Matches on both intent AND context (SHACL validation).\n"
+                            "- 'explicit': User specifies exact artifact ID (e.g., 'turn on light308', 'set brightness for light308 to 50%'). "
+                            "System does NOT need to infer. Matches only on intent structure, skips context validation.\n"
+                            "Default: 'implicit' if not specified."
+                        ),
+                        "default": "implicit"
                     }
                 },
                 "required": ["intent_list"],
@@ -321,7 +334,7 @@ class RequestInteractionPlanTool(LLMTool):
     def set_agent(self, agent):
         self.agent = agent
 
-    async def run_impl(self, intent_list: List[str], workspace_id: str | None = None):
+    async def run_impl(self, intent_list: List[str], workspace_id: str | None = None, intent_type: str = "implicit"):
         if not self.agent:
             return "Error: Agent not initialized in tool."
 
@@ -341,20 +354,38 @@ class RequestInteractionPlanTool(LLMTool):
         if not intents:
             return json.dumps({"error": "missing_intents"}, indent=2)
 
+        # Normalize intent_type (default to implicit for backward compatibility)
+        intent_type = str(intent_type).lower().strip() if intent_type else "implicit"
+        if intent_type not in ("implicit", "explicit"):
+            logger.warning(demo("Invalid intent_type=%r, defaulting to 'implicit'"), intent_type)
+            intent_type = "implicit"
+
         thread = getattr(self.agent, "active_conversation_id", None)
         timeout = float((getattr(self.agent, "config", {}) or {}).get("planning", {}).get("timeout", 60))
 
+        # Log the classified intent type
         logger.info(
-            demo("UA -> InteractionSolver GOAL_REQUEST: intents=%s workspace_id=%r"),
+            demo("UA -> InteractionSolver GOAL_REQUEST: intents=%s workspace_id=%r intent_type=%s"),
             intents,
             workspace_id,
+            intent_type.upper(),
         )
+        logger.info(
+            demo("Intent Type Classified: %s (%s)"),
+            intent_type.upper(),
+            "vague request, infer from context" if intent_type == "implicit" else "exact artifact ID specified",
+        )
+
         try:
             result = await rpc_call(
                 self.agent,
                 to_jid=str(solver_jid),
                 request_type=MessageType.GOAL_REQUEST.value,
-                body={**({"workspace_id": str(workspace_id)} if workspace_id else {}), "intents": intents},
+                body={
+                    **({"workspace_id": str(workspace_id)} if workspace_id else {}),
+                    "intents": intents,
+                    "intent_type": intent_type,  # Propagate intent_type to InteractionSolver
+                },
                 expect_type=MessageType.PLAN_CREATED.value,
                 timeout=timeout,
                 thread=thread,
@@ -554,10 +585,17 @@ class ExecuteBTTool(LLMTool):
                 return json.dumps({"error": "not_approved", "detail": "Approved plan hash mismatch (internal)."}, indent=2)
             plan_obj = approved_obj
 
-        # Extract BT tree spec
+        # Extract BT tree spec and execution context
         tree_spec = plan_obj.get("tree")
         intents = plan_obj.get("intents", [])
         is_signifier_reuse = plan_obj.get("signifier_reuse", False)
+        workspace_id = plan_obj.get("workspace_id")
+        intent_type = plan_obj.get("intent_type")  # Extract intent_type for signifier recording
+        logger.info(
+            demo("[INTENT_TYPE] Extracted from plan: intent_type=%r"),
+            intent_type,
+        )
+        execution_context = plan_obj.get("execution_context", {})
 
         if not tree_spec or not isinstance(tree_spec, dict):
             # Check for error in plan
@@ -618,7 +656,9 @@ class ExecuteBTTool(LLMTool):
 
         # Extract signifiers from executed BT and record in EnvExplorer
         if exec_result.success and not is_signifier_reuse:
-            await self._record_signifiers(tree_spec, intents, exec_result, thread)
+            await self._record_signifiers(
+                tree_spec, intents, exec_result, thread, workspace_id, execution_context, intent_type
+            )
 
         return json.dumps({
             "plan_type": "behavior_tree",
@@ -631,18 +671,131 @@ class ExecuteBTTool(LLMTool):
         }, indent=2)
 
     async def _record_signifiers(
-        self, tree_spec: dict, intents: list, exec_result: ExecutionResult, thread: str
+        self,
+        tree_spec: dict,
+        intents: list,
+        exec_result: ExecutionResult,
+        thread: str,
+        workspace_id: Optional[str] = None,
+        execution_context: Optional[dict] = None,
+        intent_type: Optional[str] = None,
     ) -> None:
         """Extract signifiers from executed BT and record locally + publish to community."""
+        # Query EnvExplorer for fresh state snapshot (for building structured_conditions)
+        # NOTE: We don't use execution_context from plan anymore (it made plan JSON too large).
+        # Instead, query for state at execution time to get actual, current state.
+        state_snapshot = None
+        explorer_jid = (getattr(self.agent, "target_jids", {}) or {}).get("explorer")
+
+        if explorer_jid and workspace_id:
+            try:
+                logger.info(demo("Querying EnvExplorer for state snapshot (workspace_id=%r)"), workspace_id)
+                state_response = await rpc_call(
+                    self.agent,
+                    to_jid=str(explorer_jid),
+                    request_type=MessageType.ENV_STATE_REQUEST.value,
+                    body={},  # Empty body = request all state
+                    expect_type=MessageType.ENV_STATE_RESPONSE.value,
+                    timeout=10.0,
+                )
+
+                if state_response and state_response.body:
+                    import json
+                    raw_state = json.loads(state_response.body) if isinstance(state_response.body, str) else state_response.body
+
+                    # Build state_snapshot in expected format: {"artifacts": {...}}
+                    if isinstance(raw_state, dict):
+                        # Unwrap if EnvExplorer returned {"artifacts": {...}} instead of direct dict
+                        if "artifacts" in raw_state and isinstance(raw_state["artifacts"], dict):
+                            artifacts_dict = raw_state["artifacts"]
+                            logger.info(
+                                demo("Unwrapped artifacts from state response: count=%d"),
+                                len(artifacts_dict)
+                            )
+                        else:
+                            # Already in direct format
+                            artifacts_dict = raw_state
+
+                        # DEBUG: Log artifact details
+                        logger.info(
+                            demo("Artifacts to filter: total=%d, artifact_ids=%s"),
+                            len(artifacts_dict),
+                            list(artifacts_dict.keys())[:3]
+                        )
+                        # Sample first artifact to see workspace_id format
+                        if artifacts_dict:
+                            sample_id = list(artifacts_dict.keys())[0]
+                            sample_info = artifacts_dict[sample_id]
+                            sample_ws = sample_info.get("workspace_id") if isinstance(sample_info, dict) else None
+                            logger.info(
+                                demo("Sample artifact: id=%r, workspace_id=%r"),
+                                sample_id, sample_ws
+                            )
+
+                        # Filter by workspace_id if needed
+                        filtered_artifacts = {}
+                        for artifact_id, artifact_info in artifacts_dict.items():
+                            if isinstance(artifact_info, dict):
+                                artifact_ws = artifact_info.get("workspace_id")
+                                # Match workspace_id (exact or substring)
+                                if artifact_ws and (str(artifact_ws) == str(workspace_id) or workspace_id in str(artifact_ws)):
+                                    filtered_artifacts[artifact_id] = artifact_info
+
+                        state_snapshot = {"artifacts": filtered_artifacts}
+                        logger.info(
+                            demo("State snapshot retrieved: %d artifacts for workspace_id=%r"),
+                            len(filtered_artifacts), workspace_id
+                        )
+            except Exception as e:
+                logger.warning(demo("Failed to query state snapshot: %s (continuing without state)"), e)
+
+        # DEBUG: Log state_snapshot structure before extraction
+        if state_snapshot:
+            artifacts_in_snapshot = state_snapshot.get("artifacts", {})
+            logger.info(
+                demo("State snapshot before extraction: has_artifacts=%s, artifact_count=%d"),
+                "artifacts" in state_snapshot,
+                len(artifacts_in_snapshot) if isinstance(artifacts_in_snapshot, dict) else 0
+            )
+            # Log first artifact details
+            if artifacts_in_snapshot and isinstance(artifacts_in_snapshot, dict):
+                first_key = list(artifacts_in_snapshot.keys())[0]
+                first_artifact = artifacts_in_snapshot[first_key]
+                logger.info(
+                    demo("First artifact in snapshot: key=%r, has_properties=%s, properties=%s"),
+                    first_key,
+                    "properties" in first_artifact if isinstance(first_artifact, dict) else False,
+                    list(first_artifact.get("properties", {}).keys())[:3] if isinstance(first_artifact, dict) else []
+                )
+
+        logger.info(
+            demo("[INTENT_TYPE] Calling extract_signifiers_from_bt with intent_type=%r"),
+            intent_type,
+        )
         signifiers = extract_signifiers_from_bt(
             tree_spec=tree_spec,
             intents=intents,
             was_successful=exec_result.success,
+            workspace_id=workspace_id,
+            state_snapshot=state_snapshot,
+            intent_type=intent_type,
+        )
+        logger.info(
+            demo("[INTENT_TYPE] Extracted %d signifiers from BT"),
+            len(signifiers),
         )
 
         if not signifiers:
             logger.info(demo("No signifiers extracted from BT"))
             return
+
+        # Debug: log structured_conditions from first signifier
+        if signifiers and isinstance(signifiers[0], dict):
+            conditions = signifiers[0].get("structured_conditions", [])
+            logger.info(
+                demo("Signifier extracted with %d structured_conditions"),
+                len(conditions) if isinstance(conditions, list) else 0
+            )
 
         logger.info(demo("Recording %d signifiers from BT execution"), len(signifiers))
 

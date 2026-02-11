@@ -313,7 +313,7 @@ class InteractionSolverAgent(Agent, IAgent):
         except Exception as e:
             return json.dumps({"error": "rpc_failed", "detail": str(e)})
 
-    async def _generate_plan(self, intents: List[str], workspace_id: Optional[str] = None) -> str:
+    async def _generate_plan(self, intents: List[str], workspace_id: Optional[str] = None, intent_type: Optional[str] = None) -> str:
         """
         Gather context programmatically (affordances + state) and generate a BT JSON IR plan.
 
@@ -323,6 +323,7 @@ class InteractionSolverAgent(Agent, IAgent):
             "tree": { ... },            # JSON IR behavior tree spec (or None)
             "explanation": "...",        # LLM's explanation
             "intents": ["..."],          # Input intents
+            "intent_type": "EXPLICIT",   # EXPLICIT or IMPLICIT
             "impossible": false,         # True if the goal is infeasible
             "signifier_reuse": false,    # True if built from signifiers (no LLM)
         }
@@ -331,19 +332,19 @@ class InteractionSolverAgent(Agent, IAgent):
         if not intents:
             return json.dumps(
                 {"plan_type": "behavior_tree", "error": "missing_intents", "detail": "No intents provided.",
-                 "tree": None, "intents": []},
+                 "tree": None, "intents": [], "intent_type": intent_type},
                 indent=2,
             )
 
         # Fast-path: if there is a suitable signifier match for every intent, reuse it to build
         # a BT directly, without querying EnvExplorer for capabilities/state and without calling the LLM.
-        reused_plan = await self._try_build_plan_from_signifiers(intents, workspace_id=workspace_id)
+        reused_plan = await self._try_build_plan_from_signifiers(intents, workspace_id=workspace_id, intent_type=intent_type)
         if reused_plan is not None:
             logger.info(demo("BT recovered from signifiers (no EnvExplorer context queries, no LLM)"))
             return json.dumps(reused_plan, indent=2)
 
         try:
-            context = await self._gather_planning_context(intents, workspace_id=workspace_id)
+            context = await self._gather_planning_context(intents, workspace_id=workspace_id, intent_type=intent_type)
         except Exception as e:
             logger.warning(f"Context gathering failed: {e}")
             return json.dumps(
@@ -353,6 +354,7 @@ class InteractionSolverAgent(Agent, IAgent):
                     "detail": str(e),
                     "tree": None,
                     "intents": intents,
+                    "intent_type": intent_type,
                 },
                 indent=2,
             )
@@ -379,6 +381,7 @@ class InteractionSolverAgent(Agent, IAgent):
                     "detail": str(e),
                     "tree": None,
                     "intents": intents,
+                    "intent_type": intent_type,
                 },
                 indent=2,
             )
@@ -389,6 +392,11 @@ class InteractionSolverAgent(Agent, IAgent):
             "tree": result.get("tree") or None,
             "explanation": result.get("explanation", ""),
             "intents": intents,
+            "workspace_id": workspace_id,  # Include workspace_id for signifier context
+            "intent_type": intent_type,  # Include intent_type for signifier recording
+            # NOTE: Don't include full state_snapshot/affordances in execution_context - plan JSON
+            # becomes too large (causes "Unterminated string" errors in LLM tool calls).
+            # UserAssistant will query EnvExplorer for fresh state at execution time instead.
         }
 
         if result.get("impossible"):
@@ -397,7 +405,7 @@ class InteractionSolverAgent(Agent, IAgent):
         return json.dumps(output, indent=2)
 
     async def _try_build_plan_from_signifiers(
-        self, intents: List[str], workspace_id: Optional[str] = None
+        self, intents: List[str], workspace_id: Optional[str] = None, intent_type: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Try to build a BT JSON IR directly from signifier matches (fast path).
@@ -408,7 +416,7 @@ class InteractionSolverAgent(Agent, IAgent):
         - If any intent has no usable signifier match, return None (triggers normal LLM path).
         """
         try:
-            signifier_matches = await self._gather_signifier_matches(intents, workspace_id=workspace_id)
+            signifier_matches = await self._gather_signifier_matches(intents, workspace_id=workspace_id, intent_type=intent_type)
         except Exception:
             return None
 
@@ -433,11 +441,13 @@ class InteractionSolverAgent(Agent, IAgent):
             "tree": tree,
             "explanation": "Plan recovered from signifiers (no LLM call needed).",
             "intents": intents,
+            "workspace_id": workspace_id,  # Include workspace_id for consistency
+            "intent_type": intent_type,  # Include intent_type for signifier context
             "signifier_reuse": True,
             "signifier_ids": signifier_ids,
         }
 
-    async def _gather_planning_context(self, intents: List[str], workspace_id: Optional[str] = None) -> Dict[str, Any]:
+    async def _gather_planning_context(self, intents: List[str], workspace_id: Optional[str] = None, intent_type: Optional[str] = None) -> Dict[str, Any]:
         """
         Pull environment context once: affordances and state (from EnvExplorer).
         Returns a dict with capped affordances and optional state snapshot.
@@ -529,7 +539,7 @@ class InteractionSolverAgent(Agent, IAgent):
         # Optional signifier suggestions (embedded RD4 memory hosted by EnvExplorer).
         signifier_matches: Dict[str, Any] = {}
         try:
-            signifier_matches = await self._gather_signifier_matches(intents, workspace_id=workspace_id)
+            signifier_matches = await self._gather_signifier_matches(intents, workspace_id=workspace_id, intent_type=intent_type)
         except Exception:
             signifier_matches = {}
 
@@ -556,7 +566,7 @@ class InteractionSolverAgent(Agent, IAgent):
             "signifier_matches": signifier_matches,
         }
 
-    async def _gather_signifier_matches(self, intents: List[str], workspace_id: Optional[str] = None) -> Dict[str, Any]:
+    async def _gather_signifier_matches(self, intents: List[str], workspace_id: Optional[str] = None, intent_type: Optional[str] = None) -> Dict[str, Any]:
         """
         Ask EnvExplorer for signifier matches per intent (best-effort).
 
@@ -572,11 +582,18 @@ class InteractionSolverAgent(Agent, IAgent):
         local_out: Dict[str, Any] = {}
         if explorer_jid:
             async def _one_local(intent: str) -> Dict[str, Any]:
+                logger.info(
+                    demo("[INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent=%r, workspace_id=%r, intent_type=%r"),
+                    intent,
+                    workspace_id,
+                    intent_type,
+                )
                 raw = await self._query_env_explorer(
                     message_type=MessageType.SIGNIFIER_MATCH_REQUEST.value,
                     body={
                         "intent": intent,
                         **({"workspace_id": str(workspace_id)} if workspace_id else {}),
+                        **({"intent_type": str(intent_type)} if intent_type else {}),
                         "k": 5,
                     },
                     expect_type=MessageType.SIGNIFIER_MATCH_RESPONSE.value,
@@ -779,12 +796,17 @@ class GoalRequestBehaviour(CyclicBehaviour):
 
         intents: List[str] = []
         workspace_id: Optional[str] = None
+        intent_type: Optional[str] = None
         try:
             payload = json.loads(msg.body or "{}")
             if isinstance(payload, dict):
                 ws = payload.get("workspace_id") or payload.get("workspace")
                 if ws:
                     workspace_id = str(ws)
+                # Extract intent_type from payload
+                it = payload.get("intent_type")
+                if it and str(it).upper() in ("EXPLICIT", "IMPLICIT"):
+                    intent_type = str(it).upper()
             raw_intents = payload.get("intents")
             if isinstance(raw_intents, list):
                 intents = [str(i).strip() for i in raw_intents if str(i).strip()]
@@ -841,7 +863,7 @@ class GoalRequestBehaviour(CyclicBehaviour):
             await self.send(reply)
             return
 
-        plan_json = await self.agent._generate_plan(intents, workspace_id=workspace_id)
+        plan_json = await self.agent._generate_plan(intents, workspace_id=workspace_id, intent_type=intent_type)
 
         try:
             parsed_plan = json.loads(plan_json or "{}")
