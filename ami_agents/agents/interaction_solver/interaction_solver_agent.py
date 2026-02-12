@@ -419,14 +419,13 @@ class InteractionSolverAgent(Agent, IAgent):
         if tree is None:
             return None
 
-        # Collect signifier IDs used for traceability
+        # Collect signifier IDs used for traceability (all finals per intent)
         signifier_ids: List[str] = []
         for intent in intents:
             match_data = signifier_matches.get(intent, {})
             if isinstance(match_data, dict):
                 finals = match_data.get("final_matches", [])
-                if finals:
-                    signifier_ids.append(str(finals[0]))
+                signifier_ids.extend(str(f) for f in finals)
 
         return {
             "plan_type": "behavior_tree",

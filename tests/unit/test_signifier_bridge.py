@@ -154,3 +154,98 @@ class TestBuildBTFromSignifiers:
             intents=["test"],
         )
         assert bt is None
+
+    # ── Multi-action signifier reuse tests ─────────────────────────────────
+
+    def test_build_multi_action_single_intent(self, sample_multi_action_signifier_matches):
+        """1 intent with 2 final_matches → sequence of 2 actions."""
+        bt = build_bt_from_signifiers(
+            signifier_matches=sample_multi_action_signifier_matches,
+            intents=["increase light level"],
+        )
+        assert bt is not None
+        assert bt["type"] == "sequence"
+        assert len(bt["children"]) == 2
+        assert bt["children"][0]["type"] == "action"
+        assert bt["children"][1]["type"] == "action"
+
+    def test_build_multi_action_preserves_order(self, sample_multi_action_signifier_matches):
+        """Actions appear in same order as final_matches."""
+        bt = build_bt_from_signifiers(
+            signifier_matches=sample_multi_action_signifier_matches,
+            intents=["increase light level"],
+        )
+        assert bt is not None
+        urls = [c["action_url"] for c in bt["children"]]
+        assert "turn_on" in urls[0]
+        assert "set_brightness" in urls[1]
+
+    def test_build_multi_action_with_payloads(self, sample_multi_action_signifier_matches):
+        """Each action retains its own payload_hint."""
+        bt = build_bt_from_signifiers(
+            signifier_matches=sample_multi_action_signifier_matches,
+            intents=["increase light level"],
+        )
+        assert bt is not None
+        # First action has empty payload (no parameters key)
+        assert "parameters" not in bt["children"][0] or bt["children"][0].get("parameters") == {}
+        # Second action has brightness payload
+        assert bt["children"][1]["parameters"] == {"brightness": 100}
+
+    def test_build_multi_intent_one_multi_action(self, sample_multi_action_signifier_matches):
+        """2 intents, one with 2 actions → parallel of [sequence, action]."""
+        matches = dict(sample_multi_action_signifier_matches)
+        matches["open blinds"] = {
+            "matches": [{"signifier_id": "s3", "affordance_uri": "http://localhost/set_position", "payload_hint": {"position": 100}}],
+            "final_matches": ["s3"],
+        }
+        bt = build_bt_from_signifiers(
+            signifier_matches=matches,
+            intents=["increase light level", "open blinds"],
+        )
+        assert bt is not None
+        assert bt["type"] == "parallel"
+        assert len(bt["children"]) == 2
+        # First child: sequence (multi-action intent)
+        assert bt["children"][0]["type"] == "sequence"
+        assert len(bt["children"][0]["children"]) == 2
+        # Second child: single action
+        assert bt["children"][1]["type"] == "action"
+
+    def test_build_multi_intent_both_multi_action(self):
+        """2 intents, both with 2+ actions → parallel of [sequence, sequence]."""
+        matches = {
+            "increase light": {
+                "matches": [
+                    {"signifier_id": "s1", "affordance_uri": "http://localhost/turn_on"},
+                    {"signifier_id": "s2", "affordance_uri": "http://localhost/set_brightness", "payload_hint": {"brightness": 100}},
+                ],
+                "final_matches": ["s1", "s2"],
+            },
+            "adjust blinds": {
+                "matches": [
+                    {"signifier_id": "s3", "affordance_uri": "http://localhost/open_blinds"},
+                    {"signifier_id": "s4", "affordance_uri": "http://localhost/set_position", "payload_hint": {"position": 80}},
+                ],
+                "final_matches": ["s3", "s4"],
+            },
+        }
+        bt = build_bt_from_signifiers(
+            signifier_matches=matches,
+            intents=["increase light", "adjust blinds"],
+        )
+        assert bt is not None
+        assert bt["type"] == "parallel"
+        assert len(bt["children"]) == 2
+        assert bt["children"][0]["type"] == "sequence"
+        assert bt["children"][1]["type"] == "sequence"
+
+    def test_build_multi_action_single_intent_single_match(self, sample_signifier_matches):
+        """1 intent with 1 final_match → still returns single action node (backward compat)."""
+        bt = build_bt_from_signifiers(
+            signifier_matches=sample_signifier_matches,
+            intents=["increase light level"],
+        )
+        assert bt is not None
+        assert bt["type"] == "action"
+        assert "set_brightness" in bt["action_url"]

@@ -125,7 +125,10 @@ def build_bt_from_signifiers(
     Construct a BT JSON IR directly from signifier matches (fast path).
 
     If ALL intents have matching signifiers, we can build a plan
-    without calling the LLM.
+    without calling the LLM.  When an intent has multiple
+    ``final_matches``, the corresponding actions are wrapped in a
+    ``sequence`` node (ordered execution).  Multiple intents are
+    wrapped in a ``parallel`` node (independent goals).
 
     Args:
         signifier_matches: Dict of intent -> match data
@@ -137,7 +140,7 @@ def build_bt_from_signifiers(
     if not signifier_matches or not intents:
         return None
 
-    action_nodes: list[dict] = []
+    intent_nodes: list[dict] = []
 
     for intent in intents:
         match_data = signifier_matches.get(intent)
@@ -150,47 +153,68 @@ def build_bt_from_signifiers(
         if not finals and not matches:
             return None  # This intent has no match
 
-        # Find best match
-        best_match = None
-        if matches:
-            if finals:
-                for m in matches:
-                    if str(m.get("signifier_id")) == str(finals[0]):
-                        best_match = m
-                        break
-            if not best_match:
-                best_match = matches[0]
-
-        if not best_match:
+        # Resolve ALL final_matches to their full match dicts
+        resolved = _resolve_final_matches(finals, matches)
+        if not resolved:
             return None
 
-        affordance_uri = best_match.get("affordance_uri", "")
-        if not affordance_uri:
-            return None
+        # Build action nodes for every resolved match
+        intent_actions: list[dict] = []
+        for m in resolved:
+            affordance_uri = m.get("affordance_uri", "")
+            if not affordance_uri:
+                return None
 
-        action_node = {
-            "name": f"action_{intent.replace(' ', '_')[:30]}",
-            "type": "action",
-            "action_url": affordance_uri,
-        }
+            action_node: dict[str, Any] = {
+                "name": f"action_{intent.replace(' ', '_')[:30]}",
+                "type": "action",
+                "action_url": affordance_uri,
+            }
 
-        payload = best_match.get("payload_hint") or best_match.get("payload")
-        if payload and isinstance(payload, dict):
-            action_node["parameters"] = payload
+            payload = m.get("payload_hint") or m.get("payload")
+            if payload and isinstance(payload, dict):
+                action_node["parameters"] = payload
 
-        action_nodes.append(action_node)
+            intent_actions.append(action_node)
 
-    if not action_nodes:
+        # Single action for this intent → bare node; multiple → sequence
+        if len(intent_actions) == 1:
+            intent_nodes.append(intent_actions[0])
+        else:
+            intent_nodes.append({
+                "name": f"Sequence_{intent.replace(' ', '_')[:25]}",
+                "type": "sequence",
+                "children": intent_actions,
+            })
+
+    if not intent_nodes:
         return None
 
-    # Single action: return directly
-    if len(action_nodes) == 1:
-        return action_nodes[0]
+    # Single intent node: return directly
+    if len(intent_nodes) == 1:
+        return intent_nodes[0]
 
-    # Multiple actions: wrap in parallel (independent commands)
+    # Multiple intents: wrap in parallel (independent goals)
     return {
         "name": "SignifierReusePlan",
         "type": "parallel",
         "policy": "success_on_all",
-        "children": action_nodes,
+        "children": intent_nodes,
     }
+
+
+def _resolve_final_matches(finals: list, matches: list[dict]) -> list[dict]:
+    """Resolve final_match IDs to full match dicts, preserving order.
+
+    Falls back to ``[matches[0]]`` when no *finals* can be resolved.
+    """
+    matches_by_id = {str(m.get("signifier_id")): m for m in matches}
+    resolved = []
+    for fid in finals:
+        m = matches_by_id.get(str(fid))
+        if m:
+            resolved.append(m)
+    # Fallback: if no finals resolved, use first match
+    if not resolved and matches:
+        resolved = [matches[0]]
+    return resolved
