@@ -1,6 +1,16 @@
 # Python
 # ======
 
+# venv
+bin/
+Include/
+Lib/
+Scripts/
+pyvenv.cfg
+running.txt
+.*project
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
