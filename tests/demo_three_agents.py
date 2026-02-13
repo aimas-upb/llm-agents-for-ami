@@ -124,7 +124,7 @@ def _configure_console_logging() -> None:
 
     # Keep our high-signal logs.
     for name in [
-        "ManualFullFlowPlan",
+        "3AgentsDemo",
         "UserAssistant",
         "InteractionSolver",
         "ami_agents.agents.env_explorer.env_explorer_agent",
@@ -173,7 +173,7 @@ def _strip_demo_prefix_from_logs() -> None:
 
 
 _configure_console_logging()
-logger = logging.getLogger("ManualFullFlowPlan")
+logger = logging.getLogger("3AgentsDemo")
 
 _NO_COLOR = os.getenv("AMI_NO_COLOR") or os.getenv("NO_COLOR")
 _RED = "" if _NO_COLOR else "\033[31m"
@@ -383,7 +383,7 @@ class AgentInstance:
         logger.info(demo(f"Instance '{self.name}' stopped."))
 
 
-async def create_agent_instance(instance_id: str) -> AgentInstance:
+async def create_agent_instance(instance_id: str, instance_index: int) -> AgentInstance:
     # Generate unique JIDs using short UUID
     env_jid = f"env_{instance_id}@{XMPP_SERVER}"
     solver_jid = f"solver_{instance_id}@{XMPP_SERVER}"
@@ -494,7 +494,7 @@ async def create_agent_instance(instance_id: str) -> AgentInstance:
     }
 
     logger.info(demo(f"Creating instance '{instance_id}':"))
-    logger.info(demo(f"  EnvExplorer: {env_jid}"))
+    logger.info(demo(f"  EnvExplorer: {env_jid}, port: {8086 + instance_index}"))
     logger.info(demo(f"  InteractionSolver: {solver_jid}"))
     logger.info(demo(f"  UserAssistant: {assistant_jid}"))
 
@@ -502,7 +502,8 @@ async def create_agent_instance(instance_id: str) -> AgentInstance:
         jid=env_jid,
         password=XMPP_PASSWORD,
         config=env_config,
-        hmas_client=DummyHMASClient()
+        hmas_client=DummyHMASClient(),
+        integration_port = 8086 + instance_index
     )
 
     interaction_solver = InteractionSolverAgent(
@@ -533,10 +534,12 @@ async def main():
     instances: List[AgentInstance] = []
 
     logger.info(demo(f"Creating {NUM_INSTANCES} agent instances..."))
+    instance_index = 0
     for _ in range(NUM_INSTANCES):
         instance_id = generate_short_uuid()
-        instance = await create_agent_instance(instance_id)
+        instance = await create_agent_instance(instance_id, instance_index)
         instances.append(instance)
+        instance_index += 1
 
     logger.info(demo(f"Created {len(instances)} instances:"))
     for inst in instances:

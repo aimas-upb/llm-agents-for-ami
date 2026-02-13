@@ -41,7 +41,7 @@ class EnvExplorerAgent(Agent, IAgent):
     """
 
     def __init__(self, jid: str, password: str, config: Dict[str, Any],
-                 hmas_client: IHMASClient):
+                 hmas_client: IHMASClient, integration_port: int = None):
         """
         Initialize EnvExplorer agent.
 
@@ -62,6 +62,7 @@ class EnvExplorerAgent(Agent, IAgent):
         self.integration_engine = YggdrasilIntegration(self.yggdrasil_url)
         self.discovery_complete = False
         self.logger = logging.getLogger(__name__)
+        self.integration_port = integration_port
 
         # --- Embedded RD4 signifier engine (ami_agents/shared/memory) ---
         self._rd4_engine_ready: bool = False
@@ -83,7 +84,7 @@ class EnvExplorerAgent(Agent, IAgent):
         """
         self.logger.info(demo(f"EnvExplorer booting (yggdrasil_url={self.yggdrasil_url})"))
         self.logger.info("EnvExplorerAgent starting...")
-        self.add_behaviour(InitialDiscoveryBehaviour())
+        self.add_behaviour(InitialDiscoveryBehaviour(self.integration_port))
 
         # Route environment capability/state requests to the handler using templates
         cap_template = Template()
@@ -788,6 +789,10 @@ class EnvExplorerAgent(Agent, IAgent):
 class InitialDiscoveryBehaviour(OneShotBehaviour):
     """Behavior for initial environment discovery."""
 
+    def __init__(self, port: int = None):
+        super().__init__()
+        self.integration_port = port
+
     async def run(self):
         """
         Perform initial discovery of the environment.
@@ -812,7 +817,10 @@ class InitialDiscoveryBehaviour(OneShotBehaviour):
             return
 
         # Start webhook listener for event notifications before subscribing
-        callback_url = await self.agent.integration_engine.start_notification_listener()
+        if self.integration_port is None:
+            callback_url = await self.agent.integration_engine.start_notification_listener()
+        else:
+            callback_url = await self.agent.integration_engine.start_notification_listener(port = self.integration_port)
         
         try:
             await self.agent.integration_engine.explore_hmas_environment()
