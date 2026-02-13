@@ -87,15 +87,31 @@ public class LightSensorTD extends HypermediaTDArtifact implements VertxInjectab
     return intensity < 0 ? 0 : intensity;
   }
 
+  private String getWorkspaceSuffix() {
+    String workspaceName = getId().getWorkspaceId().getName();
+    return workspaceName.replaceAll("^[a-zA-Z]+", "");
+  }
+
+  private String buildArtifactActionUrl(String artifactPrefix, String action) {
+    String workspaceName = getId().getWorkspaceId().getName();
+    String suffix = getWorkspaceSuffix();
+    String artifactName = artifactPrefix + suffix;
+    return this.httpConfig.getArtifactUri(workspaceName, artifactName) + "/" + action;
+  }
+
+  private String buildAgentWebId() {
+    return this.httpConfig.getBaseUriTrailingSlash() + "agents/alex";
+  }
+
   private Future<Long> retrieveCurrentSimulationTimeAsync() {
     Promise<Long> promise = Promise.promise();
-    String clockUrl = "http://localhost:8080/workspaces/lab308/artifacts/clock308/timeOfDay";
+    String clockUrl = buildArtifactActionUrl("clock", "timeOfDay");
     WebClient client = WebClient.create(this.vertxInstance);
     io.vertx.core.json.JsonObject requestBody = new io.vertx.core.json.JsonObject();
 
     client.postAbs(clockUrl)
       .putHeader("Content-Type", "application/json")
-      .putHeader("X-Agent-WebID", "http://localhost:8080/agents/alex")
+      .putHeader("X-Agent-WebID", buildAgentWebId())
       .sendJsonObject(requestBody)
       .onSuccess(response -> {
         try {
@@ -120,12 +136,12 @@ public class LightSensorTD extends HypermediaTDArtifact implements VertxInjectab
 
   private Future<Integer> getBlindsClosedPercentageAsync() {
     Promise<Integer> promise = Promise.promise();
-    String blindsUrl = "http://localhost:8080/workspaces/lab308/artifacts/blinds308/status";
+    String blindsUrl = buildArtifactActionUrl("blinds", "status");
     WebClient client = WebClient.create(this.vertxInstance);
 
     client.postAbs(blindsUrl)
         .putHeader("Content-Type", "application/json")
-        .putHeader("X-Agent-WebID", "http://localhost:8080/agents/alex")
+        .putHeader("X-Agent-WebID", buildAgentWebId())
         .send()
         .onSuccess(response -> {
           try {
@@ -151,12 +167,12 @@ public class LightSensorTD extends HypermediaTDArtifact implements VertxInjectab
 
   private Future<Boolean> areLightsOffAsync() {
     Promise<Boolean> promise = Promise.promise();
-    String lightsUrl = "http://localhost:8080/workspaces/lab308/artifacts/light308/status";
+    String lightsUrl = buildArtifactActionUrl("light", "status");
     WebClient client = WebClient.create(this.vertxInstance);
 
     client.postAbs(lightsUrl)
         .putHeader("Content-Type", "application/json")
-        .putHeader("X-Agent-WebID", "http://localhost:8080/agents/alex")
+        .putHeader("X-Agent-WebID", buildAgentWebId())
         .send()
         .onSuccess(response -> {
           try {
@@ -182,12 +198,12 @@ public class LightSensorTD extends HypermediaTDArtifact implements VertxInjectab
 
   private Future<Integer> getLightIntensityAsync() {
     Promise<Integer> promise = Promise.promise();
-    String lightsUrl = "http://localhost:8080/workspaces/lab308/artifacts/light308/status";
+    String lightsUrl = buildArtifactActionUrl("light", "status");
     WebClient client = WebClient.create(this.vertxInstance);
 
     client.postAbs(lightsUrl)
         .putHeader("Content-Type", "application/json")
-        .putHeader("X-Agent-WebID", "http://localhost:8080/agents/alex")
+        .putHeader("X-Agent-WebID", buildAgentWebId())
         .send()
         .onSuccess(response -> {
           try {

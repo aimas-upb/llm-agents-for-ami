@@ -140,15 +140,31 @@ public class PeoplePresenceSensorTD extends HypermediaTDArtifact implements Vert
     }
   }
 
+  private String getWorkspaceSuffix() {
+    String workspaceName = getId().getWorkspaceId().getName();
+    return workspaceName.replaceAll("^[a-zA-Z]+", "");
+  }
+
+  private String buildArtifactActionUrl(String artifactPrefix, String action) {
+    String workspaceName = getId().getWorkspaceId().getName();
+    String suffix = getWorkspaceSuffix();
+    String artifactName = artifactPrefix + suffix;
+    return this.httpConfig.getArtifactUri(workspaceName, artifactName) + "/" + action;
+  }
+
+  private String buildAgentWebId() {
+    return this.httpConfig.getBaseUriTrailingSlash() + "agents/alex";
+  }
+
   private Future<Long> retrieveCurrentSimulationTimeAsync() {
     Promise<Long> promise = Promise.promise();
-    String clockUrl = "http://localhost:8080/workspaces/lab308/artifacts/clock308/timeOfDay";
+    String clockUrl = buildArtifactActionUrl("clock", "timeOfDay");
     WebClient client = WebClient.create(this.vertxInstance);
     io.vertx.core.json.JsonObject requestBody = new io.vertx.core.json.JsonObject();
 
     client.postAbs(clockUrl)
       .putHeader("Content-Type", "application/json")
-      .putHeader("X-Agent-WebID", "http://localhost:8080/agents/alex")
+      .putHeader("X-Agent-WebID", buildAgentWebId())
       .sendJsonObject(requestBody)
       .onSuccess(response -> {
         try {
