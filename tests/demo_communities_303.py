@@ -1184,7 +1184,7 @@ async def main():
     # Require LLM API key (both UA and solver will call it).
     _require_env("OPENAI_API_KEY")
 
-    yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8303/").strip() # 303
+    yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8083/").strip() # 303
     # yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8080/").strip() # 308
 
     explorer_jid = f"env_explorer@{xmpp_server}"
@@ -1297,6 +1297,8 @@ async def main():
             password,
             config=llm_cfg,
             target_jids={"explorer": explorer_jid, "solver": solver_jid},
+            yggdrasil_url = "http://localhost:8083/" # 303
+            # yggdrasil_url = "http://localhost:8080/" # 308
         )
 
     solver = InteractionSolverAgent(

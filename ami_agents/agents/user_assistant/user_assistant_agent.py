@@ -56,7 +56,7 @@ class UserAssistantAgent(LLMAgent, IAgent):
     2. System-facing: Plan management and execution
     """
 
-    def __init__(self, jid: str, password: str, config: Dict[str, Any], target_jids: Dict[str, str]):
+    def __init__(self, jid: str, password: str, config: Dict[str, Any], target_jids: Dict[str, str], yggdrasil_url: str = None):
         """
         Initialize UserAssistant agent.
 
@@ -152,7 +152,7 @@ class UserAssistantAgent(LLMAgent, IAgent):
  
         # --- Execution engine (YggdrasilIntegration) ---
         # Used by ExecutePlanTool to apply plans to the environment.
-        self.yggdrasil_url = resolve_yggdrasil_url(config)
+        self.yggdrasil_url = resolve_yggdrasil_url(config) if yggdrasil_url is None else yggdrasil_url
         self.execution_engine = YggdrasilIntegration(self.yggdrasil_url)
         self._execution_engine_ready = False
         self._execution_engine_lock = asyncio.Lock()
