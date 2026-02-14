@@ -533,6 +533,8 @@ class InteractionSolverAgent(Agent, IAgent):
 
         base_conversation_id = f"community_plan_{goal_id}"
 
+        # TODO add any other relevant information
+
         request_payload = {
             "goal_id": goal_id,
             "intents": intents,
@@ -631,7 +633,7 @@ class InteractionSolverAgent(Agent, IAgent):
             )
             return
         else:
-            self._continue_generate_plan(goal_status)
+            return self._continue_generate_plan(goal_status)
 
     async def _continue_generate_plan(self, goal_status: "GoalStatus") -> None:
         """
@@ -651,6 +653,10 @@ class InteractionSolverAgent(Agent, IAgent):
         goal_status.continue_triggered = True
         
         goal_status.update_status(phase=PlanningPhase.GENERATING_LOCAL_PLAN)
+        
+        ## TODO use whatever came from the communities here
+        
+        # TODO Andrei Barbu: de afisat aici tot ce a venit de la comunitate pe acest scop
         
         if self.GATHER_PLANNING_CONTEXT:
             try:
