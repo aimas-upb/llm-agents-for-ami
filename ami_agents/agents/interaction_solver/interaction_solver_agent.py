@@ -28,7 +28,7 @@ from ...shared.models.messages import (
     extract_conversation_id,
     serialize_body,
 )
-from ...shared.models.community import Community
+from ...shared.models.community import Community, AffordanceMatch
 from ...shared.utils.spade_rpc import rpc_call, RpcTimeoutError, send_via_router
 from ...shared.utils.demo_log import demo
 from ...shared.models.plan import BehaviorTreePlan, NodeTemplate, Plan
@@ -205,6 +205,12 @@ class InteractionSolverAgent(Agent, IAgent):
             plan_generator: LLM-based plan generator.
         """
         super().__init__(jid, password)
+        
+        self.REUSE_PLANS = False
+        self.QUERY_COMMUNITY = True
+        self.GATHER_PLANNING_CONTEXT = False
+        self.USE_LLM_PLANNING = False
+        
         self.config = config or {}
         self.plan_generator = plan_generator  # retained for future behaviour-tree execution
         self.environment_ready = False
@@ -217,7 +223,19 @@ class InteractionSolverAgent(Agent, IAgent):
         self.goal_list: Dict[str, GoalStatus] = {}
 
         # Communities this agent belongs to or knows about
-        self.communities: List[Community] = []
+        member_ids = [f"interaction_solver-303@localhost", f"interaction_solver-308@localhost"]
+
+        lighting_affordance = AffordanceMatch(
+            description="Community for controlling lighting"
+        )
+    
+        lighting_community = Community(
+            affordance_match=lighting_affordance,
+            community_id="lighting",
+            member_ids=member_ids,
+        )
+
+        self.communities: List[Community] = [lighting_community]
 
         # Cache the last known environment context so we can build plans from signifiers
         # without querying EnvExplorer again for capabilities/state.
@@ -506,8 +524,9 @@ class InteractionSolverAgent(Agent, IAgent):
             return
 
         logger.info(
-            demo("Sending COMMUNITY_REQUEST to %d agents for goal_id=%s from communities=%s"),
+            demo("Sending COMMUNITY_REQUEST to %d agents [%s] for goal_id=%s from communities=%s"),
             len(agents_to_query),
+            str(agents_to_query),
             goal_id,
             matching_communities,
         )
@@ -555,6 +574,7 @@ class InteractionSolverAgent(Agent, IAgent):
                 indent=2,
             )
 
+        self.goal_list[goal_id] = GoalStatus(goal_id, intents, workspace_id)
         goal_status = self.goal_list[goal_id]
         logger.info(demo("Reusing existing goal: goal_id=%s phase=%s"), goal_id, goal_status.phase.value)
         goal_status.intents = intents
@@ -563,69 +583,55 @@ class InteractionSolverAgent(Agent, IAgent):
 
         # Fast-path: if there is a suitable signifier match for every intent, reuse it to build
         # a plan directly, without querying EnvExplorer for capabilities/state and without calling the LLM.
-        goal_status.update_status(phase=PlanningPhase.GATHERING_REUSED_PLAN)
-        reused_plan = await self._try_build_plan_from_signifiers(intents, workspace_id=workspace_id)
-        if reused_plan is not None:
-            logger.info(
-                demo("Plan recovered from signifiers (no EnvExplorer context queries, no LLM): steps=%d goal_id=%s"),
-                len(reused_plan.get("steps") or []),
-                goal_id,
-            )
-            goal_status.update_status(
-                phase=PlanningPhase.COMPLETED_SUCCESS,
-                reused_plan=reused_plan,
-                reused_plan_source="signifiers",
-                best_plan=reused_plan,
-                best_plan_source="reused"
-            )
-            return json.dumps(reused_plan, indent=2)
+        if self.REUSE_PLANS:
+            goal_status.update_status(phase=PlanningPhase.GATHERING_REUSED_PLAN)
+            reused_plan = await self._try_build_plan_from_signifiers(intents, workspace_id=workspace_id)
+            if reused_plan is not None:
+                logger.info(
+                    demo("Plan recovered from signifiers (no EnvExplorer context queries, no LLM): steps=%d goal_id=%s"),
+                    len(reused_plan.get("steps") or []),
+                    goal_id,
+                )
+                goal_status.update_status(
+                    phase=PlanningPhase.COMPLETED_SUCCESS,
+                    reused_plan=reused_plan,
+                    reused_plan_source="signifiers",
+                    best_plan=reused_plan,
+                    best_plan_source="reused"
+                )
+                return json.dumps(reused_plan, indent=2)
 
-        goal_status.update_status(phase=PlanningPhase.GENERATING_LOCAL_PLAN)
-
-        try:
-            context = await self._gather_planning_context(intents, workspace_id=workspace_id)
-        except Exception as e:
-            logger.warning(f"Context gathering failed: {e}")
-            error_plan = {
-                "plan_version": "1.2",
-                "error": "context_gathering_failed",
-                "detail": str(e),
-                "steps": [],
-            }
-            goal_status.update_status(
-                phase=PlanningPhase.COMPLETED_FAILURE,
-                error="context_gathering_failed",
-                error_detail=str(e)
-            )
-            return json.dumps(error_plan, indent=2)
-
-        # Store context in goal status
-        goal_status.update_status(context=context)
-
-        # Query community agents for assistance (if any matching communities)
-        goal_status.update_status(phase=PlanningPhase.QUERYING_COMMUNITY)
-        await self._query_community_agents(goal_status=goal_status)
-
-        # Start timeout for community responses
-        timeout_seconds = DEFAULT_COMMUNITY_QUERY_TIMEOUT
-        loop = asyncio.get_event_loop()
         
-        def timeout_callback():
-            """Called when community query timeout expires."""
+        if self.QUERY_COMMUNITY:
+            ## TODO LATER Here be constructing a context of environment states to attach to the query
+            
+            # Query community agents for assistance (if any matching communities)
+            logger.info(demo("Preparing to query community"))
+            goal_status.update_status(phase=PlanningPhase.QUERYING_COMMUNITY)
+            await self._query_community_agents(goal_status=goal_status)
+    
+            # Start timeout for community responses
+            timeout_seconds = DEFAULT_COMMUNITY_QUERY_TIMEOUT
+            loop = asyncio.get_event_loop()
+            
+            def timeout_callback():
+                """Called when community query timeout expires."""
+                logger.info(
+                    demo("Community query timeout expired for goal_id=%s, triggering continue_generate_plan"),
+                    goal_id
+                )
+                asyncio.create_task(self._continue_generate_plan(goal_status))
+            
+            timer_handle = loop.call_later(timeout_seconds, timeout_callback)
+            
             logger.info(
-                demo("Community query timeout expired for goal_id=%s, triggering continue_generate_plan"),
+                demo("Community query timeout started: %.1fs for goal_id=%s"),
+                timeout_seconds,
                 goal_id
             )
-            asyncio.create_task(self._continue_generate_plan(goal_status))
-        
-        timer_handle = loop.call_later(timeout_seconds, timeout_callback)
-        
-        logger.info(
-            demo("Community query timeout started: %.1fs for goal_id=%s"),
-            timeout_seconds,
-            goal_id
-        )
-        return 
+            return
+        else:
+            self._continue_generate_plan(goal_status)
 
     async def _continue_generate_plan(self, goal_status: "GoalStatus") -> None:
         """
@@ -645,50 +651,45 @@ class InteractionSolverAgent(Agent, IAgent):
         goal_status.continue_triggered = True
         
         goal_status.update_status(phase=PlanningPhase.GENERATING_LOCAL_PLAN)
+        
+        if self.GATHER_PLANNING_CONTEXT:
+            try:
+                context = await self._gather_planning_context(intents, workspace_id=workspace_id)
+            except Exception as e:
+                logger.warning(f"Context gathering failed: {e}")
+                error_plan = {
+                    "plan_version": "1.2",
+                    "error": "context_gathering_failed",
+                    "detail": str(e),
+                    "steps": [],
+                }
+                goal_status.update_status(
+                    phase=PlanningPhase.COMPLETED_FAILURE,
+                    error="context_gathering_failed",
+                    error_detail=str(e)
+                )
+                return json.dumps(error_plan, indent=2)
+    
+            # Store context in goal status
+            goal_status.update_status(context=context)
+        
+        goal_status.update_status(phase=PlanningPhase.GENERATING_LOCAL_PLAN)
         intents = goal_status.intents
         workspace_id = goal_status.workspace_id       
         context = goal_status.context
         
+        if not self.USE_LLM_PLANNING:
+            return json.dumps(
+                        {
+                            "plan_version": "1.2",
+                            "error": "not planned",
+                            "detail": f"LLM Planning skipped because USE_LLM_PLAN is off",
+                            "steps": [],
+                        },
+                        indent=2,
+                    ) 
+            
         prompt_messages = self._build_planning_prompt(intents, context, workspace_id=workspace_id)
-
-        def _extract_json_text(raw: str) -> str:
-            """
-            Best-effort extraction of a JSON object/array from LLM output.
-            Handles common cases like markdown code fences.
-            """
-            if not raw:
-                return raw
-            s = raw.strip()
-
-            # Strip markdown fences: ```json ... ``` or ``` ... ```
-            if s.startswith("```"):
-                # remove first fence line
-                first_nl = s.find("\n")
-                if first_nl != -1:
-                    s = s[first_nl + 1 :]
-                # remove trailing fence
-                if s.rstrip().endswith("```"):
-                    s = s.rstrip()
-                    s = s[: -3]
-                s = s.strip()
-
-            # If still has surrounding prose, try to isolate the first JSON blob.
-            # Prefer {...} but allow [...] too.
-            obj_start = s.find("{")
-            arr_start = s.find("[")
-            if obj_start == -1 and arr_start == -1:
-                return s
-
-            if obj_start == -1 or (arr_start != -1 and arr_start < obj_start):
-                start = arr_start
-                end = s.rfind("]")
-            else:
-                start = obj_start
-                end = s.rfind("}")
-
-            if start != -1 and end != -1 and end > start:
-                return s[start : end + 1].strip()
-            return s
 
         try:
             completion_kwargs: Dict[str, Any] = {
@@ -707,7 +708,7 @@ class InteractionSolverAgent(Agent, IAgent):
             completion = await self.llm_client.chat.completions.create(**completion_kwargs)
             content = completion.choices[0].message.content or ""
             content = content.strip()
-            json_text = _extract_json_text(content)
+            json_text = self._extract_json_text(content)
 
             # Try to parse JSON; if invalid, wrap as diagnostic
             try:
@@ -782,6 +783,45 @@ class InteractionSolverAgent(Agent, IAgent):
                 error_detail=str(e)
             )
             return json.dumps(fallback, indent=2)
+
+    def _extract_json_text(self, raw: str) -> str:
+        """
+        Best-effort extraction of a JSON object/array from LLM output.
+        Handles common cases like markdown code fences.
+        """
+        if not raw:
+            return raw
+        s = raw.strip()
+
+        # Strip markdown fences: ```json ... ``` or ``` ... ```
+        if s.startswith("```"):
+            # remove first fence line
+            first_nl = s.find("\n")
+            if first_nl != -1:
+                s = s[first_nl + 1 :]
+            # remove trailing fence
+            if s.rstrip().endswith("```"):
+                s = s.rstrip()
+                s = s[: -3]
+            s = s.strip()
+
+        # If still has surrounding prose, try to isolate the first JSON blob.
+        # Prefer {...} but allow [...] too.
+        obj_start = s.find("{")
+        arr_start = s.find("[")
+        if obj_start == -1 and arr_start == -1:
+            return s
+
+        if obj_start == -1 or (arr_start != -1 and arr_start < obj_start):
+            start = arr_start
+            end = s.rfind("]")
+        else:
+            start = obj_start
+            end = s.rfind("}")
+
+        if start != -1 and end != -1 and end > start:
+            return s[start : end + 1].strip()
+        return s
 
     async def _try_build_plan_from_signifiers(
         self, intents: List[str], workspace_id: Optional[str] = None
@@ -1349,7 +1389,7 @@ class CommunityRequestBehaviour(CyclicBehaviour):
 
         # Gather local planning context (affordances, state, signifier matches)
         try:
-            context = await self.agent._gather_planning_context(intents, workspace_id=workspace_id)
+            signifiers = await self.agent._gather_signifier_matches(intents, workspace_id=workspace_id)
         except Exception as e:
             logger.warning("Failed to gather planning context for community_request: %s", e)
             reply.body = json.dumps({
@@ -1362,7 +1402,7 @@ class CommunityRequestBehaviour(CyclicBehaviour):
 
         response_data = {
             "responding_agent": str(self.agent.jid),
-            "context": context,
+            "context": signifiers,
             "goal_id": goal_id,
         }
 
@@ -1371,7 +1411,7 @@ class CommunityRequestBehaviour(CyclicBehaviour):
             goal_id or "N/A",
             intents,
             str(msg.sender),
-            context,
+            signifiers,
         )
 
         reply.body = json.dumps(response_data, indent=2)

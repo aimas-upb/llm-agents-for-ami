@@ -950,7 +950,8 @@ class EventProcessingBehaviour(CyclicBehaviour):
             if property_uri and value is not None:
                 # Update Internal State
                 artifact.current_state[property_uri] = value
-                self.agent.logger.info(f"STATE UPDATE: {artifact.name} -> {property_uri} = {value}")
+                # commented this because it produces a lot of output
+                # self.agent.logger.info(f"STATE UPDATE: {artifact.name} -> {property_uri} = {value}")
                 
         except Exception as e:
             self.agent.logger.error(f"Error processing event: {e}")

@@ -93,6 +93,7 @@ import re
 import shutil
 import sys
 import uuid
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -976,34 +977,34 @@ class OrchestratorAgent(Agent):
                 exec_timeout_s = 180.0
 
             list_devices_query = "List all active (available) devices in the environment."
-            state_query = "In lab308, show the state of light308 (is it on and what is its intensity?)."
-            turn_on_query = "In lab308, turn on lights_308."
-            explicit_query = "In lab308, turn off the light and open the blinds to 50% of the maximum level."
-            implicit_query = "In lab308, it's kind of dark in here."
+            state_query = "In lab303, show the state of light303 (is it on and what is its intensity?)."
+            # turn_on_query = "In lab308, turn on lights_308."
+            # explicit_query = "In lab308, turn off the light and open the blinds to 50% of the maximum level."
+            implicit_query = "In it's kind of dark in here."
 
-            # 1) Capabilities / workspaces
-            logger.info('DEMO: Asking UserAssistant: "%s"', list_devices_query)
-            reply = await self._ask_user_assistant(list_devices_query, timeout_s=simple_timeout_s)
-            if reply is None:
-                print("\nERROR: Timed out waiting for device list reply from UserAssistant.\n")
-                return
-            print("\n" + "=" * 60)
-            print("[UserAssistant Devices Reply]")
-            print("-" * 60)
-            _print_red_line(reply)
-            print("=" * 60 + "\n")
-
-            # 2) State query (forces UA <-> EnvExplorer state conversation)
-            logger.info('DEMO: Asking UserAssistant: "%s"', state_query)
-            reply = await self._ask_user_assistant(state_query, timeout_s=simple_timeout_s)
-            if reply is None:
-                print("\nERROR: Timed out waiting for state reply from UserAssistant.\n")
-                return
-            print("\n" + "=" * 60)
-            print("[UserAssistant State Reply]")
-            print("-" * 60)
-            _print_red_line(reply)
-            print("=" * 60 + "\n")
+            # # 1) Capabilities / workspaces
+            # logger.info('DEMO: Asking UserAssistant: "%s"', list_devices_query)
+            # reply = await self._ask_user_assistant(list_devices_query, timeout_s=simple_timeout_s)
+            # if reply is None:
+            #     print("\nERROR: Timed out waiting for device list reply from UserAssistant.\n")
+            #     return
+            # print("\n" + "=" * 60)
+            # print("[UserAssistant Devices Reply]")
+            # print("-" * 60)
+            # _print_red_line(reply)
+            # print("=" * 60 + "\n")
+            #
+            # # 2) State query (forces UA <-> EnvExplorer state conversation)
+            # logger.info('DEMO: Asking UserAssistant: "%s"', state_query)
+            # reply = await self._ask_user_assistant(state_query, timeout_s=simple_timeout_s)
+            # if reply is None:
+            #     print("\nERROR: Timed out waiting for state reply from UserAssistant.\n")
+            #     return
+            # print("\n" + "=" * 60)
+            # print("[UserAssistant State Reply]")
+            # print("-" * 60)
+            # _print_red_line(reply)
+            # print("=" * 60 + "\n")
 
             # # 3) Turn on the light
             # logger.info('DEMO: Asking UserAssistant: "%s"', turn_on_query)
@@ -1087,89 +1088,89 @@ class OrchestratorAgent(Agent):
             #     prompt = "Press Enter to continue to the IMPLICIT request... "
             #     await asyncio.get_running_loop().run_in_executor(None, input, prompt)
             #
-            # # 4) IMPLICIT request (approve + execute + record signifier)
-            # logger.info('DEMO: Sending IMPLICIT request: "%s"', implicit_query)
-            # proposal = await self._ask_user_assistant(implicit_query, timeout_s=plan_timeout_s)
-            # if proposal is None:
-            #     print("\nERROR: Timed out waiting for IMPLICIT reply from UserAssistant.\n")
-            #     return
-            #
-            # def _looks_like_plan_confirmation(text: str) -> bool:
-            #     s = " ".join(str(text or "").strip().lower().split())
-            #     return bool(
-            #         re.search(
-            #             r"\bdoes\s+(this|that|the)\s+(plan\s+)?look\s+(good|ok|okay)(\s+to\s+you)?(?=\s*(?:[?.!]|$))",
-            #             s,
-            #         )
-            #     )
-            #
-            # # If UA returns an unexpected plan-management message (e.g., discarding a stale pending plan),
-            # # retry once so the demo can continue deterministically.
-            # for attempt in (1, 2):
-            #     print("\n" + "=" * 60)
-            #     print("[UserAssistant IMPLICIT Plan Proposal]" if attempt == 1 else "[UserAssistant IMPLICIT Plan Proposal (Retry)]")
-            #     print("-" * 60)
-            #     _print_red_line(proposal)
-            #     print("=" * 60 + "\n")
-            #
-            #     if _looks_like_plan_confirmation(proposal):
-            #         break
-            #
-            #     if attempt == 2:
-            #         print(
-            #             "\nERROR: IMPLICIT step did not produce a plan confirmation prompt. "
-            #             "Re-run the sequence (or check UserAssistant prompts/logs).\n"
-            #         )
-            #         return
-            #
-            #     logger.warning(
-            #         'DEMO: IMPLICIT reply did not look like a plan proposal (missing confirmation prompt); retrying once. reply="%s"',
-            #         proposal,
-            #     )
-            #     proposal = await self._ask_user_assistant(implicit_query, timeout_s=plan_timeout_s)
-            #     if proposal is None:
-            #         print("\nERROR: Timed out waiting for IMPLICIT reply from UserAssistant (retry).\n")
-            #         return
-            #
-            # logger.info('DEMO: Approving IMPLICIT plan ("yes")...')
-            # await self._send_approval("yes")
-            # exec_reply = await self._wait_user_assistant_reply(timeout_s=exec_timeout_s)
-            # if exec_reply is None:
-            #     print("\nERROR: Timed out waiting for IMPLICIT execution result from UserAssistant.\n")
-            #     return
-            # print("\n" + "=" * 60)
-            # print("[UserAssistant IMPLICIT Execution Reply]")
-            # print("-" * 60)
-            # _print_red_line(exec_reply)
-            # print("=" * 60 + "\n")
-            #
-            # await self._print_selected_states(
-            #     "[EnvExplorer State After IMPLICIT Execution]",
-            #     tokens=["light308", "blinds308", "lightSensor308"],
-            # )
-            #
-            # # Show signifiers after IMPLICIT execution (should include the newly recorded one).
-            # print("\n" + "=" * 60)
-            # print("[EnvExplorer Signifiers After IMPLICIT Execution]")
-            # print("-" * 60)
-            # try:
-            #     res = await rpc_call(
-            #         self.agent,
-            #         to_jid=self.agent.explorer_jid,
-            #         request_type=MessageType.SIGNIFIER_LIST_REQUEST.value,
-            #         body={},
-            #         expect_type=MessageType.SIGNIFIER_LIST_RESPONSE.value,
-            #         timeout=15.0,
-            #         thread=self.agent.thread_id,
-            #     )
-            #     signifiers_payload = json.loads(res.body or "{}")
-            # except RpcTimeoutError:
-            #     signifiers_payload = {"error": "timeout"}
-            # except Exception as e:
-            #     signifiers_payload = {"error": "rpc_failed", "detail": str(e)}
-            #
-            # print(json.dumps(signifiers_payload, indent=2))
-            # print("=" * 60 + "\n")
+            # 4) IMPLICIT request (approve + execute + record signifier)
+            logger.info('DEMO: Sending IMPLICIT request: "%s"', implicit_query)
+            proposal = await self._ask_user_assistant(implicit_query, timeout_s=plan_timeout_s)
+            if proposal is None:
+                print("\nERROR: Timed out waiting for IMPLICIT reply from UserAssistant.\n")
+                return
+            
+            def _looks_like_plan_confirmation(text: str) -> bool:
+                s = " ".join(str(text or "").strip().lower().split())
+                return bool(
+                    re.search(
+                        r"\bdoes\s+(this|that|the)\s+(plan\s+)?look\s+(good|ok|okay)(\s+to\s+you)?(?=\s*(?:[?.!]|$))",
+                        s,
+                    )
+                )
+            
+            # If UA returns an unexpected plan-management message (e.g., discarding a stale pending plan),
+            # retry once so the demo can continue deterministically.
+            for attempt in (1, 2):
+                print("\n" + "=" * 60)
+                print("[UserAssistant IMPLICIT Plan Proposal]" if attempt == 1 else "[UserAssistant IMPLICIT Plan Proposal (Retry)]")
+                print("-" * 60)
+                _print_red_line(proposal)
+                print("=" * 60 + "\n")
+            
+                if _looks_like_plan_confirmation(proposal):
+                    break
+            
+                if attempt == 2:
+                    print(
+                        "\nERROR: IMPLICIT step did not produce a plan confirmation prompt. "
+                        "Re-run the sequence (or check UserAssistant prompts/logs).\n"
+                    )
+                    return
+            
+                logger.warning(
+                    'DEMO: IMPLICIT reply did not look like a plan proposal (missing confirmation prompt); retrying once. reply="%s"',
+                    proposal,
+                )
+                proposal = await self._ask_user_assistant(implicit_query, timeout_s=plan_timeout_s)
+                if proposal is None:
+                    print("\nERROR: Timed out waiting for IMPLICIT reply from UserAssistant (retry).\n")
+                    return
+            
+            logger.info('DEMO: Approving IMPLICIT plan ("yes")...')
+            await self._send_approval("yes")
+            exec_reply = await self._wait_user_assistant_reply(timeout_s=exec_timeout_s)
+            if exec_reply is None:
+                print("\nERROR: Timed out waiting for IMPLICIT execution result from UserAssistant.\n")
+                return
+            print("\n" + "=" * 60)
+            print("[UserAssistant IMPLICIT Execution Reply]")
+            print("-" * 60)
+            _print_red_line(exec_reply)
+            print("=" * 60 + "\n")
+            
+            await self._print_selected_states(
+                "[EnvExplorer State After IMPLICIT Execution]",
+                tokens=["light308", "blinds308", "lightSensor308"],
+            )
+            
+            # Show signifiers after IMPLICIT execution (should include the newly recorded one).
+            print("\n" + "=" * 60)
+            print("[EnvExplorer Signifiers After IMPLICIT Execution]")
+            print("-" * 60)
+            try:
+                res = await rpc_call(
+                    self.agent,
+                    to_jid=self.agent.explorer_jid,
+                    request_type=MessageType.SIGNIFIER_LIST_REQUEST.value,
+                    body={},
+                    expect_type=MessageType.SIGNIFIER_LIST_RESPONSE.value,
+                    timeout=15.0,
+                    thread=self.agent.thread_id,
+                )
+                signifiers_payload = json.loads(res.body or "{}")
+            except RpcTimeoutError:
+                signifiers_payload = {"error": "timeout"}
+            except Exception as e:
+                signifiers_payload = {"error": "rpc_failed", "detail": str(e)}
+            
+            print(json.dumps(signifiers_payload, indent=2))
+            print("=" * 60 + "\n")
 
 
 async def main():
@@ -1186,11 +1187,12 @@ async def main():
 
     yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8083/").strip() # 303
     # yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8080/").strip() # 308
-
-    explorer_jid = f"env_explorer@{xmpp_server}"
-    assistant_jid = f"user_assistant@{xmpp_server}"
-    solver_jid = f"interaction_solver@{xmpp_server}"
-    orchestrator_jid = f"orchestrator@{xmpp_server}"
+    ROOM = 303
+    
+    explorer_jid = f"env_explorer-{ROOM}@{xmpp_server}"
+    assistant_jid = f"user_assistant-{ROOM}@{xmpp_server}"
+    solver_jid = f"interaction_solver-{ROOM}@{xmpp_server}"
+    orchestrator_jid = f"orchestrator-{ROOM}@{xmpp_server}"
 
     # Optional: clear embedded RD4 signifier storage before starting (makes the run reproducible).
     if args.clear_signifiers or _env_flag("CLEAR_SIGNIFIERS"):

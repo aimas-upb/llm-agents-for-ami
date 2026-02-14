@@ -93,6 +93,7 @@ import re
 import shutil
 import sys
 import uuid
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -982,29 +983,33 @@ class OrchestratorAgent(Agent):
             implicit_query = "In lab308, it's kind of dark in here."
 
             # 1) Capabilities / workspaces
-            logger.info('DEMO: Asking UserAssistant: "%s"', list_devices_query)
-            reply = await self._ask_user_assistant(list_devices_query, timeout_s=simple_timeout_s)
-            if reply is None:
-                print("\nERROR: Timed out waiting for device list reply from UserAssistant.\n")
-                return
-            print("\n" + "=" * 60)
-            print("[UserAssistant Devices Reply]")
-            print("-" * 60)
-            _print_red_line(reply)
-            print("=" * 60 + "\n")
+            # logger.info('DEMO: Asking UserAssistant: "%s"', list_devices_query)
+            # reply = await self._ask_user_assistant(list_devices_query, timeout_s=simple_timeout_s)
+            # if reply is None:
+            #     print("\nERROR: Timed out waiting for device list reply from UserAssistant.\n")
+            #     return
+            # print("\n" + "=" * 60)
+            # print("[UserAssistant Devices Reply]")
+            # print("-" * 60)
+            # _print_red_line(reply)
+            # print("=" * 60 + "\n")
+            #
+            # # 2) State query (forces UA <-> EnvExplorer state conversation)
+            # logger.info('DEMO: Asking UserAssistant: "%s"', state_query)
+            # reply = await self._ask_user_assistant(state_query, timeout_s=simple_timeout_s)
+            # if reply is None:
+            #     print("\nERROR: Timed out waiting for state reply from UserAssistant.\n")
+            #     return
+            # print("\n" + "=" * 60)
+            # print("[UserAssistant State Reply]")
+            # print("-" * 60)
+            # _print_red_line(reply)
+            # print("=" * 60 + "\n")
 
-            # 2) State query (forces UA <-> EnvExplorer state conversation)
-            logger.info('DEMO: Asking UserAssistant: "%s"', state_query)
-            reply = await self._ask_user_assistant(state_query, timeout_s=simple_timeout_s)
-            if reply is None:
-                print("\nERROR: Timed out waiting for state reply from UserAssistant.\n")
-                return
-            print("\n" + "=" * 60)
-            print("[UserAssistant State Reply]")
-            print("-" * 60)
-            _print_red_line(reply)
-            print("=" * 60 + "\n")
-
+            # wait for queries
+            print("waiting")
+            time.sleep(60000)
+            
             # # 3) Turn on the light
             # logger.info('DEMO: Asking UserAssistant: "%s"', turn_on_query)
             # reply = await self._ask_user_assistant(turn_on_query, timeout_s=simple_timeout_s)
@@ -1187,10 +1192,12 @@ async def main():
     # yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8083/").strip() # 303
     yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8080/").strip() # 308
 
-    explorer_jid = f"env_explorer@{xmpp_server}"
-    assistant_jid = f"user_assistant@{xmpp_server}"
-    solver_jid = f"interaction_solver@{xmpp_server}"
-    orchestrator_jid = f"orchestrator@{xmpp_server}"
+    ROOM = 305
+    
+    explorer_jid = f"env_explorer-{ROOM}@{xmpp_server}"
+    assistant_jid = f"user_assistant-{ROOM}@{xmpp_server}"
+    solver_jid = f"interaction_solver-{ROOM}@{xmpp_server}"
+    orchestrator_jid = f"orchestrator-{ROOM}@{xmpp_server}"
 
     # Optional: clear embedded RD4 signifier storage before starting (makes the run reproducible).
     if args.clear_signifiers or _env_flag("CLEAR_SIGNIFIERS"):
