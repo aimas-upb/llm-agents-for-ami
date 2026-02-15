@@ -12,7 +12,7 @@ import uuid
 from typing import Any, Dict, List, Optional, Coroutine
 from enum import Enum
 from spade.agent import Agent
-from spade.behaviour import CyclicBehaviour
+from spade.behaviour import CyclicBehaviour, OneShotBehaviour
 from spade.message import Message as SpadeMessage
 from spade.template import Template
 from openai import AsyncOpenAI
@@ -127,7 +127,9 @@ class GoalStatus:
 
         self.local_plan: Optional[Dict[str, Any]] = None
         self.local_plan_complete: bool = False
-
+        
+        self.pending_reply: Optional[SpadeMessage] = None
+        self.reply_sent: bool = False
         # Community interaction
         self.relevant_communities: List[str] = []
         self.community_responses: Dict[str, Dict[str, Any]] = {}  # agent_jid -> response
@@ -564,7 +566,7 @@ class InteractionSolverAgent(Agent, IAgent):
             len(agents_to_query),
         )
 
-    async def _generate_plan(self, intents: List[str], workspace_id: Optional[str] = None, goal_id: Optional[str] = None) -> str:
+    async def _generate_plan(self, intents: List[str], workspace_id: Optional[str] = None, goal_id: Optional[str] = None, pending_reply: Optional[SpadeMessage] = None) -> str:
         """
         Gather context programmatically (affordances + state) and ask the LLM once.
         If the LLM call fails or returns non-JSON, wrap a diagnostic JSON.
@@ -603,6 +605,8 @@ class InteractionSolverAgent(Agent, IAgent):
                 )
                 return json.dumps(reused_plan, indent=2)
 
+        if pending_reply is not None:
+            goal_status.pending_reply = pending_reply
         
         if self.QUERY_COMMUNITY:
             ## TODO LATER Here be constructing a context of environment states to attach to the query
@@ -610,28 +614,14 @@ class InteractionSolverAgent(Agent, IAgent):
             # Query community agents for assistance (if any matching communities)
             logger.info(demo("Preparing to query community"))
             goal_status.update_status(phase=PlanningPhase.QUERYING_COMMUNITY)
-            await self._query_community_agents(goal_status=goal_status)
-    
-            # Start timeout for community responses
-            timeout_seconds = DEFAULT_COMMUNITY_QUERY_TIMEOUT
-            loop = asyncio.get_event_loop()
-            
-            def timeout_callback():
-                """Called when community query timeout expires."""
-                logger.info(
-                    demo("Community query timeout expired for goal_id=%s, triggering continue_generate_plan"),
-                    goal_id
-                )
-                asyncio.create_task(self._continue_generate_plan(goal_status))
-            
-            timer_handle = loop.call_later(timeout_seconds, timeout_callback)
+            community_behaviour = CommunityQueryBehaviour(goal_status)
+            self.add_behaviour(community_behaviour)
             
             logger.info(
-                demo("Community query timeout started: %.1fs for goal_id=%s"),
-                timeout_seconds,
+                demo("CommunityQueryBehaviour added for goal_id=%s"),
                 goal_id
             )
-            return
+            return None
         else:
             return self._continue_generate_plan(goal_status)
 
@@ -657,7 +647,13 @@ class InteractionSolverAgent(Agent, IAgent):
         ## TODO use whatever came from the communities here
         
         # TODO Andrei Barbu: de afisat aici tot ce a venit de la comunitate pe acest scop
-        
+        if goal_status.community_responses:
+            logger.info(demo("Community responses (%d) received for goal_id=%s"), len(goal_status.community_responses), goal_status.goal_id)
+            for response in goal_status.community_responses:
+                logger.info(demo("Community response: %s"), response)
+        else:
+            logger.info(demo("No community responses received for goal_id=%s"), goal_status.goal_id)
+            
         if self.GATHER_PLANNING_CONTEXT:
             try:
                 context = await self._gather_planning_context(intents, workspace_id=workspace_id)
@@ -789,6 +785,49 @@ class InteractionSolverAgent(Agent, IAgent):
                 error_detail=str(e)
             )
             return json.dumps(fallback, indent=2)
+
+    def _prepare_plan_reply(self, goal_status: "GoalStatus", plan_json: str) -> Optional[SpadeMessage]:
+        if goal_status.pending_reply is None:
+            logger.warning(
+                demo("No pending_reply for goal_id=%s, cannot prepare reply"),
+                goal_status.goal_id
+            )
+            return None
+        
+        if goal_status.reply_sent:
+            logger.debug(
+                demo("Reply already sent for goal_id=%s, skipping"),
+                goal_status.goal_id
+            )
+            return None
+        
+        reply = goal_status.pending_reply
+        reply.body = plan_json
+        
+        try:
+            parsed_plan = json.loads(plan_json or "{}")
+            steps = parsed_plan.get("steps") if isinstance(parsed_plan, dict) else None
+            step_count = len(steps) if isinstance(steps, list) else 0
+            used_signifiers = 0
+            if isinstance(steps, list):
+                for s in steps:
+                    meta = s.get("metadata") if isinstance(s, dict) else None
+                    if isinstance(meta, dict) and meta.get("used_signifier_id"):
+                        used_signifiers += 1
+            logger.info(
+                demo("Prepared plan reply: goal_id=%s steps=%d used_signifiers=%d"),
+                goal_status.goal_id,
+                step_count,
+                used_signifiers
+            )
+        except Exception:
+            logger.info(
+                demo("Prepared plan reply: goal_id=%s (failed to parse JSON for summary)"),
+                goal_status.goal_id
+            )
+        goal_status.reply_sent = True
+        
+        return reply
 
     def _extract_json_text(self, raw: str) -> str:
         """
@@ -1413,7 +1452,7 @@ class CommunityRequestBehaviour(CyclicBehaviour):
         }
 
         logger.info(
-            demo("COMMUNITY_RESPONSE sent: goal_id=%s intents=%s to=%s context=%d"),
+            demo("COMMUNITY_RESPONSE sent: goal_id=%s intents=%s to=%s context=%s"),
             goal_id or "N/A",
             intents,
             str(msg.sender),
@@ -1449,6 +1488,8 @@ class CommunityResponseBehaviour(CyclicBehaviour):
             goal_id or "missing",
             sender_jid,
         )
+        
+        logger.info("COMMUNITY_RESPONSE content: %s", json.dumps(response_data, indent=2))
 
         if not goal_id:
             logger.warning("COMMUNITY_RESPONSE missing goal_id from=%s", sender_jid)
@@ -1484,9 +1525,182 @@ class CommunityResponseBehaviour(CyclicBehaviour):
             response_ratio = received_count / expected_count
 
             if response_ratio >= DEFAULT_COMMUNITY_MIN_RESPONSE_RATIO:
-                self.agent._continue_generate_plan(goal_status)
+                plan_json = await self.agent._continue_generate_plan(goal_status)
+                reply = self.agent._prepare_plan_reply(goal_status, plan_json)
+                if reply:
+                    await self.send(reply)
+                    logger.info(
+                        demo("CommunityResponseBehaviour: Reply sent for goal_id=%s (RESP case)"),
+                        goal_id
+                    )
+                    logger.info(
+                        demo("CommunityResponseBehaviour: Reply is: %s"),
+                                json.dumps(plan_json, indent=2)
+                    )
+                
 
+class CommunityQueryBehaviour(OneShotBehaviour):
+    """One-shot behavior to query community agents and handle responses"""
+    
+    def __init__(self, goal_status: "GoalStatus"):
+        super().__init__()
+        self.goal_status = goal_status
+    
+    async def run(self):
+        goal_status = self.goal_status
+        goal_id = goal_status.goal_id
+        intents = goal_status.intents
+        workspace_id = goal_status.workspace_id
+        context = goal_status.context
+        
+        logger.info(
+            demo("CommunityQueryBehaviour starting for goal_id=%s"),
+            goal_id
+        )
+        
+        # Gather community agents
+        if not self.agent.communities:
+            logger.warning(
+                demo("No communities configured for goal_id=%s"),
+                goal_id
+            )
+            await self.agent._continue_generate_plan(goal_status)
+            return
+    
+        agents_to_query = set()
+        matching_communities = []
+        
+        for community in self.agent.communities:
+            match_score = community.matches_context(context)
+            logger.debug(
+                "Community %s match_score=%.3f for goal_id=%s",
+                community.community_id,
+                match_score,
+                goal_id,
+            )
+            if match_score >= COMMUNITY_MATCH_THRESHOLD:
+                matching_communities.append(community.community_id)
+                agents_to_query.update(community.member_ids)
+        
+        my_jid = str(self.agent.jid).split("/")[0]
+        agents_to_query.discard(my_jid)
+        
+        goal_status.update_status(relevant_communities=matching_communities)
+        
+        if not agents_to_query:
+            logger.warning(
+                demo("No other agents in communities for goal_id=%s, skipping to local planning"),
+                goal_id
+            )
+            await self.agent._continue_generate_plan(goal_status)
+            return
+        
+        logger.info(
+            demo("Sending COMMUNITY_REQUEST to %d agents %s for goal_id=%s from communities=%s"),
+            len(agents_to_query),
+            list(agents_to_query),
+            goal_id,
+            matching_communities,
+        )
+        
+        base_conversation_id = f"community_plan_{goal_id}"
+        
+        request_payload = {
+            "goal_id": goal_id,
+            "intents": intents,
+            "workspace_id": workspace_id
+        }
+        
+        goal_status.update_status(community_expected_responses=len(agents_to_query))
+        
+        # Send requests to all community agents
+        for agent_jid in agents_to_query:
+            conversation_id = f"{base_conversation_id}_{agent_jid.split('@')[0]}"
+            msg = SpadeMessage(to=agent_jid)
+            msg.set_metadata("type", MessageType.COMMUNITY_REQUEST.value)
+            msg.set_metadata(META_CONVERSATION_ID, conversation_id)
+            msg.set_metadata(META_CORRELATION_ID, str(uuid.uuid4()))
+            msg.body = serialize_body(request_payload)
+            
+            try:
+                await self.send(msg)
+                logger.info(
+                    demo("COMMUNITY_REQUEST sent to %s for goal_id=%s"),
+                    agent_jid,
+                    goal_id
+                )
+            except Exception as e:
+                logger.error(
+                    demo("Failed to send COMMUNITY_REQUEST to %s: %s"),
+                    agent_jid,
+                    str(e)
+                )
+        
+        logger.info(
+            demo("Community requests sent for goal_id=%s to %d agents"),
+            goal_id,
+            len(agents_to_query)
+        )
+        
+        # Add TimeoutBehaviour to be triggered after timeout
+        timeout_seconds = DEFAULT_COMMUNITY_QUERY_TIMEOUT
+        timeout_behaviour = TimeoutBehaviour(goal_status)
+        
+        import asyncio
+        loop = asyncio.get_event_loop()
+        
+        def add_timeout_behaviour():
+            if not goal_status.continue_triggered:
+                self.agent.add_behaviour(timeout_behaviour)
+        
+        loop.call_later(timeout_seconds, add_timeout_behaviour)
+        
+        logger.info(
+            demo("TimeoutBehaviour scheduled for %.1fs for goal_id=%s"),
+            timeout_seconds,
+            goal_id
+        )
+     
+class TimeoutBehaviour(OneShotBehaviour):
+    """One-shot behavior triggered when community query times out"""
+    
+    def __init__(self, goal_status: "GoalStatus"):
+        super().__init__()
+        self.goal_status = goal_status
+    
+    async def run(self):
+        goal_status = self.goal_status
+        goal_id = goal_status.goal_id
+        
+        if goal_status.continue_triggered:
+            logger.debug(
+                demo("TimeoutBehaviour: _continue_generate_plan already triggered for goal_id=%s, skipping"),
+                goal_id
+            )
+            return
+        
+        logger.info(
+            demo("TimeoutBehaviour: Community query timeout expired for goal_id=%s (received %d/%d responses)"),
+            goal_id,
+            len(goal_status.community_responses),
+            goal_status.community_expected_responses
+        )
+        
+        plan_json = await self.agent._continue_generate_plan(goal_status)
+        
+        reply = self.agent._prepare_plan_reply(goal_status, plan_json)
+        if reply:
+            await self.send(reply)
+            logger.info(
+                demo("TimeoutBehaviour: Reply sent for goal_id=%s (T_OUT case)"),
+                goal_id
+            )
+            logger.info(
+                demo("TimeoutBehaviour: Reply is: %s"),
+                     json.dumps(plan_json, indent=2)
+            )
 
+   
 class EnvironmentReadyBehaviour(CyclicBehaviour):
     """Behavior for waiting for environment discovery to complete."""
 
@@ -1593,6 +1807,14 @@ class GoalRequestBehaviour(CyclicBehaviour):
             str(msg.sender),
         )
 
+        reply = msg.make_reply()
+        reply.set_metadata("type", MessageType.PLAN_CREATED.value)
+        corr = msg.get_metadata(META_CORRELATION_ID)
+        if corr:
+            reply.set_metadata(META_CORRELATION_ID, corr)
+        if msg.thread:
+            reply.thread = msg.thread
+
         # Ensure environment is ready before planning.
         env_timeout = float(self.agent.config.get("planning", {}).get("context_gathering", {}).get("timeout", DEFAULT_TIMEOUT))
         ready = await self.agent.await_environment_ready(timeout=env_timeout)
@@ -1616,42 +1838,30 @@ class GoalRequestBehaviour(CyclicBehaviour):
             await self.send(reply)
             return
 
-        plan_json = await self.agent._generate_plan(intents, workspace_id=workspace_id, goal_id=goal_id)
+        plan_json = await self.agent._generate_plan(intents, workspace_id=workspace_id, goal_id=goal_id, pending_reply=reply)
 
-        logger.info(
-            demo("GOAL_STATUS: intents=%s workspace_id=%r goal_id=%s from=%s"),
-            intents,
-            workspace_id,
-            goal_id,
-            str(msg.sender)
-        )
-        logger.info(demo(f"Goal status dict: {self.agent.goal_list[goal_id].to_dict()}"))
-        logger.info(demo(f'PLAN: {plan_json}'))
-
-        try:
-            parsed_plan = json.loads(plan_json or "{}")
-            steps = parsed_plan.get("steps") if isinstance(parsed_plan, dict) else None
-            step_count = len(steps) if isinstance(steps, list) else 0
-            used_signifiers = 0
-            if isinstance(steps, list):
-                for s in steps:
-                    meta = s.get("metadata") if isinstance(s, dict) else None
-                    if isinstance(meta, dict) and meta.get("used_signifier_id"):
-                        used_signifiers += 1
-            logger.info(demo("Plan created: steps=%d used_signifiers=%d"), step_count, used_signifiers)
-        except Exception:
-            logger.info(demo("Plan created (failed to parse JSON for summary)."))
-
-        reply = msg.make_reply()
-        reply.set_metadata("type", MessageType.PLAN_CREATED.value)
-        reply.body = plan_json
-        # Propagate correlation_id/thread for request/response pairing.
-        corr = msg.get_metadata(META_CORRELATION_ID)
-        if corr:
-            reply.set_metadata(META_CORRELATION_ID, corr)
-        if msg.thread:
-            reply.thread = msg.thread
-        await self.send(reply)
+        if plan_json is None:
+            logger.info(
+                demo("GoalRequestBehaviour: Community query in progress for goal_id=%s, reply will be sent later"),
+                goal_id
+            )
+            return
+        else:
+            logger.info(
+                demo("GOAL_STATUS: intents=%s workspace_id=%r goal_id=%s from=%s"),
+                intents,
+                workspace_id,
+                goal_id,
+                str(msg.sender)
+            )
+            logger.info(demo(f"Goal status dict: {self.agent.goal_list[goal_id].to_dict()}"))
+            logger.info(demo(f'PLAN: {plan_json}'))
+            
+            goal_status = self.agent.goal_list.get(goal_id)
+            reply = self.agent._prepare_plan_reply(goal_status, plan_json)
+            if reply:
+                await self.send(reply)
+                logger.info(demo("Plan sent immediately (NO_Q) for goal_id=%s"), goal_id)
 
     async def handle_goal_request(self, goal_request: GoalRequest) -> BehaviorTreePlan:
         """
