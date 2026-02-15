@@ -1008,7 +1008,7 @@ class OrchestratorAgent(Agent):
 
             # wait for queries
             print("waiting")
-            time.sleep(60000)
+            await asyncio.sleep(60000)
             
             # # 3) Turn on the light
             # logger.info('DEMO: Asking UserAssistant: "%s"', turn_on_query)
@@ -1192,7 +1192,7 @@ async def main():
     # yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8083/").strip() # 303
     yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8080/").strip() # 308
 
-    ROOM = 305
+    ROOM = 308
     
     explorer_jid = f"env_explorer-{ROOM}@{xmpp_server}"
     assistant_jid = f"user_assistant-{ROOM}@{xmpp_server}"
