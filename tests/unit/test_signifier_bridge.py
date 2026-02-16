@@ -155,7 +155,7 @@ class TestBuildBTFromSignifiers:
         )
         assert bt is None
 
-    # ── Multi-action signifier reuse tests ─────────────────────────────────
+    # Multi-action signifier reuse tests
 
     def test_build_multi_action_single_intent(self, sample_multi_action_signifier_matches):
         """1 intent with 2 final_matches → sequence of 2 actions."""
@@ -249,3 +249,77 @@ class TestBuildBTFromSignifiers:
         assert bt is not None
         assert bt["type"] == "action"
         assert "set_brightness" in bt["action_url"]
+
+    # Structured intent override tests
+
+    def test_build_overrides_payload_with_structured_intent(self, sample_signifier_matches):
+        """set intent with explicit value overrides the signifier's payload_hint."""
+        structured = [{"action": "set", "artifact": "light308", "parameter": "brightness", "value": 50}]
+        bt = build_bt_from_signifiers(
+            signifier_matches=sample_signifier_matches,
+            intents=["increase light level"],
+            structured_intents=structured,
+        )
+        assert bt is not None
+        # Should use intent's value (50) not signifier's payload_hint (100)
+        assert bt["parameters"] == {"brightness": 50}
+
+    def test_build_returns_none_for_modify_intent(self, sample_signifier_matches):
+        """modify intents cannot be fast-pathed (need read-compute-set)."""
+        structured = [{"action": "modify", "artifact": "light308", "parameter": "brightness", "value": 10}]
+        bt = build_bt_from_signifiers(
+            signifier_matches=sample_signifier_matches,
+            intents=["increase light level"],
+            structured_intents=structured,
+        )
+        assert bt is None
+
+    def test_build_returns_none_for_modify_without_value(self, sample_signifier_matches):
+        """modify intents with null value also bail from fast path."""
+        structured = [{"action": "modify", "artifact": "light308", "parameter": "brightness", "value": None}]
+        bt = build_bt_from_signifiers(
+            signifier_matches=sample_signifier_matches,
+            intents=["increase light level"],
+            structured_intents=structured,
+        )
+        assert bt is None
+
+    def test_build_check_intent_has_no_parameters(self):
+        """check intents produce action nodes without parameters."""
+        matches = {
+            "check light": {
+                "matches": [{"signifier_id": "s1", "affordance_uri": "http://localhost/light/status", "payload_hint": {"brightness": 75}}],
+                "final_matches": ["s1"],
+            },
+        }
+        structured = [{"action": "check", "artifact": "light308"}]
+        bt = build_bt_from_signifiers(
+            signifier_matches=matches,
+            intents=["check light"],
+            structured_intents=structured,
+        )
+        assert bt is not None
+        assert "parameters" not in bt
+
+    def test_build_backward_compat_without_structured(self, sample_signifier_matches):
+        """Without structured_intents, falls back to signifier payload_hint (backward compat)."""
+        bt = build_bt_from_signifiers(
+            signifier_matches=sample_signifier_matches,
+            intents=["increase light level"],
+            structured_intents=None,
+        )
+        assert bt is not None
+        assert bt["parameters"] == {"brightness": 100}  # Original signifier payload
+
+    def test_build_structured_length_mismatch_falls_back(self, sample_signifier_matches):
+        """If structured_intents length doesn't match intents, falls back to payload_hint."""
+        structured = [{"action": "set", "artifact": "light308", "parameter": "brightness", "value": 50},
+                      {"action": "set", "artifact": "other", "parameter": "x", "value": 1}]
+        bt = build_bt_from_signifiers(
+            signifier_matches=sample_signifier_matches,
+            intents=["increase light level"],  # Only 1 intent but 2 structured
+            structured_intents=structured,
+        )
+        assert bt is not None
+        # Length mismatch → structured_map not populated → falls back to payload_hint
+        assert bt["parameters"] == {"brightness": 100}

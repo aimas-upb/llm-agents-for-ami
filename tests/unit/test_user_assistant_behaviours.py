@@ -26,7 +26,7 @@ from ami_agents.agents.user_assistant.utils import (
 )
 
 
-# ── Utility function tests ─────────────────────────────────────────
+# Utility function tests
 
 
 class TestStripCodeFences:
@@ -134,7 +134,7 @@ class TestBtPreview:
         assert bt_preview({}) != ""  # Returns "?(?)"
 
 
-# ── Intent integration tests ───────────────────────────────────────
+# Intent integration tests
 
 
 class TestIntentCanonicalStrings:
@@ -142,11 +142,11 @@ class TestIntentCanonicalStrings:
 
     def test_multiple_intents_produce_list(self):
         intents = [
-            Intent(action="turn_on", artifact="light308"),
+            Intent(action="set", artifact="light308", parameter="on_off", value=True),
             Intent(action="set", artifact="light308", parameter="brightness", value=100),
         ]
         strings = [i.to_canonical_string() for i in intents]
-        assert strings == ["turn on light308", "set light308 brightness to 100"]
+        assert strings == ["set light308 on_off to True", "set light308 brightness to 100"]
 
     def test_set_with_zero_value(self):
         i = Intent(action="set", artifact="light308", parameter="brightness", value=0)
@@ -159,8 +159,33 @@ class TestIntentCanonicalStrings:
         assert "set" in result
         assert "light308" in result
 
+    def test_modify_canonical_string(self):
+        i = Intent(action="modify", artifact="light308", parameter="brightness", value=10)
+        assert i.to_canonical_string() == "modify light308 brightness by 10"
 
-# ── Confirmation token tests ────────────────────────────────────────
+    def test_modify_null_value_canonical(self):
+        i = Intent(action="modify", artifact="light308", parameter="brightness")
+        assert i.to_canonical_string() == "modify light308 brightness"
+
+    def test_check_canonical_string(self):
+        i = Intent(action="check", artifact="light308")
+        assert i.to_canonical_string() == "check light308"
+
+    def test_intent_text_preferred_over_canonical(self):
+        """When intent_text is set, it should be preferred for signifier matching."""
+        i = Intent(action="set", artifact="light308", parameter="on_off", value=True,
+                   intent_text="turn on the light")
+        # Simulate the intent string generation logic from behaviours._handle_goal
+        intent_str = i.intent_text or i.to_canonical_string()
+        assert intent_str == "turn on the light"
+
+    def test_canonical_fallback_when_no_intent_text(self):
+        i = Intent(action="set", artifact="light308", parameter="on_off", value=True)
+        intent_str = i.intent_text or i.to_canonical_string()
+        assert intent_str == "set light308 on_off to True"
+
+
+# Confirmation token tests
 
 
 class TestConfirmationTokens:
@@ -181,7 +206,7 @@ class TestConfirmationTokens:
         assert _CONFIRM_TOKENS.isdisjoint(_REJECT_TOKENS)
 
 
-# ── ConversationState flow tests ────────────────────────────────────
+# ConversationState flow tests
 
 
 class TestConversationStateFlow:
@@ -193,7 +218,7 @@ class TestConversationStateFlow:
         assert conv.phase == ConversationPhase.IDLE
 
         conv.phase = ConversationPhase.EXTRACTING_INTENTS
-        conv.intents = [Intent(action="turn_on", artifact="light308")]
+        conv.intents = [Intent(action="set", artifact="light308", parameter="on_off", value=True)]
         assert conv.phase == ConversationPhase.EXTRACTING_INTENTS
 
         conv.phase = ConversationPhase.AWAITING_PLAN
@@ -222,7 +247,7 @@ class TestConversationStateFlow:
             plan_json='{"tree": {}}',
             plan_hash="abc",
             plan_summary="A plan",
-            intents=[Intent(action="turn_on", artifact="light308")],
+            intents=[Intent(action="set", artifact="light308", parameter="on_off", value=True)],
         )
         conv.clear_plan()
         conv.phase = ConversationPhase.IDLE
@@ -231,7 +256,7 @@ class TestConversationStateFlow:
         assert conv.phase == ConversationPhase.IDLE
 
 
-# ── Plan hash gating tests ──────────────────────────────────────────
+# Plan hash gating tests
 
 
 class TestPlanHashGating:

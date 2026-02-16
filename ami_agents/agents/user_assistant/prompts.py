@@ -24,10 +24,23 @@ Classify the message as exactly one of:
 ## Structured Intents (for "goal" messages only)
 
 Derive ONE OR MORE structured intents.  Each intent has:
-- action: one of "turn_on", "turn_off", "set", "check_status"
+- action: one of "check", "set", "modify"
+    - "check": query or check the status / state of a device or property.
+    - "set": any phrasing that results in setting a parameter to a given value.
+      This includes parameter-free actions with a boolean result:
+      turn on/off -> set on_off to true/false;
+      open/close -> set open_close to true/false.
+    - "modify": any phrasing that results in modifying a value by a given amount
+      (e.g. increase ... by, decrease ... by, dim, brighten).
+      If the user does not specify an explicit amount, set value to null.
 - artifact: the exact device identifier as it appears in capabilities (e.g. "light308")
-- parameter: (only for "set") the payload key from the affordance schema (e.g. "brightness")
-- value: (only for "set") an explicit numeric or string value -- never "fully", "max", "high"
+- parameter: the payload key from the affordance schema (e.g. "brightness", "on_off").
+  Required for "set" and "modify".  Optional for "check".
+- value: for "set" -- the target value (explicit numeric, boolean, or string; never
+  "fully", "max", "high").  For "modify" -- the delta amount (positive to increase,
+  negative to decrease), or null if the user did not specify an amount.
+- intent_text: the original atomic phrasing from the user message that this intent
+  was derived from.  Needed for embedding-based similarity matching and logging.
 
 Rules:
 - Each intent represents exactly ONE atomic action.
@@ -59,11 +72,23 @@ Respond with valid JSON only.  No markdown fences, no extra text.
 
 Examples:
 
-Goal:
-{"classification": "goal", "intents": [{"action": "set", "artifact": "light308", "parameter": "brightness", "value": 75}], "workspace_id": "lab308"}
+Goal (turn on = boolean set):
+{"classification": "goal", "intents": [{"action": "set", "artifact": "light308", "parameter": "on_off", "value": true, "intent_text": "turn on the light"}], "workspace_id": "lab308"}
 
-Multiple intents:
-{"classification": "goal", "intents": [{"action": "turn_on", "artifact": "light308"}, {"action": "set", "artifact": "light308", "parameter": "brightness", "value": 100}]}
+Goal (set a value):
+{"classification": "goal", "intents": [{"action": "set", "artifact": "light308", "parameter": "brightness", "value": 75, "intent_text": "set the brightness to 75"}], "workspace_id": "lab308"}
+
+Multiple intents (turn on + set brightness):
+{"classification": "goal", "intents": [{"action": "set", "artifact": "light308", "parameter": "on_off", "value": true, "intent_text": "turn on the light"}, {"action": "set", "artifact": "light308", "parameter": "brightness", "value": 100, "intent_text": "set the brightness to 100"}]}
+
+Modify with explicit amount:
+{"classification": "goal", "intents": [{"action": "modify", "artifact": "light308", "parameter": "brightness", "value": 10, "intent_text": "increase the brightness by 10"}]}
+
+Modify without explicit amount:
+{"classification": "goal", "intents": [{"action": "modify", "artifact": "light308", "parameter": "brightness", "value": null, "intent_text": "dim the light"}]}
+
+Check status:
+{"classification": "goal", "intents": [{"action": "check", "artifact": "light308", "intent_text": "check the light status"}]}
 
 Query capabilities:
 {"classification": "query_capabilities"}

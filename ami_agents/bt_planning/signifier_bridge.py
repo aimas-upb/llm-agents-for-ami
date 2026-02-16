@@ -120,6 +120,7 @@ def _extract_action_name(url: str) -> str:
 def build_bt_from_signifiers(
     signifier_matches: dict,
     intents: list[str],
+    structured_intents: list[dict] | None = None,
 ) -> Optional[dict]:
     """
     Construct a BT JSON IR directly from signifier matches (fast path).
@@ -130,9 +131,23 @@ def build_bt_from_signifiers(
     ``sequence`` node (ordered execution).  Multiple intents are
     wrapped in a ``parallel`` node (independent goals).
 
+    When *structured_intents* are provided, the function applies
+    intent-aware payload handling:
+
+    - ``modify`` intents cause the fast path to bail out (returns None)
+      because they require a read-compute-set pattern the LLM must handle.
+    - ``set`` intents with an explicit value override the signifier's
+      ``payload_hint`` so the user's actual target value is used.
+    - ``check`` intents skip parameters entirely.
+    - When no structured intent is available, falls back to reusing the
+      signifier's ``payload_hint`` as-is (backward compatibility).
+
     Args:
         signifier_matches: Dict of intent -> match data
         intents: List of intents to satisfy
+        structured_intents: Optional list of structured intent dicts
+            (parallel to *intents*) with keys ``action``, ``parameter``,
+            ``value``, etc.
 
     Returns:
         BT JSON IR dict if all intents have matches, None otherwise
@@ -140,9 +155,22 @@ def build_bt_from_signifiers(
     if not signifier_matches or not intents:
         return None
 
+    # Build lookup: intent_string -> structured_intent_dict
+    structured_map: dict[str, dict] = {}
+    if structured_intents and len(structured_intents) == len(intents):
+        for intent_str, si in zip(intents, structured_intents):
+            if isinstance(si, dict):
+                structured_map[intent_str] = si
+
     intent_nodes: list[dict] = []
 
     for intent in intents:
+        si = structured_map.get(intent)
+
+        # modify intents require read-compute-set — bail to LLM path
+        if si and si.get("action") == "modify":
+            return None
+
         match_data = signifier_matches.get(intent)
         if not isinstance(match_data, dict):
             return None  # Not all intents matched
@@ -171,9 +199,17 @@ def build_bt_from_signifiers(
                 "action_url": affordance_uri,
             }
 
-            payload = m.get("payload_hint") or m.get("payload")
-            if payload and isinstance(payload, dict):
-                action_node["parameters"] = payload
+            # Intent-aware payload selection
+            if si and si.get("action") == "set" and si.get("value") is not None and si.get("parameter"):
+                # Use the caller's actual target value, not the stale signifier hint
+                action_node["parameters"] = {si["parameter"]: si["value"]}
+            elif si and si.get("action") == "check":
+                pass  # check intents have no parameters
+            else:
+                # Fallback: reuse signifier's payload_hint as-is
+                payload = m.get("payload_hint") or m.get("payload")
+                if payload and isinstance(payload, dict):
+                    action_node["parameters"] = payload
 
             intent_actions.append(action_node)
 

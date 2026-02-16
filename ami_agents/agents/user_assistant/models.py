@@ -25,31 +25,34 @@ class Intent:
     """Structured intent extracted from a user message.
 
     Canonical action types:
-        - ``turn_on``   → "turn on <artifact>"
-        - ``turn_off``  → "turn off <artifact>"
-        - ``set``       → "set <artifact> <parameter> to <value>"
-        - ``check_status`` → "check status of <artifact>"
+        - ``check``  → "check <artifact>" or "check <artifact> <parameter>"
+        - ``set``    → "set <artifact> <parameter> to <value>"
+                       Includes boolean actions: turn on/off, open/close
+                       (e.g. set on_off to true, set open_close to false).
+        - ``modify`` → "modify <artifact> <parameter> by <value>"
+                       or "modify <artifact> <parameter>" when the delta
+                       is unspecified (BT planner determines the amount).
     """
 
     action: str
     artifact: str
     parameter: Optional[str] = None
     value: Optional[Any] = None
+    intent_text: Optional[str] = None
 
     def to_canonical_string(self) -> str:
-        """Convert to the canonical string form expected by InteractionSolver.
-
-        Follows the templates from section VII of the original prompt.
-        """
-        if self.action == "turn_on":
-            return f"turn on {self.artifact}"
-        elif self.action == "turn_off":
-            return f"turn off {self.artifact}"
+        """Convert to the canonical string form expected by InteractionSolver."""
+        if self.action == "check":
+            if self.parameter:
+                return f"check {self.artifact} {self.parameter}"
+            return f"check {self.artifact}"
         elif self.action == "set" and self.parameter is not None and self.value is not None:
             return f"set {self.artifact} {self.parameter} to {self.value}"
-        elif self.action == "check_status":
-            return f"check status of {self.artifact}"
-        # Fallback for non-standard actions
+        elif self.action == "modify" and self.parameter is not None:
+            if self.value is not None:
+                return f"modify {self.artifact} {self.parameter} by {self.value}"
+            return f"modify {self.artifact} {self.parameter}"
+        # Fallback for non-standard actions or incomplete fields
         parts = [self.action, self.artifact]
         if self.parameter:
             parts.append(self.parameter)
@@ -64,6 +67,8 @@ class Intent:
             d["parameter"] = self.parameter
         if self.value is not None:
             d["value"] = self.value
+        if self.intent_text is not None:
+            d["intent_text"] = self.intent_text
         return d
 
     @classmethod
@@ -74,6 +79,7 @@ class Intent:
             artifact=data.get("artifact", ""),
             parameter=data.get("parameter"),
             value=data.get("value"),
+            intent_text=data.get("intent_text"),
         )
 
 

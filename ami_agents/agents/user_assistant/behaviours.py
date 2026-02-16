@@ -192,7 +192,7 @@ class UserMessageBehaviour(CyclicBehaviour):
             conv.phase = ConversationPhase.IDLE
             return
 
-        intent_strings = [intent.to_canonical_string() for intent in conv.intents]
+        intent_strings = [intent.intent_text or intent.to_canonical_string() for intent in conv.intents]
         logger.info(demo("Derived intents: %s  workspace=%s"), intent_strings, conv.workspace_id)
 
         # Send GOAL_REQUEST to InteractionSolver (deterministic RPC)
@@ -203,7 +203,10 @@ class UserMessageBehaviour(CyclicBehaviour):
             return
 
         conv.phase = ConversationPhase.AWAITING_PLAN
-        body: Dict[str, Any] = {"intents": intent_strings}
+        body: Dict[str, Any] = {
+            "intents": intent_strings,
+            "structured_intents": [i.to_dict() for i in conv.intents],
+        }
         if conv.workspace_id:
             body["workspace_id"] = str(conv.workspace_id)
 
