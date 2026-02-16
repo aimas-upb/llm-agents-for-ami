@@ -623,7 +623,8 @@ class InteractionSolverAgent(Agent, IAgent):
             )
             return None
         else:
-            return self._continue_generate_plan(goal_status)
+            plan_json = await self._continue_generate_plan(goal_status)
+            return plan_json
 
     async def _continue_generate_plan(self, goal_status: "GoalStatus") -> None:
         """
@@ -1561,10 +1562,21 @@ class CommunityQueryBehaviour(OneShotBehaviour):
         # Gather community agents
         if not self.agent.communities:
             logger.warning(
-                demo("No communities configured for goal_id=%s"),
+                demo("No communities configured for goal_id=%s, skipping to local planning"),
                 goal_id
             )
-            await self.agent._continue_generate_plan(goal_status)
+            plan_json = await self.agent._continue_generate_plan(goal_status)
+            reply = self.agent._prepare_plan_reply(goal_status, plan_json)
+            if reply:
+                await self.send(reply)
+                logger.info(
+                        demo("CommunityQueryBehaviour: Reply sent for goal_id=%s (no communities case)"),
+                        goal_id
+                    )
+                logger.info(
+                    demo("CommunityQueryBehaviour: Reply is: %s"),
+                        json.dumps(plan_json, indent=2)
+                )
             return
     
         agents_to_query = set()
@@ -1592,7 +1604,18 @@ class CommunityQueryBehaviour(OneShotBehaviour):
                 demo("No other agents in communities for goal_id=%s, skipping to local planning"),
                 goal_id
             )
-            await self.agent._continue_generate_plan(goal_status)
+            plan_json = await self.agent._continue_generate_plan(goal_status)
+            reply = self.agent._prepare_plan_reply(goal_status, plan_json)
+            if reply:
+                await self.send(reply)
+                logger.info(
+                        demo("CommunityQueryBehaviour: Reply sent for goal_id=%s (no agents to query case)"),
+                        goal_id
+                    )
+                logger.info(
+                    demo("CommunityQueryBehaviour: Reply is: %s"),
+                        json.dumps(plan_json, indent=2)
+                )
             return
         
         logger.info(
@@ -1862,6 +1885,10 @@ class GoalRequestBehaviour(CyclicBehaviour):
             if reply:
                 await self.send(reply)
                 logger.info(demo("Plan sent immediately (NO_Q) for goal_id=%s"), goal_id)
+                logger.info(
+                        demo("GoalRequestBehaviour: Reply is: %s"),
+                                json.dumps(plan_json, indent=2)
+                    )
 
     async def handle_goal_request(self, goal_request: GoalRequest) -> BehaviorTreePlan:
         """
