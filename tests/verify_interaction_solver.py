@@ -159,7 +159,7 @@ class PlanProbeAgent(Agent):
             msg = SpadeMessage(to=self.agent.solver_jid)
             msg.set_metadata("type", MessageType.GOAL_REQUEST.value)
             msg.thread = self.agent.request_thread
-            msg.body = json.dumps({"intent": self.agent.goal_text})
+            msg.body = json.dumps({"intents": [{"action": "unknown", "artifact": "unknown", "intent_text": self.agent.goal_text}]})
             await self.send(msg)
 
     class ReceivePlanBehaviour(CyclicBehaviour):

@@ -32,6 +32,7 @@ from ...shared.models.plan import BehaviorTreePlan, NodeTemplate, Plan
 from ...shared.protocols.llm_protocol import IPlanGenerator
 from ...bt_planning.planning.bt_planner import AsyncBTPlanner
 from ...bt_planning.signifier_bridge import build_bt_from_signifiers
+from ...agents.user_assistant.models import Intent
 from ...shared.community.community_client import CommunitySignifierClient
 
 logger = logging.getLogger("InteractionSolver")
@@ -313,7 +314,7 @@ class InteractionSolverAgent(Agent, IAgent):
         except Exception as e:
             return json.dumps({"error": "rpc_failed", "detail": str(e)})
 
-    async def _generate_plan(self, intents: List[str], workspace_id: Optional[str] = None, structured_intents: Optional[List[dict]] = None) -> str:
+    async def _generate_plan(self, intents: List[Intent], workspace_id: Optional[str] = None) -> str:
         """
         Gather context programmatically (affordances + state) and generate a BT JSON IR plan.
 
@@ -322,12 +323,12 @@ class InteractionSolverAgent(Agent, IAgent):
             "plan_type": "behavior_tree",
             "tree": { ... },            # JSON IR behavior tree spec (or None)
             "explanation": "...",        # LLM's explanation
-            "intents": ["..."],          # Input intents
+            "intents": [{...}, ...],    # Serialized Intent objects
             "impossible": false,         # True if the goal is infeasible
             "signifier_reuse": false,    # True if built from signifiers (no LLM)
         }
         """
-        intents = [str(i).strip() for i in (intents or []) if str(i).strip()]
+        intents = [i for i in (intents or []) if i.to_query_string().strip()]
         if not intents:
             return json.dumps(
                 {"plan_type": "behavior_tree", "error": "missing_intents", "detail": "No intents provided.",
@@ -335,15 +336,17 @@ class InteractionSolverAgent(Agent, IAgent):
                 indent=2,
             )
 
+        intent_strings = [i.to_query_string() for i in intents]
+
         # Fast-path: if there is a suitable signifier match for every intent, reuse it to build
         # a BT directly, without querying EnvExplorer for capabilities/state and without calling the LLM.
-        reused_plan = await self._try_build_plan_from_signifiers(intents, workspace_id=workspace_id, structured_intents=structured_intents)
+        reused_plan = await self._try_build_plan_from_signifiers(intents, workspace_id=workspace_id)
         if reused_plan is not None:
             logger.info(demo("BT recovered from signifiers (no EnvExplorer context queries, no LLM)"))
             return json.dumps(reused_plan, indent=2)
 
         try:
-            context = await self._gather_planning_context(intents, workspace_id=workspace_id)
+            context = await self._gather_planning_context(intent_strings, workspace_id=workspace_id)
         except Exception as e:
             logger.warning(f"Context gathering failed: {e}")
             return json.dumps(
@@ -352,7 +355,7 @@ class InteractionSolverAgent(Agent, IAgent):
                     "error": "context_gathering_failed",
                     "detail": str(e),
                     "tree": None,
-                    "intents": intents,
+                    "intents": [i.to_dict() for i in intents],
                 },
                 indent=2,
             )
@@ -360,7 +363,7 @@ class InteractionSolverAgent(Agent, IAgent):
         # Generate BT using AsyncBTPlanner (LLM tool call with validation retries)
         try:
             result = await self.bt_planner.generate_bt(
-                intents=intents,
+                intents=intent_strings,
                 affordances=context.get("affordances", []),
                 state=context.get("state"),
                 signifier_hints=context.get("signifier_matches"),
@@ -378,7 +381,7 @@ class InteractionSolverAgent(Agent, IAgent):
                     "error": "plan_generation_failed",
                     "detail": str(e),
                     "tree": None,
-                    "intents": intents,
+                    "intents": [i.to_dict() for i in intents],
                 },
                 indent=2,
             )
@@ -388,10 +391,8 @@ class InteractionSolverAgent(Agent, IAgent):
             "plan_type": "behavior_tree",
             "tree": result.get("tree") or None,
             "explanation": result.get("explanation", ""),
-            "intents": intents,
+            "intents": [i.to_dict() for i in intents],
         }
-        if structured_intents:
-            output["structured_intents"] = structured_intents
 
         if result.get("impossible"):
             output["impossible"] = True
@@ -399,7 +400,7 @@ class InteractionSolverAgent(Agent, IAgent):
         return json.dumps(output, indent=2)
 
     async def _try_build_plan_from_signifiers(
-        self, intents: List[str], workspace_id: Optional[str] = None, structured_intents: Optional[List[dict]] = None
+        self, intents: List[Intent], workspace_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Try to build a BT JSON IR directly from signifier matches (fast path).
@@ -408,41 +409,40 @@ class InteractionSolverAgent(Agent, IAgent):
         - We still query EnvExplorer for SIGNIFIER_MATCH_REQUEST (it hosts the embedded RD4 engine).
         - We MUST NOT query EnvExplorer for ENV_CAPABILITIES_REQUEST / ENV_STATE_REQUEST in this path.
         - If any intent has no usable signifier match, return None (triggers normal LLM path).
-        - If structured_intents are provided, they are forwarded to build_bt_from_signifiers
-          so that set intents use the caller's value (not stale payload_hint) and modify
+        - Intent-aware payload handling is done inside build_bt_from_signifiers:
+          set intents use the caller's value (not stale payload_hint) and modify
           intents fall through to the LLM path.
         """
+        intent_strings = [i.to_query_string() for i in intents]
+
         try:
-            signifier_matches = await self._gather_signifier_matches(intents, workspace_id=workspace_id)
+            signifier_matches = await self._gather_signifier_matches(intent_strings, workspace_id=workspace_id)
         except Exception:
             return None
 
         if not isinstance(signifier_matches, dict) or not signifier_matches:
             return None
 
-        tree = build_bt_from_signifiers(signifier_matches, intents, structured_intents=structured_intents)
+        tree = build_bt_from_signifiers(signifier_matches, intents)
         if tree is None:
             return None
 
         # Collect signifier IDs used for traceability (all finals per intent)
         signifier_ids: List[str] = []
-        for intent in intents:
-            match_data = signifier_matches.get(intent, {})
+        for intent_str in intent_strings:
+            match_data = signifier_matches.get(intent_str, {})
             if isinstance(match_data, dict):
                 finals = match_data.get("final_matches", [])
                 signifier_ids.extend(str(f) for f in finals)
 
-        result: Dict[str, Any] = {
+        return {
             "plan_type": "behavior_tree",
             "tree": tree,
             "explanation": "Plan recovered from signifiers (no LLM call needed).",
-            "intents": intents,
+            "intents": [i.to_dict() for i in intents],
             "signifier_reuse": True,
             "signifier_ids": signifier_ids,
         }
-        if structured_intents:
-            result["structured_intents"] = structured_intents
-        return result
 
     async def _gather_planning_context(self, intents: List[str], workspace_id: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -784,8 +784,7 @@ class GoalRequestBehaviour(CyclicBehaviour):
         if msg.get_metadata("type") != MessageType.GOAL_REQUEST.value:
             return
 
-        intents: List[str] = []
-        structured_intents: Optional[List[dict]] = None
+        intent_objects: List[Intent] = []
         workspace_id: Optional[str] = None
         try:
             payload = json.loads(msg.body or "{}")
@@ -793,22 +792,24 @@ class GoalRequestBehaviour(CyclicBehaviour):
                 ws = payload.get("workspace_id") or payload.get("workspace")
                 if ws:
                     workspace_id = str(ws)
-                raw_si = payload.get("structured_intents")
-                if isinstance(raw_si, list) and all(isinstance(s, dict) for s in raw_si):
-                    structured_intents = raw_si
             raw_intents = payload.get("intents")
             if isinstance(raw_intents, list):
-                intents = [str(i).strip() for i in raw_intents if str(i).strip()]
+                for item in raw_intents:
+                    if isinstance(item, dict):
+                        intent_objects.append(Intent.from_dict(item))
+                    elif isinstance(item, str) and item.strip():
+                        # Bare string fallback
+                        intent_objects.append(Intent(action="unknown", artifact="unknown", intent_text=item.strip()))
             else:
                 goal_text = payload.get("intent") or payload.get("goal")
                 if goal_text:
-                    intents = [str(goal_text).strip()]
+                    intent_objects.append(Intent(action="unknown", artifact="unknown", intent_text=str(goal_text).strip()))
         except json.JSONDecodeError:
             if msg.body:
-                intents = [str(msg.body).strip()]
+                intent_objects.append(Intent(action="unknown", artifact="unknown", intent_text=str(msg.body).strip()))
 
-        intents = [i for i in intents if i]
-        if not intents:
+        intent_objects = [i for i in intent_objects if i.to_query_string().strip()]
+        if not intent_objects:
             reply = msg.make_reply()
             reply.set_metadata("type", MessageType.GOAL_RESPONSE.value)
             reply.body = json.dumps({"plan_type": "behavior_tree", "error": "missing_intent", "tree": None, "intents": []})
@@ -821,9 +822,10 @@ class GoalRequestBehaviour(CyclicBehaviour):
             await self.send(reply)
             return
 
+        intent_strings = [i.to_query_string() for i in intent_objects]
         logger.info(
             demo("Received GOAL_REQUEST: intents=%s workspace_id=%r from=%s"),
-            intents,
+            intent_strings,
             workspace_id,
             str(msg.sender),
         )
@@ -840,7 +842,7 @@ class GoalRequestBehaviour(CyclicBehaviour):
                     "error": "env_not_ready",
                     "detail": "Environment discovery not completed (timeout).",
                     "tree": None,
-                    "intents": intents,
+                    "intents": [i.to_dict() for i in intent_objects],
                 },
                 indent=2,
             )
@@ -852,7 +854,7 @@ class GoalRequestBehaviour(CyclicBehaviour):
             await self.send(reply)
             return
 
-        plan_json = await self.agent._generate_plan(intents, workspace_id=workspace_id, structured_intents=structured_intents)
+        plan_json = await self.agent._generate_plan(intent_objects, workspace_id=workspace_id)
 
         try:
             parsed_plan = json.loads(plan_json or "{}")

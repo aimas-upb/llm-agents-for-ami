@@ -172,17 +172,14 @@ class TestIntentCanonicalStrings:
         assert i.to_canonical_string() == "check light308"
 
     def test_intent_text_preferred_over_canonical(self):
-        """When intent_text is set, it should be preferred for signifier matching."""
+        """When intent_text is set, to_query_string() should prefer it."""
         i = Intent(action="set", artifact="light308", parameter="on_off", value=True,
                    intent_text="turn on the light")
-        # Simulate the intent string generation logic from behaviours._handle_goal
-        intent_str = i.intent_text or i.to_canonical_string()
-        assert intent_str == "turn on the light"
+        assert i.to_query_string() == "turn on the light"
 
     def test_canonical_fallback_when_no_intent_text(self):
         i = Intent(action="set", artifact="light308", parameter="on_off", value=True)
-        intent_str = i.intent_text or i.to_canonical_string()
-        assert intent_str == "set light308 on_off to True"
+        assert i.to_query_string() == "set light308 on_off to True"
 
 
 # Confirmation token tests

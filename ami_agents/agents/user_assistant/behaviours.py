@@ -192,7 +192,7 @@ class UserMessageBehaviour(CyclicBehaviour):
             conv.phase = ConversationPhase.IDLE
             return
 
-        intent_strings = [intent.intent_text or intent.to_canonical_string() for intent in conv.intents]
+        intent_strings = [intent.to_query_string() for intent in conv.intents]
         logger.info(demo("Derived intents: %s  workspace=%s"), intent_strings, conv.workspace_id)
 
         # Send GOAL_REQUEST to InteractionSolver (deterministic RPC)
@@ -204,8 +204,7 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         conv.phase = ConversationPhase.AWAITING_PLAN
         body: Dict[str, Any] = {
-            "intents": intent_strings,
-            "structured_intents": [i.to_dict() for i in conv.intents],
+            "intents": [i.to_dict() for i in conv.intents],
         }
         if conv.workspace_id:
             body["workspace_id"] = str(conv.workspace_id)
@@ -337,7 +336,12 @@ class UserMessageBehaviour(CyclicBehaviour):
             return ExecutionResult(success=False, error="Invalid plan JSON")
 
         tree_spec = plan_obj.get("tree", {})
-        intents = plan_obj.get("intents", [])
+        raw_intents = plan_obj.get("intents", [])
+        intents = [
+            Intent.from_dict(d) if isinstance(d, dict)
+            else Intent(action="unknown", artifact="unknown", intent_text=str(d))
+            for d in raw_intents
+        ]
         is_signifier_reuse = plan_obj.get("signifier_reuse", False)
 
         if not tree_spec or not isinstance(tree_spec, dict):
@@ -384,9 +388,13 @@ class UserMessageBehaviour(CyclicBehaviour):
         self, tree_spec: dict, intents: list, exec_result: ExecutionResult, thread: str
     ) -> None:
         """Extract and record signifiers from an executed BT."""
+        intent_strings = [
+            i.to_query_string() if isinstance(i, Intent) else str(i)
+            for i in intents
+        ]
         signifiers = extract_signifiers_from_bt(
             tree_spec=tree_spec,
-            intents=intents,
+            intents=intent_strings,
             was_successful=exec_result.success,
         )
         if not signifiers:

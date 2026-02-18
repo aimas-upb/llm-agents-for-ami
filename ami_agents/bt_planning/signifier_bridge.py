@@ -12,6 +12,8 @@ Functions:
 import logging
 from typing import Any, Optional
 
+from ami_agents.agents.user_assistant.models import Intent
+
 logger = logging.getLogger(__name__)
 
 
@@ -119,8 +121,7 @@ def _extract_action_name(url: str) -> str:
 
 def build_bt_from_signifiers(
     signifier_matches: dict,
-    intents: list[str],
-    structured_intents: list[dict] | None = None,
+    intents: list[Intent],
 ) -> Optional[dict]:
     """
     Construct a BT JSON IR directly from signifier matches (fast path).
@@ -131,23 +132,19 @@ def build_bt_from_signifiers(
     ``sequence`` node (ordered execution).  Multiple intents are
     wrapped in a ``parallel`` node (independent goals).
 
-    When *structured_intents* are provided, the function applies
-    intent-aware payload handling:
+    Intent-aware payload handling:
 
     - ``modify`` intents cause the fast path to bail out (returns None)
       because they require a read-compute-set pattern the LLM must handle.
     - ``set`` intents with an explicit value override the signifier's
       ``payload_hint`` so the user's actual target value is used.
     - ``check`` intents skip parameters entirely.
-    - When no structured intent is available, falls back to reusing the
-      signifier's ``payload_hint`` as-is (backward compatibility).
+    - Intents with an unknown action fall back to reusing the
+      signifier's ``payload_hint`` as-is.
 
     Args:
-        signifier_matches: Dict of intent -> match data
-        intents: List of intents to satisfy
-        structured_intents: Optional list of structured intent dicts
-            (parallel to *intents*) with keys ``action``, ``parameter``,
-            ``value``, etc.
+        signifier_matches: Dict of intent query string -> match data
+        intents: List of Intent objects to satisfy
 
     Returns:
         BT JSON IR dict if all intents have matches, None otherwise
@@ -155,23 +152,16 @@ def build_bt_from_signifiers(
     if not signifier_matches or not intents:
         return None
 
-    # Build lookup: intent_string -> structured_intent_dict
-    structured_map: dict[str, dict] = {}
-    if structured_intents and len(structured_intents) == len(intents):
-        for intent_str, si in zip(intents, structured_intents):
-            if isinstance(si, dict):
-                structured_map[intent_str] = si
-
     intent_nodes: list[dict] = []
 
     for intent in intents:
-        si = structured_map.get(intent)
+        query_str = intent.to_query_string()
 
         # modify intents require read-compute-set — bail to LLM path
-        if si and si.get("action") == "modify":
+        if intent.action == "modify":
             return None
 
-        match_data = signifier_matches.get(intent)
+        match_data = signifier_matches.get(query_str)
         if not isinstance(match_data, dict):
             return None  # Not all intents matched
 
@@ -194,16 +184,16 @@ def build_bt_from_signifiers(
                 return None
 
             action_node: dict[str, Any] = {
-                "name": f"action_{intent.replace(' ', '_')[:30]}",
+                "name": f"action_{query_str.replace(' ', '_')[:30]}",
                 "type": "action",
                 "action_url": affordance_uri,
             }
 
             # Intent-aware payload selection
-            if si and si.get("action") == "set" and si.get("value") is not None and si.get("parameter"):
+            if intent.action == "set" and intent.value is not None and intent.parameter:
                 # Use the caller's actual target value, not the stale signifier hint
-                action_node["parameters"] = {si["parameter"]: si["value"]}
-            elif si and si.get("action") == "check":
+                action_node["parameters"] = {intent.parameter: intent.value}
+            elif intent.action == "check":
                 pass  # check intents have no parameters
             else:
                 # Fallback: reuse signifier's payload_hint as-is
@@ -218,7 +208,7 @@ def build_bt_from_signifiers(
             intent_nodes.append(intent_actions[0])
         else:
             intent_nodes.append({
-                "name": f"Sequence_{intent.replace(' ', '_')[:25]}",
+                "name": f"Sequence_{query_str.replace(' ', '_')[:25]}",
                 "type": "sequence",
                 "children": intent_actions,
             })

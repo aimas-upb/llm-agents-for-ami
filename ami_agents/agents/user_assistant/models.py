@@ -40,6 +40,15 @@ class Intent:
     value: Optional[Any] = None
     intent_text: Optional[str] = None
 
+    def to_query_string(self) -> str:
+        """Preferred string form for signifier queries and LLM prompts.
+
+        Prefers ``intent_text`` (the user's original phrasing, better for
+        embedding-based similarity search) and falls back to
+        ``to_canonical_string()`` when ``intent_text`` is not available.
+        """
+        return self.intent_text or self.to_canonical_string()
+
     def to_canonical_string(self) -> str:
         """Convert to the canonical string form expected by InteractionSolver."""
         if self.action == "check":

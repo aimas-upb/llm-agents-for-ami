@@ -76,6 +76,17 @@ class TestIntent:
         i = Intent(action="set", artifact="light308", parameter="on_off", value=True)
         assert i.intent_text is None
 
+    # to_query_string
+
+    def test_to_query_string_prefers_intent_text(self):
+        i = Intent(action="set", artifact="light308", parameter="on_off", value=True,
+                   intent_text="turn on the light")
+        assert i.to_query_string() == "turn on the light"
+
+    def test_to_query_string_falls_back_to_canonical(self):
+        i = Intent(action="set", artifact="light308", parameter="brightness", value=75)
+        assert i.to_query_string() == "set light308 brightness to 75"
+
     # serialization
 
     def test_to_dict(self):

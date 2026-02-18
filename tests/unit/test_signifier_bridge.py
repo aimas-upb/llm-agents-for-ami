@@ -4,6 +4,7 @@ Unit tests for BT <-> Signifier conversion (signifier_bridge).
 
 import pytest
 
+from ami_agents.agents.user_assistant.models import Intent
 from ami_agents.bt_planning.signifier_bridge import (
     extract_signifiers_from_bt,
     build_bt_from_signifiers,
@@ -92,10 +93,14 @@ class TestExtractSignifiers:
 class TestBuildBTFromSignifiers:
     """Tests for build_bt_from_signifiers()."""
 
+    def _intent(self, intent_text, action="unknown", artifact="unknown", parameter=None, value=None):
+        """Helper to create an Intent with intent_text matching the signifier_matches key."""
+        return Intent(action=action, artifact=artifact, parameter=parameter, value=value, intent_text=intent_text)
+
     def test_build_single_intent(self, sample_signifier_matches):
         bt = build_bt_from_signifiers(
             signifier_matches=sample_signifier_matches,
-            intents=["increase light level"],
+            intents=[self._intent("increase light level")],
         )
         assert bt is not None
         assert bt["type"] == "action"
@@ -115,7 +120,7 @@ class TestBuildBTFromSignifiers:
         }
         bt = build_bt_from_signifiers(
             signifier_matches=matches,
-            intents=["turn on light", "open blinds"],
+            intents=[self._intent("turn on light"), self._intent("open blinds")],
         )
         assert bt is not None
         assert bt["type"] == "parallel"
@@ -124,14 +129,14 @@ class TestBuildBTFromSignifiers:
     def test_build_returns_none_if_no_matches(self):
         bt = build_bt_from_signifiers(
             signifier_matches={},
-            intents=["test"],
+            intents=[self._intent("test")],
         )
         assert bt is None
 
     def test_build_returns_none_if_partial_match(self, sample_signifier_matches):
         bt = build_bt_from_signifiers(
             signifier_matches=sample_signifier_matches,
-            intents=["increase light level", "unmatched intent"],
+            intents=[self._intent("increase light level"), self._intent("unmatched intent")],
         )
         assert bt is None
 
@@ -151,7 +156,7 @@ class TestBuildBTFromSignifiers:
         }
         bt = build_bt_from_signifiers(
             signifier_matches=matches,
-            intents=["test"],
+            intents=[self._intent("test")],
         )
         assert bt is None
 
@@ -161,7 +166,7 @@ class TestBuildBTFromSignifiers:
         """1 intent with 2 final_matches → sequence of 2 actions."""
         bt = build_bt_from_signifiers(
             signifier_matches=sample_multi_action_signifier_matches,
-            intents=["increase light level"],
+            intents=[self._intent("increase light level")],
         )
         assert bt is not None
         assert bt["type"] == "sequence"
@@ -173,7 +178,7 @@ class TestBuildBTFromSignifiers:
         """Actions appear in same order as final_matches."""
         bt = build_bt_from_signifiers(
             signifier_matches=sample_multi_action_signifier_matches,
-            intents=["increase light level"],
+            intents=[self._intent("increase light level")],
         )
         assert bt is not None
         urls = [c["action_url"] for c in bt["children"]]
@@ -184,7 +189,7 @@ class TestBuildBTFromSignifiers:
         """Each action retains its own payload_hint."""
         bt = build_bt_from_signifiers(
             signifier_matches=sample_multi_action_signifier_matches,
-            intents=["increase light level"],
+            intents=[self._intent("increase light level")],
         )
         assert bt is not None
         # First action has empty payload (no parameters key)
@@ -201,7 +206,7 @@ class TestBuildBTFromSignifiers:
         }
         bt = build_bt_from_signifiers(
             signifier_matches=matches,
-            intents=["increase light level", "open blinds"],
+            intents=[self._intent("increase light level"), self._intent("open blinds")],
         )
         assert bt is not None
         assert bt["type"] == "parallel"
@@ -232,7 +237,7 @@ class TestBuildBTFromSignifiers:
         }
         bt = build_bt_from_signifiers(
             signifier_matches=matches,
-            intents=["increase light", "adjust blinds"],
+            intents=[self._intent("increase light"), self._intent("adjust blinds")],
         )
         assert bt is not None
         assert bt["type"] == "parallel"
@@ -241,24 +246,23 @@ class TestBuildBTFromSignifiers:
         assert bt["children"][1]["type"] == "sequence"
 
     def test_build_multi_action_single_intent_single_match(self, sample_signifier_matches):
-        """1 intent with 1 final_match → still returns single action node (backward compat)."""
+        """1 intent with 1 final_match → still returns single action node."""
         bt = build_bt_from_signifiers(
             signifier_matches=sample_signifier_matches,
-            intents=["increase light level"],
+            intents=[self._intent("increase light level")],
         )
         assert bt is not None
         assert bt["type"] == "action"
         assert "set_brightness" in bt["action_url"]
 
-    # Structured intent override tests
+    # Intent-aware payload tests
 
-    def test_build_overrides_payload_with_structured_intent(self, sample_signifier_matches):
+    def test_build_set_intent_overrides_payload(self, sample_signifier_matches):
         """set intent with explicit value overrides the signifier's payload_hint."""
-        structured = [{"action": "set", "artifact": "light308", "parameter": "brightness", "value": 50}]
         bt = build_bt_from_signifiers(
             signifier_matches=sample_signifier_matches,
-            intents=["increase light level"],
-            structured_intents=structured,
+            intents=[Intent(action="set", artifact="light308", parameter="brightness", value=50,
+                            intent_text="increase light level")],
         )
         assert bt is not None
         # Should use intent's value (50) not signifier's payload_hint (100)
@@ -266,21 +270,19 @@ class TestBuildBTFromSignifiers:
 
     def test_build_returns_none_for_modify_intent(self, sample_signifier_matches):
         """modify intents cannot be fast-pathed (need read-compute-set)."""
-        structured = [{"action": "modify", "artifact": "light308", "parameter": "brightness", "value": 10}]
         bt = build_bt_from_signifiers(
             signifier_matches=sample_signifier_matches,
-            intents=["increase light level"],
-            structured_intents=structured,
+            intents=[Intent(action="modify", artifact="light308", parameter="brightness", value=10,
+                            intent_text="increase light level")],
         )
         assert bt is None
 
     def test_build_returns_none_for_modify_without_value(self, sample_signifier_matches):
         """modify intents with null value also bail from fast path."""
-        structured = [{"action": "modify", "artifact": "light308", "parameter": "brightness", "value": None}]
         bt = build_bt_from_signifiers(
             signifier_matches=sample_signifier_matches,
-            intents=["increase light level"],
-            structured_intents=structured,
+            intents=[Intent(action="modify", artifact="light308", parameter="brightness",
+                            intent_text="increase light level")],
         )
         assert bt is None
 
@@ -292,34 +294,18 @@ class TestBuildBTFromSignifiers:
                 "final_matches": ["s1"],
             },
         }
-        structured = [{"action": "check", "artifact": "light308"}]
         bt = build_bt_from_signifiers(
             signifier_matches=matches,
-            intents=["check light"],
-            structured_intents=structured,
+            intents=[Intent(action="check", artifact="light308", intent_text="check light")],
         )
         assert bt is not None
         assert "parameters" not in bt
 
-    def test_build_backward_compat_without_structured(self, sample_signifier_matches):
-        """Without structured_intents, falls back to signifier payload_hint (backward compat)."""
+    def test_build_unknown_action_uses_payload_hint(self, sample_signifier_matches):
+        """Intent with unknown action falls back to signifier payload_hint."""
         bt = build_bt_from_signifiers(
             signifier_matches=sample_signifier_matches,
-            intents=["increase light level"],
-            structured_intents=None,
+            intents=[self._intent("increase light level")],
         )
         assert bt is not None
-        assert bt["parameters"] == {"brightness": 100}  # Original signifier payload
-
-    def test_build_structured_length_mismatch_falls_back(self, sample_signifier_matches):
-        """If structured_intents length doesn't match intents, falls back to payload_hint."""
-        structured = [{"action": "set", "artifact": "light308", "parameter": "brightness", "value": 50},
-                      {"action": "set", "artifact": "other", "parameter": "x", "value": 1}]
-        bt = build_bt_from_signifiers(
-            signifier_matches=sample_signifier_matches,
-            intents=["increase light level"],  # Only 1 intent but 2 structured
-            structured_intents=structured,
-        )
-        assert bt is not None
-        # Length mismatch → structured_map not populated → falls back to payload_hint
         assert bt["parameters"] == {"brightness": 100}
