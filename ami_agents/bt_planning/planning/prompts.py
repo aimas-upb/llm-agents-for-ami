@@ -103,9 +103,17 @@ def format_capability_context(
     return "\n".join(lines) if lines else "No affordances available."
 
 
+EXPLICIT_SIMILARITY_THRESHOLD = 0.95
+
+
 def format_signifier_hints(signifier_matches: dict | None) -> str:
     """
     Format signifier matches as BT planning hints.
+
+    Matches above ``EXPLICIT_SIMILARITY_THRESHOLD`` are labelled as *exact*
+    (reuse affordance **and** parameters as-is).  Lower-similarity matches
+    are labelled as *suggested* (reuse affordance, but adjust parameters to
+    the current context).
 
     Args:
         signifier_matches: Dict of intent -> match data from EnvExplorer/community
@@ -146,14 +154,19 @@ def format_signifier_hints(signifier_matches: dict | None) -> str:
                 best_match = matches[0]
 
         if best_match:
+            similarity = best_match.get("intent_similarity", best_match.get("similarity"))
+            is_explicit = (similarity is not None and float(similarity) >= EXPLICIT_SIMILARITY_THRESHOLD)
+
             lines.append(f"Intent: \"{intent}\"")
             aff_uri = best_match.get("affordance_uri", "")
             if aff_uri:
                 lines.append(f"  Recommended action_url: {aff_uri}")
             payload = best_match.get("payload_hint") or best_match.get("payload")
             if payload:
-                lines.append(f"  Recommended parameters: {payload}")
-            similarity = best_match.get("intent_similarity", best_match.get("similarity"))
+                if is_explicit:
+                    lines.append(f"  Exact match -- reuse these parameters as-is: {payload}")
+                else:
+                    lines.append(f"  Suggested parameters (adjust to current context): {payload}")
             if similarity is not None:
                 lines.append(f"  Confidence: {similarity}")
             source = best_match.get("source", "")

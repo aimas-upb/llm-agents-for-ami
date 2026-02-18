@@ -197,6 +197,32 @@ def sample_signifier_matches():
 
 
 @pytest.fixture
+def sample_multi_action_signifier_matches():
+    """Signifier matches where one intent maps to multiple actions (multi-action reuse)."""
+    return {
+        "increase light level": {
+            "matches": [
+                {
+                    "signifier_id": "sig-001",
+                    "affordance_uri": "http://localhost:8080/workspaces/lab308/artifacts/light308/turn_on",
+                    "payload_hint": {},
+                    "intent_similarity": 0.92,
+                    "source": "lab308",
+                },
+                {
+                    "signifier_id": "sig-002",
+                    "affordance_uri": "http://localhost:8080/workspaces/lab308/artifacts/light308/set_brightness",
+                    "payload_hint": {"brightness": 100},
+                    "intent_similarity": 0.88,
+                    "source": "lab308",
+                },
+            ],
+            "final_matches": ["sig-001", "sig-002"],
+        },
+    }
+
+
+@pytest.fixture
 def sample_state():
     """Sample environment state."""
     return {

@@ -732,7 +732,7 @@ class OrchestratorAgent(Agent):
                     self.agent,
                     to_jid=self.agent.solver_jid,
                     request_type=MessageType.GOAL_REQUEST.value,
-                    body={"intents": [match_intent], "workspace_id": "lab308"},
+                    body={"intents": [{"action": "unknown", "artifact": "unknown", "intent_text": match_intent}], "workspace_id": "lab308"},
                     expect_type=MessageType.PLAN_CREATED.value,
                     timeout=90.0,
                     thread=self.agent.thread_id,
