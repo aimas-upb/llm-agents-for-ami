@@ -477,6 +477,7 @@ class EnvExplorerAgent(Agent, IAgent):
         matcher_version: Optional[str] = None,
         min_similarity: Optional[float] = None,
         intent_type: Optional[str] = None,
+        query_structured_intent: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         await self._ensure_rd4_engine_ready()
 
@@ -528,6 +529,7 @@ class EnvExplorerAgent(Agent, IAgent):
                 k=int(k),
                 version=version_to_use,
                 min_similarity=float(min_similarity),
+                query_structured_intent=query_structured_intent,
             )
         except Exception:
             version_to_use = "v0"
@@ -536,6 +538,7 @@ class EnvExplorerAgent(Agent, IAgent):
                 signifiers=signifier_dicts,
                 k=int(k),
                 version=version_to_use,
+                query_structured_intent=query_structured_intent,
             )
 
         context_graph, _ = self._rd4_context_builder.normalize_context(context)
@@ -753,6 +756,67 @@ class EnvExplorerAgent(Agent, IAgent):
 
         return "\n".join(shapes_lines)
 
+    def _generate_nl_description(
+        self, structured_conditions: List[Dict[str, Any]], ctx_meta: Dict[str, Any]
+    ) -> str:
+        """
+        Generate natural language description from structured conditions.
+
+        Converts structured conditions into human-readable text.
+        Falls back to workspace metadata if no conditions available.
+
+        Args:
+            structured_conditions: List of condition dicts with artifact, property, value_conditions
+            ctx_meta: Context metadata (workspace_id, was_successful, etc.)
+
+        Returns:
+            Natural language description string
+        """
+        if structured_conditions and isinstance(structured_conditions, list) and len(structured_conditions) > 0:
+            # Build description from conditions
+            parts = []
+            for cond in structured_conditions:
+                if not isinstance(cond, dict):
+                    continue
+
+                artifact = cond.get("artifact", "")
+                prop = cond.get("property_affordance", "")
+                value_conditions = cond.get("value_conditions", [])
+
+                # Extract artifact ID from URI (e.g., "lights_308" from full URI)
+                artifact_id = artifact.rstrip("/").rsplit("/", 1)[-1] if artifact else "artifact"
+                # Extract property name from URI
+                prop_name = prop.rstrip("/").rsplit("/", 1)[-1] if prop else "property"
+
+                # Format value conditions
+                for vc in value_conditions:
+                    if not isinstance(vc, dict):
+                        continue
+                    operator = vc.get("operator", "equals")
+                    value = vc.get("value")
+
+                    if operator == "equals":
+                        parts.append(f"{artifact_id} {prop_name} is {value}")
+                    elif operator == "greater_than":
+                        parts.append(f"{artifact_id} {prop_name} > {value}")
+                    elif operator == "greater_than_or_equal":
+                        parts.append(f"{artifact_id} {prop_name} >= {value}")
+                    elif operator == "less_than":
+                        parts.append(f"{artifact_id} {prop_name} < {value}")
+                    elif operator == "less_than_or_equal":
+                        parts.append(f"{artifact_id} {prop_name} <= {value}")
+                    elif operator == "not_equals":
+                        parts.append(f"{artifact_id} {prop_name} != {value}")
+
+            if parts:
+                return "; ".join(parts)
+
+        # Fallback: use workspace metadata
+        workspace_id = ctx_meta.get("workspace_id", "unknown")
+        was_successful = ctx_meta.get("was_successful", True)
+        status = "successful" if was_successful else "failed"
+        return f"Execution in workspace {workspace_id} ({status})"
+
     async def _rd4_record_execution(
         self,
         *,
@@ -803,6 +867,15 @@ class EnvExplorerAgent(Agent, IAgent):
                     if action_name:
                         intent_structured["action_name"] = str(action_name)
 
+                    # Include original structured_intent (action, artifact, parameter, value) if available
+                    structured_intent_orig = sig_dict.get("structured_intent")
+                    if structured_intent_orig and isinstance(structured_intent_orig, dict):
+                        intent_structured["structured_intent"] = structured_intent_orig
+                        self.logger.info(
+                            demo("[STRUCTURED_INTENT] Preserving original structured_intent: %s"),
+                            structured_intent_orig
+                        )
+
                     # Build context metadata
                     ctx_meta = {
                         "workspace_id": sig_dict.get("workspace_id"),
@@ -848,6 +921,9 @@ class EnvExplorerAgent(Agent, IAgent):
                             signifier_id,
                         )
 
+                    # Generate natural language description from structured conditions
+                    nl_description = self._generate_nl_description(structured_conditions, ctx_meta)
+
                     signifier = RD4Signifier(
                         signifier_id=signifier_id,
                         version=1,
@@ -857,7 +933,7 @@ class EnvExplorerAgent(Agent, IAgent):
                             structured=intent_structured
                         ),
                         context=IntentContext(
-                            nl_description=json.dumps(ctx_meta),
+                            nl_description=nl_description,
                             structured_conditions=structured_conditions,
                             shacl_shapes=shacl_shapes,  # Generated from structured_conditions
                         ),
@@ -1014,14 +1090,18 @@ class EnvExplorerAgent(Agent, IAgent):
                 "thread": thread,
                 "step_id": step_id,
                 "evidence": evidence,
+                "was_successful": True,  # OLD PATH assumes success
             }
+
+            # Generate natural language description
+            nl_description = self._generate_nl_description([], ctx_meta)
 
             signifier = RD4Signifier(
                 signifier_id=signifier_id,
                 version=1,
                 status=SignifierStatus.ACTIVE,
                 intent=IntentionDescription(nl_text=intent, structured=intent_structured),
-                context=IntentContext(nl_description=json.dumps(ctx_meta), structured_conditions=[], shacl_shapes=shacl_shapes),
+                context=IntentContext(nl_description=nl_description, structured_conditions=[], shacl_shapes=shacl_shapes),
                 affordance_uri=affordance_uri,
                 provenance=Provenance(created_by=str(sender or self.jid), source="execution"),
             )
@@ -1509,6 +1589,7 @@ class SignifierRequestHandler(CyclicBehaviour):
             matcher_version = payload.get("matcher_version")
             min_similarity = payload.get("min_similarity")
             intent_type = payload.get("intent_type")  # Extract intent_type for filtering/ranking
+            query_structured_intent = payload.get("query_structured_intent")  # Extract structured_intent for v2 matcher
 
             response_payload = await self.agent._rd4_match_signifiers(
                 intent=str(intent),
@@ -1517,6 +1598,7 @@ class SignifierRequestHandler(CyclicBehaviour):
                 matcher_version=str(matcher_version) if matcher_version else None,
                 min_similarity=float(min_similarity) if min_similarity is not None else None,
                 intent_type=str(intent_type).upper() if intent_type and str(intent_type).upper() in ("EXPLICIT", "IMPLICIT") else None,
+                query_structured_intent=query_structured_intent if isinstance(query_structured_intent, dict) else None,
             )
             reply_type = MessageType.SIGNIFIER_MATCH_RESPONSE.value
 

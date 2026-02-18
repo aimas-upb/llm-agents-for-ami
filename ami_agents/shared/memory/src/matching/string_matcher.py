@@ -30,6 +30,7 @@ class StringContainsMatcher(IntentMatcher):
         signifiers: List[Dict[str, Any]],
         k: int = 10,
         case_sensitive: bool = False,
+        min_similarity: float = 0.0,
         **kwargs,
     ) -> List[MatchResult]:
         """Match intent query using string containment.
@@ -39,6 +40,7 @@ class StringContainsMatcher(IntentMatcher):
             signifiers: List of signifier dictionaries
             k: Number of top results to return
             case_sensitive: Whether matching should be case-sensitive
+            min_similarity: Minimum similarity threshold (0.0 to 1.0)
             **kwargs: Additional parameters (ignored)
 
         Returns:
@@ -62,7 +64,8 @@ class StringContainsMatcher(IntentMatcher):
                 query_tokens, signifier, case_sensitive
             )
 
-            if similarity > 0:
+            # Filter by minimum similarity threshold
+            if similarity >= min_similarity:
                 results.append(
                     MatchResult(
                         signifier_id=signifier.get("signifier_id", "unknown"),
@@ -79,7 +82,7 @@ class StringContainsMatcher(IntentMatcher):
         results.sort(key=lambda x: x.similarity, reverse=True)
 
         logger.info(
-            f"String matching found {len(results)} matches, returning top {k}"
+            f"String matching found {len(results)} matches (min_similarity={min_similarity}), returning top {k}"
         )
         return results[:k]
 

@@ -334,6 +334,58 @@ class RequestInteractionPlanTool(LLMTool):
     def set_agent(self, agent):
         self.agent = agent
 
+    def _validate_and_correct_intent_type(
+        self,
+        intents: List[str],
+        intent_type: str,
+        user_message: str
+    ) -> str:
+        """
+        Validate intent_type consistency with user's original message.
+
+        Checks if LLM inferred artifact IDs not present in user's request.
+        If so, overrides intent_type to 'implicit' and logs a warning.
+
+        Args:
+            intents: List of canonical intent strings
+            intent_type: LLM-determined intent type ('implicit' or 'explicit')
+            user_message: User's original message (lowercase)
+
+        Returns:
+            Corrected intent_type
+        """
+        import re
+
+        if not user_message:
+            # No user message available, trust LLM classification
+            return intent_type
+
+        # Check each intent for artifact ID patterns (e.g., "lights_308", "blinds_308")
+        for intent_str in intents:
+            # Pattern: <name>_<digits> (e.g., lights_308, blinds_308, thermostat_22)
+            artifact_ids = re.findall(r'\b(\w+_\d+)\b', intent_str)
+
+            for artifact_id in artifact_ids:
+                # Check if user actually mentioned this artifact ID
+                # Also check for variations without underscore (e.g., "light308" vs "lights_308")
+                artifact_id_no_underscore = artifact_id.replace("_", "")
+
+                if artifact_id.lower() not in user_message and artifact_id_no_underscore.lower() not in user_message:
+                    # LLM inferred artifact ID that user didn't say!
+                    logger.warning(
+                        demo("INTENT_TYPE MISMATCH DETECTED: LLM inferred artifact ID '%s' not in user message '%s'"),
+                        artifact_id,
+                        user_message[:100]  # Truncate for logging
+                    )
+                    logger.warning(
+                        demo("Overriding intent_type from '%s' to 'implicit' (user didn't specify exact artifact)"),
+                        intent_type.upper()
+                    )
+                    return "implicit"  # Override to implicit
+
+        # All artifact IDs in intents match user's message, classification is correct
+        return intent_type
+
     async def run_impl(self, intent_list: List[str], workspace_id: str | None = None, intent_type: str = "implicit"):
         if not self.agent:
             return "Error: Agent not initialized in tool."
@@ -359,6 +411,10 @@ class RequestInteractionPlanTool(LLMTool):
         if intent_type not in ("implicit", "explicit"):
             logger.warning(demo("Invalid intent_type=%r, defaulting to 'implicit'"), intent_type)
             intent_type = "implicit"
+
+        # CRITICAL VALIDATION: Check consistency between intent_type and user's original message
+        user_message = getattr(self.agent, "_last_user_message", "").lower()
+        intent_type = self._validate_and_correct_intent_type(intents, intent_type, user_message)
 
         thread = getattr(self.agent, "active_conversation_id", None)
         timeout = float((getattr(self.agent, "config", {}) or {}).get("planning", {}).get("timeout", 60))

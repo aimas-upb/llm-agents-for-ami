@@ -24,6 +24,7 @@ def extract_signifiers_from_bt(
     workspace_id: Optional[str] = None,
     state_snapshot: Optional[dict] = None,
     intent_type: Optional[str] = None,
+    structured_intents: list[dict] | None = None,
 ) -> list[dict]:
     """
     Walk a BT JSON IR tree and extract signifier-worthy leaf nodes.
@@ -42,12 +43,26 @@ def extract_signifiers_from_bt(
         workspace_id: Optional workspace URI for context
         state_snapshot: Optional state snapshot from execution context for building structured_conditions
         intent_type: Intent type classification (EXPLICIT or IMPLICIT)
+        structured_intents: Optional list of structured intent dicts for artifact-based matching
 
     Returns:
         List of signifier dicts ready for recording
     """
+    # Build artifact_id -> intent_string mapping for accurate matching
+    artifact_to_intent: dict[str, str] = {}
+    # Build intent_string -> structured_intent_dict mapping for storage
+    intent_to_structured: dict[str, dict] = {}
+    if structured_intents and len(structured_intents) == len(intents):
+        for intent_str, si in zip(intents, structured_intents):
+            if isinstance(si, dict):
+                if "artifact" in si:
+                    artifact_id = str(si["artifact"])
+                    artifact_to_intent[artifact_id] = intent_str
+                # Store the full structured_intent for later use
+                intent_to_structured[intent_str] = si
+
     signifiers: list[dict] = []
-    _walk_tree(tree_spec, intents, was_successful, signifiers, workspace_id, state_snapshot, intent_type)
+    _walk_tree(tree_spec, intents, was_successful, signifiers, workspace_id, state_snapshot, intent_type, artifact_to_intent, intent_to_structured)
     return signifiers
 
 
@@ -59,6 +74,8 @@ def _walk_tree(
     workspace_id: Optional[str],
     state_snapshot: Optional[dict],
     intent_type: Optional[str],
+    artifact_to_intent: dict[str, str],
+    intent_to_structured: dict[str, dict],
     depth: int = 0,
 ) -> None:
     """Recursively walk the tree and collect action nodes as signifiers."""
@@ -72,15 +89,16 @@ def _walk_tree(
         parameters = node.get("parameters", {})
         node_name = node.get("name", "")
 
-        # Try to match this action to an intent
-        intent = _match_node_to_intent(node_name, action_url, intents)
+        # Try to match this action to an intent (using artifact-based matching if available)
+        intent = _match_node_to_intent(node_name, action_url, intents, artifact_to_intent)
 
         # Extract structured conditions from state snapshot
         structured_conditions = _extract_conditions_from_state(
             state_snapshot, workspace_id, action_url, parameters
         )
 
-        signifiers.append({
+        # Build signifier dict with structured_intent if available
+        sig_dict = {
             "intent": intent,
             "affordance_uri": action_url,
             "action_name": _extract_action_name(action_url),
@@ -91,24 +109,73 @@ def _walk_tree(
             "node_name": node_name,
             "structured_conditions": structured_conditions,
             "intent_type": intent_type,  # Add intent_type for memory engine filtering
-        })
+        }
+
+        # Add original structured_intent if available for this intent
+        if intent in intent_to_structured:
+            sig_dict["structured_intent"] = intent_to_structured[intent]
+
+        signifiers.append(sig_dict)
 
     elif node_type in ("sequence", "selector", "parallel"):
         for child in node.get("children", []):
-            _walk_tree(child, intents, was_successful, signifiers, workspace_id, state_snapshot, intent_type, depth + 1)
+            _walk_tree(child, intents, was_successful, signifiers, workspace_id, state_snapshot, intent_type, artifact_to_intent, intent_to_structured, depth + 1)
 
 
 def _match_node_to_intent(
     node_name: str,
     action_url: str,
     intents: list[str],
+    artifact_to_intent: dict[str, str],
 ) -> str:
     """
     Try to match a BT node to one of the intents.
 
-    Uses simple heuristic: check if intent keywords appear in the node name.
-    Falls back to the first intent if no match found.
+    Strategy:
+    1. If artifact_to_intent mapping is available, extract artifact_id from action_url
+       and look up the corresponding intent (most accurate)
+    2. Otherwise, use keyword-based heuristic matching
+    3. Falls back to first intent if no match found
+
+    Args:
+        node_name: Name of the BT action node
+        action_url: Affordance URL of the action
+        intents: List of intent strings
+        artifact_to_intent: Mapping from artifact_id to intent_string (from structured_intents)
+
+    Returns:
+        The matched intent string
     """
+    # STRATEGY 1: Artifact-based matching (most accurate)
+    if artifact_to_intent:
+        # Extract artifact_id from action_url
+        # e.g., "http://localhost:8080/workspaces/lab308/artifacts/lights_308/ha/light/turn_on"
+        #       -> "lights_308"
+        if "/artifacts/" in action_url:
+            parts = action_url.split("/artifacts/")
+            if len(parts) > 1:
+                # Get the part after "/artifacts/" and extract first segment
+                artifact_part = parts[1].split("/")[0]
+                # Try exact match
+                if artifact_part in artifact_to_intent:
+                    logger.info(
+                        demo("[INTENT_MATCH] Exact artifact match: artifact=%s -> intent=%r"),
+                        artifact_part,
+                        artifact_to_intent[artifact_part]
+                    )
+                    return artifact_to_intent[artifact_part]
+                # Try partial match (e.g., "lights_308" in URL fragment with anchor)
+                for artifact_id, intent_str in artifact_to_intent.items():
+                    if artifact_id in artifact_part:
+                        logger.info(
+                            demo("[INTENT_MATCH] Partial artifact match: artifact=%s (from %s) -> intent=%r"),
+                            artifact_id,
+                            artifact_part,
+                            intent_str
+                        )
+                        return intent_str
+
+    # STRATEGY 2: Keyword-based matching (fallback)
     node_name_lower = node_name.lower()
     action_name = _extract_action_name(action_url).lower().replace("_", " ")
 
@@ -144,8 +211,24 @@ def _match_node_to_intent(
                 best_overlap_size = overlap_size
                 best_intent = intent
 
-    # Return best match or default to first intent
-    return best_intent if best_intent else (intents[0] if intents else "unknown")
+    if best_intent:
+        logger.info(
+            demo("[INTENT_MATCH] Keyword-based match: node=%s action=%s -> intent=%r"),
+            node_name,
+            action_name,
+            best_intent
+        )
+        return best_intent
+
+    # STRATEGY 3: Fallback to first intent
+    fallback = intents[0] if intents else "unknown"
+    logger.warning(
+        demo("[INTENT_MATCH] No match found, falling back to first intent: %r (node=%s, action_url=%s)"),
+        fallback,
+        node_name,
+        action_url
+    )
+    return fallback
 
 
 def _extract_action_name(url: str) -> str:
@@ -292,19 +375,54 @@ def _extract_conditions_from_state(
     return result
 
 
+def _resolve_final_matches(finals: list, matches: list[dict]) -> list[dict]:
+    """Resolve final_match IDs to full match dicts, preserving order.
+
+    Falls back to ``[matches[0]]`` when no *finals* can be resolved.
+    """
+    matches_by_id = {str(m.get("signifier_id")): m for m in matches}
+    resolved = []
+    for fid in finals:
+        m = matches_by_id.get(str(fid))
+        if m:
+            resolved.append(m)
+    # Fallback: if no finals resolved, use first match
+    if not resolved and matches:
+        resolved = [matches[0]]
+    return resolved
+
+
 def build_bt_from_signifiers(
     signifier_matches: dict,
     intents: list[str],
+    structured_intents: list[dict] | None = None,
 ) -> Optional[dict]:
     """
     Construct a BT JSON IR directly from signifier matches (fast path).
 
     If ALL intents have matching signifiers, we can build a plan
-    without calling the LLM.
+    without calling the LLM.  When an intent has multiple
+    ``final_matches``, the corresponding actions are wrapped in a
+    ``sequence`` node (ordered execution).  Multiple intents are
+    wrapped in a ``parallel`` node (independent goals).
+
+    When *structured_intents* are provided, the function applies
+    intent-aware payload handling:
+
+    - ``modify`` intents cause the fast path to bail out (returns None)
+      because they require a read-compute-set pattern the LLM must handle.
+    - ``set`` intents with an explicit value override the signifier's
+      ``payload_hint`` so the user's actual target value is used.
+    - ``check`` intents skip parameters entirely.
+    - When no structured intent is available, falls back to reusing the
+      signifier's ``payload_hint`` as-is (backward compatibility).
 
     Args:
         signifier_matches: Dict of intent -> match data
         intents: List of intents to satisfy
+        structured_intents: Optional list of structured intent dicts
+            (parallel to *intents*) with keys ``action``, ``parameter``,
+            ``value``, etc.
 
     Returns:
         BT JSON IR dict if all intents have matches, None otherwise
@@ -312,9 +430,26 @@ def build_bt_from_signifiers(
     if not signifier_matches or not intents:
         return None
 
-    action_nodes: list[dict] = []
+    # Build lookup: intent_string -> structured_intent_dict
+    structured_map: dict[str, dict] = {}
+    if structured_intents and len(structured_intents) == len(intents):
+        for intent_str, si in zip(intents, structured_intents):
+            if isinstance(si, dict):
+                structured_map[intent_str] = si
+        logger.info(demo("build_bt_from_signifiers: received %d structured_intents for parameter adaptation"), len(structured_intents))
+    else:
+        logger.info(demo("build_bt_from_signifiers: NO structured_intents, using backward compatibility mode (direct payload_hint copy)"))
+
+    intent_nodes: list[dict] = []
 
     for intent in intents:
+        si = structured_map.get(intent)
+
+        # modify intents require read-compute-set — bail to LLM path
+        if si and si.get("action") == "modify":
+            logger.info(demo("build_bt_from_signifiers: MODIFY action detected for intent=%r, bailing to LLM path"), intent)
+            return None
+
         match_data = signifier_matches.get(intent)
         if not isinstance(match_data, dict):
             return None  # Not all intents matched
@@ -325,47 +460,69 @@ def build_bt_from_signifiers(
         if not finals and not matches:
             return None  # This intent has no match
 
-        # Find best match
-        best_match = None
-        if matches:
-            if finals:
-                for m in matches:
-                    if str(m.get("signifier_id")) == str(finals[0]):
-                        best_match = m
-                        break
-            if not best_match:
-                best_match = matches[0]
-
-        if not best_match:
+        # Resolve ALL final_matches to their full match dicts
+        resolved = _resolve_final_matches(finals, matches)
+        if not resolved:
             return None
 
-        affordance_uri = best_match.get("affordance_uri", "")
-        if not affordance_uri:
-            return None
+        # Build action nodes for every resolved match
+        intent_actions: list[dict] = []
+        for m in resolved:
+            affordance_uri = m.get("affordance_uri", "")
+            if not affordance_uri:
+                return None
 
-        action_node = {
-            "name": f"action_{intent.replace(' ', '_')[:30]}",
-            "type": "action",
-            "action_url": affordance_uri,
-        }
+            action_node: dict[str, Any] = {
+                "name": f"action_{intent.replace(' ', '_')[:30]}",
+                "type": "action",
+                "action_url": affordance_uri,
+            }
 
-        payload = best_match.get("payload_hint") or best_match.get("payload")
-        if payload and isinstance(payload, dict):
-            action_node["parameters"] = payload
+            # Intent-aware payload selection (parameter adaptation logic)
+            if si and si.get("action") == "set" and si.get("value") is not None and si.get("parameter"):
+                param_name = si["parameter"]
+                # Special case: 'on_off' is a semantic parameter, not an API parameter
+                # The action (turn_on vs turn_off) is already encoded in the affordance_uri
+                if param_name == "on_off":
+                    logger.info(demo("build_bt_from_signifiers: SET action with on_off parameter - skipping (encoded in affordance_uri)"))
+                    # Don't add on_off to parameters; it's already in the URI
+                else:
+                    # Use the caller's actual target value, not the stale signifier hint
+                    action_node["parameters"] = {param_name: si["value"]}
+                    logger.info(demo("build_bt_from_signifiers: SET action - overriding payload_hint with structured_intent value: %s=%s"), param_name, si["value"])
+            elif si and si.get("action") == "check":
+                logger.info(demo("build_bt_from_signifiers: CHECK action - no parameters needed"))
+                pass  # check intents have no parameters
+            else:
+                # Fallback: reuse signifier's payload_hint as-is (backward compatibility)
+                payload = m.get("payload_hint") or m.get("payload")
+                if payload and isinstance(payload, dict):
+                    action_node["parameters"] = payload
+                    logger.info(demo("build_bt_from_signifiers: using payload_hint from signifier (no structured_intent or fallback): %s"), payload)
 
-        action_nodes.append(action_node)
+            intent_actions.append(action_node)
 
-    if not action_nodes:
+        # Single action for this intent → bare node; multiple → sequence
+        if len(intent_actions) == 1:
+            intent_nodes.append(intent_actions[0])
+        else:
+            intent_nodes.append({
+                "name": f"Sequence_{intent.replace(' ', '_')[:25]}",
+                "type": "sequence",
+                "children": intent_actions,
+            })
+
+    if not intent_nodes:
         return None
 
-    # Single action: return directly
-    if len(action_nodes) == 1:
-        return action_nodes[0]
+    # Single intent node: return directly
+    if len(intent_nodes) == 1:
+        return intent_nodes[0]
 
-    # Multiple actions: wrap in parallel (independent commands)
+    # Multiple intents: wrap in parallel (independent goals)
     return {
         "name": "SignifierReusePlan",
         "type": "parallel",
         "policy": "success_on_all",
-        "children": action_nodes,
+        "children": intent_nodes,
     }

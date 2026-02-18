@@ -313,7 +313,7 @@ class InteractionSolverAgent(Agent, IAgent):
         except Exception as e:
             return json.dumps({"error": "rpc_failed", "detail": str(e)})
 
-    async def _generate_plan(self, intents: List[str], workspace_id: Optional[str] = None, intent_type: Optional[str] = None) -> str:
+    async def _generate_plan(self, intents: List[str], workspace_id: Optional[str] = None, intent_type: Optional[str] = None, structured_intents: Optional[List[dict]] = None) -> str:
         """
         Gather context programmatically (affordances + state) and generate a BT JSON IR plan.
 
@@ -338,7 +338,7 @@ class InteractionSolverAgent(Agent, IAgent):
 
         # Fast-path: if there is a suitable signifier match for every intent, reuse it to build
         # a BT directly, without querying EnvExplorer for capabilities/state and without calling the LLM.
-        reused_plan = await self._try_build_plan_from_signifiers(intents, workspace_id=workspace_id, intent_type=intent_type)
+        reused_plan = await self._try_build_plan_from_signifiers(intents, workspace_id=workspace_id, intent_type=intent_type, structured_intents=structured_intents)
         if reused_plan is not None:
             logger.info(demo("BT recovered from signifiers (no EnvExplorer context queries, no LLM)"))
             return json.dumps(reused_plan, indent=2)
@@ -394,6 +394,7 @@ class InteractionSolverAgent(Agent, IAgent):
             "intents": intents,
             "workspace_id": workspace_id,  # Include workspace_id for signifier context
             "intent_type": intent_type,  # Include intent_type for signifier recording
+            "structured_intents": structured_intents or [],  # Include structured_intents for artifact matching
             # NOTE: Don't include full state_snapshot/affordances in execution_context - plan JSON
             # becomes too large (causes "Unterminated string" errors in LLM tool calls).
             # UserAssistant will query EnvExplorer for fresh state at execution time instead.
@@ -405,7 +406,7 @@ class InteractionSolverAgent(Agent, IAgent):
         return json.dumps(output, indent=2)
 
     async def _try_build_plan_from_signifiers(
-        self, intents: List[str], workspace_id: Optional[str] = None, intent_type: Optional[str] = None
+        self, intents: List[str], workspace_id: Optional[str] = None, intent_type: Optional[str] = None, structured_intents: Optional[List[dict]] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Try to build a BT JSON IR directly from signifier matches (fast path).
@@ -416,14 +417,14 @@ class InteractionSolverAgent(Agent, IAgent):
         - If any intent has no usable signifier match, return None (triggers normal LLM path).
         """
         try:
-            signifier_matches = await self._gather_signifier_matches(intents, workspace_id=workspace_id, intent_type=intent_type)
+            signifier_matches = await self._gather_signifier_matches(intents, workspace_id=workspace_id, intent_type=intent_type, structured_intents=structured_intents)
         except Exception:
             return None
 
         if not isinstance(signifier_matches, dict) or not signifier_matches:
             return None
 
-        tree = build_bt_from_signifiers(signifier_matches, intents)
+        tree = build_bt_from_signifiers(signifier_matches, intents, structured_intents=structured_intents)
         if tree is None:
             return None
 
@@ -443,6 +444,7 @@ class InteractionSolverAgent(Agent, IAgent):
             "intents": intents,
             "workspace_id": workspace_id,  # Include workspace_id for consistency
             "intent_type": intent_type,  # Include intent_type for signifier context
+            "structured_intents": structured_intents or [],  # Include structured_intents for artifact matching
             "signifier_reuse": True,
             "signifier_ids": signifier_ids,
         }
@@ -539,7 +541,7 @@ class InteractionSolverAgent(Agent, IAgent):
         # Optional signifier suggestions (embedded RD4 memory hosted by EnvExplorer).
         signifier_matches: Dict[str, Any] = {}
         try:
-            signifier_matches = await self._gather_signifier_matches(intents, workspace_id=workspace_id, intent_type=intent_type)
+            signifier_matches = await self._gather_signifier_matches(intents, workspace_id=workspace_id, intent_type=intent_type, structured_intents=structured_intents)
         except Exception:
             signifier_matches = {}
 
@@ -566,7 +568,7 @@ class InteractionSolverAgent(Agent, IAgent):
             "signifier_matches": signifier_matches,
         }
 
-    async def _gather_signifier_matches(self, intents: List[str], workspace_id: Optional[str] = None, intent_type: Optional[str] = None) -> Dict[str, Any]:
+    async def _gather_signifier_matches(self, intents: List[str], workspace_id: Optional[str] = None, intent_type: Optional[str] = None, structured_intents: Optional[List[dict]] = None) -> Dict[str, Any]:
         """
         Ask EnvExplorer for signifier matches per intent (best-effort).
 
@@ -577,16 +579,27 @@ class InteractionSolverAgent(Agent, IAgent):
         if not intents:
             return {}
 
+        # Build intent -> structured_intent mapping
+        intent_to_structured: dict[str, dict] = {}
+        if structured_intents and len(structured_intents) == len(intents):
+            for intent_str, si in zip(intents, structured_intents):
+                if isinstance(si, dict):
+                    intent_to_structured[intent_str] = si
+
         # Query local EnvExplorer (via SPADE RPC)
         explorer_jid = self.target_jids.get("explorer")
         local_out: Dict[str, Any] = {}
         if explorer_jid:
             async def _one_local(intent: str) -> Dict[str, Any]:
+                # Get structured_intent for this intent if available
+                structured_intent = intent_to_structured.get(intent)
+
                 logger.info(
-                    demo("[INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent=%r, workspace_id=%r, intent_type=%r"),
+                    demo("[INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent=%r, workspace_id=%r, intent_type=%r, has_structured_intent=%s"),
                     intent,
                     workspace_id,
                     intent_type,
+                    bool(structured_intent),
                 )
                 raw = await self._query_env_explorer(
                     message_type=MessageType.SIGNIFIER_MATCH_REQUEST.value,
@@ -594,6 +607,7 @@ class InteractionSolverAgent(Agent, IAgent):
                         "intent": intent,
                         **({"workspace_id": str(workspace_id)} if workspace_id else {}),
                         **({"intent_type": str(intent_type)} if intent_type else {}),
+                        **({"query_structured_intent": structured_intent} if structured_intent else {}),
                         "k": 5,
                     },
                     expect_type=MessageType.SIGNIFIER_MATCH_RESPONSE.value,
@@ -797,6 +811,7 @@ class GoalRequestBehaviour(CyclicBehaviour):
         intents: List[str] = []
         workspace_id: Optional[str] = None
         intent_type: Optional[str] = None
+        structured_intents: Optional[List[dict]] = None
         try:
             payload = json.loads(msg.body or "{}")
             if isinstance(payload, dict):
@@ -807,6 +822,14 @@ class GoalRequestBehaviour(CyclicBehaviour):
                 it = payload.get("intent_type")
                 if it and str(it).upper() in ("EXPLICIT", "IMPLICIT"):
                     intent_type = str(it).upper()
+                # Extract structured_intents from payload (optional, for parameter adaptation)
+                raw_structured = payload.get("structured_intents")
+                if isinstance(raw_structured, list):
+                    structured_intents = [si for si in raw_structured if isinstance(si, dict)]
+                    if structured_intents:
+                        logger.info(demo("GoalRequestBehaviour: received %d structured_intents from GOAL_REQUEST"), len(structured_intents))
+                        for si in structured_intents:
+                            logger.info(demo("  structured_intent: action=%s artifact=%s parameter=%s value=%s"), si.get("action"), si.get("artifact"), si.get("parameter"), si.get("value"))
             raw_intents = payload.get("intents")
             if isinstance(raw_intents, list):
                 intents = [str(i).strip() for i in raw_intents if str(i).strip()]
@@ -863,7 +886,7 @@ class GoalRequestBehaviour(CyclicBehaviour):
             await self.send(reply)
             return
 
-        plan_json = await self.agent._generate_plan(intents, workspace_id=workspace_id, intent_type=intent_type)
+        plan_json = await self.agent._generate_plan(intents, workspace_id=workspace_id, intent_type=intent_type, structured_intents=structured_intents)
 
         try:
             parsed_plan = json.loads(plan_json or "{}")

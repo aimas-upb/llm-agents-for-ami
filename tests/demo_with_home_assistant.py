@@ -362,10 +362,11 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     )
     p.add_argument(
         "--signifier-matcher",
-        choices=("v0", "v1"),
+        choices=("v0", "v1", "v2"),
         default=os.getenv("SIGNIFIER_MATCHER_VERSION", "").strip() or "v1",
         help=(
             "Intent matcher version for the embedded RD4 engine (default: v1). "
+            "v0=string contains, v1=embeddings, v2=structured intent. "
             "Can also be set via SIGNIFIER_MATCHER_VERSION."
         ),
     )
