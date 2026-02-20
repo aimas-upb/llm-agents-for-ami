@@ -4,9 +4,13 @@ Data models for the User Assistant agent.
 Defines structured intents, conversation state machine, and per-conversation state.
 """
 
+import logging
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationPhase(Enum):
@@ -99,6 +103,45 @@ CONFIRM_TOKENS = frozenset(
 REJECT_TOKENS = frozenset(
     {"no", "cancel", "discard", "reject", "nope", "nah", "stop"}
 )
+
+
+def validate_intent_type(
+    intents: List[str],
+    intent_type: str,
+    user_message: str,
+) -> str:
+    """Validate intent_type consistency with user's original message.
+
+    Checks if LLM inferred artifact IDs not present in user's request.
+    If so, overrides intent_type to 'implicit' and logs a warning.
+
+    Args:
+        intents: List of canonical intent strings
+        intent_type: LLM-determined intent type ('implicit' or 'explicit')
+        user_message: User's original message (lowercase)
+
+    Returns:
+        Corrected intent_type
+    """
+    if not user_message:
+        return intent_type
+
+    for intent_str in intents:
+        artifact_ids = re.findall(r'\b(\w+_\d+)\b', intent_str)
+        for artifact_id in artifact_ids:
+            artifact_id_no_underscore = artifact_id.replace("_", "")
+            if artifact_id.lower() not in user_message and artifact_id_no_underscore.lower() not in user_message:
+                logger.warning(
+                    "INTENT_TYPE MISMATCH DETECTED: LLM inferred artifact ID '%s' not in user message '%s'",
+                    artifact_id, user_message[:100],
+                )
+                logger.warning(
+                    "Overriding intent_type from '%s' to 'implicit' (user didn't specify exact artifact)",
+                    intent_type.upper(),
+                )
+                return "implicit"
+
+    return intent_type
 
 
 @dataclass

@@ -32,6 +32,14 @@ Sequences (recommended via CLI):
         - Expects InteractionSolver to reuse signifiers (no ENV_CAPABILITIES/ENV_STATE query in solver)
         - Approves and executes the recovered plan WITHOUT recording a new signifier.
 
+    python tests/manual_test_full_flow_plan.py --sequence 5
+        Intent Type Classification Test (sequence 5):
+        - Tests IMPLICIT goal: "Turn on a light" (vague, no artifact ID, system infers)
+        - Tests IMPLICIT goal: "Turn on the light" (vague, no artifact ID, system infers)
+        - Tests EXPLICIT goal: "Toggle light308" (exact artifact ID specified)
+        - Verifies logging shows correct intent_type classification
+        - Demonstrates difference in matching behavior (context-aware vs context-free)
+
     python tests/manual_test_full_flow_plan.py --sequence reuse-check
         Reuse-check only: does NOT start UserAssistant; verifies solver reused expected signifier affordance.
 
@@ -333,7 +341,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         "--sequence",
         default=None,
         help=(
-            'Which sequence to run: "2"/"startup", "3"/"demo", "4"/"reuse"/"reuse-demo", "reuse-check", "basic". '
+            'Which sequence to run: "2"/"startup", "3"/"demo", "4"/"reuse"/"reuse-demo", "5"/"intent-type", "reuse-check", "basic". '
             "If omitted, uses legacy env flags."
         ),
     )
@@ -354,10 +362,11 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     )
     p.add_argument(
         "--signifier-matcher",
-        choices=("v0", "v1"),
+        choices=("v0", "v1", "v2"),
         default=os.getenv("SIGNIFIER_MATCHER_VERSION", "").strip() or "v1",
         help=(
             "Intent matcher version for the embedded RD4 engine (default: v1). "
+            "v0=string contains, v1=embeddings, v2=structured intent. "
             "Can also be set via SIGNIFIER_MATCHER_VERSION."
         ),
     )
@@ -404,6 +413,10 @@ def _resolve_sequence(args: argparse.Namespace) -> str:
         return "reuse-check"
     if s in ("reuse", "reuse-demo", "reuse_demo", "4"):
         return "reuse-demo"
+    if s in ("intent-type", "intent-test", "classification", "5"):
+        return "intent-type-test"
+    if s in ("toggle-only", "toggle-test", "6"):
+        return "toggle-only-test"
     raise ValueError(f"Unknown --sequence value: {args.sequence!r}")
 
 
@@ -421,6 +434,8 @@ class OrchestratorAgent(Agent):
         run_reuse_flow: bool,
         run_demo_sequence: bool,
         run_reuse_demo_sequence: bool,
+        run_intent_type_test_sequence: bool,
+        run_toggle_only_test_sequence: bool,
         yggdrasil_url: str,
     ):
         super().__init__(jid, password)
@@ -430,6 +445,8 @@ class OrchestratorAgent(Agent):
         self.run_reuse_flow = bool(run_reuse_flow)
         self.run_demo_sequence = bool(run_demo_sequence)
         self.run_reuse_demo_sequence = bool(run_reuse_demo_sequence)
+        self.run_intent_type_test_sequence = bool(run_intent_type_test_sequence)
+        self.run_toggle_only_test_sequence = bool(run_toggle_only_test_sequence)
         self.yggdrasil_url = str(yggdrasil_url or "").strip()
         self.thread_id = str(uuid.uuid4())
         self.first_reply: Optional[str] = None
@@ -525,6 +542,16 @@ class OrchestratorAgent(Agent):
 
             if self.agent.run_reuse_demo_sequence:
                 await self._run_reuse_demo_sequence()
+                await self.agent.stop()
+                return
+
+            if self.agent.run_intent_type_test_sequence:
+                await self._run_intent_type_test_sequence()
+                await self.agent.stop()
+                return
+
+            if self.agent.run_toggle_only_test_sequence:
+                await self._run_toggle_only_test_sequence()
                 await self.agent.stop()
                 return
 
@@ -1171,6 +1198,230 @@ class OrchestratorAgent(Agent):
             print(json.dumps(signifiers_payload, indent=2))
             print("=" * 60 + "\n")
 
+        async def _run_intent_type_test_sequence(self) -> None:
+            """
+            Sequence 5: Intent Type Classification Test
+            - Tests EXPLICIT goal classification (indefinite article: "a light")
+            - Tests IMPLICIT goal classification (definite article: "the light")
+            - Verifies correct intent_type logging and behavior
+            """
+            try:
+                plan_timeout_s = float(os.getenv("AMI_PLAN_TIMEOUT_S", "180"))
+            except Exception:
+                plan_timeout_s = 180.0
+            try:
+                exec_timeout_s = float(os.getenv("AMI_EXEC_TIMEOUT_S", "180"))
+            except Exception:
+                exec_timeout_s = 180.0
+
+            print("\n" + "=" * 60)
+            print("[Intent Type Classification Test - Sequence 5]")
+            print("=" * 60 + "\n")
+
+            # Test 1: IMPLICIT GOAL (indefinite article, vague)
+            implicit_query_1 = "turn on a light."
+            logger.info('TEST 1: Sending IMPLICIT request (vague): "%s"', implicit_query_1)
+            print("\n" + "=" * 60)
+            print("[TEST 1: IMPLICIT Goal - 'turn on A light' (vague)]")
+            print("-" * 60)
+            print("Expected: LLM should classify as intent_type='implicit'")
+            print("Expected logging: 'Intent Type Classified: IMPLICIT (vague request, infer from context)'")
+            print("=" * 60 + "\n")
+
+            proposal = await self._ask_user_assistant(implicit_query_1, timeout_s=plan_timeout_s)
+            if proposal is None:
+                print("\nERROR: Timed out waiting for IMPLICIT plan proposal from UserAssistant.\n")
+                return
+
+            print("\n" + "=" * 60)
+            print("[UserAssistant IMPLICIT Plan Proposal (Test 1)]")
+            print("-" * 60)
+            _print_red_line(proposal)
+            print("=" * 60 + "\n")
+
+            logger.info('Approving IMPLICIT plan ("yes")...')
+            await self._send_approval("yes")
+
+            exec_reply = await self._wait_user_assistant_reply(timeout_s=exec_timeout_s)
+            if exec_reply is None:
+                print("\nERROR: Timed out waiting for IMPLICIT execution result from UserAssistant.\n")
+                return
+
+            print("\n" + "=" * 60)
+            print("[UserAssistant IMPLICIT Execution Reply (Test 1)]")
+            print("-" * 60)
+            _print_red_line(exec_reply)
+            print("=" * 60 + "\n")
+
+            await self._print_selected_states(
+                "[EnvExplorer State After IMPLICIT Execution (Test 1)]",
+                tokens=["light308", "lights_308"],
+            )
+
+            # Small delay between tests
+            await asyncio.sleep(2.0)
+
+            # Test 2: IMPLICIT GOAL (definite article, vague)
+            implicit_query_2 = "In lab308, turn off the light."
+            logger.info('TEST 2: Sending IMPLICIT request (vague): "%s"', implicit_query_2)
+            print("\n" + "=" * 60)
+            print("[TEST 2: IMPLICIT Goal - 'turn off THE light' (vague)]")
+            print("-" * 60)
+            print("Expected: LLM should classify as intent_type='implicit'")
+            print("Expected logging: 'Intent Type Classified: IMPLICIT (vague request, infer from context)'")
+            print("=" * 60 + "\n")
+
+            proposal = await self._ask_user_assistant(implicit_query_2, timeout_s=plan_timeout_s)
+            if proposal is None:
+                print("\nERROR: Timed out waiting for IMPLICIT plan proposal from UserAssistant.\n")
+                return
+
+            print("\n" + "=" * 60)
+            print("[UserAssistant IMPLICIT Plan Proposal (Test 2)]")
+            print("-" * 60)
+            _print_red_line(proposal)
+            print("=" * 60 + "\n")
+
+            logger.info('Approving IMPLICIT plan ("yes")...')
+            await self._send_approval("yes")
+
+            exec_reply = await self._wait_user_assistant_reply(timeout_s=exec_timeout_s)
+            if exec_reply is None:
+                print("\nERROR: Timed out waiting for IMPLICIT execution result from UserAssistant.\n")
+                return
+
+            print("\n" + "=" * 60)
+            print("[UserAssistant IMPLICIT Execution Reply (Test 2)]")
+            print("-" * 60)
+            _print_red_line(exec_reply)
+            print("=" * 60 + "\n")
+
+            await self._print_selected_states(
+                "[EnvExplorer State After IMPLICIT Execution (Test 2)]",
+                tokens=["light308", "lights_308"],
+            )
+
+            # Small delay between tests
+            await asyncio.sleep(2.0)
+
+            # Test 3: EXPLICIT GOAL - artifact ID specified
+            explicit_query = "In lab308, toggle light308."
+            logger.info('TEST 3: Sending EXPLICIT request (artifact ID): "%s"', explicit_query)
+            print("\n" + "=" * 60)
+            print("[TEST 3: EXPLICIT Goal - 'toggle light308' (artifact ID specified)]")
+            print("-" * 60)
+            print("Expected: LLM should classify as intent_type='explicit'")
+            print("Expected logging: 'Intent Type Classified: EXPLICIT (exact artifact ID specified)'")
+            print("=" * 60 + "\n")
+
+            proposal = await self._ask_user_assistant(explicit_query, timeout_s=plan_timeout_s)
+            if proposal is None:
+                print("\nERROR: Timed out waiting for EXPLICIT plan proposal from UserAssistant.\n")
+                return
+
+            print("\n" + "=" * 60)
+            print("[UserAssistant EXPLICIT Plan Proposal (Test 3)]")
+            print("-" * 60)
+            _print_red_line(proposal)
+            print("=" * 60 + "\n")
+
+            logger.info('Approving EXPLICIT plan ("yes")...')
+            await self._send_approval("yes")
+
+            exec_reply = await self._wait_user_assistant_reply(timeout_s=exec_timeout_s)
+            if exec_reply is None:
+                print("\nERROR: Timed out waiting for EXPLICIT execution result from UserAssistant.\n")
+                return
+
+            print("\n" + "=" * 60)
+            print("[UserAssistant EXPLICIT Execution Reply (Test 3)]")
+            print("-" * 60)
+            _print_red_line(exec_reply)
+            print("=" * 60 + "\n")
+
+            await self._print_selected_states(
+                "[EnvExplorer State After EXPLICIT Execution (Test 3)]",
+                tokens=["light308", "lights_308"],
+            )
+
+            print("\n" + "=" * 60)
+            print("[Intent Type Classification Test Complete]")
+            print("-" * 60)
+            print("Review the logs above to verify:")
+            print("  1. IMPLICIT request (vague) logged: 'Intent Type Classified: IMPLICIT'")
+            print("  2. IMPLICIT request (vague) logged: 'Intent Type Classified: IMPLICIT'")
+            print("  3. EXPLICIT request (artifact ID) logged: 'Intent Type Classified: EXPLICIT'")
+            print("=" * 60 + "\n")
+
+        async def _run_toggle_only_test_sequence(self) -> None:
+            """
+            Sequence 6: Toggle Light Only Test (Quick Test)
+            - Tests single EXPLICIT goal: "In lab308, toggle light308."
+            - Verifies correct intent_type classification and execution
+            """
+            try:
+                plan_timeout_s = float(os.getenv("AMI_PLAN_TIMEOUT_S", "180"))
+            except Exception:
+                plan_timeout_s = 180.0
+
+            try:
+                exec_timeout_s = float(os.getenv("AMI_EXEC_TIMEOUT_S", "180"))
+            except Exception:
+                exec_timeout_s = 180.0
+
+            logger.info(demo("Running manual test sequence=toggle-only-test"))
+
+            print("\n" + "=" * 60)
+            print("[Toggle Light Only Test - Sequence 6]")
+            print("=" * 60 + "\n")
+
+            # Single Test: EXPLICIT GOAL - artifact ID specified
+            explicit_query = "In lab308, toggle light308."
+            logger.info('TEST: Sending EXPLICIT request (artifact ID): "%s"', explicit_query)
+            print("\n" + "=" * 60)
+            print("[TEST: EXPLICIT Goal - 'toggle light308' (artifact ID specified)]")
+            print("-" * 60)
+            print("Expected: LLM should classify as intent_type='explicit'")
+            print("Expected logging: 'Intent Type Classified: EXPLICIT (exact artifact ID specified)'")
+            print("=" * 60 + "\n")
+
+            proposal = await self._ask_user_assistant(explicit_query, timeout_s=plan_timeout_s)
+            if proposal is None:
+                print("\nERROR: Timed out waiting for EXPLICIT plan proposal from UserAssistant.\n")
+                return
+
+            print("\n" + "=" * 60)
+            print("[UserAssistant EXPLICIT Plan Proposal]")
+            print("-" * 60)
+            _print_red_line(proposal)
+            print("=" * 60 + "\n")
+
+            logger.info('Approving EXPLICIT plan ("yes")...')
+            await self._send_approval("yes")
+
+            exec_reply = await self._wait_user_assistant_reply(timeout_s=exec_timeout_s)
+            if exec_reply is None:
+                print("\nERROR: Timed out waiting for EXPLICIT execution result from UserAssistant.\n")
+                return
+
+            print("\n" + "=" * 60)
+            print("[UserAssistant EXPLICIT Execution Reply]")
+            print("-" * 60)
+            _print_red_line(exec_reply)
+            print("=" * 60 + "\n")
+
+            await self._print_selected_states(
+                "[EnvExplorer State After EXPLICIT Execution]",
+                tokens=["light308", "lights_308"],
+            )
+
+            print("\n" + "=" * 60)
+            print("[Toggle Test Complete]")
+            print("-" * 60)
+            print("Review the logs above to verify:")
+            print("  - EXPLICIT request (artifact ID) logged: 'Intent Type Classified: EXPLICIT'")
+            print("=" * 60 + "\n")
+
 
 async def main():
     args = _parse_args(sys.argv[1:])
@@ -1204,6 +1455,8 @@ async def main():
     run_reuse_flow = sequence == "reuse-check"
     run_demo_sequence = sequence == "demo"
     run_reuse_demo_sequence = sequence == "reuse-demo"
+    run_intent_type_test_sequence = sequence == "intent-type-test"
+    run_toggle_only_test_sequence = sequence == "toggle-only-test"
     run_startup_sequence = sequence == "startup"
 
     logger.info(demo("Running manual test sequence=%s"), sequence)
@@ -1235,7 +1488,7 @@ async def main():
 
     # UserAssistant and Solver configs (new agents.yaml-compatible structure)
     # Default model requested by user:
-    model = os.getenv("OPENAI_MODEL", "o3")
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     # This model name is typically served via OpenRouter's OpenAI-compatible API.
     base_url = os.getenv("OPENAI_BASE_URL")
     if not base_url:
@@ -1316,6 +1569,8 @@ async def main():
             run_reuse_flow=run_reuse_flow,
             run_demo_sequence=run_demo_sequence,
             run_reuse_demo_sequence=run_reuse_demo_sequence,
+            run_intent_type_test_sequence=run_intent_type_test_sequence,
+            run_toggle_only_test_sequence=run_toggle_only_test_sequence,
             yggdrasil_url=yggdrasil_url,
         )
 

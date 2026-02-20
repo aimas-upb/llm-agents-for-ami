@@ -26,7 +26,7 @@ from ...bt_planning.execution.base import ExecutionResult
 from ...bt_planning.signifier_bridge import extract_signifiers_from_bt
 from ...shared.community.community_client import CommunitySignifierClient
 
-from .models import ConversationPhase, ConversationState, Intent, CONFIRM_TOKENS, REJECT_TOKENS
+from .models import ConversationPhase, ConversationState, Intent, CONFIRM_TOKENS, REJECT_TOKENS, validate_intent_type
 from .prompts import (
     INTENT_EXTRACTION_SYSTEM_PROMPT,
     PLAN_SUMMARY_SYSTEM_PROMPT,
@@ -186,6 +186,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         raw_intents = extraction.get("intents", [])
         conv.intents = [Intent.from_dict(i) for i in raw_intents if isinstance(i, dict)]
         conv.workspace_id = extraction.get("workspace_id")
+        intent_type = extraction.get("intent_type", "implicit")  # Extract intent_type from LLM response
 
         if not conv.intents:
             await self._reply(msg, "I couldn't derive any specific intents. Could you be more precise?")
@@ -193,7 +194,12 @@ class UserMessageBehaviour(CyclicBehaviour):
             return
 
         intent_strings = [intent.to_query_string() for intent in conv.intents]
-        logger.info(demo("Derived intents: %s  workspace=%s"), intent_strings, conv.workspace_id)
+
+        # Validate and correct intent_type based on user's actual message
+        # This catches cases where LLM inferred artifact IDs not present in user input
+        intent_type = validate_intent_type(intent_strings, intent_type, conv.user_message.lower())
+
+        logger.info(demo("Derived intents: %s  workspace=%s  intent_type=%s"), intent_strings, conv.workspace_id, intent_type.upper())
 
         # Send GOAL_REQUEST to InteractionSolver (deterministic RPC)
         solver_jid = self.agent.target_jids.get("solver")
@@ -205,6 +211,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         conv.phase = ConversationPhase.AWAITING_PLAN
         body: Dict[str, Any] = {
             "intents": [i.to_dict() for i in conv.intents],
+            "intent_type": intent_type,
         }
         if conv.workspace_id:
             body["workspace_id"] = str(conv.workspace_id)
@@ -212,7 +219,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         planning_cfg = (self.agent.config.get("planning", {}) or {})
         timeout = float(planning_cfg.get("timeout", 60))
 
-        logger.info(demo("UA -> InteractionSolver GOAL_REQUEST: intents=%s"), intent_strings)
+        logger.info(demo("UA -> InteractionSolver GOAL_REQUEST: intents=%s intent_type=%s"), intent_strings, intent_type.upper())
         try:
             result = await rpc_call(
                 self.agent,
@@ -343,6 +350,8 @@ class UserMessageBehaviour(CyclicBehaviour):
             for d in raw_intents
         ]
         is_signifier_reuse = plan_obj.get("signifier_reuse", False)
+        intent_type = plan_obj.get("intent_type")
+        workspace_id = plan_obj.get("workspace_id")
 
         if not tree_spec or not isinstance(tree_spec, dict):
             return ExecutionResult(success=False, error="Plan has no behavior tree to execute")
@@ -351,7 +360,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         await self.agent.ensure_execution_engine_ready()
 
         node_count = count_bt_nodes(tree_spec)
-        logger.info(demo("Executing BT: thread=%s nodes=%d signifier_reuse=%s"), thread, node_count, is_signifier_reuse)
+        logger.info(demo("Executing BT: thread=%s nodes=%d signifier_reuse=%s intent_type=%s"), thread, node_count, is_signifier_reuse, intent_type)
 
         executor = IRExecutor(max_ticks=50)
         loop = asyncio.get_event_loop()
@@ -376,7 +385,7 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         # Record signifiers from successful execution
         if exec_result.success and not is_signifier_reuse:
-            await self._record_signifiers(tree_spec, intents, exec_result, thread)
+            await self._record_signifiers(tree_spec, intents, exec_result, thread, intent_type, workspace_id)
 
         return exec_result
 
@@ -385,23 +394,78 @@ class UserMessageBehaviour(CyclicBehaviour):
     # ------------------------------------------------------------------
 
     async def _record_signifiers(
-        self, tree_spec: dict, intents: list, exec_result: ExecutionResult, thread: str
+        self,
+        tree_spec: dict,
+        intents: list,
+        exec_result: ExecutionResult,
+        thread: str,
+        intent_type: Optional[str] = None,
+        workspace_id: Optional[str] = None,
     ) -> None:
         """Extract and record signifiers from an executed BT."""
         intent_strings = [
             i.to_query_string() if isinstance(i, Intent) else str(i)
             for i in intents
         ]
+        structured_intents = [
+            i.to_dict() if isinstance(i, Intent) else (i if isinstance(i, dict) else None)
+            for i in intents
+        ]
+        structured_intents = [s for s in structured_intents if s is not None]
+
+        # Query environment state for context-rich signifiers
+        state_snapshot: Optional[dict] = None
+        explorer_jid = self.agent.target_jids.get("explorer")
+        if explorer_jid and workspace_id:
+            try:
+                logger.info(demo("Querying environment state for signifier context (workspace_id=%r)"), workspace_id)
+                state_response = await rpc_call(
+                    self.agent,
+                    to_jid=str(explorer_jid),
+                    request_type=MessageType.ENV_STATE_REQUEST.value,
+                    body={},
+                    expect_type=MessageType.ENV_STATE_RESPONSE.value,
+                    timeout=10.0,
+                )
+
+                if state_response and state_response.body:
+                    raw_state = json.loads(state_response.body) if isinstance(state_response.body, str) else state_response.body
+
+                    if isinstance(raw_state, dict):
+                        if "artifacts" in raw_state and isinstance(raw_state["artifacts"], dict):
+                            artifacts_dict = raw_state["artifacts"]
+                        else:
+                            artifacts_dict = raw_state
+
+                        filtered_artifacts = {}
+                        for artifact_id, artifact_info in artifacts_dict.items():
+                            if isinstance(artifact_info, dict):
+                                artifact_ws = artifact_info.get("workspace_id")
+                                if artifact_ws and (str(artifact_ws) == str(workspace_id) or workspace_id in str(artifact_ws)):
+                                    filtered_artifacts[artifact_id] = artifact_info
+
+                        state_snapshot = {"artifacts": filtered_artifacts}
+                        logger.info(
+                            demo("State snapshot retrieved: %d artifacts for workspace_id=%r"),
+                            len(filtered_artifacts), workspace_id
+                        )
+            except Exception as e:
+                logger.warning(demo("Failed to query state snapshot: %s (continuing without state)"), e)
+
         signifiers = extract_signifiers_from_bt(
             tree_spec=tree_spec,
             intents=intent_strings,
             was_successful=exec_result.success,
+            workspace_id=workspace_id,
+            state_snapshot=state_snapshot,
+            intent_type=intent_type,
+            structured_intents=structured_intents,
         )
         if not signifiers:
             logger.info(demo("No signifiers extracted from BT"))
             return
 
-        logger.info(demo("Recording %d signifiers from BT execution"), len(signifiers))
+        logger.info(demo("Recording %d signifiers from BT execution (intent_type=%s)"), len(signifiers), intent_type)
 
         # 1. Record locally via EnvExplorer
         explorer_jid = self.agent.target_jids.get("explorer")

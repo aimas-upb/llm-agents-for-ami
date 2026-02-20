@@ -10,6 +10,7 @@ from typing import Dict, List, Optional
 from src.matching.base import IntentMatcher, MatchResult
 from src.matching.embedding_matcher import EmbeddingMatcher
 from src.matching.string_matcher import StringContainsMatcher
+from src.matching.structured_matcher import StructuredIntentMatcher
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,10 @@ class IntentMatcherRegistry:
                 f"Could not register EmbeddingMatcher: {e}. "
                 "Install sentence-transformers to enable embedding matching."
             )
+
+        # Register structured intent matcher (v2)
+        self.register(StructuredIntentMatcher())
+        logger.info("Registered StructuredIntentMatcher (v2)")
 
     def register(self, matcher: IntentMatcher) -> None:
         """Register a new matcher version.
