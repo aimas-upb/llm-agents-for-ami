@@ -301,6 +301,42 @@ class TestBuildBTFromSignifiers:
         assert bt is not None
         assert "parameters" not in bt
 
+    def test_build_set_on_off_skips_parameters(self):
+        """set on_off intent produces action node WITHOUT parameters.
+
+        The on/off semantic is encoded in the affordance_uri (turn_on vs turn_off),
+        so no API parameter should be sent.
+        """
+        matches = {
+            "turn on the light": {
+                "matches": [{"signifier_id": "s1", "affordance_uri": "http://localhost/light/turn_on", "payload_hint": {"on_off": True}}],
+                "final_matches": ["s1"],
+            },
+        }
+        bt = build_bt_from_signifiers(
+            signifier_matches=matches,
+            intents=[Intent(action="set", artifact="light308", parameter="on_off", value=True,
+                            intent_text="turn on the light")],
+        )
+        assert bt is not None
+        assert "parameters" not in bt
+
+    def test_build_set_on_off_false_skips_parameters(self):
+        """set on_off=False (turn off) also skips parameters."""
+        matches = {
+            "turn off the light": {
+                "matches": [{"signifier_id": "s1", "affordance_uri": "http://localhost/light/turn_off"}],
+                "final_matches": ["s1"],
+            },
+        }
+        bt = build_bt_from_signifiers(
+            signifier_matches=matches,
+            intents=[Intent(action="set", artifact="light308", parameter="on_off", value=False,
+                            intent_text="turn off the light")],
+        )
+        assert bt is not None
+        assert "parameters" not in bt
+
     def test_build_unknown_action_uses_payload_hint(self, sample_signifier_matches):
         """Intent with unknown action falls back to signifier payload_hint."""
         bt = build_bt_from_signifiers(

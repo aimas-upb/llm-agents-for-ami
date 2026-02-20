@@ -476,6 +476,8 @@ class EnvExplorerAgent(Agent, IAgent):
         k: int = 10,
         matcher_version: Optional[str] = None,
         min_similarity: Optional[float] = None,
+        intent_type: Optional[str] = None,
+        query_structured_intent: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         await self._ensure_rd4_engine_ready()
 
@@ -498,12 +500,27 @@ class EnvExplorerAgent(Agent, IAgent):
             min_similarity = self._rd4_default_min_similarity
 
         self.logger.info(
-            demo("Signifier match: intent=%r matcher=%s min_similarity=%s k=%s"),
+            demo("[INTENT_TYPE] Signifier match: intent=%r matcher=%s min_similarity=%s k=%s intent_type=%r"),
             intent,
             version_to_use,
             min_similarity,
             k,
+            intent_type,
         )
+
+        # Log context validation strategy
+        if intent_type == "EXPLICIT":
+            self.logger.info(
+                demo("[INTENT_TYPE] Context validation DISABLED for EXPLICIT intent (exact target specified)")
+            )
+        elif intent_type == "IMPLICIT":
+            self.logger.info(
+                demo("[INTENT_TYPE] Context validation ENABLED for IMPLICIT intent (inferring from environment)")
+            )
+        else:
+            self.logger.info(
+                demo("[INTENT_TYPE] Context validation ENABLED (intent_type not specified, defaulting to validation)")
+            )
 
         try:
             match_results = self._rd4_matcher_registry.match(
@@ -512,6 +529,7 @@ class EnvExplorerAgent(Agent, IAgent):
                 k=int(k),
                 version=version_to_use,
                 min_similarity=float(min_similarity),
+                query_structured_intent=query_structured_intent,
             )
         except Exception:
             version_to_use = "v0"
@@ -520,6 +538,7 @@ class EnvExplorerAgent(Agent, IAgent):
                 signifiers=signifier_dicts,
                 k=int(k),
                 version=version_to_use,
+                query_structured_intent=query_structured_intent,
             )
 
         context_graph, _ = self._rd4_context_builder.normalize_context(context)
@@ -533,7 +552,11 @@ class EnvExplorerAgent(Agent, IAgent):
             shacl_conforms = True
             shacl_violations: List[str] = []
 
-            if getattr(getattr(s, "context", None), "shacl_shapes", None):
+            # EXPLICIT intents: skip context validation (user specified exact target)
+            # IMPLICIT intents: validate context (need to infer from environment state)
+            should_validate_context = (intent_type != "EXPLICIT")
+
+            if should_validate_context and getattr(getattr(s, "context", None), "shacl_shapes", None):
                 validation = self._rd4_shacl_validator.validate_signifier_context(
                     context_graph,
                     s.context.shacl_shapes,
@@ -564,8 +587,41 @@ class EnvExplorerAgent(Agent, IAgent):
                     "shacl_conforms": shacl_conforms,
                     "shacl_violations": shacl_violations,
                     "payload_hint": payload_hint,
+                    "intent_type": getattr(s, "intent_type", None),  # Include intent_type for ranking
                 }
             )
+
+        # Rank matches: prefer signifiers with matching intent_type
+        if intent_type and matches:
+            # Count matches by intent_type before ranking
+            matching_count = sum(1 for m in matches if m.get("intent_type") == intent_type)
+            non_matching_count = len(matches) - matching_count
+
+            # Sort matches: intent_type matches first, then by similarity
+            def _rank_key(m: Dict[str, Any]) -> tuple:
+                has_matching_intent_type = (m.get("intent_type") == intent_type)
+                similarity = m.get("intent_similarity", 0.0)
+                # Return tuple: (match_type_priority, similarity)
+                # Higher priority = comes first (so negate for reverse sort)
+                return (not has_matching_intent_type, -similarity)
+
+            matches.sort(key=_rank_key)
+            self.logger.info(
+                demo("[INTENT_TYPE] Ranked %d matches by intent_type=%s: matching=%d, non-matching=%d"),
+                len(matches),
+                intent_type,
+                matching_count,
+                non_matching_count,
+            )
+            # Log top 3 matches with their intent_type
+            for i, m in enumerate(matches[:3]):
+                self.logger.info(
+                    demo("[INTENT_TYPE] Match #%d: signifier_id=%s, intent_type=%r, similarity=%.4f"),
+                    i + 1,
+                    m.get("signifier_id"),
+                    m.get("intent_type"),
+                    m.get("intent_similarity", 0.0),
+                )
 
         final_matches = [m["signifier_id"] for m in matches if m.get("shacl_conforms")]
 
@@ -582,17 +638,343 @@ class EnvExplorerAgent(Agent, IAgent):
             "total_signifiers": len(signifier_dicts),
         }
 
+    def _generate_shacl_shapes_from_conditions(
+        self, structured_conditions: List[Dict[str, Any]]
+    ) -> Optional[str]:
+        """
+        Generate SHACL shapes (Turtle format) from structured_conditions.
+
+        Maps structured conditions to SHACL constraints for context validation:
+        - equals → sh:hasValue (exact match)
+        - greater_than → sh:minExclusive
+        - greater_than_or_equal → sh:minInclusive
+        - less_than → sh:maxExclusive
+        - less_than_or_equal → sh:maxInclusive
+
+        Args:
+            structured_conditions: List of condition dicts with artifact, property, value_conditions
+
+        Returns:
+            SHACL shapes as Turtle string, or None if no valid conditions
+        """
+        if not structured_conditions or not isinstance(structured_conditions, list):
+            return None
+
+        # Group conditions by artifact to create one NodeShape per artifact
+        artifact_conditions: Dict[str, List[Dict[str, Any]]] = {}
+        for cond in structured_conditions:
+            if not isinstance(cond, dict):
+                continue
+            artifact = cond.get("artifact")
+            if not artifact:
+                continue
+            if artifact not in artifact_conditions:
+                artifact_conditions[artifact] = []
+            artifact_conditions[artifact].append(cond)
+
+        if not artifact_conditions:
+            return None
+
+        # Build SHACL Turtle
+        shapes_lines = [
+            "@prefix sh: <http://www.w3.org/ns/shacl#> .",
+            "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .",
+            "",
+        ]
+
+        for idx, (artifact_uri, conditions) in enumerate(artifact_conditions.items()):
+            shape_id = f"<urn:signifier:shape:{idx}>"
+            shapes_lines.append(f"{shape_id} a sh:NodeShape ;")
+            shapes_lines.append(f"    sh:targetNode <{artifact_uri}> ;")
+
+            # Add property constraints
+            for prop_idx, cond in enumerate(conditions):
+                prop_uri = cond.get("property_affordance")
+                value_conditions = cond.get("value_conditions", [])
+                if not prop_uri or not value_conditions:
+                    continue
+
+                is_last_property = (prop_idx == len(conditions) - 1)
+                shapes_lines.append("    sh:property [")
+                shapes_lines.append(f"        sh:path <{prop_uri}> ;")
+
+                # Process each value condition
+                for vc_idx, vc in enumerate(value_conditions):
+                    if not isinstance(vc, dict):
+                        continue
+                    operator = vc.get("operator", "equals")
+                    value = vc.get("value")
+                    if value is None:
+                        continue
+
+                    # Determine datatype and format value
+                    if isinstance(value, bool):
+                        value_str = "true" if value else "false"
+                        datatype = "xsd:boolean"
+                    elif isinstance(value, str):
+                        # Escape quotes
+                        escaped = value.replace('"', '\\"')
+                        value_str = f'"{escaped}"'
+                        datatype = "xsd:string"
+                    elif isinstance(value, int):
+                        value_str = str(value)
+                        datatype = "xsd:integer"
+                    elif isinstance(value, float):
+                        value_str = str(value)
+                        datatype = "xsd:double"
+                    elif isinstance(value, list):
+                        # For lists, we can't easily represent in SHACL - skip
+                        continue
+                    elif isinstance(value, dict):
+                        # For dicts, we can't easily represent in SHACL - skip
+                        continue
+                    else:
+                        escaped = str(value).replace('"', '\\"')
+                        value_str = f'"{escaped}"'
+                        datatype = "xsd:string"
+
+                    # Add datatype constraint (first, before value constraints)
+                    shapes_lines.append(f"        sh:datatype {datatype} ;")
+
+                    # Map operator to SHACL constraint
+                    is_last_vc = (vc_idx == len(value_conditions) - 1)
+                    if operator == "equals":
+                        shapes_lines.append(f"        sh:hasValue {value_str}{';' if not is_last_vc else ''}")
+                    elif operator == "greater_than":
+                        shapes_lines.append(f"        sh:minExclusive {value_str}{';' if not is_last_vc else ''}")
+                    elif operator == "greater_than_or_equal":
+                        shapes_lines.append(f"        sh:minInclusive {value_str}{';' if not is_last_vc else ''}")
+                    elif operator == "less_than":
+                        shapes_lines.append(f"        sh:maxExclusive {value_str}{';' if not is_last_vc else ''}")
+                    elif operator == "less_than_or_equal":
+                        shapes_lines.append(f"        sh:maxInclusive {value_str}{';' if not is_last_vc else ''}")
+                    # For not_equals, we could use sh:not but it's complex - skip for now
+
+                shapes_lines.append(f"    ]{';' if not is_last_property else '.'}")
+
+            shapes_lines.append("")
+
+        return "\n".join(shapes_lines)
+
+    def _generate_nl_description(
+        self, structured_conditions: List[Dict[str, Any]], ctx_meta: Dict[str, Any]
+    ) -> str:
+        """
+        Generate natural language description from structured conditions.
+
+        Converts structured conditions into human-readable text.
+        Falls back to workspace metadata if no conditions available.
+
+        Args:
+            structured_conditions: List of condition dicts with artifact, property, value_conditions
+            ctx_meta: Context metadata (workspace_id, was_successful, etc.)
+
+        Returns:
+            Natural language description string
+        """
+        if structured_conditions and isinstance(structured_conditions, list) and len(structured_conditions) > 0:
+            # Build description from conditions
+            parts = []
+            for cond in structured_conditions:
+                if not isinstance(cond, dict):
+                    continue
+
+                artifact = cond.get("artifact", "")
+                prop = cond.get("property_affordance", "")
+                value_conditions = cond.get("value_conditions", [])
+
+                # Extract artifact ID from URI (e.g., "lights_308" from full URI)
+                artifact_id = artifact.rstrip("/").rsplit("/", 1)[-1] if artifact else "artifact"
+                # Extract property name from URI
+                prop_name = prop.rstrip("/").rsplit("/", 1)[-1] if prop else "property"
+
+                # Format value conditions
+                for vc in value_conditions:
+                    if not isinstance(vc, dict):
+                        continue
+                    operator = vc.get("operator", "equals")
+                    value = vc.get("value")
+
+                    if operator == "equals":
+                        parts.append(f"{artifact_id} {prop_name} is {value}")
+                    elif operator == "greater_than":
+                        parts.append(f"{artifact_id} {prop_name} > {value}")
+                    elif operator == "greater_than_or_equal":
+                        parts.append(f"{artifact_id} {prop_name} >= {value}")
+                    elif operator == "less_than":
+                        parts.append(f"{artifact_id} {prop_name} < {value}")
+                    elif operator == "less_than_or_equal":
+                        parts.append(f"{artifact_id} {prop_name} <= {value}")
+                    elif operator == "not_equals":
+                        parts.append(f"{artifact_id} {prop_name} != {value}")
+
+            if parts:
+                return "; ".join(parts)
+
+        # Fallback: use workspace metadata
+        workspace_id = ctx_meta.get("workspace_id", "unknown")
+        was_successful = ctx_meta.get("was_successful", True)
+        status = "successful" if was_successful else "failed"
+        return f"Execution in workspace {workspace_id} ({status})"
+
     async def _rd4_record_execution(
         self,
         *,
-        plan: Any,
-        execution_report: Any,
+        plan: Any = None,
+        execution_report: Any = None,
         sender: Optional[str] = None,
         thread: Optional[str] = None,
         workspace_id: Optional[str] = None,
+        signifiers: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
+        self.logger.info(demo(">>> _rd4_record_execution CALLED: plan_type=%s, execution_report_type=%s, signifiers_provided=%s"), type(plan).__name__, type(execution_report).__name__, signifiers is not None)
         await self._ensure_rd4_engine_ready()
 
+        # NEW PATH: If signifiers are already provided (from BT extraction), skip plan parsing
+        if signifiers and isinstance(signifiers, list) and len(signifiers) > 0:
+            self.logger.info(demo(">>> Using pre-extracted signifiers (count=%d), skipping plan parsing"), len(signifiers))
+            # Jump directly to storing signifiers (reuse code below)
+            from src.models.signifier import (
+                IntentContext,
+                IntentionDescription,
+                Provenance,
+                Signifier as RD4Signifier,
+                SignifierStatus,
+            )
+
+            created: List[str] = []
+            skipped: List[Dict[str, Any]] = []
+
+            for sig_dict in signifiers:
+                if not isinstance(sig_dict, dict):
+                    skipped.append({"error": "invalid_signifier"})
+                    continue
+
+                try:
+                    # Convert pre-extracted signifier dict to RD4Signifier
+                    signifier_id = sig_dict.get("signifier_id") or f"sig-{uuid.uuid4().hex}"
+                    intent_text = sig_dict.get("intent", "")
+                    affordance_uri = sig_dict.get("affordance_uri", "")
+                    action_name = sig_dict.get("action_name")
+                    payload_hint = sig_dict.get("payload_hint", {})
+
+                    if not affordance_uri:
+                        skipped.append({"signifier_id": signifier_id, "error": "missing_affordance_uri"})
+                        continue
+
+                    # Build structured intent
+                    intent_structured = {"intent": intent_text, "payload": payload_hint}
+                    if action_name:
+                        intent_structured["action_name"] = str(action_name)
+
+                    # Include original structured_intent (action, artifact, parameter, value) if available
+                    structured_intent_orig = sig_dict.get("structured_intent")
+                    if structured_intent_orig and isinstance(structured_intent_orig, dict):
+                        intent_structured["structured_intent"] = structured_intent_orig
+                        self.logger.info(
+                            demo("[STRUCTURED_INTENT] Preserving original structured_intent: %s"),
+                            structured_intent_orig
+                        )
+
+                    # Build context metadata
+                    ctx_meta = {
+                        "workspace_id": sig_dict.get("workspace_id"),
+                        "thread": thread,
+                        "was_successful": sig_dict.get("was_successful", True),
+                        "source": sig_dict.get("source", "bt_execution"),
+                        "node_name": sig_dict.get("node_name"),
+                    }
+
+                    # Extract structured_conditions from signifier dict (built from state_snapshot)
+                    structured_conditions = sig_dict.get("structured_conditions", [])
+                    # Ensure it's a list (defensive)
+                    if not isinstance(structured_conditions, list):
+                        structured_conditions = []
+
+                    # Extract intent_type (EXPLICIT or IMPLICIT classification)
+                    intent_type = sig_dict.get("intent_type")
+                    self.logger.info(
+                        demo("[INTENT_TYPE] Extracted from signifier dict: intent_type=%r for signifier %s"),
+                        intent_type,
+                        signifier_id,
+                    )
+                    # Validate it's one of the expected values
+                    if intent_type and str(intent_type).upper() not in ("EXPLICIT", "IMPLICIT"):
+                        self.logger.warning(
+                            demo("[INTENT_TYPE] Invalid intent_type %r for signifier %s, setting to None"),
+                            intent_type,
+                            signifier_id,
+                        )
+                        intent_type = None
+
+                    # Generate SHACL shapes from structured_conditions for context validation
+                    shacl_shapes = self._generate_shacl_shapes_from_conditions(structured_conditions)
+                    if shacl_shapes:
+                        self.logger.info(
+                            demo("Generated SHACL shapes for signifier %s (%d conditions)"),
+                            signifier_id,
+                            len(structured_conditions),
+                        )
+                    else:
+                        self.logger.debug(
+                            demo("No SHACL shapes generated for signifier %s (no valid conditions)"),
+                            signifier_id,
+                        )
+
+                    # Generate natural language description from structured conditions
+                    nl_description = self._generate_nl_description(structured_conditions, ctx_meta)
+
+                    signifier = RD4Signifier(
+                        signifier_id=signifier_id,
+                        version=1,
+                        status=SignifierStatus.ACTIVE,
+                        intent=IntentionDescription(
+                            nl_text=str(intent_text),
+                            structured=intent_structured
+                        ),
+                        context=IntentContext(
+                            nl_description=nl_description,
+                            structured_conditions=structured_conditions,
+                            shacl_shapes=shacl_shapes,  # Generated from structured_conditions
+                        ),
+                        affordance_uri=affordance_uri,
+                        intent_type=intent_type,  # Pass intent_type for memory engine filtering
+                        provenance=Provenance(created_by=str(sender or self.jid), source="bt_execution"),
+                    )
+
+                    self._rd4_registry.create(signifier)
+                    created.append(signifier_id)
+                    self.logger.info(
+                        demo("[INTENT_TYPE] Stored signifier %s: intent=%r -> affordance=%s, intent_type=%r"),
+                        signifier_id,
+                        intent_text,
+                        affordance_uri,
+                        intent_type,
+                    )
+
+                except Exception as e:
+                    self.logger.error(
+                        demo("Failed to create signifier from pre-extracted: %s - %s"),
+                        type(e).__name__,
+                        str(e),
+                        exc_info=True,
+                    )
+                    skipped.append({"signifier_id": signifier_id if 'signifier_id' in locals() else "unknown", "error": "create_failed", "detail": str(e)})
+
+            result = {
+                "ok": True,
+                "created_count": len(created),
+                "created_ids": created,
+                "skipped": skipped,
+            }
+            self.logger.info(
+                demo("Signifier recording result: created=%d, skipped=%d"),
+                len(created),
+                len(skipped),
+            )
+            return result
+
+        # OLD PATH: Extract signifiers from plan steps
         plan_obj = plan
         if isinstance(plan_obj, str):
             try:
@@ -601,11 +983,13 @@ class EnvExplorerAgent(Agent, IAgent):
                 plan_obj = None
 
         if not isinstance(plan_obj, dict):
-            return {"ok": False, "error": "invalid_plan"}
+            self.logger.warning(demo(">>> EARLY RETURN: invalid_plan (plan_obj type=%s)"), type(plan_obj).__name__)
+            return {"ok": False, "error": "invalid_plan", "hint": "no plan or signifiers provided"}
 
         steps = plan_obj.get("steps")
         if not isinstance(steps, list) or not steps:
-            return {"ok": False, "error": "missing_steps"}
+            self.logger.warning(demo(">>> EARLY RETURN: missing_steps (steps type=%s, empty=%s)"), type(steps).__name__, not steps if isinstance(steps, list) else "N/A")
+            return {"ok": False, "error": "missing_steps", "hint": "plan must have 'steps' array or provide 'signifiers' directly"}
 
         ok_step_ids: set[str] = set()
         if isinstance(execution_report, dict):
@@ -618,7 +1002,7 @@ class EnvExplorerAgent(Agent, IAgent):
                     if sid is not None:
                         ok_step_ids.add(str(sid))
 
-        from src.models.signifier import (  # type: ignore[import-not-found]
+        from src.models.signifier import (
             IntentContext,
             IntentionDescription,
             Provenance,
@@ -706,14 +1090,18 @@ class EnvExplorerAgent(Agent, IAgent):
                 "thread": thread,
                 "step_id": step_id,
                 "evidence": evidence,
+                "was_successful": True,  # OLD PATH assumes success
             }
+
+            # Generate natural language description
+            nl_description = self._generate_nl_description([], ctx_meta)
 
             signifier = RD4Signifier(
                 signifier_id=signifier_id,
                 version=1,
                 status=SignifierStatus.ACTIVE,
                 intent=IntentionDescription(nl_text=intent, structured=intent_structured),
-                context=IntentContext(nl_description=json.dumps(ctx_meta), structured_conditions=[], shacl_shapes=shacl_shapes),
+                context=IntentContext(nl_description=nl_description, structured_conditions=[], shacl_shapes=shacl_shapes),
                 affordance_uri=affordance_uri,
                 provenance=Provenance(created_by=str(sender or self.jid), source="execution"),
             )
@@ -728,14 +1116,27 @@ class EnvExplorerAgent(Agent, IAgent):
                     affordance_uri,
                 )
             except Exception as e:
+                self.logger.error(
+                    demo("Failed to create signifier %s: %s - %s"),
+                    signifier_id,
+                    type(e).__name__,
+                    str(e),
+                    exc_info=True,
+                )
                 skipped.append({"step_id": step_id, "error": "create_failed", "detail": str(e)})
 
-        return {
+        result = {
             "ok": True,
             "created_count": len(created),
             "created_ids": created,
             "skipped": skipped,
         }
+        self.logger.info(
+            demo("Signifier recording result: created=%d, skipped=%d"),
+            len(created),
+            len(skipped),
+        )
+        return result
 
     async def start(self, *args, **kwargs) -> None:
         """
@@ -1187,6 +1588,8 @@ class SignifierRequestHandler(CyclicBehaviour):
             k = payload.get("k", 10)
             matcher_version = payload.get("matcher_version")
             min_similarity = payload.get("min_similarity")
+            intent_type = payload.get("intent_type")  # Extract intent_type for filtering/ranking
+            query_structured_intent = payload.get("query_structured_intent")  # Extract structured_intent for v2 matcher
 
             response_payload = await self.agent._rd4_match_signifiers(
                 intent=str(intent),
@@ -1194,6 +1597,8 @@ class SignifierRequestHandler(CyclicBehaviour):
                 k=int(k) if str(k).isdigit() else 10,
                 matcher_version=str(matcher_version) if matcher_version else None,
                 min_similarity=float(min_similarity) if min_similarity is not None else None,
+                intent_type=str(intent_type).upper() if intent_type and str(intent_type).upper() in ("EXPLICIT", "IMPLICIT") else None,
+                query_structured_intent=query_structured_intent if isinstance(query_structured_intent, dict) else None,
             )
             reply_type = MessageType.SIGNIFIER_MATCH_RESPONSE.value
 
@@ -1204,13 +1609,23 @@ class SignifierRequestHandler(CyclicBehaviour):
             except json.JSONDecodeError:
                 payload = {}
 
-            response_payload = await self.agent._rd4_record_execution(
-                plan=payload.get("plan"),
-                execution_report=payload.get("execution_report") or payload.get("execution") or {},
-                sender=str(msg.sender) if getattr(msg, "sender", None) else None,
-                thread=str(msg.thread) if getattr(msg, "thread", None) else None,
-                workspace_id=payload.get("workspace_id"),
-            )
+            try:
+                response_payload = await self.agent._rd4_record_execution(
+                    plan=payload.get("plan"),
+                    execution_report=payload.get("execution_report") or payload.get("execution") or {},
+                    sender=str(msg.sender) if getattr(msg, "sender", None) else None,
+                    thread=str(msg.thread) if getattr(msg, "thread", None) else None,
+                    workspace_id=payload.get("workspace_id"),
+                    signifiers=payload.get("signifiers"),  # NEW: accept pre-extracted signifiers from BT
+                )
+            except Exception as e:
+                self.agent.logger.error(
+                    demo("!!! EXCEPTION in _rd4_record_execution: %s - %s"),
+                    type(e).__name__,
+                    str(e),
+                    exc_info=True,
+                )
+                response_payload = {"ok": False, "error": "exception", "detail": str(e)}
             reply_type = MessageType.SIGNIFIER_RECORD_EXECUTION_RESPONSE.value
 
         else:

@@ -34,6 +34,7 @@ Derive ONE OR MORE structured intents.  Each intent has:
       (e.g. increase ... by, decrease ... by, dim, brighten).
       If the user does not specify an explicit amount, set value to null.
 - artifact: the exact device identifier as it appears in capabilities (e.g. "light308")
+  OR "light" / "blinds" / "thermostat" (generic, no ID) if user is vague.
 - parameter: the payload key from the affordance schema (e.g. "brightness", "on_off").
   Required for "set" and "modify".  Optional for "check".
 - value: for "set" -- the target value (explicit numeric, boolean, or string; never
@@ -45,8 +46,37 @@ Derive ONE OR MORE structured intents.  Each intent has:
 Rules:
 - Each intent represents exactly ONE atomic action.
 - If the request implies multiple actions (e.g. "turn on and set brightness"), split them.
-- Use the EXACT artifact_id from the capabilities.
+- Use the EXACT artifact_id from the capabilities IF the user explicitly specifies it.
+- If the user is VAGUE (e.g., "a light", "the light"), use generic artifact name ("light").
 - If the user mentions a workspace (e.g. "in lab308"), extract it as workspace_id.
+
+## Intent Type Classification (CRITICAL)
+
+Based on the user's original request, determine the intent_type:
+
+A) IMPLICIT GOAL (intent_type="implicit") - DEFAULT, User is Vague:
+   - User does NOT specify exact artifact ID
+   - User uses vague references: "A light", "THE light", "SOME device"
+   - System must decide which artifact based on context
+   - artifact field should be GENERIC (e.g., "light", NOT "light308")
+   - Examples:
+     * "Turn on a light" → implicit, artifact="light" (NO ID!)
+     * "Turn on the light" → implicit, artifact="light" (NO ID!)
+     * "Set the thermostat to 22" → implicit, artifact="thermostat" (NO ID!)
+     * "It's dark here" → implicit, artifact="light" (NO ID!)
+
+B) EXPLICIT GOAL (intent_type="explicit") - User Specifies Exactly:
+   - User EXPLICITLY specifies artifact ID (e.g., "light308", "thermostat22")
+   - artifact field should be EXACT ID (e.g., "light308")
+   - Examples:
+     * "Toggle light308" → explicit, artifact="light308"
+     * "Turn on light308" → explicit, artifact="light308"
+     * "Set brightness for light308 to 50%" → explicit, artifact="light308"
+
+CRITICAL RULE: DO NOT INFER ARTIFACT IDs FOR VAGUE REQUESTS!
+- If user says "a light" or "the light", use artifact="light" (generic)
+- ONLY use specific ID if user explicitly said it (e.g., "light308")
+
 
 ## For "query_state" messages
 
@@ -72,23 +102,26 @@ Respond with valid JSON only.  No markdown fences, no extra text.
 
 Examples:
 
-Goal (turn on = boolean set):
-{"classification": "goal", "intents": [{"action": "set", "artifact": "light308", "parameter": "on_off", "value": true, "intent_text": "turn on the light"}], "workspace_id": "lab308"}
+Goal (turn on = boolean set) - IMPLICIT:
+{"classification": "goal", "intent_type": "implicit", "intents": [{"action": "set", "artifact": "light", "parameter": "on_off", "value": true, "intent_text": "turn on the light"}], "workspace_id": "lab308"}
 
-Goal (set a value):
-{"classification": "goal", "intents": [{"action": "set", "artifact": "light308", "parameter": "brightness", "value": 75, "intent_text": "set the brightness to 75"}], "workspace_id": "lab308"}
+Goal (turn on = boolean set) - EXPLICIT:
+{"classification": "goal", "intent_type": "explicit", "intents": [{"action": "set", "artifact": "light308", "parameter": "on_off", "value": true, "intent_text": "turn on light308"}], "workspace_id": "lab308"}
 
-Multiple intents (turn on + set brightness):
-{"classification": "goal", "intents": [{"action": "set", "artifact": "light308", "parameter": "on_off", "value": true, "intent_text": "turn on the light"}, {"action": "set", "artifact": "light308", "parameter": "brightness", "value": 100, "intent_text": "set the brightness to 100"}]}
+Goal (set a value) - EXPLICIT:
+{"classification": "goal", "intent_type": "explicit", "intents": [{"action": "set", "artifact": "light308", "parameter": "brightness", "value": 75, "intent_text": "set the brightness to 75"}], "workspace_id": "lab308"}
 
-Modify with explicit amount:
-{"classification": "goal", "intents": [{"action": "modify", "artifact": "light308", "parameter": "brightness", "value": 10, "intent_text": "increase the brightness by 10"}]}
+Multiple intents (turn on + set brightness) - EXPLICIT:
+{"classification": "goal", "intent_type": "explicit", "intents": [{"action": "set", "artifact": "light308", "parameter": "on_off", "value": true, "intent_text": "turn on the light"}, {"action": "set", "artifact": "light308", "parameter": "brightness", "value": 100, "intent_text": "set the brightness to 100"}]}
 
-Modify without explicit amount:
-{"classification": "goal", "intents": [{"action": "modify", "artifact": "light308", "parameter": "brightness", "value": null, "intent_text": "dim the light"}]}
+Modify with explicit amount - IMPLICIT:
+{"classification": "goal", "intent_type": "implicit", "intents": [{"action": "modify", "artifact": "light", "parameter": "brightness", "value": 10, "intent_text": "increase the brightness by 10"}]}
 
-Check status:
-{"classification": "goal", "intents": [{"action": "check", "artifact": "light308", "intent_text": "check the light status"}]}
+Modify without explicit amount - IMPLICIT:
+{"classification": "goal", "intent_type": "implicit", "intents": [{"action": "modify", "artifact": "light", "parameter": "brightness", "value": null, "intent_text": "dim the light"}]}
+
+Check status - IMPLICIT:
+{"classification": "goal", "intent_type": "implicit", "intents": [{"action": "check", "artifact": "light", "intent_text": "check the light status"}]}
 
 Query capabilities:
 {"classification": "query_capabilities"}
