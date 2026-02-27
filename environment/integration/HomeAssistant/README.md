@@ -47,6 +47,25 @@ export BASE_WS_URI="http://localhost:8080"        # public base for adapter URIs
 # Optional monitor/explorer endpoints
 export MONITOR_URL="http://localhost:8081"
 export EXPLORER_URL="http://localhost:8082"
+# Optional TD-SOSA per-device/environment-variable overrides (JSON object)
+# Keys supported:
+# - entity:<entity_id>[:<signal_name>]
+# - device:<device_name>[:<signal_name>]
+# - device_id:<device_id>[:<signal_name>]
+# - artifact:<artifact_label>[:<signal_name>]
+# - domain:<domain>[:<signal_name>]
+# - action:<domain>.<service>
+# - entity:<entity_id>:action:<domain>.<service> (most specific for actions)
+# Values:
+# - ambient variable key (e.g., "luminosity") OR full URI
+export TD_SOSA_ENV_VAR_OVERRIDES='{
+  "entity:sensor.home1_living_room_temperature:state": "thermal_comfort",
+  "entity:light.home1_lights_living_room:brightness": "luminosity",
+  "entity:light.home1_lights_living_room:action:light.turn_on": "luminosity",
+  "device:home1_lights_kitchen": "luminosity"
+}'
+# Or load the provided complete profile for lab308 + Home1/Home2/Home3:
+export TD_SOSA_ENV_VAR_OVERRIDES="$(cat tdsosa-env-overrides.sample.json)"
 ```
 
 ## 6) Start the adapter
@@ -74,3 +93,29 @@ set_property.py - set a property in HomeAssistant using the same environment var
 - ./set-property.py lights_308 brightness 192
 - ./set-property.py blinds_308 state closed
 - ./set-property.py blinds_308 position 60
+
+## Run tests
+From this directory:
+
+```bash
+cd /Users/cristi/aiml/gits/master-thesis/7-userassistant-system-facing/llm-agents-for-ami/environment/integration/HomeAssistant
+python3 -m pip install -r requirements.txt
+```
+
+Run all adapter tests:
+
+```bash
+python3 -m pytest -v tests/
+```
+
+Run only the extra adapter tests:
+
+```bash
+python3 -m pytest -v tests/test_ygg_adapter_extra.py
+```
+
+Run only TD-SOSA tests:
+
+```bash
+python3 -m pytest -v tests/test_ygg_adapter_tdsosa.py
+```

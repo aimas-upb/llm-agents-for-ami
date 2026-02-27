@@ -31,6 +31,11 @@ WOTSEC = Namespace("https://www.w3.org/2019/wot/security#")
 HTV    = Namespace("http://www.w3.org/2011/http#")
 JACAMO = Namespace("https://purl.org/hmas/jacamo/")
 TD     = Namespace("https://www.w3.org/2019/wot/td#")
+SOSA   = Namespace("http://www.w3.org/ns/sosa/")
+SSN    = Namespace("http://www.w3.org/ns/ssn/")
+QUDT   = Namespace("http://qudt.org/schema/qudt/")
+UNIT   = Namespace("http://qudt.org/vocab/unit/")
+TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
 
 # XSD value type URIs for event payloads
 XSD_BOOL   = "http://www.w3.org/2001/XMLSchema#boolean"
@@ -39,8 +44,8 @@ XSD_DOUBLE = "http://www.w3.org/2001/XMLSchema#double"
 XSD_STRING = "http://www.w3.org/2001/XMLSchema#string"
 
 # ---------------- Config & App -----------------
-HA_URL = os.getenv("HA_URL", "ws://poclea.go.ro:7589/api/websocket")
-HA_TOKEN = os.getenv("HA_TOKEN", "")
+HA_URL = os.getenv("HA_URL", "ws://localhost:8123/api/websocket")
+HA_TOKEN = os.getenv("HA_TOKEN", "").strip()
 if not HA_TOKEN:
     raise RuntimeError("HA_TOKEN env var required")
 HA_BASE_URL = os.getenv("HA_BASE_URL")
@@ -52,6 +57,32 @@ MONITOR_URL = os.getenv("MONITOR_URL", os.getenv("FORWARD_URL", ""))  # destinat
 EXPLORER_URL = os.getenv("EXPLORER_URL", "")  # Environment Explorer base URL for admin reset
 AREAS = {a.strip() for a in os.getenv("AREAS", "").split(",") if a.strip()}  # allowed area_ids
 BASE_WS_URI = os.getenv("BASE_WS_URI", BASE_FALLBACK)  # e.g., https://example.org/ws/lab
+
+
+def _load_tdsosa_overrides() -> Dict[str, str]:
+    raw = os.getenv("TD_SOSA_ENV_VAR_OVERRIDES", "").strip()
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except Exception as exc:
+        print("Invalid TD_SOSA_ENV_VAR_OVERRIDES JSON:", exc)
+        return {}
+    if not isinstance(data, dict):
+        print("TD_SOSA_ENV_VAR_OVERRIDES must be a JSON object")
+        return {}
+    out: Dict[str, str] = {}
+    for k, v in data.items():
+        if not isinstance(k, str) or not isinstance(v, str):
+            continue
+        key = " ".join(k.strip().lower().split())
+        val = v.strip()
+        if key and val:
+            out[key] = val
+    return out
+
+
+TD_SOSA_ENV_VAR_OVERRIDES = _load_tdsosa_overrides()
 
 app = FastAPI(title="Yggdrasil to Home Assistant adapter")
 app.add_middleware(
@@ -242,6 +273,174 @@ def _format_climate_state(state: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _normalize_override_key(key: str) -> str:
+    return " ".join(key.strip().lower().split())
+
+
+def _to_override_token(value: Optional[str]) -> str:
+    return _normalize_override_key((value or "").replace(" ", "_"))
+
+
+def _resolve_env_var_override(
+    *,
+    entity: Optional[Dict[str, Any]] = None,
+    device: Optional[Dict[str, Any]] = None,
+    artifact_label: Optional[str] = None,
+    domain: Optional[str] = None,
+    signal_name: Optional[str] = None,
+    service_name: Optional[str] = None,
+) -> Optional[str]:
+    if not TD_SOSA_ENV_VAR_OVERRIDES:
+        return None
+    ent_id = _to_override_token((entity or {}).get("entity_id"))
+    dev_id = _to_override_token((device or {}).get("id"))
+    dev_name = _to_override_token((device or {}).get("name"))
+    art = _to_override_token(artifact_label)
+    dom = _to_override_token(domain)
+    sig = _to_override_token(signal_name)
+    svc = _to_override_token(service_name)
+    keys: List[str] = []
+    if svc and dom:
+        dsvc = f"{dom}.{svc}"
+        if ent_id:
+            keys.append(f"entity:{ent_id}:action:{dsvc}")
+        if dev_id:
+            keys.append(f"device_id:{dev_id}:action:{dsvc}")
+        if dev_name:
+            keys.append(f"device:{dev_name}:action:{dsvc}")
+        if art:
+            keys.append(f"artifact:{art}:action:{dsvc}")
+        keys.append(f"action:{dsvc}")
+    if sig:
+        if ent_id:
+            keys.append(f"entity:{ent_id}:{sig}")
+        if dev_id:
+            keys.append(f"device_id:{dev_id}:{sig}")
+        if dev_name:
+            keys.append(f"device:{dev_name}:{sig}")
+        if art:
+            keys.append(f"artifact:{art}:{sig}")
+        if dom:
+            keys.append(f"domain:{dom}:{sig}")
+    if ent_id:
+        keys.append(f"entity:{ent_id}")
+    if dev_id:
+        keys.append(f"device_id:{dev_id}")
+    if dev_name:
+        keys.append(f"device:{dev_name}")
+    if art:
+        keys.append(f"artifact:{art}")
+    if dom:
+        keys.append(f"domain:{dom}")
+    for key in keys:
+        match = TD_SOSA_ENV_VAR_OVERRIDES.get(_normalize_override_key(key))
+        if match:
+            return match
+    return None
+
+
+def _env_var_uri(base: str, workspace_id: str, env_var: str) -> URIRef:
+    if env_var.startswith("http://") or env_var.startswith("https://"):
+        return URIRef(env_var)
+    return URIRef(f"{base}workspaces/{workspace_id}/environment/{urllib.parse.quote(env_var, safe='')}")
+
+
+def _ambient_var_from_signals(domain: str, device_class: Optional[str], signal_name: Optional[str]) -> Optional[str]:
+    text = f"{domain} {(device_class or '')} {(signal_name or '')}".lower()
+    if any(tok in text for tok in ("illumin", "lumin", "bright", "light")):
+        return "luminosity"
+    if any(tok in text for tok in ("temp", "thermal", "heat", "cool")):
+        return "thermal_comfort"
+    if "humid" in text:
+        return "humidity"
+    if "press" in text:
+        return "pressure"
+    if any(tok in text for tok in ("motion", "occup", "presence", "person")):
+        return "occupancy_presence"
+    if any(tok in text for tok in ("lock", "security", "alarm", "camera")):
+        return "security_state"
+    if any(tok in text for tok in ("media", "speaker", "vacuum", "coffee", "appliance")):
+        return "activity_state"
+    return None
+
+
+def _ambient_var_for_action(domain: str, service_name: str) -> Optional[str]:
+    token = f"{domain}.{service_name}".lower()
+    if domain == "climate":
+        return "thermal_comfort"
+    if domain in {"light", "cover"}:
+        return "luminosity"
+    if domain == "humidifier":
+        return "humidity"
+    if domain in {"lock", "alarm_control_panel", "camera"}:
+        return "security_state"
+    if domain in {"media_player", "vacuum"}:
+        return "activity_state"
+    return _ambient_var_from_signals(domain, None, token)
+
+
+def _effect_direction(service_name: str) -> Optional[str]:
+    s = service_name.lower()
+    inc_markers = ("turn_on", "open", "raise", "increase", "up", "unlock", "start")
+    dec_markers = ("turn_off", "close", "lower", "decrease", "down", "lock", "stop")
+    if any(marker in s for marker in inc_markers):
+        return "increase"
+    if any(marker in s for marker in dec_markers):
+        return "decrease"
+    return None
+
+
+def _domain_is_observer(domain: str) -> bool:
+    return domain in {"sensor", "binary_sensor", "weather", "person", "device_tracker"}
+
+
+def _domain_is_actuator(domain: str) -> bool:
+    return domain in {"light", "cover", "climate", "humidifier", "fan", "switch", "media_player", "vacuum", "lock", "alarm_control_panel"}
+
+
+def _add_tdsosa_property_links(
+    rdf: HomeAssistantRDF,
+    property_affordance: BNode,
+    feature_of_interest: URIRef,
+    env_var_uri: URIRef,
+    observable: bool,
+    actuatable: bool,
+) -> None:
+    if observable:
+        rdf.g.add((property_affordance, RDF.type, TDSOSA.ObservablePropertyAffordance))
+        rdf.g.add((env_var_uri, RDF.type, SOSA.ObservableProperty))
+    if actuatable:
+        rdf.g.add((property_affordance, RDF.type, TDSOSA.ActuatablePropertyAffordance))
+        rdf.g.add((env_var_uri, RDF.type, SOSA.ActuatableProperty))
+    rdf.g.add((property_affordance, TDSOSA.affordsProperty, env_var_uri))
+    rdf.g.add((feature_of_interest, SSN.hasProperty, env_var_uri))
+    rdf.g.add((env_var_uri, SSN.isPropertyOf, feature_of_interest))
+
+
+def _add_tdsosa_action_effect(
+    rdf: HomeAssistantRDF,
+    action_affordance: BNode,
+    feature_of_interest: URIRef,
+    env_var_uri: URIRef,
+    actuation_uri: URIRef,
+    direction: str,
+) -> None:
+    rdf.g.add((action_affordance, TDSOSA.hasEffectActuation, actuation_uri))
+    rdf.g.add((actuation_uri, RDF.type, SOSA.Actuation))
+    rdf.g.add((actuation_uri, RDF.type, TDSOSA.IncreasingActuation if direction == "increase" else TDSOSA.DecreasingActuation))
+    rdf.g.add((actuation_uri, SOSA.actsOnProperty, env_var_uri))
+    rdf.g.add((actuation_uri, TDSOSA.increasesObservableProperty if direction == "increase" else TDSOSA.decreasesObservableProperty, env_var_uri))
+    amount = BNode()
+    rdf.g.add((actuation_uri, TDSOSA.amount, amount))
+    rdf.g.add((amount, RDF.type, QUDT.QuantityValue))
+    rdf.g.add((amount, QUDT.numericValue, Literal(1)))
+    rdf.g.add((amount, QUDT.unit, UNIT.UNITLESS))
+    rdf.g.add((feature_of_interest, SSN.hasProperty, env_var_uri))
+    rdf.g.add((env_var_uri, SSN.isPropertyOf, feature_of_interest))
+    rdf.g.add((env_var_uri, RDF.type, SOSA.ObservableProperty))
+    rdf.g.add((env_var_uri, RDF.type, SOSA.ActuatableProperty))
+
+
 async def _resolve_device_and_entities(workspace_id: str, artifact_name: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]], Optional[Dict[str, Any]], str]:
     decoded_name = urllib.parse.unquote(artifact_name)
     decoded_canon = _canonical_label(decoded_name)
@@ -389,7 +588,8 @@ async def _ws_handshake(url: str, token: str):
     await ws.send(json.dumps({"type": "auth", "access_token": token}))
     msg = json.loads(await ws.recv())
     if msg.get("type") != "auth_ok":
-        raise RuntimeError("Auth failed")
+        reason = msg.get("message") or msg.get("type") or "unknown auth error"
+        raise RuntimeError(f"Auth failed for HA_URL={url}: {reason}")
     return ws
 
 async def _build_entity_area_map() -> Tuple[Dict[str, str], Dict[str, str], Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]:
@@ -581,7 +781,12 @@ async def _register_known_artifacts_to_monitor():
 
 @app.on_event("startup")
 async def _startup_forwarder():
-    print(f"App startup: MONITOR_URL={'set' if MONITOR_URL else 'unset'}, EXPLORER_URL={'set' if EXPLORER_URL else 'unset'}, AREAS={sorted(AREAS) if AREAS else 'ALL'}, BASE_WS_URI={BASE_WS_URI}")
+    print(
+        f"App startup: MONITOR_URL={'set' if MONITOR_URL else 'unset'}, "
+        f"EXPLORER_URL={'set' if EXPLORER_URL else 'unset'}, "
+        f"AREAS={sorted(AREAS) if AREAS else 'ALL'}, BASE_WS_URI={BASE_WS_URI}, "
+        f"TD_SOSA_ENV_VAR_OVERRIDES={len(TD_SOSA_ENV_VAR_OVERRIDES)}"
+    )
     # Fire-and-forget reset
     asyncio.create_task(_post_monitor_reset())
     asyncio.create_task(_post_explorer_reset())
@@ -668,11 +873,23 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
         art_dir = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/")
         safe_name = urllib.parse.quote(artifact_label, safe="")
         art = URIRef(f"{art_dir}{safe_name}#artifact")
+        artifact_foi = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/environment#foi")
+
+        for prefix, ns in {
+            "sosa": SOSA,
+            "ssn": SSN,
+            "qudt": QUDT,
+            "unit": UNIT,
+            "tdsosa": TDSOSA,
+        }.items():
+            rdf.g.bind(prefix, ns)
 
         # Build RDF
         rdf.g.add((art, RDF.type, TD.Thing))
         rdf.g.add((art, RDF.type, HMAS.Artifact))
         rdf.g.add((art, TD.title, Literal(artifact_label)))
+        rdf.g.add((artifact_foi, RDF.type, SOSA.FeatureOfInterest))
+        rdf.g.add((artifact_foi, TD.title, Literal(f"{artifact_label} environment")))
         domains = {e["entity_id"].split(".")[0] for e in device_entities}
         if "light" in domains:
             rdf.g.add((art, RDF.type, EX.HueLamp))
@@ -698,6 +915,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
 
             # Get a representative entity for this domain to check capabilities
             domain_entity = _pick_entity(device_entities, domain)
+            domain_entity_meta = next((e for e in device_entities if e.get("entity_id") == domain_entity), None)
             domain_entity_state = state_map.get(domain_entity, {}) if domain_entity else {}
             domain_entity_attrs = domain_entity_state.get("attributes", {}) if isinstance(domain_entity_state, dict) else {}
 
@@ -727,7 +945,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                 # Get service description
                 service_description = definition.get("description")
 
-                rdf._add_action(
+                action_affordance = rdf._add_action(
                     art,
                     action_name,
                     EX.StatusCommand,
@@ -737,6 +955,28 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                     input_schema=input_schema,
                     description=service_description,
                 )
+                env_var_key = _resolve_env_var_override(
+                    entity=domain_entity_meta,
+                    device=device,
+                    artifact_label=artifact_label,
+                    domain=domain,
+                    service_name=svc_name,
+                ) or _ambient_var_for_action(domain, svc_name)
+                direction = _effect_direction(svc_name)
+                if action_affordance and env_var_key and direction:
+                    env_var_uri = _env_var_uri(rdf.base, aid, env_var_key)
+                    actuation_uri = URIRef(
+                        f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/actuations/"
+                        f"{urllib.parse.quote(domain, safe='')}_{urllib.parse.quote(svc_name, safe='')}_{direction}"
+                    )
+                    _add_tdsosa_action_effect(
+                        rdf=rdf,
+                        action_affordance=action_affordance,
+                        feature_of_interest=artifact_foi,
+                        env_var_uri=env_var_uri,
+                        actuation_uri=actuation_uri,
+                        direction=direction,
+                    )
 
         # Sensor-specific value action
         if "sensor" in domains:
@@ -837,7 +1077,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                 property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/state")
                 # Pass domain to schema builder for context-aware schema generation
                 schema = rdf._build_property_schema("state", schema_value, entity_attrs, entity_domain=entity_domain)
-                rdf._add_property(
+                state_prop = rdf._add_property(
                     art,
                     "state",
                     property_uri,
@@ -845,6 +1085,23 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                     description=f"Current state of {entity_id}",
                     observable=True
                 )
+                state_env_key = _resolve_env_var_override(
+                    entity=entity,
+                    device=device,
+                    artifact_label=artifact_label,
+                    domain=entity_domain,
+                    signal_name="state",
+                ) or _ambient_var_from_signals(entity_domain, entity_attrs.get("device_class"), "state")
+                if state_prop and state_env_key:
+                    env_var_uri = _env_var_uri(rdf.base, aid, state_env_key)
+                    _add_tdsosa_property_links(
+                        rdf=rdf,
+                        property_affordance=state_prop,
+                        feature_of_interest=artifact_foi,
+                        env_var_uri=env_var_uri,
+                        observable=_domain_is_observer(entity_domain),
+                        actuatable=_domain_is_actuator(entity_domain),
+                    )
 
             # Add properties for each attribute (filtering out metadata)
             if entity_attrs:
@@ -864,7 +1121,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                     schema = rdf._build_property_schema(attr_name, attr_value, entity_attrs)
 
                     # Add the property affordance
-                    rdf._add_property(
+                    op_prop = rdf._add_property(
                         art,
                         attr_name,
                         property_uri,
@@ -872,6 +1129,23 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                         description=f"{attr_name} of {entity_id}",
                         observable=True
                     )
+                    env_var_key = _resolve_env_var_override(
+                        entity=entity,
+                        device=device,
+                        artifact_label=artifact_label,
+                        domain=domain,
+                        signal_name=attr_name,
+                    ) or _ambient_var_from_signals(domain, entity_attrs.get("device_class"), attr_name)
+                    if op_prop and env_var_key:
+                        env_var_uri = _env_var_uri(rdf.base, aid, env_var_key)
+                        _add_tdsosa_property_links(
+                            rdf=rdf,
+                            property_affordance=op_prop,
+                            feature_of_interest=artifact_foi,
+                            env_var_uri=env_var_uri,
+                            observable=_domain_is_observer(domain),
+                            actuatable=_domain_is_actuator(domain),
+                        )
 
                 # Add special "metadata" property affordance
                 # Include both attributes and state-level metadata (timestamps)
