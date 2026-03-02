@@ -1,257 +1,169 @@
-# AMI Agents - LLM-Powered Ambient Intelligence
+# AmI HMAS: Hybrid Agents with Individual and Collective Experience-Aware Code-based Planning for Smart Environments
 
-AAMAS 2026 demo for LLM-powered agents in a Hypermedia Multi-Agent System (HMAS), focused on Ambient Intelligence (AmI) applications.
+**EMAS 2026** — Engineering Multi-Agent Systems Workshop
 
-This demonstrator presents an end-to-end interaction workflow that integrates a simulated HomeAssistant smart environment deployment, its hypermedia-based semantic representation, and the AmI HMAS framework agents supporting both explicit and implicit user requests. The HomeAssistant deployment is configured with a smart light, motorized blinds, and indoor / outdoor environmental sensors.
+> Vlad-Alexandru Florea, Alexandru Sorici, Vlad-Matei Drăghici, Andrei-Cătălin Barbu, Andrei Olaru
+> Department of Computer Science and Engineering, UNSTPB, Bucharest
 
-With the HomeAssistant interface running, the mapping engine is launched, automatically translating the HomeAssistant configuration into a TD-based Hypermedia Environment. The resulting RDF model is inspected through a web browser, illustrating how devices, states, and affordances are exposed as navigable semantic resources.
+**[Paper](#)** | **[Demo video](https://youtu.be/qPZlZ1Rz6eY)** | **[Repository](https://github.com/aimas-upb/llm-agents-for-ami/tree/emas2026)**
 
-Next, the AmI HMAS agents are started. Logs illustrate agent initialization, exploration of the hypermedia environment, and discovery of available artifacts. User-driven interactions are then demonstrated. The user first queries the state of the smart light, revealing the interaction between UserAssistant and EnvExplorer for state retrieval. An explicit command to adjust the light and blinds is subsequently issued, classified as unambiguous, executed directly, and stored as a signifier linking the user goal to concrete affordances. 
+---
 
-The handling of implicit requests is then showcased. With the room in a state of low light conditions, the user complains about insufficient illumination. In the absence of a prior Signifier, the system explores relevant affordances, proposes a plan to increase brightness, validates it with the user, executes it, and records the resulting Signifier. When a similar, but differently phrased, implicit request is later issued, the previously learned Signifier is reused to recover and execute the plan directly, demonstrating experience-based adaptation without additional environment exploration.
+## What This Repository Contains
 
-## Overview
+This repository contains the full source code of **AmI HMAS**, a framework for goal-driven,
+LLM-supported interactions with smart environments. It maps HomeAssistant deployments into
+semantically represented Hypermedia Environments (HMAS / W3C WoT), and combines classical
+agent control with LLM reasoning at controlled injection points to plan and execute user goals
+as BehaviorTree-based procedural plans.
 
-This project implements an agent-based system for goal-driven interaction with smart environments. Users can make natural language inquiries about environment state and express goals (both precise and under-specified) that the system will plan and execute.
+The four main contributions of the paper are implemented here:
 
-### Key Features
+| # | Contribution | Key code location |
+|---|---|---|
+| 1 | **HMAS integration pipeline** — HA → W3C WoT Thing Descriptions | [`ami_agents/environment/integration/HomeAssistant/`](ami_agents/environment/integration/HomeAssistant/) |
+| 2 | **Hybrid agent architecture** — deterministic state machine + LLM injection | [`ami_agents/agents/`](ami_agents/agents/) |
+| 3 | **Signifier Memory Engine** — experience storage, embedding + SHACL matching | [`ami_agents/shared/memory/`](ami_agents/shared/memory/) |
+| 4 | **Community-based experience sharing** — cross-environment intent-level transfer | [`ami_agents/shared/community/`](ami_agents/shared/community/) |
 
-- **Natural Language Interface**: Express goals and queries in natural language
-- **Intelligent Planning**: LLM-powered planning with behavior trees
-- **Environment Discovery**: Automatic discovery and mapping of smart environments
-- **Adaptive Execution**: Learn from usage patterns (signifiers) to improve future planning
-- **Maintenance Goals**: Support for persistent, triggered goals
-- **Multi-Environment Support**: Works with HomeAssistant, Yggdrasil, and other WoT-compliant environments
+---
 
-## Architecture
+## Quick Start
 
-The system consists of three main agents implemented using SPADE and SPADE_LLM:
-
-### UserAssistant Agent
-Dual-purpose agent with:
-- **User-facing**: Chat interface with conversation memory and message classification
-- **System-facing**: Plan management, execution monitoring, and preference storage
-
-Message types handled:
-- ENV_CAPABILITIES: Environment capability queries
-- ENV_STATE: Environment state queries
-- GOAL_REQUEST: Goal execution requests
-- PLAN_MANAGEMENT: Plan lifecycle management
-- PREFERENCE_STATEMENT: User preference recording
-
-### EnvExplorer Agent
-Classical SPADE agent responsible for:
-- Environment discovery using WoT Discovery principles (Direct, Well-Known URI, mDNS)
-- Continuous monitoring for environment changes
-- Signifier storage (usage experiences)
-- Affordance matching using hybrid reasoning (rule-based + LLM)
-- Physics-informed modeling for capability matching
-
-### InteractionSolver Agent
-Planning and execution agent that:
-- Receives goal requests from UserAssistant
-- Gathers planning context from EnvExplorer
-- Generates behavior tree plans using LLM
-- Monitors plan execution with node-level status tracking
-- Supports community-based planning (future)
-
-## Project Structure
-
-```
-ami_agents/
-├── config/                    # YAML configuration files
-│   ├── environment.yaml       # Environment discovery and connection
-│   ├── agents.yaml           # Agent configurations
-│   └── services.yaml         # External services
-│
-├── agents/                   # Agent implementations
-│   ├── user_assistant/       # UserAssistant agent
-│   ├── env_explorer/         # EnvExplorer agent
-│   └── interaction_solver/   # InteractionSolver agent
-│
-├── environment/              # Environment connection layer
-│   ├── discovery/            # Discovery service implementations
-│   ├── connection/           # HMAS client
-│   └── integration/          # Integration engines (HomeAssistant, Yggdrasil)
-│
-├── shared/                   # Shared components
-│   ├── models/              # Data models
-│   ├── protocols/           # Protocol interfaces
-│   ├── memory/              # Memory management
-│   └── utils/               # Utilities
-│
-└── main.py                  # Main entry point
-```
-
-See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for detailed documentation.
-
-## Getting Started
-
-### Prerequisites
-
-- Python 3.9+
-- SPADE server (XMPP server)
-- HomeAssistant instance (optional, for HomeAssistant integration)
-- OpenAI or Anthropic API key (for LLM functionality)
-
-### Installation
-
-1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd llm-agents-for-ami
-```
-
-2. Install HomeAssistant and the integration engine following the instruction [here](./ami_agents/environment/integration/HomeAssistant/README.md) 
-
-3. Create virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-4. Install dependencies:
-```bash
+git clone https://github.com/aimas-upb/llm-agents-for-ami.git
+cd llm-agents-for-ami && git checkout emas2026
+python -m venv venv && source venv/bin/activate
 pip install -r agents-requirements.txt
+export OPENAI_API_KEY="<your-key>"
+spade run   # in a separate terminal
+python tests/manual_test_full_flow_plan.py --sequence 3 --clear-signifiers
 ```
 
-5. Configure environment:
+Full setup (HomeAssistant, Yggdrasil adapter): [docs/installation.md](docs/installation.md)
+
+---
+
+## Paper → Code Navigation
+
+Use this table to go directly from a paper section, figure, or listing to the implementing code.
+
+### Agents (Section 3.2)
+
+| Agent | Role | Implementation |
+|---|---|---|
+| **UserAssistant** | User interface; NLU/NLG; deterministic 6-state lifecycle | [`ami_agents/agents/user_assistant/`](ami_agents/agents/user_assistant/) |
+| **EnvExplorer** | WoT discovery; artifact state tracking; signifier management | [`ami_agents/agents/env_explorer/env_explorer_agent.py`](ami_agents/agents/env_explorer/env_explorer_agent.py) |
+| **InteractionSolver** | Dual-path BT planning; community querying | [`ami_agents/agents/interaction_solver/interaction_solver_agent.py`](ami_agents/agents/interaction_solver/interaction_solver_agent.py) |
+
+### BehaviorTree Planning (Section 3.3 — Table 1 in paper)
+
+| Component | Description | Code |
+|---|---|---|
+| `AsyncBTPlanner` | LLM-based BT JSON IR generation (OpenAI tool call + retry) | [`ami_agents/bt_planning/planning/bt_planner.py`](ami_agents/bt_planning/planning/bt_planner.py) |
+| BT JSON IR schema | Node types: `sequence`, `selector`, `parallel`, `action`, `condition` | [`ami_agents/bt_planning/planning/schema.py`](ami_agents/bt_planning/planning/schema.py) |
+| `IRExecutor` | Compiles JSON IR → `py_trees` object; tick-based execution | [`ami_agents/bt_planning/execution/ir_executor.py`](ami_agents/bt_planning/execution/ir_executor.py) |
+| BT leaf nodes | `ActionAffordanceNode`, `PropertyAffordanceNode`, `PropertyConditionNode` | [`ami_agents/bt_planning/nodes/affordance_nodes.py`](ami_agents/bt_planning/nodes/affordance_nodes.py) |
+| Signifier bridge | Walks executed BT → extracts signifier records | [`ami_agents/bt_planning/signifier_bridge.py`](ami_agents/bt_planning/signifier_bridge.py) |
+
+### Dual-Path Planning Algorithm (Section 3.4 — Algorithm 1 in paper)
+
+The fast-path vs. LLM-path decision logic from Algorithm 1 is implemented in:
+[`ami_agents/agents/interaction_solver/interaction_solver_agent.py`](ami_agents/agents/interaction_solver/interaction_solver_agent.py)
+
+### Signifier Memory Engine (Section 4 — Listing 1 in paper)
+
+| Component | Description | Code |
+|---|---|---|
+| Signifier data model | Fields: intent, affordance_uri, payload_hint, structured_conditions | [`ami_agents/shared/memory/src/models/signifier.py`](ami_agents/shared/memory/src/models/signifier.py) |
+| Structured matcher | Artifact-type + action + parameter hard-match filter | [`ami_agents/shared/memory/src/matching/structured_matcher.py`](ami_agents/shared/memory/src/matching/structured_matcher.py) |
+| SHACL validator | Context validation for implicit intent matching | [`ami_agents/shared/memory/src/validation/shacl_validator.py`](ami_agents/shared/memory/src/validation/shacl_validator.py) |
+
+### Community-Based Sharing (Section 5)
+
+| Component | Description | Code |
+|---|---|---|
+| Community client | XMPP-based inter-agent signifier query protocol | [`ami_agents/shared/community/community_client.py`](ami_agents/shared/community/community_client.py) |
+
+### HomeAssistant Integration Pipeline (Section 3.1)
+
+| Component | Description | Code |
+|---|---|---|
+| Yggdrasil–HA adapter | Maps HA areas/devices → HMAS workspaces/artifacts with WoT TDs | [`ami_agents/environment/integration/HomeAssistant/ygg_ha_adapter.py`](ami_agents/environment/integration/HomeAssistant/ygg_ha_adapter.py) |
+| Lab308 device config | Virtual Lab308 device definitions (light, blinds, sensors) | [`ami_agents/environment/integration/HomeAssistant/lab308.yaml`](ami_agents/environment/integration/HomeAssistant/lab308.yaml) |
+| Setup guide | Step-by-step HA + adapter setup | [`ami_agents/environment/integration/HomeAssistant/README.md`](ami_agents/environment/integration/HomeAssistant/README.md) |
+
+---
+
+## LLM Prompt Index
+
+| Prompt | Agent | Phase | File:symbol |
+|---|---|---|---|
+| `INTENT_EXTRACTION_SYSTEM_PROMPT` | UserAssistant | `EXTRACTING_INTENTS` — NLU | [`user_assistant/prompts.py`](ami_agents/agents/user_assistant/prompts.py) |
+| `PLAN_SUMMARY_SYSTEM_PROMPT` | UserAssistant | `SUMMARIZING_PLAN` — NLG | [`user_assistant/prompts.py`](ami_agents/agents/user_assistant/prompts.py) |
+| `QUERY_RESPONSE_SYSTEM_PROMPT` | UserAssistant | Query response — NLG | [`user_assistant/prompts.py`](ami_agents/agents/user_assistant/prompts.py) |
+| `BT_PLANNING_SYSTEM_PROMPT` | InteractionSolver | LLM planning path | [`bt_planning/planning/prompts.py`](ami_agents/bt_planning/planning/prompts.py) |
+| `format_signifier_hints()` | InteractionSolver | Signifier hint injection | [`bt_planning/planning/prompts.py`](ami_agents/bt_planning/planning/prompts.py) |
+| `format_capability_context()` | InteractionSolver | Affordance/state injection | [`bt_planning/planning/prompts.py`](ami_agents/bt_planning/planning/prompts.py) |
+
+**EnvExplorer has no LLM prompts** — it is a classical SPADE agent using deterministic discovery
+and embedding-based matching.
+
+Full prompt documentation: [docs/prompts.md](docs/prompts.md)
+
+---
+
+## Reproducing the Experiments
+
+| Experiment | Paper section | How to run |
+|---|---|---|
+| Explicit request BT planning (HomeBench, 400 cases, 4 models) | Section 6.1, Table 1 | `pytest tests/e2e/test_demo_homebench.py -m e2e` |
+| Cold start — all LLM path | Section 6.2, Table 2 Phase A | `pytest tests/e2e/test_demo_lab308.py -m e2e -k cold` |
+| Warm start — signifier fast-path | Section 6.2, Table 2 Phase B | `pytest tests/e2e/test_demo_lab308.py -m e2e -k warm` |
+| Cross-env transfer | Section 6.2, Table 2 Phase C | `pytest tests/e2e/test_cross_env_sharing.py -m e2e` |
+
+Full details, expected results, and per-phase analysis: [docs/evaluation.md](docs/evaluation.md)
+
+---
+
+## Running the Demo
+
+The demo sequences correspond to the companion demo paper workflow:
+
 ```bash
-cp .env.example .env
-# Edit .env with your configuration
+# Sequence 3: explicit + implicit request (cold start, signifier recording)
+python tests/manual_test_full_flow_plan.py --sequence 3 --clear-signifiers
+
+# Sequence 4: implicit request with prior signifier (fast path)
+python tests/manual_test_full_flow_plan.py --sequence 4
 ```
 
-6. Configure agents:
-```bash
-# Edit configuration files in ami_agents/config/
-# - environment.yaml: Set discovery method and environment connection
-# - agents.yaml: Configure agent JIDs, passwords, and LLM settings
-# - services.yaml: Configure external services
-```
+Full demo guide with all sequences and environment variables: [docs/demo.md](docs/demo.md)
 
-### Running the System
+---
 
-1. Run SPADE server
-```bash
-spade run
-```
+## Documentation
 
-2. Run the AAMAS 2026 demo
-First you need to export an API key, either OpenAI or OpenRouter:
-```bash
-export OPENAI_API_KEY=
-```
-Then, in order to run the AAMAS 2026 demo:
-```bash
-python tests/demo_with_home_assistant.py --sequence 3 --clear-signifiers --demo 
-python tests/demo_with_home_assistant.py --sequence 4
-```
+| Document | Contents |
+|---|---|
+| [docs/installation.md](docs/installation.md) | Full setup: Python env, HomeAssistant, Yggdrasil adapter, SPADE |
+| [docs/configuration.md](docs/configuration.md) | YAML config files, environment variables, multi-environment setup |
+| [docs/evaluation.md](docs/evaluation.md) | Reproducing Tables 1 and 2 from the paper |
+| [docs/demo.md](docs/demo.md) | Demo sequences (Seq. 2–4) with expected outputs |
+| [docs/prompts.md](docs/prompts.md) | All LLM prompts: intent, purpose, paper reference, call sites |
+| [docs/project-structure.md](docs/project-structure.md) | Full directory layout and data flow |
+| [docs/testing.md](docs/testing.md) | Yggdrasil integration tests and HMAS ontology notes |
 
-Or, if you want to play around with the system in interactive mode:
-```bash
-python tests/manual_interactive_cli.py --demo
-```
-
-
-## Configuration
-
-### Environment Discovery
-
-Three discovery methods are supported:
-
-1. **Direct**: Provide a known TD Directory URL
-2. **Well-Known URI**: Compose URI from known structure or query service
-3. **mDNS**: Discover on local network (default: `_ami-hmas._tcp.local`)
-
-### HomeAssistant Integration
-
-The IntegrationEngine converts HomeAssistant deployments to HMAS:
-
-- HomeAssistant instance → "home" workspace
-- Floors → Floor workspaces
-- Areas → Area workspaces
-- Device labels → Logical area workspaces
-- Devices → Artifacts with Thing Descriptions
-
-### External Services
-
-External services (calendar, weather, etc.) are mapped to virtual Things:
-- API endpoints → Action affordances
-- Sensor data → Property affordances
-- Organized in user-specific workspaces
-
-## Implementation Status
-
-⚠️ **Current Status**: This is a skeleton implementation with TODO stubs.
-
-All major components have been structured with:
-- Interface definitions
-- Method signatures
-- Detailed TODO comments describing implementation steps
-- Logical flow from agent start to shutdown
-
-### What's Implemented
-- ✅ Complete folder structure
-- ✅ Configuration files (YAML)
-- ✅ Data models and type definitions
-- ✅ Protocol interfaces
-- ✅ Agent class structures with behavior skeletons
-- ✅ Environment connection layer interfaces
-
-### What Needs Implementation
-- 🔲 SPADE integration and message handling
-- 🔲 LLM provider implementations
-- 🔲 Database and storage backends
-- 🔲 HMAS client implementation
-- 🔲 Discovery service implementations
-- 🔲 Integration engine implementations
-- 🔲 Memory management
-- 🔲 Behavior tree execution
-- 🔲 Signifier storage and retrieval
-- 🔲 Testing infrastructure
-
-## Development
-
-### Code Organization Principles
-
-1. **Separation of Concerns**: Each component has a clear responsibility
-2. **Interface-Driven**: Protocol interfaces define contracts between components
-3. **Configuration-Driven**: Behavior controlled via YAML configuration
-4. **Async-First**: All I/O operations use async/await
-5. **Type-Annotated**: All functions have type hints
-
-### Next Steps for Implementation
-
-1. Implement storage backends (SQLite for plans, signifiers, conversations)
-2. Implement HMAS client with WoT Thing Description support
-3. Implement LLM provider wrappers (OpenAI, Anthropic)
-4. Implement discovery services (especially mDNS)
-5. Implement HomeAssistant integration engine
-6. Implement SPADE behaviors and message handling
-7. Implement behavior tree execution engine
-8. Add comprehensive testing
-9. Add user interface (CLI or web-based)
+---
 
 ## Technologies
 
-- **SPADE**: Multi-agent system framework
-- **SPADE_LLM**: LLM integration for SPADE agents
-- **W3C WoT**: Web of Things Thing Descriptions
-- **HMAS**: Hypermedia Multi-Agent Systems
-- **OpenAI/Anthropic**: LLM providers for planning and intent extraction
-- **HomeAssistant**: Smart home platform integration
+- **[SPADE](https://spade-mas.readthedocs.io/)** — Multi-agent system framework (XMPP)
+- **[py_trees](https://py-trees.readthedocs.io/)** — BehaviorTree execution engine
+- **[W3C WoT Thing Description](https://www.w3.org/TR/wot-thing-description/)** — Semantic device representation
+- **[Yggdrasil](https://github.com/Interactions-HSG/yggdrasil)** — HMAS platform
+- **[HomeAssistant](https://www.home-assistant.io/)** — Smart environment platform
+- **[HMAS ontology](https://purl.org/hmas/)** — Hypermedia MAS vocabulary
+- **[CASHMERE ontology](https://github.com/aimas-upb/cashmere)** — Signifier context vocabulary
+- **OpenAI API** — LLM provider (GPT-4o, GPT-4o-mini, GPT-5-mini, GPT-5-nano tested)
 
-## License
-
-[Specify License]
-
-## Contributing
-
-[Specify contribution guidelines]
-
-## References
-
-- [SPADE Documentation](https://spade-mas.readthedocs.io/en/latest/)
-- [SPADE_LLM Documentation](https://sosanzma.github.io/spade_llm/)
-- [W3C WoT Thing Description](https://www.w3.org/TR/wot-thing-description/)
-- [W3C WoT Discovery](https://www.w3.org/TR/wot-discovery/)
