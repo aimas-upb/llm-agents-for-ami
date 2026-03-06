@@ -4,6 +4,7 @@ This module converts key-value context maps into canonical RDF graphs
 suitable for SHACL validation.
 """
 
+import json
 import logging
 from typing import Any, Dict, List, Tuple
 
@@ -180,6 +181,8 @@ class ContextGraphBuilder:
             return Literal(value, datatype=XSD.double)
         elif isinstance(value, str):
             return Literal(value, datatype=XSD.string)
+        elif isinstance(value, (dict, list)):
+            return Literal(json.dumps(value), datatype=XSD.string)
         else:
             logger.warning(
                 f"Unknown value type {type(value)}, defaulting to string"

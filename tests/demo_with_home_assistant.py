@@ -261,14 +261,14 @@ def _print_red_line(text: str) -> None:
 
 
 async def _reset_lab308_state() -> None:
-    """Ensure lights are off and blinds closed before the demo starts."""
+    """Ensure lights are off and blinds at 50% before the demo starts."""
     light_off_url = f"{LAB308_BASE}/artifacts/lights_308/ha/light/turn_off"
-    blinds_close_url = f"{LAB308_BASE}/artifacts/blinds_308/setClosedPercentage"
+    blinds_url = f"{LAB308_BASE}/artifacts/blinds_308/ha/cover/set_cover_position"
     try:
         async with aiohttp.ClientSession() as session:
             await session.post(light_off_url, json={})
-            await session.post(blinds_close_url, json={"closedPercentage": 100})
-        logger.info("Reset lab308 state: lights_308 off, blinds_308 closed.")
+            await session.post(blinds_url, json={"position": 50})
+        logger.info("Reset lab308 state: lights_308 off, blinds_308 50%.")
     except Exception as exc:
         logger.warning("Failed to reset lab308 state before demo: %s", exc)
 
@@ -879,7 +879,7 @@ class OrchestratorAgent(Agent):
                 return
 
             toggle_url = f"{base}/workspaces/lab308/artifacts/light308/toggle"
-            blinds_url = f"{base}/workspaces/lab308/artifacts/blinds308/setClosedPercentage"
+            blinds_url = f"{base}/workspaces/lab308/artifacts/blinds_308/ha/cover/set_cover_position"
 
             snapshot = await self._get_state_snapshot()
             artifacts = snapshot.get("artifacts") if isinstance(snapshot.get("artifacts"), dict) else {}
@@ -907,8 +907,8 @@ class OrchestratorAgent(Agent):
                         async with session.post(toggle_url, json={}) as resp:
                             await resp.text()
 
-                    # "lowered to only 25% of the maximum" (i.e., open ~25%) -> closedPercentage=75
-                    async with session.post(blinds_url, json={"closedPercentage": 75}) as resp:
+                    # "lowered to only 25% of the maximum" (i.e., open ~25%) -> position=25
+                    async with session.post(blinds_url, json={"position": 25}) as resp:
                         await resp.text()
             except Exception as e:
                 print(f"\nWARNING: External reset HTTP calls failed: {e}\n")
@@ -1005,7 +1005,7 @@ class OrchestratorAgent(Agent):
             list_devices_query = "List all active (available) devices in the environment."
             state_query = "In lab308, show the state of light308 (is it on and what is its intensity?)."
             turn_on_query = "In lab308, turn on lights_308."
-            explicit_query = "In lab308, turn off the light and open the blinds to 50% of the maximum level."
+            explicit_query = "In lab308, turn off the light and open the blinds to 80% of the maximum level."
             implicit_query = "In lab308, it's kind of dark in here."
 
             # 1) Capabilities / workspaces
@@ -1588,12 +1588,15 @@ async def main():
         logger.info("Starting EnvExplorer...")
         await explorer.start(auto_register=True)
 
+        # InteractionSolver must start before UserAssistant so that it is ready
+        # to receive the ENV_DISCOVERY_COMPLETE notification sent by EnvExplorer
+        # while discovery runs in the background.
+        logger.info("Starting InteractionSolver...")
+        await solver.start(auto_register=True)
+
         if assistant:
             logger.info("Starting UserAssistant...")
             await assistant.start(auto_register=True)
-
-        logger.info("Starting InteractionSolver...")
-        await solver.start(auto_register=True)
 
         # Wait for discovery to finish before sending the user query (so tool calls see real capabilities).
         for _ in range(600):

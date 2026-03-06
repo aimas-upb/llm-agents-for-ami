@@ -837,7 +837,7 @@ class OrchestratorAgent(Agent):
                 return
 
             toggle_url = f"{base}/workspaces/lab308/artifacts/light308/toggle"
-            blinds_url = f"{base}/workspaces/lab308/artifacts/blinds308/setClosedPercentage"
+            blinds_url = f"{base}/workspaces/lab308/artifacts/blinds_308/ha/cover/set_cover_position"
 
             snapshot = await self._get_state_snapshot()
             artifacts = snapshot.get("artifacts") if isinstance(snapshot.get("artifacts"), dict) else {}
@@ -865,8 +865,8 @@ class OrchestratorAgent(Agent):
                         async with session.post(toggle_url, json={}) as resp:
                             await resp.text()
 
-                    # "lowered to only 25% of the maximum" (i.e., open ~25%) -> closedPercentage=75
-                    async with session.post(blinds_url, json={"closedPercentage": 75}) as resp:
+                    # "lowered to only 25% of the maximum" (i.e., open ~25%) -> position=25
+                    async with session.post(blinds_url, json={"position": 25}) as resp:
                         await resp.text()
             except Exception as e:
                 print(f"\nWARNING: External reset HTTP calls failed: {e}\n")
