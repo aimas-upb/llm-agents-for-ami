@@ -1,9 +1,8 @@
 # Deploy the AmI HMAS demonstrator website to GitHub Pages.
-# Triggered on any push to `emas2026` that touches website/ files,
-# or manually via workflow_dispatch.
+# Pushes website/ to the gh-pages branch — no environment protection needed.
 #
 # Setup required (one-time, in repo Settings → Pages):
-#   Source → GitHub Actions
+#   Source → Deploy from a branch → gh-pages → / (root)
 
 name: Deploy Demonstrator Website
 
@@ -16,11 +15,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
-# Only one deploy at a time; cancel in-flight runs on new push.
 concurrency:
   group: github-pages
   cancel-in-progress: true
@@ -29,22 +25,15 @@ jobs:
   deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup GitHub Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload website/ as Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy website/ to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: website/
-
-      - name: Deploy to GitHub Pages
-        id: deploy
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./website
+          publish_branch: gh-pages
+          force_orphan: true
