@@ -115,14 +115,18 @@
           <span class="video-title">System Demonstration</span>
         </div>
         <div class="video-wrap">
-          <iframe
-            src="https://www.youtube-nocookie.com/embed/M7_sPTWmBFc?rel=0&modestbranding=1"
-            title="AmI HMAS &mdash; System Demonstration"
-            frameborder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen
-            loading="lazy">
-          </iframe>
+          <div class="yt-facade" data-id="M7_sPTWmBFc" onclick="loadYT(this)" role="button" tabindex="0"
+               aria-label="Play: AmI HMAS System Demonstration on YouTube"
+               onkeydown="if(event.key==='Enter'||event.key===' ')loadYT(this)">
+            <img src="https://img.youtube.com/vi/M7_sPTWmBFc/maxresdefault.jpg"
+                 alt="AmI HMAS System Demonstration thumbnail" loading="lazy">
+            <div class="yt-play" aria-hidden="true">
+              <svg viewBox="0 0 68 48" width="68" height="48">
+                <path d="M66.5 7.7c-.8-2.9-3-5.1-5.8-5.9C55.8 0 34 0 34 0S12.2 0 7.3 1.8C4.5 2.6 2.3 4.9 1.5 7.7 0 12.8 0 24 0 24s0 11.2 1.5 16.3c.8 2.9 3 5.1 5.8 5.9C12.2 48 34 48 34 48s21.8 0 26.7-1.8c2.8-.8 5-3 5.8-5.9C68 35.2 68 24 68 24s0-11.2-1.5-16.3z" fill="#f00"/>
+                <path d="M45 24 27 14v20" fill="#fff"/>
+              </svg>
+            </div>
+          </div>
         </div>
         <p class="video-desc">
           A walkthrough of the AmI HMAS system showing how users control a smart lab
@@ -137,14 +141,18 @@
           <span class="video-title">Full Technical Demo</span>
         </div>
         <div class="video-wrap">
-          <iframe
-            src="https://www.youtube-nocookie.com/embed/M7_sPTWmBFc?rel=0&modestbranding=1"
-            title="AmI HMAS &mdash; Technical Demo"
-            frameborder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen
-            loading="lazy">
-          </iframe>
+          <div class="yt-facade" data-id="M7_sPTWmBFc" onclick="loadYT(this)" role="button" tabindex="0"
+               aria-label="Play: AmI HMAS Technical Demo on YouTube"
+               onkeydown="if(event.key==='Enter'||event.key===' ')loadYT(this)">
+            <img src="https://img.youtube.com/vi/M7_sPTWmBFc/maxresdefault.jpg"
+                 alt="AmI HMAS Technical Demo thumbnail" loading="lazy">
+            <div class="yt-play" aria-hidden="true">
+              <svg viewBox="0 0 68 48" width="68" height="48">
+                <path d="M66.5 7.7c-.8-2.9-3-5.1-5.8-5.9C55.8 0 34 0 34 0S12.2 0 7.3 1.8C4.5 2.6 2.3 4.9 1.5 7.7 0 12.8 0 24 0 24s0 11.2 1.5 16.3c.8 2.9 3 5.1 5.8 5.9C12.2 48 34 48 34 48s21.8 0 26.7-1.8c2.8-.8 5-3 5.8-5.9C68 35.2 68 24 68 24s0-11.2-1.5-16.3z" fill="#f00"/>
+                <path d="M45 24 27 14v20" fill="#fff"/>
+              </svg>
+            </div>
+          </div>
         </div>
         <p class="video-desc">
           Detailed technical walkthrough covering all demo sequences: environment
@@ -659,6 +667,17 @@ function toggleBibtex(btn) {
   const open = block.classList.toggle('open');
   btn.setAttribute('aria-expanded', open);
   btn.textContent = open ? 'Hide BibTeX \u25B4' : 'Show BibTeX \u25BE';
+}
+
+// Click-to-play YouTube facade
+function loadYT(el) {
+  const id = el.dataset.id;
+  const iframe = document.createElement('iframe');
+  iframe.src = 'https://www.youtube.com/embed/' + id + '?rel=0&modestbranding=1&autoplay=1';
+  iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+  iframe.allowFullscreen = true;
+  iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:none;';
+  el.replaceWith(iframe);
 }
 
 // BibTeX copy

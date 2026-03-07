@@ -397,6 +397,38 @@ section:nth-child(even) { background: var(--bg-section); }
   border: none;
 }
 
+/* YouTube click-to-play facade */
+.yt-facade {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.yt-facade img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.2s;
+}
+
+.yt-facade:hover img { opacity: 0.8; }
+
+.yt-play {
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 2px 12px rgba(0,0,0,0.6));
+  transition: transform 0.15s;
+}
+
+.yt-facade:hover .yt-play { transform: scale(1.1); }
+
 .video-desc {
   padding: 0.9rem 1.2rem 1.1rem;
   font-size: 0.85rem;
