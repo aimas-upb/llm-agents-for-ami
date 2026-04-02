@@ -3,7 +3,10 @@
 
 environment:
   # Discovery method: 'direct', 'well_known', 'mdns'
-  discovery_method: 'mdns'
+  discovery_method: "${ENV_DISCOVERY_METHOD:-mdns}"
+
+  # Current environment to use (from environments section below)
+  current_environment: "${CURRENT_ENVIRONMENT:-lab308}"
 
   # Direct discovery configuration (when discovery_method is 'direct')
   direct:
@@ -109,3 +112,20 @@ notifications:
     - artifact_removed
     - capability_changed
     - state_changed
+
+# Demo/Development Environments (moved from agents.yaml)
+environments:
+  lab308:
+    name: "Lab 308"
+    yggdrasil_url: "${LAB308_YGGDRASIL_URL:-http://localhost:8080}"
+    homeassistant_url: "${LAB308_HA_URL:-http://localhost:8123}"
+
+  homebench:
+    name: "Home Bench"
+    yggdrasil_url: "${HOMEBENCH_YGGDRASIL_URL:-http://localhost:8090}"
+    homeassistant_url: "${HOMEBENCH_HA_URL:-http://localhost:8124}"
+
+# Community Signifier API (shared service)
+community:
+  api_url: "${COMMUNITY_API_URL:-http://localhost:8085}"
+  timeout: "${COMMUNITY_TIMEOUT:-10.0}"

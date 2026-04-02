@@ -4,6 +4,7 @@
 from __future__ import annotations
 import httpx
 import json
+import os
 import urllib.parse
 from typing import Any, Dict, List, Optional
 
@@ -11,7 +12,7 @@ import websockets
 from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
 
 # Namespaces
-BASE_FALLBACK = "http://localhost:8080/"
+BASE_FALLBACK = os.getenv("BASE_WS_URI", "http://localhost:8080/").rstrip("/") + "/"
 WEBSUB = Namespace("https://purl.org/hmas/websub/")
 HCTL   = Namespace("https://www.w3.org/2019/wot/hypermedia#")
 JS     = Namespace("https://www.w3.org/2019/wot/json-schema#")

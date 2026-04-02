@@ -15,6 +15,8 @@ import os
 import pytest
 import pytest_asyncio
 
+from ami_agents.shared.utils.config_loader import ConfigLoader
+
 pytestmark = [
     pytest.mark.skipif(
         not os.environ.get("OPENAI_API_KEY"),
@@ -93,6 +95,28 @@ def lab308_state():
     }
 
 
+@pytest.fixture
+def test_model():
+    """Get model from configuration, with environment variable override."""
+    try:
+        # Load configuration
+        config = ConfigLoader.merge_configs(
+            ConfigLoader.load_with_env_vars("ami_agents/config/agents.yaml"),
+            ConfigLoader.load_with_env_vars("ami_agents/config/environment.yaml")
+        )
+
+        llm_config = config.get("llm", {})
+        provider_name = llm_config.get("default_provider", "openai")
+        provider_cfg = llm_config.get("providers", {}).get(provider_name, {})
+
+        # Use environment override or config value or fallback
+        model = os.getenv("OPENAI_MODEL") or provider_cfg.get("model", "gpt-4")
+        return model
+    except:
+        # Fallback if config loading fails
+        return os.getenv("OPENAI_MODEL", "gpt-4")
+
+
 class TestLab308ImplicitToDark:
     """
     Demo Scenario 1: User says "It's too dark in here" in Lab308.
@@ -105,7 +129,7 @@ class TestLab308ImplicitToDark:
 
     @pytest.mark.asyncio
     async def test_bt_generation_for_dark_room(
-        self, planner, openai_client, lab308_affordances, lab308_state
+        self, planner, openai_client, lab308_affordances, lab308_state, test_model
     ):
         """Generate BT for implicit 'too dark' request."""
         result = await planner.generate_bt(
@@ -113,7 +137,7 @@ class TestLab308ImplicitToDark:
             affordances=lab308_affordances,
             state=lab308_state,
             client=openai_client,
-            model="gpt-4o-mini",
+            model=test_model,
         )
 
         assert isinstance(result, dict)
@@ -140,7 +164,7 @@ class TestLab308ImplicitToDark:
 
     @pytest.mark.asyncio
     async def test_signifier_extraction_from_bt(
-        self, planner, openai_client, lab308_affordances, lab308_state
+        self, planner, openai_client, lab308_affordances, lab308_state, test_model
     ):
         """Extract signifiers from generated BT."""
         from ami_agents.bt_planning.signifier_bridge import extract_signifiers_from_bt
@@ -150,7 +174,7 @@ class TestLab308ImplicitToDark:
             affordances=lab308_affordances,
             state=lab308_state,
             client=openai_client,
-            model="gpt-4o-mini",
+            model=test_model,
         )
 
         tree = result.get("tree", {})
@@ -171,7 +195,7 @@ class TestLab308ImplicitToDark:
 
     @pytest.mark.asyncio
     async def test_bt_execution_dry_run(
-        self, planner, openai_client, lab308_affordances, lab308_state
+        self, planner, openai_client, lab308_affordances, lab308_state, test_model
     ):
         """Validate generated BT with IRExecutor (dry run, no live environment)."""
         from ami_agents.bt_planning.execution.ir_executor import IRExecutor
@@ -181,7 +205,7 @@ class TestLab308ImplicitToDark:
             affordances=lab308_affordances,
             state=lab308_state,
             client=openai_client,
-            model="gpt-4o-mini",
+            model=test_model,
         )
 
         tree = result.get("tree", {})

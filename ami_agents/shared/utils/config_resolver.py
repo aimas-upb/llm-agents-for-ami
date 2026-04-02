@@ -38,7 +38,7 @@ def resolve_yggdrasil_url(
     config: Optional[Mapping[str, Any]] = None,
     *,
     env: Optional[Mapping[str, str]] = None,
-    default: str = "http://localhost:8080/",
+    default: str = None,
 ) -> str:
     """
     Resolve the Yggdrasil HMAS endpoint URL from config/env.
@@ -54,6 +54,9 @@ def resolve_yggdrasil_url(
     """
     cfg: Mapping[str, Any] = config or {}
     env_map: Mapping[str, str] = env or os.environ
+
+    if default is None:
+        default = env_map.get("BASE_WS_URI", "http://localhost:8080/")
 
     return _first_non_empty_str(
         _get(cfg, "yggdrasil_url"),

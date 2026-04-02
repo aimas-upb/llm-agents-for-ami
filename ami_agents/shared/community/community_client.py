@@ -28,20 +28,27 @@ class CommunitySignifierClient:
     - GET /signifiers - list all signifiers
     """
 
-    def __init__(self, api_url: str, timeout: float = 10.0):
+    def __init__(self, api_url: str, config: dict = None, timeout: float = None):
         """
         Args:
             api_url: Base URL of the community signifier API
-            timeout: Request timeout in seconds
+            config: Configuration dictionary containing timeouts
+            timeout: Request timeout in seconds (overrides config)
         """
         self.api_url = api_url.rstrip("/")
+        self.config = config or {}
+
+        # Get timeout from config or use provided/default value
+        if timeout is None:
+            timeout = self.config.get("timeouts", {}).get("community", {}).get("api", 10.0)
+
         self.timeout = aiohttp.ClientTimeout(total=timeout)
 
     async def match_signifiers(
         self,
         intent: str,
         k: int = 5,
-        min_similarity: float = 0.5,
+        min_similarity: float = None,
     ) -> dict:
         """
         Query community for signifier matches.
@@ -54,6 +61,10 @@ class CommunitySignifierClient:
         Returns:
             Dict with match results (matches, final_matches, etc.)
         """
+        # Use config value if min_similarity not explicitly provided
+        if min_similarity is None:
+            min_similarity = self.config.get("signifiers", {}).get("min_similarity", 0.5)
+
         try:
             async with aiohttp.ClientSession(timeout=self.timeout) as session:
                 async with session.post(

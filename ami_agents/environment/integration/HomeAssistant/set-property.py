@@ -145,7 +145,11 @@ async def main():
 
     # Try to find an applicable HA service first (preferred over direct state set)
     headers = {"Authorization": f"Bearer {ha_token}", "Content-Type": "application/json"}
-    async with httpx.AsyncClient(base_url=base_url, headers=headers, timeout=10.0) as client:
+
+    # Get timeout from environment or use default
+    ha_timeout = float(os.getenv("HA_API_TIMEOUT", "10.0"))
+
+    async with httpx.AsyncClient(base_url=base_url, headers=headers, timeout=ha_timeout) as client:
         # Inspect services
         services_resp = await client.get("/api/services")
         services_resp.raise_for_status()

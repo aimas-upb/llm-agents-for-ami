@@ -98,7 +98,7 @@ class TestHomeBenchImplicitCantRead:
             affordances=homebench_affordances,
             state=homebench_state,
             client=openai_client,
-            model="gpt-4o-mini",
+            model="gpt-4",
         )
 
         assert isinstance(result, dict)
@@ -162,7 +162,7 @@ class TestHomeBenchImplicitCantRead:
             state=homebench_state,
             signifier_hints=lab308_signifier_hints,
             client=openai_client,
-            model="gpt-4o-mini",
+            model="gpt-4",
         )
 
         assert isinstance(result, dict)
@@ -202,7 +202,7 @@ class TestHomeBenchSignifierExtraction:
             affordances=homebench_affordances,
             state=homebench_state,
             client=openai_client,
-            model="gpt-4o-mini",
+            model="gpt-4",
         )
 
         tree = result.get("tree", {})

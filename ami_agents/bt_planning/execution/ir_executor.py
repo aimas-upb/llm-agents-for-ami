@@ -42,7 +42,13 @@ class IRExecutor:
     Compiles JSON specification to py_trees objects and executes.
     """
 
-    def __init__(self, max_ticks: int = 10):
+    def __init__(self, max_ticks: int = None, config: dict = None):
+        # Get max_ticks from config if not explicitly provided
+        if max_ticks is None and config:
+            max_ticks = config.get("bt_execution", {}).get("max_ticks", {}).get("default", 10)
+        elif max_ticks is None:
+            max_ticks = 10
+
         self.max_ticks = max_ticks
 
     def execute_from_spec(self, tree_spec: dict) -> ExecutionResult:

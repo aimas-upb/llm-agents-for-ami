@@ -16,6 +16,7 @@ import websockets
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response, JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
 from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
 
@@ -23,8 +24,21 @@ from http import HTTPStatus
 from ha_utils import (HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST,
                       get_supported_service_fields)
 
+# Load .env file automatically
+def load_environment():
+    """Load .env file from project root if it exists."""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # Navigate to project root: HomeAssistant/ -> integration/ -> environment/ -> ami_agents/ -> project root
+    project_root = os.path.join(current_dir, '..', '..', '..', '..')
+    env_path = os.path.join(project_root, '.env')
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+
+# Load environment variables from .env file
+load_environment()
+
 # Namespaces
-BASE_FALLBACK = "http://localhost:8080/"
+BASE_FALLBACK = os.getenv("BASE_WS_URI", "http://localhost:8080/").rstrip("/") + "/"
 WEBSUB = Namespace("https://purl.org/hmas/websub/")
 HCTL   = Namespace("https://www.w3.org/2019/wot/hypermedia#")
 JS     = Namespace("https://www.w3.org/2019/wot/json-schema#")

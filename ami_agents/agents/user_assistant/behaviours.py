@@ -362,7 +362,9 @@ class UserMessageBehaviour(CyclicBehaviour):
         node_count = count_bt_nodes(tree_spec)
         logger.info(demo("Executing BT: thread=%s nodes=%d signifier_reuse=%s intent_type=%s"), thread, node_count, is_signifier_reuse, intent_type)
 
-        executor = IRExecutor(max_ticks=50)
+        # Get max_ticks from config
+        max_ticks = self.agent.config.get("bt_execution", {}).get("max_ticks", {}).get("user_assistant", 50)
+        executor = IRExecutor(max_ticks=max_ticks)
         loop = asyncio.get_event_loop()
         try:
             exec_result: ExecutionResult = await loop.run_in_executor(
@@ -419,13 +421,17 @@ class UserMessageBehaviour(CyclicBehaviour):
         if explorer_jid and workspace_id:
             try:
                 logger.info(demo("Querying environment state for signifier context (workspace_id=%r)"), workspace_id)
+
+                # Get signifier match timeout from config
+                signifier_timeout = self.agent.config.get("timeouts", {}).get("signifier", {}).get("match", 10.0)
+
                 state_response = await rpc_call(
                     self.agent,
                     to_jid=str(explorer_jid),
                     request_type=MessageType.ENV_STATE_REQUEST.value,
                     body={},
                     expect_type=MessageType.ENV_STATE_RESPONSE.value,
-                    timeout=10.0,
+                    timeout=signifier_timeout,
                 )
 
                 if state_response and state_response.body:
@@ -482,7 +488,7 @@ class UserMessageBehaviour(CyclicBehaviour):
                         "execution_result": exec_result.to_dict(),
                     },
                     expect_type=MessageType.SIGNIFIER_RECORD_EXECUTION_RESPONSE.value,
-                    timeout=15.0,
+                    timeout=self.agent.config.get("timeouts", {}).get("rpc", {}).get("call", 15.0),
                     thread=(thread if thread != "__default__" else None),
                 )
                 created_count = None
@@ -571,7 +577,7 @@ class UserMessageBehaviour(CyclicBehaviour):
                 request_type=MessageType.ENV_STATE_REQUEST.value,
                 body=payload,
                 expect_type=MessageType.ENV_STATE_RESPONSE.value,
-                timeout=15.0,
+                timeout=self.agent.config.get("timeouts", {}).get("rpc", {}).get("call", 15.0),
             )
             # Cache results
             try:
@@ -611,7 +617,7 @@ class UserMessageBehaviour(CyclicBehaviour):
                 request_type=MessageType.ENV_CAPABILITIES_REQUEST.value,
                 body={"query": "all"},
                 expect_type=MessageType.ENV_CAPABILITIES_RESPONSE.value,
-                timeout=15.0,
+                timeout=self.agent.config.get("timeouts", {}).get("rpc", {}).get("call", 15.0),
             )
             return result.body or ""
         except Exception as exc:

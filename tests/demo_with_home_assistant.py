@@ -109,11 +109,17 @@ import spade
 from spade.agent import Agent
 from spade.behaviour import OneShotBehaviour
 from spade.message import Message as SpadeMessage
+from dotenv import load_dotenv
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+# Load .env file automatically from project root
+env_path = PROJECT_ROOT / '.env'
+if env_path.exists():
+    load_dotenv(env_path)
 
 from ami_agents.shared.utils import spade_compat  # noqa: F401
 from ami_agents.agents.env_explorer.env_explorer_agent import EnvExplorerAgent
@@ -123,6 +129,7 @@ from ami_agents.environment.connection.hmas_client import IHMASClient
 from ami_agents.shared.models.messages import MessageType
 from ami_agents.shared.utils.demo_log import demo
 from ami_agents.shared.utils.spade_rpc import RpcTimeoutError, rpc_call
+from ami_agents.shared.utils.config_loader import ConfigLoader
 
 
 class _DropHighFrequencyStateUpdateSpamFilter(logging.Filter):
@@ -1467,28 +1474,36 @@ async def main():
     if args.pause_for_sensor:
         os.environ["PAUSE_FOR_SENSOR"] = "1"
 
-    # EnvExplorer: configure discovery notifications (optional but helpful)
-    env_config = {
-        "yggdrasil_url": yggdrasil_url,
-        "yggdrasil": {"url": yggdrasil_url},
-        "discovery": {
-            "notify_on_discovery_complete": True,
-            "notify_agents": [solver_jid],
-        },
-        "signifiers": {
-            "matcher_version": args.signifier_matcher,
-            "min_similarity": float(args.signifier_min_similarity),
-        },
+    # Load configuration from files using ConfigLoader
+    env_config = ConfigLoader.merge_configs(
+        ConfigLoader.load_with_env_vars("ami_agents/config/agents.yaml"),
+        ConfigLoader.load_with_env_vars("ami_agents/config/environment.yaml")
+    )
+
+    # Override specific demo settings
+    env_config["yggdrasil_url"] = yggdrasil_url
+    env_config["yggdrasil"] = {"url": yggdrasil_url}
+    env_config["discovery"] = {
+        "notify_on_discovery_complete": True,
+        "notify_agents": [solver_jid],
     }
+
+    # Override signifier settings from CLI args if provided
     if args.signifier_matcher or args.signifier_min_similarity is not None:
-        env_config["signifiers"] = {
-            **({"matcher_version": args.signifier_matcher} if args.signifier_matcher else {}),
-            **({"min_similarity": float(args.signifier_min_similarity)} if args.signifier_min_similarity is not None else {}),
-        }
+        if "signifiers" not in env_config:
+            env_config["signifiers"] = {}
+        if args.signifier_matcher:
+            env_config["signifiers"]["matcher_version"] = args.signifier_matcher
+        if args.signifier_min_similarity is not None:
+            env_config["signifiers"]["min_similarity"] = float(args.signifier_min_similarity)
 
     # UserAssistant and Solver configs (new agents.yaml-compatible structure)
-    # Default model requested by user:
-    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    # Get model from configuration hierarchy: config -> env -> fallback
+    llm_config = env_config.get("llm", {})
+    provider_name = llm_config.get("default_provider", "openai")
+    provider_cfg = llm_config.get("providers", {}).get(provider_name, {})
+
+    model = os.getenv("OPENAI_MODEL") or provider_cfg.get("model", "gpt-4")
     # This model name is typically served via OpenRouter's OpenAI-compatible API.
     base_url = os.getenv("OPENAI_BASE_URL")
     if not base_url:
@@ -1520,8 +1535,8 @@ async def main():
                     "api_key": os.getenv("OPENAI_API_KEY"),
                     "base_url": base_url,
                     "model": model,
-                    **({} if model.startswith("o") else {"temperature": float(os.getenv("OPENAI_TEMPERATURE", "0.5"))}),
-                    **({} if model.startswith("o") else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS", "1500"))}),
+                    **({} if model.startswith("o") else {"temperature": float(os.getenv("OPENAI_TEMPERATURE") or str(provider_cfg.get("temperature", 0.7)))}),
+                    **({} if model.startswith("o") else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS") or str(provider_cfg.get("max_tokens", 1500)))}),
                     **({"reasoning_effort": reasoning_effort} if reasoning_effort else {}),
                 }
             },
@@ -1531,8 +1546,8 @@ async def main():
             "timeout": planning_timeout_s,
             "llm_planning": {
                 "model": model,
-                **({} if model.startswith("o") else {"temperature": float(os.getenv("OPENAI_TEMPERATURE", "0.5"))}),
-                **({} if model.startswith("o") else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS", "1500"))}),
+                **({} if model.startswith("o") else {"temperature": float(os.getenv("OPENAI_TEMPERATURE") or str(provider_cfg.get("temperature", 0.7)))}),
+                **({} if model.startswith("o") else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS") or str(provider_cfg.get("max_tokens", 1500)))}),
                 **({"reasoning_effort": reasoning_effort} if reasoning_effort else {}),
             },
             "context_gathering": {"timeout": 60},

@@ -86,26 +86,37 @@ class InteractionSolverAgent(Agent, IAgent):
         provider_cfg = (llm_root.get("providers", {}) or {}).get(provider_name, {}) or {}
         planning_llm = (self.config.get("planning", {}) or {}).get("llm_planning", {}) or {}
 
-        self.model = planning_llm.get("model") or provider_cfg.get("model") or "o3"
+        self.model = planning_llm.get("model") or provider_cfg.get("model") or "gpt-4"
         self.temperature = planning_llm.get("temperature", provider_cfg.get("temperature", 0.7))
         max_tokens_cfg = planning_llm.get("max_tokens", provider_cfg.get("max_tokens", None))
         max_completion_tokens_cfg = planning_llm.get("max_completion_tokens", provider_cfg.get("max_completion_tokens", None))
 
-        self.max_tokens = None
-        self.max_completion_tokens = None
         if str(self.model).startswith("o"):
             # Reasoning models reject `max_tokens`; only use max_completion_tokens when explicitly provided.
+            self.max_tokens = None
+            self.max_completion_tokens = None
             if max_completion_tokens_cfg is not None:
                 try:
                     self.max_completion_tokens = int(max_completion_tokens_cfg)
                 except Exception:
                     self.max_completion_tokens = None
         else:
-            raw_mt = max_tokens_cfg if max_tokens_cfg is not None else 1500
+            # Non-reasoning models: use max_tokens from config, and max_completion_tokens if provided
+            default_max_tokens = provider_cfg.get("max_tokens", 1500)
+            raw_mt = max_tokens_cfg if max_tokens_cfg is not None else default_max_tokens
             try:
                 self.max_tokens = int(raw_mt) if raw_mt is not None else None
             except Exception:
-                self.max_tokens = 1500
+                self.max_tokens = int(default_max_tokens) if default_max_tokens is not None else 1500
+
+            # Also set max_completion_tokens if provided in config
+            if max_completion_tokens_cfg is not None:
+                try:
+                    self.max_completion_tokens = int(max_completion_tokens_cfg)
+                except Exception:
+                    self.max_completion_tokens = None
+            else:
+                self.max_completion_tokens = None
         self.reasoning_effort = (
             planning_llm.get("reasoning_effort")
             or provider_cfg.get("reasoning_effort")
@@ -117,12 +128,18 @@ class InteractionSolverAgent(Agent, IAgent):
         api_key = provider_cfg.get("api_key") or llm_root.get("api_key") or os.getenv("OPENAI_API_KEY")
         base_url = provider_cfg.get("base_url") or llm_root.get("base_url") or "https://api.openai.com/v1"
         raw_timeout = (llm_root.get("retry", {}) or {}).get("timeout", None)
+
+        # Get timeout values from config
+        llm_timeouts = config.get("timeouts", {}).get("llm", {})
+        default_timeout = llm_timeouts.get("default", 30.0)
+        reasoning_timeout = llm_timeouts.get("reasoning", 120.0)
+
         try:
-            timeout = float(raw_timeout) if raw_timeout is not None else 30.0
+            timeout = float(raw_timeout) if raw_timeout is not None else default_timeout
         except Exception:
-            timeout = 30.0
-        if str(self.model).startswith("o") and "openai.com" in str(base_url).lower() and timeout < 120.0:
-            timeout = 120.0
+            timeout = default_timeout
+        if str(self.model).startswith("o") and "openai.com" in str(base_url).lower() and timeout < reasoning_timeout:
+            timeout = reasoning_timeout
 
         self.base_url = str(base_url)
         if self.reasoning_effort is None and str(self.model).startswith("o") and "openai.com" in self.base_url:

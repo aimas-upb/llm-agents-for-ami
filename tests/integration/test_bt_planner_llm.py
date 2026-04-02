@@ -13,6 +13,7 @@ import pytest_asyncio
 
 from ami_agents.bt_planning.planning.bt_planner import AsyncBTPlanner
 from ami_agents.bt_planning.planning.schema import TREE_PARAMETER_SCHEMA
+from ami_agents.shared.utils.config_loader import ConfigLoader
 
 # Skip all tests in this module if no API key
 pytestmark = pytest.mark.skipif(
@@ -32,6 +33,28 @@ async def openai_client():
 @pytest.fixture
 def planner():
     return AsyncBTPlanner(max_attempts=2)
+
+
+@pytest.fixture
+def test_model():
+    """Get model from configuration, with environment variable override."""
+    try:
+        # Load configuration
+        config = ConfigLoader.merge_configs(
+            ConfigLoader.load_with_env_vars("ami_agents/config/agents.yaml"),
+            ConfigLoader.load_with_env_vars("ami_agents/config/environment.yaml")
+        )
+
+        llm_config = config.get("llm", {})
+        provider_name = llm_config.get("default_provider", "openai")
+        provider_cfg = llm_config.get("providers", {}).get(provider_name, {})
+
+        # Use environment override or config value or fallback
+        model = os.getenv("OPENAI_MODEL") or provider_cfg.get("model", "gpt-4")
+        return model
+    except:
+        # Fallback if config loading fails
+        return os.getenv("OPENAI_MODEL", "gpt-4")
 
 
 @pytest.fixture
@@ -104,13 +127,13 @@ class TestBTGeneration:
     """Test BT generation with real LLM calls."""
 
     @pytest.mark.asyncio
-    async def test_generate_bt_single_action(self, planner, openai_client, lab308_affordances):
+    async def test_generate_bt_single_action(self, planner, openai_client, lab308_affordances, test_model):
         """Single intent should produce a valid BT with at least one action node."""
         result = await planner.generate_bt(
             intents=["turn on light308"],
             affordances=lab308_affordances,
             client=openai_client,
-            model="gpt-4o-mini",
+            model=test_model,
         )
 
         assert isinstance(result, dict)
@@ -126,13 +149,13 @@ class TestBTGeneration:
         _validate_tree_structure(tree, errors)
 
     @pytest.mark.asyncio
-    async def test_generate_bt_multiple_actions(self, planner, openai_client, lab308_affordances):
+    async def test_generate_bt_multiple_actions(self, planner, openai_client, lab308_affordances, test_model):
         """Multiple intents should produce a BT with multiple action nodes."""
         result = await planner.generate_bt(
             intents=["turn on light308", "set light308 brightness to 80"],
             affordances=lab308_affordances,
             client=openai_client,
-            model="gpt-4o-mini",
+            model=test_model,
         )
 
         assert isinstance(result, dict)
@@ -152,13 +175,13 @@ class TestBTGeneration:
         assert count_actions(tree) >= 2, "Should have at least 2 action nodes for 2 intents"
 
     @pytest.mark.asyncio
-    async def test_generate_bt_impossible_request(self, planner, openai_client, lab308_affordances):
+    async def test_generate_bt_impossible_request(self, planner, openai_client, lab308_affordances, test_model):
         """Request for non-existent artifact should be marked impossible."""
         result = await planner.generate_bt(
             intents=["turn on the heater"],
             affordances=lab308_affordances,
             client=openai_client,
-            model="gpt-4o-mini",
+            model=test_model,
         )
 
         assert isinstance(result, dict)
@@ -179,13 +202,13 @@ class TestBTGeneration:
                 check_no_heater(tree)
 
     @pytest.mark.asyncio
-    async def test_generated_bt_validates(self, planner, openai_client, lab308_affordances):
+    async def test_generated_bt_validates(self, planner, openai_client, lab308_affordances, test_model):
         """Generated BT should pass the planner's own validation."""
         result = await planner.generate_bt(
             intents=["turn on light308", "open blinds308 fully"],
             affordances=lab308_affordances,
             client=openai_client,
-            model="gpt-4o-mini",
+            model=test_model,
         )
 
         tree = result.get("tree", {})
@@ -194,13 +217,13 @@ class TestBTGeneration:
             assert validation_errors == [], f"Validation errors: {validation_errors}"
 
     @pytest.mark.asyncio
-    async def test_generated_bt_uses_provided_urls(self, planner, openai_client, lab308_affordances):
+    async def test_generated_bt_uses_provided_urls(self, planner, openai_client, lab308_affordances, test_model):
         """Generated BT action URLs should come from the provided affordances."""
         result = await planner.generate_bt(
             intents=["turn on light308"],
             affordances=lab308_affordances,
             client=openai_client,
-            model="gpt-4o-mini",
+            model=test_model,
         )
 
         tree = result.get("tree", {})
@@ -251,7 +274,7 @@ class TestBTPlannerWithSignifiers:
             affordances=lab308_affordances,
             signifier_hints=signifier_hints,
             client=openai_client,
-            model="gpt-4o-mini",
+            model=test_model,
         )
 
         assert isinstance(result, dict)
@@ -285,7 +308,7 @@ class TestBTPlannerWithSignifiers:
             affordances=lab308_affordances,
             signifier_hints=None,
             client=openai_client,
-            model="gpt-4o-mini",
+            model=test_model,
         )
 
         assert isinstance(result, dict)
@@ -346,7 +369,7 @@ class TestBTPlannerWithSignifiers:
             affordances=homebench_affordances,
             signifier_hints=lab308_hints,
             client=openai_client,
-            model="gpt-4o-mini",
+            model=test_model,
         )
 
         assert isinstance(result, dict)

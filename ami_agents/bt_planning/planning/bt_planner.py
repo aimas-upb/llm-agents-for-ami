@@ -39,7 +39,7 @@ class AsyncBTPlanner:
             state={...},
             signifier_hints={...},
             client=async_openai_client,
-            model="o3",
+            model="gpt-4",
         )
     """
 
@@ -57,7 +57,7 @@ class AsyncBTPlanner:
         state: Optional[dict] = None,
         signifier_hints: Optional[dict] = None,
         client: Optional[AsyncOpenAI] = None,
-        model: str = "o3",
+        model: str = "gpt-4",
         temperature: Optional[float] = None,
         reasoning_effort: Optional[str] = None,
         max_completion_tokens: Optional[int] = None,

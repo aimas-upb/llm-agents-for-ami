@@ -74,7 +74,7 @@ class UserAssistantAgent(Agent, IAgent):
                 "llm.providers.openai.api_key in agents.yaml."
             )
 
-        model = provider_cfg.get("model") or "o3"
+        model = provider_cfg.get("model") or "gpt-4"
         temperature = provider_cfg.get("temperature", 0.7)
         max_completion_tokens = provider_cfg.get("max_completion_tokens")
         base_url = (
@@ -92,8 +92,9 @@ class UserAssistantAgent(Agent, IAgent):
         is_reasoning = str(model).startswith("o")
         if is_reasoning and "openai.com" in str(base_url).lower():
             temperature = 1.0
-            if timeout is None or timeout < 120.0:
-                timeout = 120.0
+            reasoning_timeout = config.get("timeouts", {}).get("llm", {}).get("reasoning", 120.0)
+            if timeout is None or timeout < reasoning_timeout:
+                timeout = reasoning_timeout
 
         reasoning_effort = (
             provider_cfg.get("reasoning_effort")

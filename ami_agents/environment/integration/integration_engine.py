@@ -11,6 +11,7 @@ import logging
 import asyncio
 import aiohttp
 import json
+import os
 from aiohttp import web
 
 from rdflib import Graph, URIRef, Namespace, BNode
@@ -38,7 +39,9 @@ class NotificationListener:
     Acts as the 'Mailbox' for the Agent.
     """
 
-    def __init__(self, port: int = 8086):
+    def __init__(self, port: int = None):
+        if port is None:
+            port = int(os.getenv("INTEGRATION_ENGINE_PORT", "8086"))
         self.port = port
         self.event_queue = asyncio.Queue()
         self.app = web.Application()
@@ -791,17 +794,19 @@ class HomeAssistantIntegration(IIntegrationEngine):
 class YggdrasilIntegration(IIntegrationEngine):
     """Integration for Yggdrasil environments (already HMAS)."""
 
-    def __init__(self, yggdrasil_url: str):
+    def __init__(self, yggdrasil_url: str, agent_webid: str = None):
         """
         Initialize Yggdrasil integration.
 
         Args:
             yggdrasil_url: Yggdrasil environment URL. This will be the URL to an hmas:HypermediaMASPlatform instance.
+            agent_webid: Agent WebID for integration requests. Defaults to {yggdrasil_url}/agents/alex if not provided.
         """
         ## call parent constructor
         super().__init__()
 
         self.yggdrasil_url = yggdrasil_url
+        self.agent_webid = agent_webid or f"{yggdrasil_url.rstrip('/')}/agents/alex"
         self.platform_graph: Optional[Graph] = None
         self.notification_listener: Optional[NotificationListener] = None
 
@@ -1323,7 +1328,7 @@ class YggdrasilIntegration(IIntegrationEngine):
                 # We use 'alex' as the default system agent for the integrator.
                 headers = {
                     "Content-Type": content_type,
-                    "X-Agent-WebID": "http://localhost:8080/agents/alex",
+                    "X-Agent-WebID": self.agent_webid,
                     "X-Agent-LocalName": "alex"
                 }
 
@@ -1384,7 +1389,9 @@ class YggdrasilIntegration(IIntegrationEngine):
         """
         return self.yggdrasil_url
 
-    async def start_notification_listener(self, port: int = 8086) -> str:
+    async def start_notification_listener(self, port: int = None) -> str:
+        if port is None:
+            port = int(os.getenv("INTEGRATION_ENGINE_PORT", "8086"))
         """
         Starts the background notification listener.
         Returns the public callback URL.

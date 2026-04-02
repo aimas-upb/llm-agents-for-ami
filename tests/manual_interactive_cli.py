@@ -29,12 +29,19 @@ from spade.agent import Agent
 from spade.behaviour import CyclicBehaviour
 from spade.message import Message as SpadeMessage
 from spade.template import Template
+from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# Load .env file automatically from project root
+env_path = PROJECT_ROOT / '.env'
+if env_path.exists():
+    load_dotenv(env_path)
+
 from ami_agents.shared.utils import spade_compat  # noqa: F401
+from ami_agents.shared.utils.config_loader import ConfigLoader
 from ami_agents.agents.env_explorer.env_explorer_agent import EnvExplorerAgent
 from ami_agents.agents.interaction_solver.interaction_solver_agent import InteractionSolverAgent
 from ami_agents.agents.user_assistant.user_assistant_agent import UserAssistantAgent
@@ -324,6 +331,19 @@ async def main():
     except Exception:
         api_timeout_s = 120.0 if model.startswith("o") and "openai.com" in base_url else 30.0
 
+    # Load configuration for provider settings
+    try:
+        config = ConfigLoader.merge_configs(
+            ConfigLoader.load_with_env_vars("ami_agents/config/agents.yaml"),
+            ConfigLoader.load_with_env_vars("ami_agents/config/environment.yaml")
+        )
+        llm_config = config.get("llm", {})
+        provider_name = llm_config.get("default_provider", "openai")
+        provider_cfg = llm_config.get("providers", {}).get(provider_name, {})
+    except:
+        # Fallback if config loading fails
+        provider_cfg = {"temperature": 0.7, "max_tokens": 1500}
+
     llm_cfg = {
         "llm": {
             "default_provider": "openai",
@@ -332,8 +352,8 @@ async def main():
                     "api_key": os.getenv("OPENAI_API_KEY"),
                     "base_url": base_url,
                     "model": model,
-                    **({} if model.startswith("o") else {"temperature": float(os.getenv("OPENAI_TEMPERATURE", "0.5"))}),
-                    **({} if model.startswith("o") else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS", "1500"))}),
+                    **({} if model.startswith("o") else {"temperature": float(os.getenv("OPENAI_TEMPERATURE") or str(provider_cfg.get("temperature", 0.7)))}),
+                    **({} if model.startswith("o") else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS") or str(provider_cfg.get("max_tokens", 1500)))}),
                     **({"reasoning_effort": reasoning_effort} if reasoning_effort else {}),
                 }
             },
@@ -343,8 +363,8 @@ async def main():
             "timeout": float(os.getenv("AMI_PLANNING_TIMEOUT", "180" if model.startswith("o") else "90")),
             "llm_planning": {
                 "model": model,
-                **({} if model.startswith("o") else {"temperature": float(os.getenv("OPENAI_TEMPERATURE", "0.5"))}),
-                **({} if model.startswith("o") else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS", "1500"))}),
+                **({} if model.startswith("o") else {"temperature": float(os.getenv("OPENAI_TEMPERATURE") or str(provider_cfg.get("temperature", 0.7)))}),
+                **({} if model.startswith("o") else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS") or str(provider_cfg.get("max_tokens", 1500)))}),
                 **({"reasoning_effort": reasoning_effort} if reasoning_effort else {}),
             },
             "context_gathering": {"timeout": 10},
