@@ -1,53 +1,10 @@
-"""
-Pure utility functions for the User Assistant.
-
-Extracted from the former tools.py so they can be reused by behaviours
-without depending on spade_llm.
-"""
+"""Plan-shaped JSON coercion, canonicalisation and BT preview helpers."""
 
 import hashlib
 import json
 from typing import Any, Dict
 
-
-def strip_code_fences(text: str) -> str:
-    """Remove Markdown code fences from a string."""
-    stripped = (text or "").strip()
-    if not stripped.startswith("```"):
-        return stripped
-    stripped = stripped.replace("```json", "").replace("```", "").strip()
-    return stripped
-
-
-def loose_json_loads(text: str) -> Any | None:
-    """Best-effort JSON loader.
-
-    Handles:
-    - clean JSON
-    - JSON inside Markdown code fences
-    - leading/trailing extra text (tries to raw-decode from first token)
-    """
-    cleaned = strip_code_fences(text)
-    if not cleaned:
-        return None
-
-    try:
-        return json.loads(cleaned)
-    except Exception:
-        pass
-
-    decoder = json.JSONDecoder()
-    for token in ("{", "[", '"'):
-        idx = cleaned.find(token)
-        if idx < 0:
-            continue
-        try:
-            obj, _ = decoder.raw_decode(cleaned[idx:])
-            return obj
-        except Exception:
-            continue
-
-    return None
+from .json_io import loose_json_loads
 
 
 def coerce_plan_dict(value: Any) -> Dict[str, Any] | None:

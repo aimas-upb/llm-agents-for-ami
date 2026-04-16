@@ -12,7 +12,6 @@ import logging
 import os
 from typing import Any, Dict
 
-from openai import AsyncOpenAI
 from spade.agent import Agent
 from spade.message import Message as SpadeMessage
 from spade.template import Template
@@ -31,13 +30,23 @@ from ...shared.utils.spade_rpc import send_via_router
 from ...shared.utils.config_resolver import resolve_yggdrasil_url
 from ...shared.utils.demo_log import demo
 from ...shared.state_memory import StateMemoryCache
+from ...shared.community.community_client import CommunitySignifierClient
 
 from ...environment.integration.integration_engine import YggdrasilIntegration
 
 from .models import ConversationState
 from .behaviours import UserMessageBehaviour, DemoRequestClassifierBehaviour
+from .utils import build_llm_client, build_llm_call_kwargs, LLMClientConfig
 
 logger = logging.getLogger("UserAssistant")
+
+# Fallback defaults when yaml is missing a key. Every production deployment
+# provides these via ``config/agents.yaml``; the constants here just keep the
+# agent runnable in isolated unit tests.
+_DEFAULT_GOAL_REQUEST_TIMEOUT_S = 60.0
+_DEFAULT_RPC_CALL_TIMEOUT_S = 15.0
+_DEFAULT_SIGNIFIER_MATCH_TIMEOUT_S = 10.0
+_DEFAULT_BT_MAX_TICKS = 50
 
 
 class UserAssistantAgent(Agent, IAgent):
@@ -59,68 +68,34 @@ class UserAssistantAgent(Agent, IAgent):
         self.target_jids = target_jids
 
         # ── LLM client (component, not base class) ──────────────────
-        llm_root = config.get("llm", {}) or {}
-        provider_name = llm_root.get("default_provider", "openai")
-        provider_cfg = (llm_root.get("providers", {}) or {}).get(provider_name, {}) or {}
+        self._llm_cfg: LLMClientConfig = build_llm_client(config)
+        self.llm_client = self._llm_cfg.client
+        self.llm_model: str = self._llm_cfg.model
+        self.llm_base_url: str = self._llm_cfg.base_url
+        self.llm_temperature: float = self._llm_cfg.temperature
+        self.llm_reasoning_effort = self._llm_cfg.reasoning_effort
+        self.llm_max_completion_tokens = self._llm_cfg.max_completion_tokens
 
-        api_key = (
-            provider_cfg.get("api_key")
-            or llm_root.get("api_key")
-            or os.getenv("OPENAI_API_KEY")
+        # ── Timeouts / tick limits (pulled from yaml) ───────────────
+        timeouts = config.get("timeouts", {}) or {}
+        rpc_cfg = timeouts.get("rpc", {}) or {}
+        signifier_cfg = timeouts.get("signifier", {}) or {}
+        planning_cfg = config.get("planning", {}) or {}
+
+        self.rpc_call_timeout: float = float(
+            rpc_cfg.get("call", _DEFAULT_RPC_CALL_TIMEOUT_S)
         )
-        if not api_key:
-            raise ValueError(
-                "Missing OpenAI API key. Set OPENAI_API_KEY or "
-                "llm.providers.openai.api_key in agents.yaml."
-            )
-
-        model = provider_cfg.get("model") or "gpt-4"
-        temperature = provider_cfg.get("temperature", 0.7)
-        max_completion_tokens = provider_cfg.get("max_completion_tokens")
-        base_url = (
-            provider_cfg.get("base_url")
-            or llm_root.get("base_url")
-            or "https://api.openai.com/v1"
+        self.signifier_match_timeout: float = float(
+            signifier_cfg.get("match", _DEFAULT_SIGNIFIER_MATCH_TIMEOUT_S)
         )
-        raw_timeout = (llm_root.get("retry", {}) or {}).get("timeout")
-        try:
-            timeout = float(raw_timeout) if raw_timeout is not None else None
-        except Exception:
-            timeout = None
-
-        # Reasoning-model adjustments (o-series)
-        is_reasoning = str(model).startswith("o")
-        if is_reasoning and "openai.com" in str(base_url).lower():
-            temperature = 1.0
-            reasoning_timeout = config.get("timeouts", {}).get("llm", {}).get("reasoning", 120.0)
-            if timeout is None or timeout < reasoning_timeout:
-                timeout = reasoning_timeout
-
-        reasoning_effort = (
-            provider_cfg.get("reasoning_effort")
-            or llm_root.get("reasoning_effort")
-            or os.getenv("OPENAI_REASONING_EFFORT")
+        self.goal_request_timeout: float = float(
+            planning_cfg.get("timeout", _DEFAULT_GOAL_REQUEST_TIMEOUT_S)
         )
-        if reasoning_effort is None and is_reasoning and "openai.com" in str(base_url):
-            reasoning_effort = "high"
-
-        # Persist for demo logs and behaviour access
-        self.llm_model: str = str(model)
-        self.llm_base_url: str = str(base_url)
-        self.llm_temperature: float = float(temperature)
-        self.llm_reasoning_effort: str | None = str(reasoning_effort) if reasoning_effort else None
-        self.llm_max_completion_tokens: int | None = None
-        if is_reasoning and max_completion_tokens is not None:
-            try:
-                self.llm_max_completion_tokens = int(max_completion_tokens)
-            except Exception:
-                pass
-
-        # Create AsyncOpenAI client
-        client_kwargs: Dict[str, Any] = {"api_key": str(api_key), "base_url": base_url}
-        if timeout is not None:
-            client_kwargs["timeout"] = float(timeout)
-        self.llm_client = AsyncOpenAI(**client_kwargs)
+        self.bt_max_ticks: int = int(
+            config.get("bt_execution", {})
+            .get("max_ticks", {})
+            .get("user_assistant", _DEFAULT_BT_MAX_TICKS)
+        )
 
         # ── Execution engine ────────────────────────────────────────
         self.yggdrasil_url = resolve_yggdrasil_url(config)
@@ -139,8 +114,6 @@ class UserAssistantAgent(Agent, IAgent):
         community_url = community_cfg.get("api_url") or os.getenv("COMMUNITY_API_URL")
         self.community_client = None
         if community_url:
-            from ...shared.community.community_client import CommunitySignifierClient
-
             self.community_client = CommunitySignifierClient(api_url=community_url)
             logger.info("Community signifier client enabled (url=%s)", community_url)
 
@@ -156,16 +129,7 @@ class UserAssistantAgent(Agent, IAgent):
 
     def build_llm_kwargs(self) -> Dict[str, Any]:
         """Build extra kwargs for ``llm_client.chat.completions.create``."""
-        kwargs: Dict[str, Any] = {}
-        if not str(self.llm_model).startswith("o"):
-            kwargs["temperature"] = self.llm_temperature
-        else:
-            # Reasoning models: no temperature, use reasoning_effort
-            if self.llm_reasoning_effort:
-                kwargs["reasoning_effort"] = self.llm_reasoning_effort
-            if self.llm_max_completion_tokens is not None:
-                kwargs["max_completion_tokens"] = self.llm_max_completion_tokens
-        return kwargs
+        return build_llm_call_kwargs(self._llm_cfg)
 
     # ── Execution engine ────────────────────────────────────────────
 
@@ -192,7 +156,7 @@ class UserAssistantAgent(Agent, IAgent):
     async def setup(self):
         await super().setup()
 
-        temp_display = "default" if str(self.llm_model).startswith("o") else self.llm_temperature
+        temp_display = "default" if self.llm_model.startswith("o") else self.llm_temperature
         logger.info(
             demo(
                 "UserAssistant booting (model=%s, base_url=%s, temperature=%s, reasoning_effort=%s)"
@@ -245,4 +209,6 @@ class UserAssistantAgent(Agent, IAgent):
         return True
 
     async def receive_message(self, message: Message) -> None:
-        pass
+        # Incoming messages are routed to behaviours via SPADE templates;
+        # this IAgent hook is intentionally a no-op.
+        return

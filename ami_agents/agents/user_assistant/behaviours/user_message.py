@@ -1,5 +1,4 @@
-"""
-Composable SPADE behaviours for the User Assistant agent.
+"""UserMessageBehaviour: the main conversation state machine.
 
 The LLM is invoked only for:
 - NLU  (intent extraction)   via ``_extract_intents``
@@ -13,26 +12,32 @@ signifier recording) is deterministic.
 import asyncio
 import json
 import logging
-import re
 from typing import Any, Dict, Optional
 
 from spade.behaviour import CyclicBehaviour
 
-from ...shared.models.messages import MessageType
-from ...shared.utils.spade_rpc import rpc_call, RpcTimeoutError
-from ...shared.utils.demo_log import demo
-from ...bt_planning.execution.ir_executor import IRExecutor
-from ...bt_planning.execution.base import ExecutionResult
-from ...bt_planning.signifier_bridge import extract_signifiers_from_bt
-from ...shared.community.community_client import CommunitySignifierClient
+from ....shared.models.messages import MessageType
+from ....shared.utils.spade_rpc import rpc_call, RpcTimeoutError
+from ....shared.utils.demo_log import demo
+from ....bt_planning.execution.ir_executor import IRExecutor
+from ....bt_planning.execution.base import ExecutionResult
+from ....bt_planning.signifier_bridge import extract_signifiers_from_bt
+from ....shared.community.community_client import CommunitySignifierClient
 
-from .models import ConversationPhase, ConversationState, Intent, CONFIRM_TOKENS, REJECT_TOKENS, validate_intent_type
-from .prompts import (
+from ..models import (
+    ConversationPhase,
+    ConversationState,
+    Intent,
+    CONFIRM_TOKENS,
+    REJECT_TOKENS,
+    validate_intent_type,
+)
+from ..prompts import (
     INTENT_EXTRACTION_SYSTEM_PROMPT,
     PLAN_SUMMARY_SYSTEM_PROMPT,
     QUERY_RESPONSE_SYSTEM_PROMPT,
 )
-from .utils import (
+from ..utils import (
     coerce_plan_dict,
     canonicalize_plan_for_hash,
     count_bt_nodes,
@@ -41,10 +46,6 @@ from .utils import (
 )
 
 logger = logging.getLogger("UserAssistant")
-
-# Re-export for convenience (canonical definitions live in models.py).
-_CONFIRM_TOKENS = CONFIRM_TOKENS
-_REJECT_TOKENS = REJECT_TOKENS
 
 
 class UserMessageBehaviour(CyclicBehaviour):
@@ -57,7 +58,7 @@ class UserMessageBehaviour(CyclicBehaviour):
     # Entry point
     # ------------------------------------------------------------------
 
-    async def run(self):  # noqa: C901 (complexity acceptable for a state-machine entry)
+    async def run(self):  # noqa: C901
         msg = await self.receive(timeout=1)
         if not msg:
             return
@@ -69,16 +70,13 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         conv = self.agent.get_conversation(thread)
 
-        # ── CONFIRMATION shortcut (deterministic, no LLM) ──
         if conv.phase == ConversationPhase.AWAITING_CONFIRMATION:
             await self._handle_confirmation(msg, thread, text, conv)
             return
 
-        # ── NEW MESSAGE: LLM intent extraction ──
         conv.phase = ConversationPhase.EXTRACTING_INTENTS
         conv.user_message = text
 
-        # Fetch capabilities (context for intent extraction)
         capabilities_ctx = await self._fetch_capabilities()
 
         extraction = await self._extract_intents(text, capabilities_ctx)
@@ -91,7 +89,6 @@ class UserMessageBehaviour(CyclicBehaviour):
         elif classification == "query_state":
             await self._handle_query_state(msg, thread, conv, extraction)
         elif classification == "confirmation":
-            # Confirmation without a pending plan
             await self._reply(msg, "I don't have a pending plan right now. What would you like to do?")
             conv.phase = ConversationPhase.IDLE
         elif classification == "unclear":
@@ -174,7 +171,7 @@ class UserMessageBehaviour(CyclicBehaviour):
             return (response.choices[0].message.content or "").strip() or raw_data
         except Exception as exc:
             logger.error("LLM query formatting failed: %s", exc)
-            return raw_data  # Fallback: raw data is better than nothing
+            return raw_data
 
     # ------------------------------------------------------------------
     # DETERMINISTIC: handle goal → request plan → summarize
@@ -186,7 +183,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         raw_intents = extraction.get("intents", [])
         conv.intents = [Intent.from_dict(i) for i in raw_intents if isinstance(i, dict)]
         conv.workspace_id = extraction.get("workspace_id")
-        intent_type = extraction.get("intent_type", "implicit")  # Extract intent_type from LLM response
+        intent_type = extraction.get("intent_type", "implicit")
 
         if not conv.intents:
             await self._reply(msg, "I couldn't derive any specific intents. Could you be more precise?")
@@ -195,13 +192,10 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         intent_strings = [intent.to_query_string() for intent in conv.intents]
 
-        # Validate and correct intent_type based on user's actual message
-        # This catches cases where LLM inferred artifact IDs not present in user input
         intent_type = validate_intent_type(intent_strings, intent_type, conv.user_message.lower())
 
         logger.info(demo("Derived intents: %s  workspace=%s  intent_type=%s"), intent_strings, conv.workspace_id, intent_type.upper())
 
-        # Send GOAL_REQUEST to InteractionSolver (deterministic RPC)
         solver_jid = self.agent.target_jids.get("solver")
         if not solver_jid:
             await self._reply(msg, "Error: InteractionSolver is not configured.")
@@ -216,8 +210,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         if conv.workspace_id:
             body["workspace_id"] = str(conv.workspace_id)
 
-        planning_cfg = (self.agent.config.get("planning", {}) or {})
-        timeout = float(planning_cfg.get("timeout", 60))
+        timeout = self.agent.goal_request_timeout
 
         logger.info(demo("UA -> InteractionSolver GOAL_REQUEST: intents=%s intent_type=%s"), intent_strings, intent_type.upper())
         try:
@@ -257,7 +250,6 @@ class UserMessageBehaviour(CyclicBehaviour):
             conv.phase = ConversationPhase.IDLE
             return
 
-        # Store plan (deterministic)
         canonical, plan_hash = canonicalize_plan_for_hash(plan_obj)
         conv.plan_json = canonical
         conv.plan_hash = plan_hash
@@ -266,7 +258,6 @@ class UserMessageBehaviour(CyclicBehaviour):
         preview = bt_preview(tree)
         logger.info(demo("Plan stored: hash=%s nodes=%d preview=%s"), plan_hash, node_count, preview)
 
-        # Summarize (LLM NLG call)
         conv.phase = ConversationPhase.SUMMARIZING_PLAN
         summary = await self._summarize_plan(plan_body if isinstance(plan_body, str) else json.dumps(plan_obj))
         conv.plan_summary = summary
@@ -283,8 +274,7 @@ class UserMessageBehaviour(CyclicBehaviour):
     ) -> None:
         low = text.lower().strip()
 
-        if low in _CONFIRM_TOKENS:
-            # Execute plan
+        if low in CONFIRM_TOKENS:
             conv.phase = ConversationPhase.EXECUTING
             logger.info(demo("User confirmed plan: thread=%s"), thread)
             exec_result = await self._execute_plan(thread, conv)
@@ -298,20 +288,17 @@ class UserMessageBehaviour(CyclicBehaviour):
             conv.clear_plan()
             conv.phase = ConversationPhase.IDLE
 
-        elif low in _REJECT_TOKENS:
-            # Discard plan
+        elif low in REJECT_TOKENS:
             logger.info(demo("User rejected plan: thread=%s"), thread)
             conv.clear_plan()
             conv.phase = ConversationPhase.IDLE
             await self._reply(msg, "Okay, I've discarded that plan. What would you like to change?")
 
         else:
-            # New message while awaiting confirmation → discard and re-process
             logger.info(demo("New request while awaiting confirmation, discarding plan: thread=%s"), thread)
             conv.clear_plan()
             conv.phase = ConversationPhase.IDLE
 
-            # Re-process as a new message (fetch capabilities + extract intents)
             conv.user_message = text
             conv.phase = ConversationPhase.EXTRACTING_INTENTS
             capabilities_ctx = await self._fetch_capabilities()
@@ -356,15 +343,12 @@ class UserMessageBehaviour(CyclicBehaviour):
         if not tree_spec or not isinstance(tree_spec, dict):
             return ExecutionResult(success=False, error="Plan has no behavior tree to execute")
 
-        # Ensure execution engine is ready
         await self.agent.ensure_execution_engine_ready()
 
         node_count = count_bt_nodes(tree_spec)
         logger.info(demo("Executing BT: thread=%s nodes=%d signifier_reuse=%s intent_type=%s"), thread, node_count, is_signifier_reuse, intent_type)
 
-        # Get max_ticks from config
-        max_ticks = self.agent.config.get("bt_execution", {}).get("max_ticks", {}).get("user_assistant", 50)
-        executor = IRExecutor(max_ticks=max_ticks)
+        executor = IRExecutor(max_ticks=self.agent.bt_max_ticks)
         loop = asyncio.get_event_loop()
         try:
             exec_result: ExecutionResult = await loop.run_in_executor(
@@ -381,11 +365,9 @@ class UserMessageBehaviour(CyclicBehaviour):
             exec_result.success, exec_result.ticks, exec_result.final_status,
         )
 
-        # Invalidate state cache (environment may have changed)
         self.agent.state_memory.clear()
         logger.info(demo("State memory cache cleared after BT execution"))
 
-        # Record signifiers from successful execution
         if exec_result.success and not is_signifier_reuse:
             await self._record_signifiers(tree_spec, intents, exec_result, thread, intent_type, workspace_id)
 
@@ -415,15 +397,11 @@ class UserMessageBehaviour(CyclicBehaviour):
         ]
         structured_intents = [s for s in structured_intents if s is not None]
 
-        # Query environment state for context-rich signifiers
         state_snapshot: Optional[dict] = None
         explorer_jid = self.agent.target_jids.get("explorer")
         if explorer_jid and workspace_id:
             try:
                 logger.info(demo("Querying environment state for signifier context (workspace_id=%r)"), workspace_id)
-
-                # Get signifier match timeout from config
-                signifier_timeout = self.agent.config.get("timeouts", {}).get("signifier", {}).get("match", 10.0)
 
                 state_response = await rpc_call(
                     self.agent,
@@ -431,7 +409,7 @@ class UserMessageBehaviour(CyclicBehaviour):
                     request_type=MessageType.ENV_STATE_REQUEST.value,
                     body={},
                     expect_type=MessageType.ENV_STATE_RESPONSE.value,
-                    timeout=signifier_timeout,
+                    timeout=self.agent.signifier_match_timeout,
                 )
 
                 if state_response and state_response.body:
@@ -474,7 +452,6 @@ class UserMessageBehaviour(CyclicBehaviour):
         logger.info(demo("Recording %d signifiers from BT execution (intent_type=%s)"), len(signifiers), intent_type)
 
         # 1. Record locally via EnvExplorer
-        explorer_jid = self.agent.target_jids.get("explorer")
         if explorer_jid:
             try:
                 rec_res = await rpc_call(
@@ -488,7 +465,7 @@ class UserMessageBehaviour(CyclicBehaviour):
                         "execution_result": exec_result.to_dict(),
                     },
                     expect_type=MessageType.SIGNIFIER_RECORD_EXECUTION_RESPONSE.value,
-                    timeout=self.agent.config.get("timeouts", {}).get("rpc", {}).get("call", 15.0),
+                    timeout=self.agent.rpc_call_timeout,
                     thread=(thread if thread != "__default__" else None),
                 )
                 created_count = None
@@ -542,7 +519,6 @@ class UserMessageBehaviour(CyclicBehaviour):
         artifact_id = extraction.get("artifact_id")
         property_uri = extraction.get("property_uri")
 
-        # Check cache
         state_memory = self.agent.state_memory
         if property_uri and state_memory.has(property_uri):
             cached = state_memory.get(property_uri)
@@ -553,7 +529,6 @@ class UserMessageBehaviour(CyclicBehaviour):
             conv.phase = ConversationPhase.IDLE
             return
 
-        # RPC to EnvExplorer
         explorer_jid = self.agent.target_jids.get("explorer")
         if not explorer_jid:
             await self._reply(msg, "Error: EnvExplorer is not configured.")
@@ -577,9 +552,8 @@ class UserMessageBehaviour(CyclicBehaviour):
                 request_type=MessageType.ENV_STATE_REQUEST.value,
                 body=payload,
                 expect_type=MessageType.ENV_STATE_RESPONSE.value,
-                timeout=self.agent.config.get("timeouts", {}).get("rpc", {}).get("call", 15.0),
+                timeout=self.agent.rpc_call_timeout,
             )
-            # Cache results
             try:
                 state_data = json.loads(result.body) if isinstance(result.body, str) else result.body
                 if isinstance(state_data, dict):
@@ -590,7 +564,7 @@ class UserMessageBehaviour(CyclicBehaviour):
                     else:
                         state_memory.store_bulk(state_data)
             except Exception:
-                pass  # Best-effort caching
+                pass  # best-effort caching
 
             formatted = await self._format_query_response(result.body, conv.user_message)
             await self._reply(msg, formatted)
@@ -617,7 +591,7 @@ class UserMessageBehaviour(CyclicBehaviour):
                 request_type=MessageType.ENV_CAPABILITIES_REQUEST.value,
                 body={"query": "all"},
                 expect_type=MessageType.ENV_CAPABILITIES_RESPONSE.value,
-                timeout=self.agent.config.get("timeouts", {}).get("rpc", {}).get("call", 15.0),
+                timeout=self.agent.rpc_call_timeout,
             )
             return result.body or ""
         except Exception as exc:
@@ -629,46 +603,3 @@ class UserMessageBehaviour(CyclicBehaviour):
         reply = original_msg.make_reply()
         reply.body = text
         await self.send(reply)
-
-
-class DemoRequestClassifierBehaviour(CyclicBehaviour):
-    """Demo-only logging helper: classify user requests as EXPLICIT vs IMPLICIT.
-
-    Does not influence planning; only emits a readable log line for demos.
-    """
-
-    async def run(self):
-        msg = await self.receive(timeout=1)
-        if not msg:
-            return
-        if msg.get_metadata("message_type") != "llm":
-            return
-
-        text = (msg.body or "").strip()
-        low = text.lower()
-        if low in ("yes", "no", "ok", "okay", "proceed", "continue"):
-            return
-
-        kind = "IMPLICIT"
-        if low.startswith(("what", "show", "list", "which", "is", "are")) and (
-            "workspace" in low or "workspaces" in low or "device" in low
-            or "devices" in low or "state" in low
-        ):
-            kind = "QUERY"
-        else:
-            has_action = any(
-                kw in low
-                for kw in (
-                    "turn ", "toggle", "open", "close",
-                    "set ", "raise", "lower", "increase", "decrease",
-                )
-            )
-            mentions_device = (
-                any(tok in low for tok in ("light", "blinds"))
-                or re.search(r"\b\w+\d{3}\b", low) is not None
-                or "%" in low
-            )
-            if has_action and mentions_device:
-                kind = "EXPLICIT"
-
-        logger.info(demo("Request classified as %s: %r"), kind, text)
