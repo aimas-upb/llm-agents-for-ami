@@ -1569,7 +1569,6 @@ async def main():
         solver_jid,
         password,
         config=llm_cfg,
-        plan_generator=object(),
         target_jids={"explorer": explorer_jid},
     )
 

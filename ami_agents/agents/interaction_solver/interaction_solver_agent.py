@@ -27,7 +27,6 @@ from ...shared.models.messages import (
 )
 from ...shared.utils.spade_rpc import rpc_call, RpcTimeoutError, send_via_router
 from ...shared.utils.demo_log import demo
-from ...shared.protocols.llm_protocol import IPlanGenerator
 from ...shared.community.community_client import CommunitySignifierClient
 from ...bt_planning.planning.bt_planner import AsyncBTPlanner
 from ...bt_planning.signifier_bridge import build_bt_from_signifiers
@@ -67,12 +66,10 @@ class InteractionSolverAgent(Agent, IAgent):
         jid: str,
         password: str,
         config: Dict[str, Any],
-        plan_generator: IPlanGenerator,
         target_jids: Optional[Dict[str, str]] = None,
     ):
         super().__init__(jid, password)
         self.config = config or {}
-        self.plan_generator = plan_generator
         self.target_jids = target_jids or {}
 
         self.environment_ready = False

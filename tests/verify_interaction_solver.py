@@ -72,10 +72,6 @@ logging.getLogger("InteractionSolver").setLevel(logging.INFO)
 
 # --- Mocks and Helpers ---
 
-class _DummyPlanGenerator:
-    """Placeholder plan generator."""
-    pass
-
 class _DummyHMASClient(IHMASClient):
     """Minimal HMAS client to satisfy EnvExplorer constructor."""
     async def connect(self, endpoint_url: str) -> bool: return True
@@ -216,7 +212,6 @@ async def main():
         SOLVER_JID,
         XMPP_PASSWORD,
         config=_default_config(),
-        plan_generator=_DummyPlanGenerator(),
         target_jids={"explorer": EXPLORER_JID}
     )
 

@@ -222,7 +222,8 @@ class AMIAgentsOrchestrator:
         self.agents["interaction_solver"] = InteractionSolverAgent(
             jid=is_config["jid"],
             password=is_config["password"],
-            config=is_config
+            config=is_config,
+            target_jids=target_jids,
         )
 
         self.logger.info("All agents initialized: %s", list(self.agents.keys()))
