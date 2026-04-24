@@ -19,7 +19,7 @@ user_assistant:
 
     # Message classification settings
     classification:
-      model: "gpt-5.4-mini"  # or other LLM model identifier
+      model: "gpt-4o-mini"  # or other LLM model identifier
       confidence_threshold: 0.7
       categories:
         - ENV_CAPABILITIES
@@ -30,7 +30,7 @@ user_assistant:
 
   # Intent extraction
   intent_extraction:
-    model: "gpt-5.4-mini"
+    model: "gpt-4o-mini"
     max_retries: 3
     validation_enabled: true
 
@@ -102,9 +102,29 @@ env_explorer:
   # Affordance matching
   affordance_matching:
     use_hybrid_reasoning: true  # Rule-based + LLM
-    llm_model: "gpt-5.4-mini"
+    llm_model: "gpt-4o-mini"
     prioritize_signifiers: true
     physics_informed_modeling: true  # As per Ganesh Ramanathan approach
+
+  # RD4 Engine Settings
+  rd4_engine:
+    default_matcher_version: "${SIGNIFIER_MATCHER_VERSION:-v2}"
+    default_min_similarity: "${SIGNIFIER_MIN_SIMILARITY:-0.5}"
+    signifier_limit: "${SIGNIFIER_LIMIT:-10000}"
+    shacl_shape_version: "${SHACL_SHAPE_VERSION:-1}"
+    shacl_cache_enabled: "${SHACL_CACHE_ENABLED:-false}"
+    shacl_validation_enabled: "${SHACL_VALIDATION_ENABLED:-false}"
+
+  # Timing Configuration
+  timeouts:
+    message_reception: "${ENV_MESSAGE_TIMEOUT:-5.0}"
+    event_processing_sleep: "${ENV_EVENT_SLEEP:-2.0}"
+
+  # Internal Processing
+  processing:
+    intent_types:
+      - "EXPLICIT"
+      - "IMPLICIT"
 
 # InteractionSolver Agent Configuration
 interaction_solver:
@@ -127,8 +147,8 @@ interaction_solver:
 
     # LLM-based planning (BT JSON IR generation)
     llm_planning:
-      model: "gpt-5.4-mini"
-      temperature: 0.7
+      model: "gpt-4o-mini"
+      temperature: 0.5
       max_tokens: 2000
 
       # Behavior Tree generation
@@ -147,6 +167,10 @@ interaction_solver:
     enabled: true
     status_update_interval: 5  # seconds
 
+  # Signifier matching
+  signifiers:
+    matcher_version: "${SIGNIFIER_MATCHER_VERSION:-v2}"
+
 # LLM Configuration (shared across agents)
 llm:
   default_provider: "openai"
@@ -154,14 +178,14 @@ llm:
   providers:
     openai:
       api_key: null  # Set via environment variable OPENAI_API_KEY
-      model: "gpt-5.4-mini"
-      temperature: 0.7
+      model: "gpt-4o-mini"
+      temperature: 0.5
       max_tokens: 1500
 
     anthropic:
       api_key: null  # Set via environment variable ANTHROPIC_API_KEY
       model: "claude-3-opus-20240229"
-      temperature: 0.7
+      temperature: 0.5
       max_tokens: 1500
 
   # Retry configuration

@@ -1,7 +1,7 @@
 """
 EnvExplorer Agent - Environment discovery and monitoring.
 
-Classical SPADE agent that crawls, monitors, and manages environment knowledge.
+Refactored SPADE agent with proper package structure for behaviors and utilities.
 """
 
 import asyncio
@@ -11,7 +11,6 @@ import re
 import uuid
 from typing import Any, Dict, List, Optional
 from spade.agent import Agent
-from spade.behaviour import CyclicBehaviour, PeriodicBehaviour, OneShotBehaviour
 from spade.message import Message as SpadeMessage
 from spade.template import Template
 
@@ -26,6 +25,33 @@ from ...shared.utils.config_resolver import resolve_yggdrasil_url
 from ...shared.utils.demo_log import demo
 from ...environment.connection.hmas_client import IHMASClient
 from ...environment.integration.integration_engine import YggdrasilIntegration
+
+# Import extracted behaviors
+from .behaviors import (
+    InitialDiscoveryBehaviour,
+    EventProcessingBehaviour,
+    EnvironmentRequestHandler,
+    SignifierRequestHandler
+)
+
+# Import extracted utilities
+from .utils import (
+    artifact_tokens, tokens_from_identifier,
+    intent_compatible, workspace_match, rank_signifier_matches,
+    format_capabilities_summary, format_capabilities_payload,
+    ensure_rd4_ready, get_signifier_config, build_rd4_context_snapshot,
+    list_rd4_signifiers, generate_shacl_shapes_from_conditions, generate_nl_description
+)
+
+# Configuration constants as fallbacks
+_RD4_DEFAULTS = {
+    "default_matcher_version": "v2",
+    "default_min_similarity": 0.5,
+    "signifier_limit": 10000,
+}
+_TIMEOUTS = {
+    "message_reception": 5.0,
+}
 
 
 class EnvExplorerAgent(Agent, IAgent):
@@ -49,773 +75,320 @@ class EnvExplorerAgent(Agent, IAgent):
             jid: SPADE JID for the agent.
             password: SPADE password.
             config: Agent configuration.
-            hmas_client: HMAS client for environment interaction.
+            hmas_client: HMAS client instance.
         """
         super().__init__(jid, password)
+
         self.config = config or {}
         self.hmas_client = hmas_client
-        self.environment_map = {}
-        self.artifacts = {}
-        self.affordances = {}
-        self.signifiers_store = None
-        self.yggdrasil_url = resolve_yggdrasil_url(self.config)
-        self.integration_engine = YggdrasilIntegration(self.yggdrasil_url)
-        self.discovery_complete = False
-        self.logger = logging.getLogger(__name__)
 
-        # --- Embedded RD4 signifier engine (ami_agents/shared/memory) ---
-        self._rd4_engine_ready: bool = False
-        self._rd4_engine_lock: asyncio.Lock = asyncio.Lock()
+        # Environment state
+        self.environment_map: Dict[str, Workspace] = {}
+        self.artifacts: Dict[str, Artifact] = {}
+        self.affordances: Dict[str, Affordance] = {}
+        self.signifiers_store = None
+
+        # Integration engine
+        self.yggdrasil_url = resolve_yggdrasil_url(config)
+        self.integration_engine = YggdrasilIntegration(
+            self.yggdrasil_url, hmas_client
+        )
+
+        # Agent state
+        self.discovery_complete = False
+        self.logger = logging.getLogger(f"EnvExplorerAgent[{jid}]")
+
+        # RD4 engine state
+        self._rd4_engine_ready = False
+        self._rd4_engine_lock = asyncio.Lock()
         self._rd4_storage_dir: Optional[str] = None
-        self._rd4_registry: Any = None
-        self._rd4_matcher_registry: Any = None
-        self._rd4_context_builder: Any = None
-        self._rd4_shacl_validator: Any = None
-        self._rd4_default_matcher_version: str = "v0"
-        self._rd4_default_min_similarity: float = 0.0
+        self._rd4_registry = None
+        self._rd4_matcher_registry = None
+        self._rd4_context_builder = None
+        self._rd4_shacl_validator = None
+        self._rd4_default_matcher_version = self.config.get("rd4_engine", {}).get("default_matcher_version", _RD4_DEFAULTS["default_matcher_version"])
+        self._rd4_default_min_similarity = self.config.get("rd4_engine", {}).get("default_min_similarity", _RD4_DEFAULTS["default_min_similarity"])
+        self._rd4_shacl_validation_enabled = self.config.get("rd4_engine", {}).get("shacl_validation_enabled", "false").lower() == "true"
 
     async def setup(self):
-        """
-        Setup the agent (SPADE lifecycle method).
+        """Set up the agent behaviors and templates."""
+        self.logger.info(demo("Setting up EnvExplorerAgent..."))
 
-        Connects to the Yggdrasil HMAS instance and performs an initial
-        environment crawl to populate workspace/artifact/affordance maps.
-        """
-        self.logger.info(demo(f"EnvExplorer booting (yggdrasil_url={self.yggdrasil_url})"))
-        self.logger.info("EnvExplorerAgent starting...")
-        self.add_behaviour(InitialDiscoveryBehaviour())
+        # Create message templates
+        env_cap_template = Template()
+        env_cap_template.set_metadata("type", MessageType.ENV_CAPABILITIES_REQUEST.value)
 
-        # Route environment capability/state requests to the handler using templates
-        cap_template = Template()
-        cap_template.set_metadata("type", MessageType.ENV_CAPABILITIES_REQUEST.value)
-        state_template = Template()
-        state_template.set_metadata("type", MessageType.ENV_STATE_REQUEST.value)
+        env_state_template = Template()
+        env_state_template.set_metadata("type", MessageType.ENV_STATE_REQUEST.value)
 
-        self.add_behaviour(EnvironmentRequestHandler(), template=cap_template)
-        self.add_behaviour(EnvironmentRequestHandler(), template=state_template)
-
-        # Signifier engine requests (embedded memory + matcher)
+        # Signifier engine requests (need separate templates for each type)
         sign_match_template = Template()
         sign_match_template.set_metadata("type", MessageType.SIGNIFIER_MATCH_REQUEST.value)
+
         sign_record_template = Template()
         sign_record_template.set_metadata("type", MessageType.SIGNIFIER_RECORD_EXECUTION_REQUEST.value)
+
         sign_list_template = Template()
         sign_list_template.set_metadata("type", MessageType.SIGNIFIER_LIST_REQUEST.value)
 
+        # Add behaviors using extracted classes (FIXED: original order restored)
+        self.add_behaviour(InitialDiscoveryBehaviour())
+        self.add_behaviour(EnvironmentRequestHandler(), template=env_cap_template)
+        self.add_behaviour(EnvironmentRequestHandler(), template=env_state_template)
         self.add_behaviour(SignifierRequestHandler(), template=sign_match_template)
         self.add_behaviour(SignifierRequestHandler(), template=sign_record_template)
         self.add_behaviour(SignifierRequestHandler(), template=sign_list_template)
+        self.add_behaviour(EventProcessingBehaviour(self.integration_engine))  # MOVED TO END
 
-        self.add_behaviour(EventProcessingBehaviour(self.integration_engine))
-
+    # Utility methods that delegate to extracted utilities
     def _generate_capabilities_summary(self) -> str:
-        """
-        Formats the internal artifact map into a detailed string for the LLM.
-        Includes Forms and Input Schemas so the LLM understands parameters.
-        """
-        # 1. Check readiness
-        if not self.discovery_complete:
-            return "Environment discovery is still in progress. Please try again later."
-
-        # 2. Read from Agent Memory (populated by InitialDiscoveryBehaviour)
-        artifacts = self.artifacts.values()
-        
-        if not artifacts:
-            return "No artifacts found in the environment."
-
-        summary = "Available Environment Capabilities:\n"
-        
-        for artifact in artifacts:
-            # 3. Retrieve actions
-            # We use the engine's helper to filter affordances for this artifact ID
-            actions = self.integration_engine.get_affordances_for_artifact(artifact.artifact_id)
-            
-            # Filter for ACTION types (we only care about what we can DO)
-            action_affordances = [a for a in actions if a.affordance_type.value == "action"]
-            
-            if action_affordances:
-                summary += f"Artifact: {artifact.name}\n"
-                summary += f"  ID: {artifact.artifact_id}\n"
-                summary += f"  Capabilities:\n"
-                
-                for action in action_affordances:
-                    summary += f"    - Action: {action.name}\n"
-                    
-                    # Include Form Details (Method + URL)
-                    # This helps the LLM distinguish between GET (read) and POST (write)
-                    if action.form:
-                        summary += f"      Target: [{action.form.method}] {action.form.href}\n"
-                    
-                    # Include Input Schema (Parameters)
-                    # This tells the LLM what arguments (e.g. brightness level) are required
-                    if action.input_schema:
-                        summary += f"      Schema: {json.dumps(action.input_schema)}\n"
-                
-                summary += "\n"
-        
-        return summary
+        """Generate capabilities summary for human consumption."""
+        return format_capabilities_summary(self)
 
     def _generate_capabilities_payload(self) -> Dict[str, Any]:
-        """
-        Machine-readable capabilities payload for other agents (planning, etc.).
-        Includes a human-friendly 'summary' field for convenience.
-        """
-        if not self.discovery_complete:
-            return {
-                "discovery_complete": False,
-                "error": "discovery_in_progress",
-                "summary": "Environment discovery is still in progress. Please try again later.",
-                "workspaces": [],
-                "artifacts": [],
-                "affordances": [],
-            }
-
-        artifacts = list(self.artifacts.values())
-        if not artifacts:
-            return {
-                "discovery_complete": True,
-                "summary": "No artifacts found in the environment.",
-                "workspaces": [],
-                "artifacts": [],
-                "affordances": [],
-            }
-
-        # Workspaces (for multi-workspace UX and scoping)
-        workspaces_out: List[Dict[str, Any]] = []
-        try:
-            for ws in (self.environment_map or {}).values():
-                workspaces_out.append(
-                    {
-                        "workspace_id": ws.workspace_id,
-                        "name": ws.name,
-                        "workspace_type": getattr(ws.workspace_type, "value", str(ws.workspace_type)),
-                        "parent_workspace_id": getattr(ws, "parent_workspace_id", None),
-                        "sub_workspaces": list(getattr(ws, "sub_workspaces", []) or []),
-                        "artifacts": list(getattr(ws, "artifacts", []) or []),
-                    }
-                )
-        except Exception:
-            workspaces_out = []
-
-        affordances_out: List[Dict[str, Any]] = []
-        artifacts_out: List[Dict[str, Any]] = []
-
-        for artifact in artifacts:
-            affs = self.integration_engine.get_affordances_for_artifact(artifact.artifact_id)
-            action_affordances = [a for a in affs if a.affordance_type == AffordanceType.ACTION]
-
-            actions_out: List[Dict[str, Any]] = []
-            for action in action_affordances:
-                form = action.form
-                actions_out.append(
-                    {
-                        "affordance_id": action.affordance_id,
-                        "name": action.name,
-                        "description": action.description,
-                        "artifact_id": action.artifact_id,
-                        "affordance_type": action.affordance_type.value,
-                        "semantic_types": list(action.semantic_types or []),
-                        "form": {
-                            "href": getattr(form, "href", None),
-                            "method": getattr(form, "method", None),
-                            "content_type": getattr(form, "content_type", None),
-                            "operation_type": getattr(form, "operation_type", None),
-                            "additional_fields": getattr(form, "additional_fields", None) or {},
-                        }
-                        if form
-                        else None,
-                        "input_schema": action.input_schema,
-                        "output_schema": action.output_schema,
-                    }
-                )
-
-                affordances_out.append(
-                    {
-                        "artifact_id": artifact.artifact_id,
-                        "artifact_name": artifact.name,
-                        "workspace_id": getattr(artifact, "workspace_id", None),
-                        "affordance_id": action.affordance_id,
-                        "affordance_type": action.affordance_type.value,
-                        "action_name": action.name,
-                        "method": getattr(action.form, "method", None) if action.form else None,
-                        "target": getattr(action.form, "href", None) if action.form else None,
-                        "content_type": getattr(action.form, "content_type", None) if action.form else None,
-                        "input_schema": action.input_schema,
-                    }
-                )
-
-            artifacts_out.append(
-                {
-                    "artifact_id": artifact.artifact_id,
-                    "name": artifact.name,
-                    "workspace_id": getattr(artifact, "workspace_id", None),
-                    "actions": actions_out,
-                }
-            )
-
-        return {
-            "discovery_complete": True,
-            "summary": self._generate_capabilities_summary(),
-            "workspaces": workspaces_out,
-            "artifacts": artifacts_out,
-            "affordances": affordances_out,
-        }
+        """Generate capabilities payload for machine consumption."""
+        return format_capabilities_payload(self)
 
     def _get_signifier_config(self) -> Dict[str, Any]:
-        return (self.config or {}).get("signifiers", {}) or {}
-
-    async def _ensure_rd4_engine_ready(self) -> None:
-        if self._rd4_engine_ready:
-            return
-
-        async with self._rd4_engine_lock:
-            if self._rd4_engine_ready:
-                return
-
-            from ...shared import memory as rd4_memory
-
-            rd4_memory.ensure_engine_on_path()
-
-            from src.matching.registry import IntentMatcherRegistry  # type: ignore[import-not-found]
-            from src.storage.registry import SignifierRegistry  # type: ignore[import-not-found]
-            from src.validation.context_builder import ContextGraphBuilder  # type: ignore[import-not-found]
-            from src.validation.shacl_validator import SHACLValidator  # type: ignore[import-not-found]
-
-            cfg = self._get_signifier_config()
-
-            storage_dir = cfg.get("storage_dir")
-            if not storage_dir:
-                storage_dir = str(rd4_memory.get_default_storage_dir())
-
-            enable_authoring_validation = bool(cfg.get("enable_authoring_validation", False))
-
-            self._rd4_storage_dir = str(storage_dir)
-            self._rd4_registry = SignifierRegistry(
-                storage_dir=self._rd4_storage_dir,
-                enable_authoring_validation=enable_authoring_validation,
-            )
-
-            # Default to v0 to avoid downloading embedding models unexpectedly.
-            matcher_registry = IntentMatcherRegistry(default_version="v0")
-            preferred_version = str(cfg.get("matcher_version") or "v0")
-            if preferred_version in matcher_registry.list_versions():
-                matcher_registry.set_default_version(preferred_version)
-            self._rd4_matcher_registry = matcher_registry
-            self._rd4_default_matcher_version = matcher_registry.get_default_version()
-
-            try:
-                self._rd4_default_min_similarity = float(cfg.get("min_similarity", 0.0))
-            except Exception:
-                self._rd4_default_min_similarity = 0.0
-
-            self._rd4_context_builder = ContextGraphBuilder()
-            self._rd4_shacl_validator = SHACLValidator(enable_caching=bool(cfg.get("enable_shacl_cache", False)))
-
-            self._rd4_engine_ready = True
-            self.logger.info(
-                demo("RD4 signifier engine ready (storage_dir=%s, matcher_default=%s)"),
-                self._rd4_storage_dir,
-                self._rd4_default_matcher_version,
-            )
+        """Get signifier configuration with defaults."""
+        return get_signifier_config(self.config)
 
     def _ws_match(self, value: Any, workspace_id: str) -> bool:
-        if not workspace_id:
-            return True
-        if not value:
-            return False
-
-        ws = str(workspace_id).strip()
-        s = str(value)
-
-        if ws.startswith("http://") or ws.startswith("https://"):
-            return s == ws or ws in s
-
-        if s == ws:
-            return True
-        if f"/{ws}#" in s:
-            return True
-        if f"/{ws}/" in s:
-            return True
-        if s.endswith("/" + ws):
-            return True
-        return ws in s
+        """Check if workspace matches pattern."""
+        return workspace_match(value, workspace_id)
 
     def _build_rd4_context_snapshot(self, workspace_id: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
-        context: Dict[str, Dict[str, Any]] = {}
+        """Build RD4 context snapshot from current state."""
+        return build_rd4_context_snapshot(self, workspace_id)
 
-        for artifact in (self.artifacts or {}).values():
-            if workspace_id and not self._ws_match(getattr(artifact, "workspace_id", None), workspace_id):
-                continue
-
-            artifact_uri = str(getattr(artifact, "artifact_id", "") or "")
-            if not artifact_uri:
-                continue
-
-            state = getattr(artifact, "current_state", {}) or {}
-            if not isinstance(state, dict):
-                continue
-
-            # ContextGraphBuilder expects: {artifact_uri: {property_uri: value}}
-            context[artifact_uri] = {str(k): v for k, v in state.items()}
-
-        return context
+    async def _ensure_rd4_engine_ready(self) -> None:
+        """Ensure RD4 engine is ready."""
+        await ensure_rd4_ready(self)
 
     def _rd4_intent_compatible(
         self,
-        *,
-        intent_query: str,
-        signifier_intent: str,
-        affordance_uri: str,
-        payload_hint: Any,
+        intent_query: Optional[str] = None,
+        signifier_intent: Optional[str] = None,
+        affordance_uri: Optional[str] = None,
+        payload_hint: Optional[Dict[str, Any]] = None,
     ) -> bool:
-        """
-        Heuristic guardrails to prevent obviously wrong signifier reuse.
-
-        Notes:
-        - Embedding similarity (v1) can over-match opposites (e.g., "turn on" vs "turn off")
-          and semantically related but incompatible intents (e.g., "set blinds closedPercentage"
-          vs "set lightIntensity").
-        - This function enforces lightweight lexical/structural checks on top of the matcher.
-        """
-        qi = str(intent_query or "").strip().lower()
-        si = str(signifier_intent or "").strip().lower()
-        au = str(affordance_uri or "").strip().lower()
-
-        # 1) Artifact token compatibility (best-effort).
-        # If both mention artifact-like tokens (e.g. light308, blinds308), require overlap.
-        def _artifact_tokens(s: str) -> set[str]:
-            return set(re.findall(r"\b[a-z_]+[0-9]{1,4}\b", s.lower()))
-
-        q_art = _artifact_tokens(qi)
-        s_art = _artifact_tokens(f"{si} {au}")
-        if q_art and s_art and not (q_art & s_art):
-            return False
-
-        # 2) Polarity guardrails for on/off.
-        if "turn on" in qi and "turn off" in si:
-            return False
-        if "turn off" in qi and "turn on" in si:
-            return False
-
-        # 3) Property-setting intents: require payload/affordance alignment.
-        payload_keys: set[str] = set()
-        if isinstance(payload_hint, dict):
-            # Keep original casing so we can token-split camelCase keys (e.g., lightIntensity).
-            payload_keys = {str(k).strip() for k in payload_hint.keys()}
-
-        is_set_intent = qi.startswith("set ") and " to " in qi
-        if is_set_intent:
-            # If we are "setting" something but the signifier has no payload keys AND
-            # the affordance URI doesn't hint at a setter, treat it as incompatible.
-            if not payload_keys and not any(x in au for x in ("set", "update")):
-                return False
-
-            # Generic property extraction: parse "set <...> <property> to <...>" and
-            # require that the inferred property appears in payload keys (preferred) or
-            # at least in the affordance URI.
-            #
-            # This avoids hardcoding environment-specific property names.
-            try:
-                mid = qi.split(" to ", 1)[0].removeprefix("set ").strip()
-            except Exception:
-                mid = ""
-
-            # Remove artifact-like tokens (e.g. light308) from the middle segment.
-            prop_phrase = " ".join([t for t in mid.split() if t and t not in q_art]).strip()
-
-            def _tokens_from_identifier(s: str) -> set[str]:
-                s = str(s or "").strip()
-                if not s:
-                    return set()
-                # Split camelCase boundaries, underscores, and non-alphanumerics.
-                s = re.sub(r"([a-z])([A-Z])", r"\1 \2", s)
-                s = s.replace("_", " ")
-                parts = re.findall(r"\b[a-z0-9]+\b", s.lower())
-                # Drop very short tokens to reduce noise.
-                return {p for p in parts if len(p) >= 3}
-
-            prop_tokens = _tokens_from_identifier(prop_phrase)
-            if prop_tokens:
-                # Compare against payload keys (best signal) and affordance URI as fallback.
-                aff_tokens = _tokens_from_identifier(au.rsplit("/", 1)[-1])
-                key_token_sets = [_tokens_from_identifier(k) for k in payload_keys] if payload_keys else []
-
-                if payload_keys:
-                    if not any(prop_tokens & ks for ks in key_token_sets):
-                        return False
-                else:
-                    if not (prop_tokens & aff_tokens):
-                        return False
-
-        return True
+        """Check intent compatibility with affordance semantics."""
+        return intent_compatible(intent_query, signifier_intent, affordance_uri, payload_hint)
 
     async def _rd4_list_signifiers(self) -> Dict[str, Any]:
-        await self._ensure_rd4_engine_ready()
-
-        signifiers = self._rd4_registry.list_signifiers(limit=10000) if self._rd4_registry else []
-        out = []
-        for s in signifiers:
-            out.append(
-                {
-                    "signifier_id": s.signifier_id,
-                    "version": s.version,
-                    "status": getattr(s.status, "value", str(s.status)),
-                    "intent": getattr(s.intent, "nl_text", ""),
-                    "affordance_uri": s.affordance_uri,
-                }
-            )
-
-        return {"total": len(out), "signifiers": out}
+        """List all stored signifiers."""
+        return await list_rd4_signifiers(self, _RD4_DEFAULTS)
 
     async def _rd4_match_signifiers(
         self,
-        *,
         intent: str,
         workspace_id: Optional[str] = None,
-        context: Optional[Dict[str, Dict[str, Any]]] = None,
         k: int = 10,
         matcher_version: Optional[str] = None,
         min_similarity: Optional[float] = None,
         intent_type: Optional[str] = None,
         query_structured_intent: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """Match signifiers using RD4 engine."""
         await self._ensure_rd4_engine_ready()
+        if not self._rd4_matcher_registry or not self._rd4_registry:
+            return {"ok": False, "error": "rd4_engine_not_ready"}
 
-        intent = str(intent or "").strip()
         if not intent:
             return {"error": "missing_intent", "matches": [], "final_matches": [], "total_signifiers": 0}
 
-        if context is None:
-            context = self._build_rd4_context_snapshot(workspace_id=workspace_id)
-
-        all_signifiers = self._rd4_registry.list_signifiers(limit=10000) if self._rd4_registry else []
-        signifier_dicts = [s.model_dump() for s in all_signifiers]
-
-        if not signifier_dicts:
-            self.logger.info(demo("Signifier match: 0 stored signifiers (storage empty)."))
-            return {"matches": [], "final_matches": [], "total_signifiers": 0}
-
-        version_to_use = str(matcher_version or self._rd4_default_matcher_version or "v0")
-        if min_similarity is None:
-            min_similarity = self._rd4_default_min_similarity
-
-        self.logger.info(
-            demo("[INTENT_TYPE] Signifier match: intent=%r matcher=%s min_similarity=%s k=%s intent_type=%r"),
-            intent,
-            version_to_use,
-            min_similarity,
-            k,
-            intent_type,
-        )
-
-        # Log context validation strategy
-        if intent_type == "EXPLICIT":
-            self.logger.info(
-                demo("[INTENT_TYPE] Context validation DISABLED for EXPLICIT intent (exact target specified)")
-            )
-        elif intent_type == "IMPLICIT":
-            self.logger.info(
-                demo("[INTENT_TYPE] Context validation ENABLED for IMPLICIT intent (inferring from environment)")
-            )
-        else:
-            self.logger.info(
-                demo("[INTENT_TYPE] Context validation ENABLED (intent_type not specified, defaulting to validation)")
-            )
+        context = self._build_rd4_context_snapshot(workspace_id=workspace_id)
 
         try:
-            match_results = self._rd4_matcher_registry.match(
-                intent_query=intent,
-                signifiers=signifier_dicts,
-                k=int(k),
-                version=version_to_use,
-                min_similarity=float(min_similarity),
-                query_structured_intent=query_structured_intent,
+            all_signifiers = self._rd4_registry.list_signifiers(limit=10000)
+            signifier_dicts = [s.model_dump() for s in all_signifiers]
+
+            if not signifier_dicts:
+                self.logger.info(demo("Signifier match: 0 stored signifiers (storage empty)."))
+                return {"matches": [], "final_matches": [], "total_signifiers": 0}
+
+
+            version_to_use = str(matcher_version or self._rd4_default_matcher_version or "v0")
+            if min_similarity is None:
+                min_similarity = self._rd4_default_min_similarity
+
+            self.logger.info(
+                demo("[INTENT_TYPE] Signifier match: intent=%r matcher=%s min_similarity=%s k=%s intent_type=%r"),
+                intent,
+                version_to_use,
+                min_similarity,
+                k,
+                intent_type,
             )
-        except Exception:
-            version_to_use = "v0"
-            match_results = self._rd4_matcher_registry.match(
-                intent_query=intent,
-                signifiers=signifier_dicts,
-                k=int(k),
-                version=version_to_use,
-                query_structured_intent=query_structured_intent,
-            )
+            print(f"[MATCHER_VERSION_DEBUG] Using matcher version: {version_to_use}")
 
-        context_graph, _ = self._rd4_context_builder.normalize_context(context)
-
-        matches: List[Dict[str, Any]] = []
-        for match in match_results:
-            s = self._rd4_registry.get(match.signifier_id)
-            if not s:
-                continue
-
-            shacl_conforms = True
-            shacl_violations: List[str] = []
-
-            # EXPLICIT intents: skip context validation (user specified exact target)
-            # IMPLICIT intents: validate context (need to infer from environment state)
-            should_validate_context = (intent_type != "EXPLICIT")
-
-            if should_validate_context and getattr(getattr(s, "context", None), "shacl_shapes", None):
-                validation = self._rd4_shacl_validator.validate_signifier_context(
-                    context_graph,
-                    s.context.shacl_shapes,
-                    format="turtle",
+            # Log context validation strategy
+            if intent_type == "EXPLICIT":
+                self.logger.info(
+                    demo("[INTENT_TYPE] Context validation DISABLED for EXPLICIT intent (exact target specified)")
                 )
-                shacl_conforms = bool(validation.conforms)
-                shacl_violations = [v.message for v in (validation.violations or [])]
+            elif intent_type == "IMPLICIT":
+                self.logger.info(
+                    demo("[INTENT_TYPE] Context validation ENABLED for IMPLICIT intent (inferring from environment)")
+                )
+            else:
+                self.logger.info(
+                    demo("[INTENT_TYPE] Context validation ENABLED (intent_type not specified, defaulting to validation)")
+                )
 
-            structured = getattr(getattr(s, "intent", None), "structured", None)
-            payload_hint = structured.get("payload") if isinstance(structured, dict) else None
+            # Use RD4 matcher registry for matching
+            print(f"[V2_DEBUG] About to call matcher with {len(signifier_dicts)} signifiers")
+            print(f"[V2_DEBUG] Query: intent='{intent}', version='{version_to_use}', query_structured_intent={query_structured_intent}")
+            try:
+                match_results = self._rd4_matcher_registry.match(
+                    intent_query=intent,
+                    signifiers=signifier_dicts,
+                    k=int(k),
+                    version=version_to_use,
+                    min_similarity=float(min_similarity),
+                    query_structured_intent=query_structured_intent,
+                )
+                print(f"[V2_DEBUG] Matcher returned {len(match_results) if match_results else 0} results")
+                for i, result in enumerate(match_results[:3]):  # Show first 3
+                    print(f"[V2_DEBUG] Result {i}: similarity={getattr(result, 'similarity', 'N/A')}, signifier_id={getattr(result, 'signifier_id', 'N/A')}")
 
-            signifier_intent = getattr(s.intent, "nl_text", "")
-            if not self._rd4_intent_compatible(
-                intent_query=intent,
-                signifier_intent=signifier_intent,
-                affordance_uri=s.affordance_uri,
-                payload_hint=payload_hint,
-            ):
-                continue
+            except Exception as e:
+                self.logger.error(
+                    demo("!!! V2 MATCHER FAILED, falling back to v0: %s - %s"),
+                    type(e).__name__,
+                    str(e),
+                    exc_info=True,
+                )
+                print(f"[V2_MATCHER_ERROR] Exception: {type(e).__name__}: {str(e)}")
+                version_to_use = "v0"
+                match_results = self._rd4_matcher_registry.match(
+                    intent_query=intent,
+                    signifiers=signifier_dicts,
+                    k=int(k),
+                    version=version_to_use,
+                    query_structured_intent=query_structured_intent,
+                )
 
-            matches.append(
-                {
+            context_graph, _ = self._rd4_context_builder.normalize_context(context)
+
+            matches: List[Dict[str, Any]] = []
+            print(f"[REGISTRY_DEBUG] Processing {len(match_results)} match results")
+            for i, match in enumerate(match_results):
+                print(f"[REGISTRY_DEBUG] Match {i}: signifier_id={match.signifier_id}, similarity={getattr(match, 'similarity', 'N/A')}")
+                s = self._rd4_registry.get(match.signifier_id)
+                if not s:
+                    print(f"[REGISTRY_DEBUG] Signifier {match.signifier_id} NOT FOUND in registry!")
+                    continue
+                print(f"[REGISTRY_DEBUG] Signifier {match.signifier_id} found in registry")
+
+                shacl_conforms = True
+                shacl_violations: List[str] = []
+
+                # EXPLICIT intents: skip context validation (user specified exact target)
+                # IMPLICIT intents: validate context (need to infer from environment state)
+                should_validate_context = (intent_type != "EXPLICIT")
+
+                print(f"[SHACL_DEBUG] should_validate_context={should_validate_context}, intent_type='{intent_type}'")
+                print(f"[SHACL_DEBUG] shacl_validation_enabled={self._rd4_shacl_validation_enabled}")
+                print(f"[SHACL_DEBUG] signifier has shacl_shapes: {bool(getattr(getattr(s, 'context', None), 'shacl_shapes', None))}")
+
+                if should_validate_context and self._rd4_shacl_validation_enabled and getattr(getattr(s, "context", None), "shacl_shapes", None):
+                    print(f"[SHACL_DEBUG] Running SHACL validation for signifier {s.signifier_id}")
+                    validation = self._rd4_shacl_validator.validate_signifier_context(
+                        context_graph,
+                        s.context.shacl_shapes,
+                        format="turtle",
+                    )
+                    # ValidationResult object has .conforms and .violations attributes
+                    shacl_conforms = bool(getattr(validation, 'conforms', False))
+                    violations = getattr(validation, 'violations', []) or []
+                    shacl_violations = [getattr(v, 'message', str(v)) for v in violations]
+                    print(f"[SHACL_DEBUG] SHACL validation result: conforms={shacl_conforms}, violations={len(violations)}")
+                else:
+                    skip_reason = []
+                    if not should_validate_context:
+                        skip_reason.append("explicit intent")
+                    if not self._rd4_shacl_validation_enabled:
+                        skip_reason.append("validation disabled in config")
+                    if not getattr(getattr(s, "context", None), "shacl_shapes", None):
+                        skip_reason.append("no SHACL shapes")
+                    print(f"[SHACL_DEBUG] Skipping SHACL validation ({', '.join(skip_reason)})")
+
+                print(f"[SHACL_DEBUG] Final shacl_conforms value: {shacl_conforms}")
+
+                # RESTORED: Check intent compatibility (was missing in refactoring!)
+                structured = getattr(getattr(s, "intent", None), "structured", None)
+                payload_hint = structured.get("payload") if isinstance(structured, dict) else None
+                signifier_intent = getattr(s.intent, "nl_text", "")
+
+                print(f"[COMPATIBILITY_DEBUG] Checking compatibility: query='{intent}' vs signifier='{signifier_intent}'")
+                is_compatible = self._rd4_intent_compatible(
+                    intent_query=intent,
+                    signifier_intent=signifier_intent,
+                    affordance_uri=s.affordance_uri,
+                    payload_hint=payload_hint,
+                )
+                print(f"[COMPATIBILITY_DEBUG] Result: {is_compatible}")
+
+                if not is_compatible:
+                    print(f"[COMPATIBILITY_DEBUG] FILTERED OUT: signifier '{signifier_intent}' not compatible with query '{intent}'")
+                    continue
+
+                print(f"[COMPATIBILITY_DEBUG] PASSED: signifier '{signifier_intent}' is compatible with query '{intent}'")
+
+                match_data = {
                     "signifier_id": s.signifier_id,
-                    "affordance_uri": s.affordance_uri,
                     "intent": signifier_intent,
-                    "intent_similarity": round(float(match.similarity), 4),
-                    "matcher_version": version_to_use,
+                    "affordance_uri": s.affordance_uri,
+                    "intent_similarity": match.similarity,
+                    "intent_type": s.intent_type,
+                    "workspace_id": workspace_id,
                     "shacl_conforms": shacl_conforms,
                     "shacl_violations": shacl_violations,
-                    "payload_hint": payload_hint,
-                    "intent_type": getattr(s, "intent_type", None),  # Include intent_type for ranking
+                    "payload_hint": payload_hint,  # RESTORED: missing field
                 }
-            )
+                matches.append(match_data)
 
-        # Rank matches: prefer signifiers with matching intent_type
-        if intent_type and matches:
-            # Count matches by intent_type before ranking
-            matching_count = sum(1 for m in matches if m.get("intent_type") == intent_type)
-            non_matching_count = len(matches) - matching_count
+            # Filter by SHACL conformance if validating context
+            print(f"[SHACL_FILTER_DEBUG] Before SHACL filter: {len(matches)} matches")
+            for i, match in enumerate(matches):
+                print(f"[SHACL_FILTER_DEBUG] Match {i}: signifier_id={match.get('signifier_id')}, shacl_conforms={match.get('shacl_conforms')}")
 
-            # Sort matches: intent_type matches first, then by similarity
-            def _rank_key(m: Dict[str, Any]) -> tuple:
-                has_matching_intent_type = (m.get("intent_type") == intent_type)
-                similarity = m.get("intent_similarity", 0.0)
-                # Return tuple: (match_type_priority, similarity)
-                # Higher priority = comes first (so negate for reverse sort)
-                return (not has_matching_intent_type, -similarity)
+            if intent_type != "EXPLICIT":
+                original_count = len(matches)
+                matches = [m for m in matches if m.get("shacl_conforms", True)]
+                filtered_count = len(matches)
+                print(f"[SHACL_FILTER_DEBUG] SHACL filter applied: {original_count} -> {filtered_count} matches")
+                if original_count != filtered_count:
+                    print(f"[SHACL_FILTER_DEBUG] FILTERED OUT {original_count - filtered_count} matches due to SHACL validation")
 
-            matches.sort(key=_rank_key)
-            self.logger.info(
-                demo("[INTENT_TYPE] Ranked %d matches by intent_type=%s: matching=%d, non-matching=%d"),
-                len(matches),
-                intent_type,
-                matching_count,
-                non_matching_count,
-            )
-            # Log top 3 matches with their intent_type
-            for i, m in enumerate(matches[:3]):
-                self.logger.info(
-                    demo("[INTENT_TYPE] Match #%d: signifier_id=%s, intent_type=%r, similarity=%.4f"),
-                    i + 1,
-                    m.get("signifier_id"),
-                    m.get("intent_type"),
-                    m.get("intent_similarity", 0.0),
-                )
+            # Rank matches by intent_type and similarity
+            if intent_type:
+                matches = rank_signifier_matches(matches, intent_type)
+            else:
+                matches.sort(key=lambda m: m.get("intent_similarity", 0.0), reverse=True)
 
-        final_matches = [m["signifier_id"] for m in matches if m.get("shacl_conforms")]
+            print(f"[FINAL_RESULT_DEBUG] Returning {len(matches)} matches to InteractionSolver")
+            for i, match in enumerate(matches[:3]):  # Show first 3
+                print(f"[FINAL_RESULT_DEBUG] Match {i}: signifier_id={match.get('signifier_id', 'N/A')}, similarity={match.get('intent_similarity', 'N/A')}")
 
-        self.logger.info(
-            demo("Signifier match result: matches=%d final_matches=%d"),
-            len(matches),
-            len(final_matches),
-        )
+            return {"matches": matches, "final_matches": matches, "total_signifiers": len(signifier_dicts)}
 
-        return {
-            "intent": intent,
-            "matches": matches,
-            "final_matches": final_matches,
-            "total_signifiers": len(signifier_dicts),
-        }
+        except Exception as e:
+            self.logger.error(f"Error matching signifiers: {e}", exc_info=True)
+            return {"ok": False, "error": "exception", "detail": str(e)}
 
     def _generate_shacl_shapes_from_conditions(
         self, structured_conditions: List[Dict[str, Any]]
     ) -> Optional[str]:
-        """
-        Generate SHACL shapes (Turtle format) from structured_conditions.
-
-        Maps structured conditions to SHACL constraints for context validation:
-        - equals → sh:hasValue (exact match)
-        - greater_than → sh:minExclusive
-        - greater_than_or_equal → sh:minInclusive
-        - less_than → sh:maxExclusive
-        - less_than_or_equal → sh:maxInclusive
-
-        Args:
-            structured_conditions: List of condition dicts with artifact, property, value_conditions
-
-        Returns:
-            SHACL shapes as Turtle string, or None if no valid conditions
-        """
-        if not structured_conditions or not isinstance(structured_conditions, list):
-            return None
-
-        # Group conditions by artifact to create one NodeShape per artifact
-        artifact_conditions: Dict[str, List[Dict[str, Any]]] = {}
-        for cond in structured_conditions:
-            if not isinstance(cond, dict):
-                continue
-            artifact = cond.get("artifact")
-            if not artifact:
-                continue
-            if artifact not in artifact_conditions:
-                artifact_conditions[artifact] = []
-            artifact_conditions[artifact].append(cond)
-
-        if not artifact_conditions:
-            return None
-
-        # Build SHACL Turtle
-        shapes_lines = [
-            "@prefix sh: <http://www.w3.org/ns/shacl#> .",
-            "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .",
-            "",
-        ]
-
-        for idx, (artifact_uri, conditions) in enumerate(artifact_conditions.items()):
-            shape_id = f"<urn:signifier:shape:{idx}>"
-            shapes_lines.append(f"{shape_id} a sh:NodeShape ;")
-            shapes_lines.append(f"    sh:targetNode <{artifact_uri}> ;")
-
-            # Add property constraints
-            for prop_idx, cond in enumerate(conditions):
-                prop_uri = cond.get("property_affordance")
-                value_conditions = cond.get("value_conditions", [])
-                if not prop_uri or not value_conditions:
-                    continue
-
-                is_last_property = (prop_idx == len(conditions) - 1)
-                shapes_lines.append("    sh:property [")
-                shapes_lines.append(f"        sh:path <{prop_uri}> ;")
-
-                # Process each value condition
-                for vc_idx, vc in enumerate(value_conditions):
-                    if not isinstance(vc, dict):
-                        continue
-                    operator = vc.get("operator", "equals")
-                    value = vc.get("value")
-                    if value is None:
-                        continue
-
-                    # Determine datatype and format value
-                    if isinstance(value, bool):
-                        value_str = "true" if value else "false"
-                        datatype = "xsd:boolean"
-                    elif isinstance(value, str):
-                        # Escape quotes
-                        escaped = value.replace('"', '\\"')
-                        value_str = f'"{escaped}"'
-                        datatype = "xsd:string"
-                    elif isinstance(value, int):
-                        value_str = str(value)
-                        datatype = "xsd:integer"
-                    elif isinstance(value, float):
-                        value_str = str(value)
-                        datatype = "xsd:double"
-                    elif isinstance(value, list):
-                        # For lists, we can't easily represent in SHACL - skip
-                        continue
-                    elif isinstance(value, dict):
-                        # For dicts, we can't easily represent in SHACL - skip
-                        continue
-                    else:
-                        escaped = str(value).replace('"', '\\"')
-                        value_str = f'"{escaped}"'
-                        datatype = "xsd:string"
-
-                    # Add datatype constraint (first, before value constraints)
-                    shapes_lines.append(f"        sh:datatype {datatype} ;")
-
-                    # Map operator to SHACL constraint
-                    is_last_vc = (vc_idx == len(value_conditions) - 1)
-                    if operator == "equals":
-                        shapes_lines.append(f"        sh:hasValue {value_str}{';' if not is_last_vc else ''}")
-                    elif operator == "greater_than":
-                        shapes_lines.append(f"        sh:minExclusive {value_str}{';' if not is_last_vc else ''}")
-                    elif operator == "greater_than_or_equal":
-                        shapes_lines.append(f"        sh:minInclusive {value_str}{';' if not is_last_vc else ''}")
-                    elif operator == "less_than":
-                        shapes_lines.append(f"        sh:maxExclusive {value_str}{';' if not is_last_vc else ''}")
-                    elif operator == "less_than_or_equal":
-                        shapes_lines.append(f"        sh:maxInclusive {value_str}{';' if not is_last_vc else ''}")
-                    # For not_equals, we could use sh:not but it's complex - skip for now
-
-                shapes_lines.append(f"    ]{';' if not is_last_property else '.'}")
-
-            shapes_lines.append("")
-
-        return "\n".join(shapes_lines)
+        """Generate SHACL shapes from structured conditions."""
+        return generate_shacl_shapes_from_conditions(structured_conditions)
 
     def _generate_nl_description(
         self, structured_conditions: List[Dict[str, Any]], ctx_meta: Dict[str, Any]
     ) -> str:
-        """
-        Generate natural language description from structured conditions.
-
-        Converts structured conditions into human-readable text.
-        Falls back to workspace metadata if no conditions available.
-
-        Args:
-            structured_conditions: List of condition dicts with artifact, property, value_conditions
-            ctx_meta: Context metadata (workspace_id, was_successful, etc.)
-
-        Returns:
-            Natural language description string
-        """
-        if structured_conditions and isinstance(structured_conditions, list) and len(structured_conditions) > 0:
-            # Build description from conditions
-            parts = []
-            for cond in structured_conditions:
-                if not isinstance(cond, dict):
-                    continue
-
-                artifact = cond.get("artifact", "")
-                prop = cond.get("property_affordance", "")
-                value_conditions = cond.get("value_conditions", [])
-
-                # Extract artifact ID from URI (e.g., "lights_308" from full URI)
-                artifact_id = artifact.rstrip("/").rsplit("/", 1)[-1] if artifact else "artifact"
-                # Extract property name from URI
-                prop_name = prop.rstrip("/").rsplit("/", 1)[-1] if prop else "property"
-
-                # Format value conditions
-                for vc in value_conditions:
-                    if not isinstance(vc, dict):
-                        continue
-                    operator = vc.get("operator", "equals")
-                    value = vc.get("value")
-
-                    if operator == "equals":
-                        parts.append(f"{artifact_id} {prop_name} is {value}")
-                    elif operator == "greater_than":
-                        parts.append(f"{artifact_id} {prop_name} > {value}")
-                    elif operator == "greater_than_or_equal":
-                        parts.append(f"{artifact_id} {prop_name} >= {value}")
-                    elif operator == "less_than":
-                        parts.append(f"{artifact_id} {prop_name} < {value}")
-                    elif operator == "less_than_or_equal":
-                        parts.append(f"{artifact_id} {prop_name} <= {value}")
-                    elif operator == "not_equals":
-                        parts.append(f"{artifact_id} {prop_name} != {value}")
-
-            if parts:
-                return "; ".join(parts)
-
-        # Fallback: use workspace metadata
-        workspace_id = ctx_meta.get("workspace_id", "unknown")
-        was_successful = ctx_meta.get("was_successful", True)
-        status = "successful" if was_successful else "failed"
-        return f"Execution in workspace {workspace_id} ({status})"
+        """Generate natural language description from structured conditions."""
+        return generate_nl_description(structured_conditions, ctx_meta)
 
     async def _rd4_record_execution(
         self,
@@ -827,20 +400,32 @@ class EnvExplorerAgent(Agent, IAgent):
         workspace_id: Optional[str] = None,
         signifiers: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
+        """Record execution signifiers."""
         self.logger.info(demo(">>> _rd4_record_execution CALLED: plan_type=%s, execution_report_type=%s, signifiers_provided=%s"), type(plan).__name__, type(execution_report).__name__, signifiers is not None)
-        await self._ensure_rd4_engine_ready()
+
+        try:
+            await self._ensure_rd4_engine_ready()
+            if not self._rd4_registry:
+                return {"ok": False, "error": "rd4_engine_not_ready"}
+        except Exception as e:
+            self.logger.error(demo("!!! RD4 engine setup failed: %s"), str(e), exc_info=True)
+            return {"ok": False, "error": "rd4_engine_setup_failed", "detail": str(e)}
 
         # NEW PATH: If signifiers are already provided (from BT extraction), skip plan parsing
         if signifiers and isinstance(signifiers, list) and len(signifiers) > 0:
             self.logger.info(demo(">>> Using pre-extracted signifiers (count=%d), skipping plan parsing"), len(signifiers))
             # Jump directly to storing signifiers (reuse code below)
-            from src.models.signifier import (
-                IntentContext,
-                IntentionDescription,
-                Provenance,
-                Signifier as RD4Signifier,
-                SignifierStatus,
-            )
+            try:
+                from src.models.signifier import (  # type: ignore[import-not-found]
+                    IntentContext,
+                    IntentionDescription,
+                    Provenance,
+                    Signifier as RD4Signifier,
+                    SignifierStatus,
+                )
+            except ImportError as e:
+                self.logger.error(demo("!!! EXCEPTION in _rd4_record_execution: ImportError - %s"), str(e), exc_info=True)
+                return {"ok": False, "error": "import_failed", "detail": str(e)}
 
             created: List[str] = []
             skipped: List[Dict[str, Any]] = []
@@ -1002,13 +587,17 @@ class EnvExplorerAgent(Agent, IAgent):
                     if sid is not None:
                         ok_step_ids.add(str(sid))
 
-        from src.models.signifier import (
-            IntentContext,
-            IntentionDescription,
-            Provenance,
-            Signifier as RD4Signifier,
-            SignifierStatus,
-        )
+        try:
+            from src.models.signifier import (  # type: ignore[import-not-found]
+                IntentContext,
+                IntentionDescription,
+                Provenance,
+                Signifier as RD4Signifier,
+                SignifierStatus,
+            )
+        except ImportError as e:
+            self.logger.error(demo("!!! OLD PATH import failed: ImportError - %s"), str(e), exc_info=True)
+            return {"ok": False, "error": "import_failed", "detail": str(e)}
 
         created: List[str] = []
         skipped: List[Dict[str, Any]] = []
@@ -1138,593 +727,62 @@ class EnvExplorerAgent(Agent, IAgent):
         )
         return result
 
-    async def start(self, *args, **kwargs) -> None:
-        """
-        Start the EnvExplorer agent.
+    # Agent lifecycle methods
+    async def start(self, *args, **kwargs):
+        """Start the EnvExplorer agent."""
+        self.logger.info(demo("Starting EnvExplorer agent"))
+        await super().start(*args, **kwargs)
 
-        Uses SPADE's start to trigger setup/discovery.
-        """
-        return await super().start(*args, **kwargs)
-
-    async def stop(self) -> None:
-        """
-        Stop the EnvExplorer agent.
-
-        TODO: Implementation steps:
-        1. Stop all behaviors
-        2. Unsubscribe from environment events
-        3. Disconnect HMAS client
-        4. Close signifier storage
-        5. Cleanup resources
-        """
+    async def stop(self):
+        """Stop the EnvExplorer agent and clean up resources."""
+        self.logger.info(demo("Stopping EnvExplorer agent"))
         if self.integration_engine:
-            await self.integration_engine.stop_notification_listener()
+            try:
+                await self.integration_engine.stop_notification_listener()
+            except Exception as e:
+                self.logger.error(f"Error stopping integration engine: {e}")
         await super().stop()
 
-    async def send_message(self, message: Message) -> bool:
+    # Implement the previously stubbed message methods
+    async def send_message(self, message: Message, recipient_jid: str) -> bool:
         """
-        Send a message to another agent.
-
-        TODO: Implementation steps:
-        1. Validate message
-        2. Serialize to SPADE message format
-        3. Send via SPADE
-        4. Log sent message
-        5. Return success status
-        """
-        pass
-
-    async def receive_message(self, message: Message) -> None:
-        """
-        Receive and process a message.
-
-        TODO: Implementation steps:
-        1. Deserialize SPADE message
-        2. Route based on message type
-        3. Handle appropriately
-        """
-        pass
-
-
-class InitialDiscoveryBehaviour(OneShotBehaviour):
-    """Behavior for initial environment discovery."""
-
-    async def run(self):
-        """
-        Perform initial discovery of the environment.
-
-        TODO: Implementation steps:
-        1. Wait for agent to be ready
-        2. Crawl entire HMAS environment
-        3. Build environment map (workspaces)
-        4. Collect all artifacts and Thing Descriptions
-        5. Extract affordances from Thing Descriptions
-        6. Store in agent's data structures
-        7. Subscribe to all workspace change notifications
-        8. Mark discovery as complete
-        9. Notify UserAssistant and InteractionSolver
-        10. Stop this behavior (one-time only)
-        """
-        self.agent.logger.info(demo("Starting EnvExplorer discovery..."))
-        
-        success = await self.agent.integration_engine.initialize({})
-        if not success:
-            self.agent.logger.error("Failed to initialize Integration Engine.")
-            return
-
-        # Start webhook listener for event notifications before subscribing
-        callback_url = await self.agent.integration_engine.start_notification_listener()
-        
-        try:
-            await self.agent.integration_engine.explore_hmas_environment()
-            
-            self.agent.environment_map = self.agent.integration_engine.workspace_map
-            self.agent.artifacts = self.agent.integration_engine.artifact_map
-            self.agent.affordances = self.agent.integration_engine.affordance_map
-
-            self.agent.logger.info("Subscribing to artifact events...")
-            for artifact_id, artifact in self.agent.artifacts.items():
-                # The engine uses the internal listener automatically (callback_url=None)
-                success = await self.agent.integration_engine.subscribe_to_artifact(
-                    artifact_id, callback_url=callback_url
-                )
-                if success:
-                    self.agent.logger.debug(f"Subscribed to {artifact.name}")
-                else:
-                    self.agent.logger.warning(f"Could not subscribe to {artifact.name} (might be static)")
-            
-            self.agent.discovery_complete = True
-            self.agent.logger.info(f"Discovery Complete. Found {len(self.agent.artifacts)} artifacts.")
-            self.agent.logger.info(
-                demo("Discovery summary: workspaces=%d artifacts=%d affordances=%d"),
-                len(self.agent.environment_map or {}),
-                len(self.agent.artifacts or {}),
-                len(self.agent.affordances or {}),
-            )
-            
-            await self.notify_discovery_complete()
-            
-        except Exception as e:
-            self.agent.logger.error(f"Error during discovery: {e}", exc_info=True)
-
-        pass
-
-    async def subscribe_to_changes(self) -> None:
-        """
-        Subscribe to environment change notifications.
-
-        TODO: Implementation steps:
-        1. For each workspace in environment_map:
-           a. Subscribe to workspace change events
-           b. Register callback for change handling
-        """
-        pass
-
-    async def notify_discovery_complete(self) -> None:
-        """
-        Notify other agents that discovery is complete.
-
-        TODO: Implementation steps:
-        1. Create ENV_DISCOVERY_COMPLETE message
-        2. Send to UserAssistant
-        3. Send to InteractionSolver
-        4. Log notification sent
-        """
-        discovery_cfg = (self.agent.config or {}).get("discovery", {}) or {}
-        if not discovery_cfg.get("notify_on_discovery_complete", True):
-            return
-
-        notify_agents = discovery_cfg.get("notify_agents") or []
-        if not notify_agents:
-            self.agent.logger.info("Discovery complete: no notify_agents configured.")
-            return
-
-        payload = {
-            "discovery_complete": True,
-            "artifacts_count": len(self.agent.artifacts or {}),
-            "affordances_count": len(self.agent.affordances or {}),
-            "yggdrasil_url": getattr(self.agent, "yggdrasil_url", None),
-        }
-
-        sent = 0
-        for jid in notify_agents:
-            try:
-                msg = SpadeMessage(to=str(jid))
-                msg.set_metadata("type", MessageType.ENV_DISCOVERY_COMPLETE.value)
-                msg.set_metadata(META_CORRELATION_ID, ensure_correlation_id({}))
-                msg.body = json.dumps(payload)
-                await self.send(msg)
-                sent += 1
-            except Exception as e:
-                self.agent.logger.warning(f"Failed to notify {jid} of discovery complete: {e}")
-
-        self.agent.logger.info(f"Discovery complete notification sent to {sent}/{len(notify_agents)} agents.")
-
-class EventProcessingBehaviour(CyclicBehaviour):
-    """
-    Behavior for processing asynchronous environment events from the mailbox.
-    """
-    def __init__(self, integration_engine):
-        super().__init__()
-        self.integration = integration_engine
-
-    async def run(self):
-        # 1. Block until an event arrives (efficient)
-        try:
-            # Check if listener is running
-            if not self.integration.notification_listener:
-                await asyncio.sleep(1) # Wait for setup
-                return
-
-            event_data = await self.integration.event_queue.get()
-            
-            # 2. Extract Identity
-            # Yggdrasil sends "artifactUri" in the payload
-            artifact_uri = event_data.get("artifactUri")
-            if not artifact_uri:
-                return
-
-            # 3. Find Local Artifact
-            # Handle potential suffix mismatch (http://.../light vs http://.../light#artifact)
-            artifact = self.integration.artifact_map.get(artifact_uri)
-            if not artifact:
-                # Try fuzzy match if exact match fails
-                artifact = next((a for a in self.integration.artifact_map.values() 
-                                    if artifact_uri in a.artifact_id or a.artifact_id in artifact_uri), None)
-            
-            if not artifact:
-                self.agent.logger.warning(f"Received event for unknown artifact: {artifact_uri}")
-                return
-
-            # 4. Update State (Digital Twin)
-            property_uri = event_data.get("propertyUri")
-            value = event_data.get("value")
-            
-            if property_uri and value is not None:
-                # Update Internal State
-                artifact.current_state[property_uri] = value
-                self.agent.logger.info(f"STATE UPDATE: {artifact.name} -> {property_uri} = {value}")
-                
-        except Exception as e:
-            self.agent.logger.error(f"Error processing event: {e}")
-
-class ChangeMonitoringBehaviour(PeriodicBehaviour):
-    """Behavior for monitoring environment changes."""
-
-    async def run(self):
-        """
-        Periodically check for environment changes.
-
-        TODO: Implementation steps:
-        1. Check for new change events
-        2. For each change event:
-           a. Update internal data structures
-           b. Analyze impact on existing plans
-           c. Notify UserAssistant if plans affected
-        """
-        pass
-
-    async def handle_change_event(self, event: ChangeEvent) -> None:
-        """
-        Handle a specific change event.
-
-        TODO: Implementation steps:
-        1. Based on event type:
-           - ARTIFACT_ADDED: Add to artifacts map
-           - ARTIFACT_REMOVED: Remove from artifacts map
-           - CAPABILITY_CHANGED: Update affordances
-           - STATE_CHANGED: Update artifact state
-        2. Analyze plan impact
-        3. Send notifications if needed
-        """
-        pass
-
-    async def analyze_plan_impact(self, event: ChangeEvent) -> List[str]:
-        """
-        Analyze which plans are affected by the change.
-
-        TODO: Implementation steps:
-        1. Query UserAssistant for maintenance plans
-        2. For each plan:
-           a. Check if change affects triggering conditions
-           b. Check if change affects plan affordances
-        3. Collect affected plan_ids
-        4. Return list
-        """
-        pass
-
-
-class EnvironmentRequestHandler(CyclicBehaviour):
-    """Generic handler for incoming environment requests."""
-
-    async def run(self):
-        """
-        Handle affordance match requests.
-
-        TODO: Implementation steps:
-        1. Wait for AffordanceMatchRequest message
-        2. Process request
-        3. Send AffordanceMatchResponse back
-        """
-        msg = await self.receive(timeout=1)
-        if msg:
-            msg_type = msg.get_metadata("type")
-            
-            # Check for capabilities request
-            if msg_type == MessageType.ENV_CAPABILITIES_REQUEST.value:
-                self.agent.logger.info(demo("Received ENV_CAPABILITIES_REQUEST from %s"), str(msg.sender))
-                
-                # Generate Response (machine-readable JSON payload + summary)
-                response_payload = self.agent._generate_capabilities_payload()
-                
-                # Send Reply
-                reply = msg.make_reply()
-                reply.body = json.dumps(response_payload)
-                reply.set_metadata("type", MessageType.ENV_CAPABILITIES_RESPONSE.value)
-                
-                # Preserve Correlation ID
-                correlation_id = msg.get_metadata(META_CORRELATION_ID)
-                if correlation_id:
-                    reply.set_metadata(META_CORRELATION_ID, correlation_id)
-                # Preserve thread as conversation id carrier (if set)
-                if msg.thread:
-                    reply.thread = msg.thread
-                    
-                await self.send(reply)
-            
-            # Check for state request (full snapshot or filtered)
-            elif msg_type == MessageType.ENV_STATE_REQUEST.value:
-                self.agent.logger.info(demo("Received ENV_STATE_REQUEST from %s"), str(msg.sender))
-
-                try:
-                    payload = json.loads(msg.body or "{}")
-                except json.JSONDecodeError:
-                    payload = {}
-
-                artifact_id = (
-                    payload.get("artifact_id")
-                    or payload.get("artifact")
-                    or payload.get("artifact_uri")
-                )
-                property_uri = payload.get("property_uri") or payload.get("property")
-
-                response_payload = {}
-
-                if artifact_id:
-                    artifact = self.agent.artifacts.get(artifact_id)
-                    if not artifact:
-                        response_payload = {
-                            "error": "artifact_not_found",
-                            "artifact_id": artifact_id,
-                        }
-                    else:
-                        state = dict(artifact.current_state)
-                        if property_uri:
-                            if property_uri in state:
-                                response_payload = {
-                                    "artifact_id": artifact_id,
-                                    "property_uri": property_uri,
-                                    "value": state.get(property_uri),
-                                }
-                            else:
-                                response_payload = {
-                                    "error": "property_not_found",
-                                    "artifact_id": artifact_id,
-                                    "property_uri": property_uri,
-                                }
-                        else:
-                            response_payload = {
-                                "artifact_id": artifact_id,
-                                "name": artifact.name,
-                                "workspace_id": getattr(artifact, "workspace_id", None),
-                                "state": state,
-                            }
-                else:
-                    artifacts_snapshot = {}
-                    for aid, artifact in self.agent.artifacts.items():
-                        artifacts_snapshot[aid] = {
-                            "name": artifact.name,
-                            "workspace_id": getattr(artifact, "workspace_id", None),
-                            "state": dict(artifact.current_state),
-                        }
-                    response_payload = {"artifacts": artifacts_snapshot}
-
-                reply = msg.make_reply()
-                reply.body = json.dumps(response_payload)
-                reply.set_metadata("type", MessageType.ENV_STATE_RESPONSE.value)
-
-                correlation_id = msg.get_metadata("correlation_id")
-                if correlation_id:
-                    reply.set_metadata("correlation_id", correlation_id)
-                if msg.thread:
-                    reply.thread = msg.thread
-
-                await self.send(reply)
-        pass
-
-    async def match_affordances(self, request: AffordanceMatchRequest) -> AffordanceMatchResponse:
-        """
-        Match affordances to a goal.
-
-        TODO: Implementation steps:
-        1. Extract goal intent
-        2. Search signifiers for similar intents
-        3. Rank signifiers by:
-           a. Intent similarity
-           b. Context similarity
-        4. If signifiers found, prioritize them
-        5. If no signifiers or need more options:
-           a. Use hybrid reasoning (rule-based + LLM)
-           b. Apply physics-informed modeling
-           c. Find suitable affordances
-        6. Compile list of matched affordances
-        7. Create and return AffordanceMatchResponse
-        """
-        pass
-
-    async def search_signifiers(self, intent: str, context: Dict[str, Any],
-                               threshold: float = 0.8) -> List[Signifier]:
-        """
-        Search for signifiers matching an intent.
-
-        TODO: Implementation steps:
-        1. Query signifier storage
-        2. Compute intent similarity (using embeddings)
-        3. Filter by threshold
-        4. If context matching enabled:
-           a. Compute context similarity
-           b. Filter by context threshold
-        5. Sort by similarity scores
-        6. Return matched signifiers
-        """
-        pass
-
-    async def hybrid_affordance_matching(self, intent: str,
-                                        context: Dict[str, Any]) -> List[Affordance]:
-        """
-        Use hybrid reasoning to match affordances.
-
-        TODO: Implementation steps:
-        1. Apply rule-based matching:
-           a. Extract keywords from intent
-           b. Match against affordance descriptions
-        2. Apply LLM reasoning:
-           a. Prepare prompt with intent and affordances
-           b. Ask LLM to select suitable affordances
-           c. Parse LLM response
-        3. If physics-informed modeling enabled:
-           a. Consider physical constraints
-           b. Consider device capabilities
-        4. Combine results
-        5. Return ranked affordances
-        """
-        pass
-
-
-class SignifierRequestHandler(CyclicBehaviour):
-    """Handler for RD4 signifier engine requests (embedded in EnvExplorer)."""
-
-    async def run(self):
-        msg = await self.receive(timeout=1)
-        if not msg:
-            return
-
-        msg_type = msg.get_metadata("type")
-
-        if msg_type == MessageType.SIGNIFIER_LIST_REQUEST.value:
-            self.agent.logger.info(demo("Received SIGNIFIER_LIST_REQUEST from %s"), str(msg.sender))
-            response_payload = await self.agent._rd4_list_signifiers()
-            reply_type = MessageType.SIGNIFIER_LIST_RESPONSE.value
-
-        elif msg_type == MessageType.SIGNIFIER_MATCH_REQUEST.value:
-            self.agent.logger.info(demo("Received SIGNIFIER_MATCH_REQUEST from %s"), str(msg.sender))
-            try:
-                payload = json.loads(msg.body or "{}")
-            except json.JSONDecodeError:
-                payload = {}
-
-            intent = payload.get("intent") or payload.get("query") or payload.get("goal") or ""
-            workspace_id = payload.get("workspace_id")
-            k = payload.get("k", 10)
-            matcher_version = payload.get("matcher_version")
-            min_similarity = payload.get("min_similarity")
-            intent_type = payload.get("intent_type")  # Extract intent_type for filtering/ranking
-            query_structured_intent = payload.get("query_structured_intent")  # Extract structured_intent for v2 matcher
-
-            response_payload = await self.agent._rd4_match_signifiers(
-                intent=str(intent),
-                workspace_id=str(workspace_id) if workspace_id else None,
-                k=int(k) if str(k).isdigit() else 10,
-                matcher_version=str(matcher_version) if matcher_version else None,
-                min_similarity=float(min_similarity) if min_similarity is not None else None,
-                intent_type=str(intent_type).upper() if intent_type and str(intent_type).upper() in ("EXPLICIT", "IMPLICIT") else None,
-                query_structured_intent=query_structured_intent if isinstance(query_structured_intent, dict) else None,
-            )
-            reply_type = MessageType.SIGNIFIER_MATCH_RESPONSE.value
-
-        elif msg_type == MessageType.SIGNIFIER_RECORD_EXECUTION_REQUEST.value:
-            self.agent.logger.info(demo("Received SIGNIFIER_RECORD_EXECUTION_REQUEST from %s"), str(msg.sender))
-            try:
-                payload = json.loads(msg.body or "{}")
-            except json.JSONDecodeError:
-                payload = {}
-
-            try:
-                response_payload = await self.agent._rd4_record_execution(
-                    plan=payload.get("plan"),
-                    execution_report=payload.get("execution_report") or payload.get("execution") or {},
-                    sender=str(msg.sender) if getattr(msg, "sender", None) else None,
-                    thread=str(msg.thread) if getattr(msg, "thread", None) else None,
-                    workspace_id=payload.get("workspace_id"),
-                    signifiers=payload.get("signifiers"),  # NEW: accept pre-extracted signifiers from BT
-                )
-            except Exception as e:
-                self.agent.logger.error(
-                    demo("!!! EXCEPTION in _rd4_record_execution: %s - %s"),
-                    type(e).__name__,
-                    str(e),
-                    exc_info=True,
-                )
-                response_payload = {"ok": False, "error": "exception", "detail": str(e)}
-            reply_type = MessageType.SIGNIFIER_RECORD_EXECUTION_RESPONSE.value
-
-        else:
-            return
-
-        reply = msg.make_reply()
-        reply.body = json.dumps(response_payload)
-        reply.set_metadata("type", reply_type)
-
-        correlation_id = msg.get_metadata(META_CORRELATION_ID)
-        if correlation_id:
-            reply.set_metadata(META_CORRELATION_ID, str(correlation_id))
-        if msg.thread:
-            reply.thread = msg.thread
-
-        await self.send(reply)
-
-
-class SignifierManager:
-    """Manages storage and retrieval of signifiers."""
-
-    def __init__(self, config: Dict[str, Any]):
-        """
-        Initialize SignifierManager.
+        Send message to another agent.
 
         Args:
-            config: Signifier configuration.
-        """
-        self.config = config
-        self.storage = None  # Database connection
+            message: Message to send
+            recipient_jid: JID of recipient agent
 
-    async def initialize_storage(self) -> None:
+        Returns:
+            True if message was sent successfully
         """
-        Initialize signifier storage backend.
+        try:
+            spade_msg = SpadeMessage(to=recipient_jid)
+            spade_msg.set_metadata("type", message.message_type.value)
+            spade_msg.set_metadata(META_CORRELATION_ID, message.correlation_id)
+            spade_msg.body = message.model_dump_json()
+            await self.send(spade_msg)
+            self.logger.debug(f"Sent message to {recipient_jid}: {message.message_type}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error sending message to {recipient_jid}: {e}")
+            return False
 
-        TODO: Implementation steps:
-        1. Connect to database (SQLite, etc.)
-        2. Create tables if not exist
-        3. Load indices for fast retrieval
+    async def receive_message(self, timeout: Optional[float] = None) -> Optional[Message]:
         """
-        pass
+        Receive message with timeout.
 
-    async def store_signifier(self, signifier: Signifier) -> None:
-        """
-        Store a signifier.
+        Args:
+            timeout: Timeout in seconds (uses default if None)
 
-        TODO: Implementation steps:
-        1. Check if similar signifier exists
-        2. If exists, increment usage_count
-        3. Otherwise, insert new signifier
-        4. Update indices
+        Returns:
+            Parsed message or None if no message received
         """
-        pass
-
-    async def retrieve_signifiers_by_intent(self, intent: str,
-                                           threshold: float = 0.8) -> List[Signifier]:
-        """
-        Retrieve signifiers matching an intent.
-
-        TODO: Implementation steps:
-        1. Generate intent embedding
-        2. Query vector store or compute similarities
-        3. Filter by threshold
-        4. Return matched signifiers
-        """
-        pass
-
-    async def retrieve_signifiers_by_affordance(self, affordance_id: str) -> List[Signifier]:
-        """
-        Retrieve all signifiers for a specific affordance.
-
-        TODO: Implementation steps:
-        1. Query database for affordance_id
-        2. Return all matching signifiers
-        """
-        pass
-
-    async def extract_signifiers_from_plan(self, plan: BehaviorTreePlan) -> List[Signifier]:
-        """
-        Extract signifiers from a behavior tree plan.
-
-        TODO: Implementation steps:
-        1. Get all leaf action nodes from plan
-        2. For each action node:
-           a. Create signifier with affordance_id
-           b. Record intent (from plan goal)
-           c. Record context (from plan metadata)
-           d. Record parameters used
-        3. Store signifiers
-        4. Return list of created signifiers
-        """
-        pass
-
-    async def get_context_for_signifier(self, signifier_id: str) -> Dict[str, Any]:
-        """
-        Get the context of use for a signifier.
-
-        TODO: Implementation steps:
-        1. Retrieve signifier from database
-        2. Return context dictionary
-        """
-        pass
+        timeout = timeout or self.config.get("timeouts", {}).get("message_reception", _TIMEOUTS["message_reception"])
+        try:
+            spade_msg = await self.receive(timeout=timeout)
+            if spade_msg:
+                return Message.model_validate_json(spade_msg.body)
+            return None
+        except Exception as e:
+            self.logger.error(f"Error receiving message: {e}")
+            return None

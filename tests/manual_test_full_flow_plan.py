@@ -1310,15 +1310,17 @@ async def main():
         except Exception as e:
             raise RuntimeError(f"Yggdrasil is not reachable at {yggdrasil_url}: {e}") from e
 
+        # InteractionSolver must start FIRST to register behaviors that can receive
+        # the ENV_DISCOVERY_COMPLETE notification sent by EnvExplorer during discovery.
+        logger.info("Starting InteractionSolver...")
+        await solver.start(auto_register=True)
+
         logger.info("Starting EnvExplorer...")
         await explorer.start(auto_register=True)
 
         if assistant:
             logger.info("Starting UserAssistant...")
             await assistant.start(auto_register=True)
-
-        logger.info("Starting InteractionSolver...")
-        await solver.start(auto_register=True)
 
         # Wait for discovery to finish before sending the user query (so tool calls see real capabilities).
         for _ in range(600):
