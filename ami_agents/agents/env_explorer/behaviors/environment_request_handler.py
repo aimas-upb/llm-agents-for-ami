@@ -7,6 +7,7 @@ from spade.behaviour import CyclicBehaviour
 
 from ....shared.models.messages import MessageType, META_CORRELATION_ID
 from ....shared.utils.demo_log import demo
+from ..utils.data_formatting import format_capabilities_payload
 
 
 class EnvironmentRequestHandler(CyclicBehaviour):
@@ -30,7 +31,7 @@ class EnvironmentRequestHandler(CyclicBehaviour):
                 self.agent.logger.info(demo("Received ENV_CAPABILITIES_REQUEST from %s"), str(msg.sender))
 
                 # Generate Response (machine-readable JSON payload + summary)
-                response_payload = self.agent._generate_capabilities_payload()
+                response_payload = format_capabilities_payload(self.agent)
 
                 # Send Reply
                 reply = msg.make_reply()

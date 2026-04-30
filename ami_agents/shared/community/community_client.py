@@ -2,7 +2,7 @@
 Community Signifier Client
 
 HTTP client for querying the shared community signifier registry
-(the RD4 signifier API running as a standalone service).
+(the Experience Engine signifier API running as a standalone service).
 
 Used by InteractionSolver to discover cross-environment signifiers.
 """
@@ -19,7 +19,7 @@ class CommunitySignifierClient:
     """
     Client for querying the community signifier registry.
 
-    The community API is the RD4 signifier API (shared/memory/src/api/)
+    The community API is the Experience Engine signifier API (shared/memory/src/api/)
     running as a shared service accessible by all environments.
 
     Endpoints used:
@@ -63,7 +63,7 @@ class CommunitySignifierClient:
         """
         # Use config value if min_similarity not explicitly provided
         if min_similarity is None:
-            min_similarity = self.config.get("signifiers", {}).get("min_similarity", 0.5)
+            min_similarity = self.config.get("experience_engine", {}).get("min_similarity", 0.5)
 
         try:
             async with aiohttp.ClientSession(timeout=self.timeout) as session:

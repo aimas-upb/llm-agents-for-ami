@@ -55,7 +55,7 @@ Sequences (recommended via CLI):
 
  Optional env flags (legacy; CLI preferred):
      CLEAR_SIGNIFIERS=1
-         Clears embedded RD4 signifier storage before starting (reproducible run).
+         Clears embedded Experience Engine signifier storage before starting (reproducible run).
 
     RUN_STARTUP_SEQUENCE=1
         Startup-only mode (equivalent to `--sequence 2`).
@@ -355,7 +355,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument(
         "--clear-signifiers",
         action="store_true",
-        help="Clear embedded RD4 signifier storage before starting (overrides CLEAR_SIGNIFIERS).",
+        help="Clear embedded Experience Engine signifier storage before starting (overrides CLEAR_SIGNIFIERS).",
     )
     p.add_argument(
         "--pause-for-sensor",
@@ -372,7 +372,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         choices=("v0", "v1", "v2"),
         default=os.getenv("SIGNIFIER_MATCHER_VERSION", "").strip() or "v1",
         help=(
-            "Intent matcher version for the embedded RD4 engine (default: v1). "
+            "Intent matcher version for the embedded Experience Engine engine (default: v1). "
             "v0=string contains, v1=embeddings, v2=structured intent. "
             "Can also be set via SIGNIFIER_MATCHER_VERSION."
         ),
@@ -1449,7 +1449,7 @@ async def main():
     solver_jid = f"interaction_solver@{xmpp_server}"
     orchestrator_jid = f"orchestrator@{xmpp_server}"
 
-    # Optional: clear embedded RD4 signifier storage before starting (makes the run reproducible).
+    # Optional: clear embedded Experience Engine signifier storage before starting (makes the run reproducible).
     if args.clear_signifiers or _env_flag("CLEAR_SIGNIFIERS"):
         storage_dir = PROJECT_ROOT / "ami_agents" / "shared" / "memory" / "storage"
         for subdir in ["rdf", "json", "indexes"]:

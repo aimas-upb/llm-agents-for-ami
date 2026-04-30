@@ -1,27 +1,19 @@
 """
 Utils package for EnvExplorer agent.
+
+Contains generic utilities that are NOT experience-specific.
+Experience-specific functions have been moved to the experience/ module.
 """
 
 from .text_processing import artifact_tokens, tokens_from_identifier
-from .matching_utils import (
-    rank_signifier_matches, workspace_match, intent_compatible
-)
-from .rd4_engine_utils import (
-    ensure_rd4_ready, get_signifier_config, build_rd4_context_snapshot, list_rd4_signifiers
-)
-from .data_formatting import (
-    format_capabilities_summary, format_capabilities_payload,
-    generate_shacl_shapes_from_conditions, generate_nl_description
-)
+from .matching_utils import workspace_match
+from .data_formatting import format_capabilities_summary, format_capabilities_payload
 
 __all__ = [
-    # Text processing
+    # Text processing utilities (generic)
     'artifact_tokens', 'tokens_from_identifier',
-    # Matching utilities
-    'rank_signifier_matches', 'workspace_match', 'intent_compatible',
-    # RD4 engine utilities
-    'ensure_rd4_ready', 'get_signifier_config', 'build_rd4_context_snapshot', 'list_rd4_signifiers',
-    # Data formatting utilities
+    # Matching utilities (generic)
+    'workspace_match',
+    # Data formatting utilities (generic)
     'format_capabilities_summary', 'format_capabilities_payload',
-    'generate_shacl_shapes_from_conditions', 'generate_nl_description',
 ]

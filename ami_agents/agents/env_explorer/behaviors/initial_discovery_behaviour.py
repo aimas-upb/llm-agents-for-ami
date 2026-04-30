@@ -82,11 +82,13 @@ class InitialDiscoveryBehaviour(OneShotBehaviour):
         3. Send to InteractionSolver
         4. Log notification sent
         """
-        discovery_cfg = (self.agent.config or {}).get("discovery", {}) or {}
-        if not discovery_cfg.get("notify_on_discovery_complete", True):
+        # Hardcoded notification configuration (discovery config section removed per Requirement 2)
+        notify_on_discovery_complete = True
+        notify_agents = ["user_assistant@localhost", "interaction_solver@localhost"]
+
+        if not notify_on_discovery_complete:
             return
 
-        notify_agents = discovery_cfg.get("notify_agents") or []
         if not notify_agents:
             self.agent.logger.info("Discovery complete: no notify_agents configured.")
             return

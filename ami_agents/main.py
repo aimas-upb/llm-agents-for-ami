@@ -188,7 +188,6 @@ class AMIAgentsOrchestrator:
         shared_configs = {
             "llm": self.config.get("llm", {}),
             "timeouts": self.config.get("timeouts", {}),
-            "signifiers": self.config.get("signifiers", {}),
             "environment": self.config.get("environment", {}),
             "bt_execution": self.config.get("bt_execution", {}),
             "http": self.config.get("http", {}),

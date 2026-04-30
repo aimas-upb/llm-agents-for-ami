@@ -2,7 +2,7 @@
 Signifier-BT Bridge
 
 Converts between BehaviorTree JSON IR nodes and the Signifier model
-used by the RD4 engine in EnvExplorer.
+used by the Experience Engine in EnvExplorer.
 
 Functions:
 - extract_signifiers_from_bt: Walk BT, collect action nodes as signifiers

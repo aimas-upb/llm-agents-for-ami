@@ -259,7 +259,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--clear-signifiers",
         action="store_true",
-        help="Clear embedded RD4 signifier storage before starting.",
+        help="Clear embedded Experience Engine signifier storage before starting.",
     )
     parser.add_argument(
         "--response-timeout",
