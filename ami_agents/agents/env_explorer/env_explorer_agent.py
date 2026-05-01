@@ -83,9 +83,7 @@ class EnvExplorerAgent(Agent, IAgent):
 
         # Integration engine
         self.yggdrasil_url = resolve_yggdrasil_url(config)
-        self.integration_engine = YggdrasilIntegration(
-            self.yggdrasil_url, hmas_client
-        )
+        self.integration_engine = YggdrasilIntegration(self.yggdrasil_url)
 
         # Agent state
         self.discovery_complete = False

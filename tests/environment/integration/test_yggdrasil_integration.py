@@ -17,6 +17,14 @@ import pytest
 from rdflib import Graph
 from ami_agents.environment.integration.integration_engine import YggdrasilIntegration
 import ami_agents.environment.integration.integration_engine as integration_engine_module
+from ami_agents.shared.models.environment import (
+    Affordance,
+    AffordanceForm,
+    AffordanceType,
+    Artifact,
+    ArtifactCategory,
+    ThingDescription,
+)
 
 
 class TestYggdrasilIntegration:
@@ -151,6 +159,77 @@ class TestYggdrasilIntegration:
 
         assert result is True
         assert str(integration.platform_uri) == "http://localhost:8080/#platform"
+
+    @pytest.mark.asyncio
+    async def test_subscribe_to_artifact_uses_focus_callback_url(self, monkeypatch):
+        integration = YggdrasilIntegration("http://localhost:8080/")
+
+        artifact_id = "http://localhost:8080/workspaces/lab308/artifacts/clock_308#artifact"
+        focus_affordance_id = "http://localhost:8080/workspaces/lab308/focus"
+
+        artifact = Artifact(
+            artifact_id=artifact_id,
+            artifact_type=ArtifactCategory.PHYSICAL_DEVICE,
+            name="clock_308",
+            workspace_id="http://localhost:8080/workspaces/lab308#workspace",
+            thing_description=ThingDescription(
+                id=artifact_id,
+                title="clock_308",
+                description="clock_308",
+                rdf="",
+                actions=[focus_affordance_id],
+            ),
+        )
+        affordance = Affordance(
+            affordance_id=focus_affordance_id,
+            affordance_type=AffordanceType.ACTION,
+            name="focusArtifact",
+            description="Focus artifact",
+            artifact_id=artifact_id,
+            rdf="",
+            form=AffordanceForm(
+                href=focus_affordance_id,
+                content_type="application/json",
+                method="POST",
+            ),
+        )
+
+        captured = {}
+
+        async def fake_execute(affordance_id, payload=None):
+            captured["affordance_id"] = affordance_id
+            captured["payload"] = payload
+            return "ok"
+
+        integration.artifact_map[artifact_id] = artifact
+        integration.affordance_map[focus_affordance_id] = affordance
+        monkeypatch.setattr(integration, "execute_affordance", fake_execute)
+
+        result = await integration.subscribe_to_artifact(
+            artifact_id,
+            callback_url="http://127.0.0.1:8087/webhook",
+        )
+
+        assert result is True
+        assert captured["affordance_id"] == focus_affordance_id
+        assert captured["payload"] == {
+            "artifactName": "clock_308",
+            "callbackUrl": "http://127.0.0.1:8087/webhook",
+        }
+
+    @pytest.mark.asyncio
+    async def test_notification_listener_verification_echoes_challenge(self):
+        listener = integration_engine_module.NotificationListener(port=8087)
+
+        class DummyRequest:
+            def __init__(self, query):
+                self.query = query
+
+        response = await listener._handle_webhook_verification(
+            DummyRequest({"hub.challenge": "test-challenge"})
+        )
+        assert response.status == 200
+        assert response.text == "test-challenge"
 
     @pytest.mark.asyncio
     async def test_find_workspaces(self):

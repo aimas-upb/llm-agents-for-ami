@@ -45,10 +45,18 @@ class NotificationListener:
         self.port = port
         self.event_queue = asyncio.Queue()
         self.app = web.Application()
+        self.app.router.add_get('/webhook', self._handle_webhook_verification)
         self.app.router.add_post('/webhook', self._handle_webhook)
         self.runner = None
         self.site = None
         self.base_url = None
+
+    async def _handle_webhook_verification(self, request):
+        """Handle WebSub-style intent verification requests."""
+        challenge = request.query.get("hub.challenge")
+        if not challenge:
+            return web.Response(status=400, text="Missing hub.challenge")
+        return web.Response(text=challenge)
 
     async def _handle_webhook(self, request):
         """Handle incoming POST requests from Yggdrasil."""
@@ -1455,7 +1463,7 @@ class YggdrasilIntegration(IIntegrationEngine):
             logger.info(f"Using CArtAgO Focus for {artifact.name}...")
             payload = {
                 "artifactName": artifact.name,
-                "callbackIri": callback_url
+                "callbackUrl": callback_url,
             }
             result = await self.execute_affordance(focus_affordance_id, payload)
             if result is not None:
