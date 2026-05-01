@@ -1,0 +1,198 @@
+version: 1
+
+devices:
+  home1_lights_kitchen:
+    - platform: light
+      name: Home1.Kitchen.Lights
+      support_brightness: true
+      initial_value: 'off'        # on / off
+      initial_brightness: 128     # 0-255 ≈ 50 %
+
+  home1_lights_dining:
+    - platform: light
+      name: Home1.Dining.Lights
+      support_brightness: true
+      initial_value: 'off'        # on / off
+      initial_brightness: 128     # 0-255 ≈ 50 %
+
+  home1_lights_living_roon:
+    - platform: light
+      name: Home1.LivingRoom.Lights
+      support_brightness: true
+      initial_value: 'off'        # on / off
+      initial_brightness: 128     # 0-255 ≈ 50 %
+
+  home1_lights_hall:
+    - platform: light
+      name: Home1.Hall.Lights
+      support_brightness: true
+      initial_value: 'off'        # on / off
+      initial_brightness: 128     # 0-255 ≈ 50 %
+
+  home1_lights_entry:
+    - platform: light
+      name: Home1.Entry.Lights
+      support_brightness: true
+      initial_value: 'off'        # on / off
+      initial_brightness: 128     # 0-255 ≈ 50 %
+
+  home1_lights_bath:
+    - platform: light
+      name: Home1.Bath.Lights
+      support_brightness: true
+      initial_value: 'off'        # on / off
+      initial_brightness: 128     # 0-255 ≈ 50 %
+
+  home1_lights_bedroom:
+    - platform: light
+      name: Home1.Bedroom.Lights
+      support_brightness: true
+      initial_value: 'off'        # on / off
+      initial_brightness: 128     # 0-255 ≈ 50 %
+
+  home1_lamp_living_roon:
+    - platform: light
+      name: Home1.LivingRoom.Lamp
+      support_brightness: true
+      initial_value: 'off'        # on / off
+      initial_brightness: 128     # 0-255 ≈ 50 %
+
+  home1_clock:
+    - platform: sensor
+      name: Home1.Clock
+      class: timestamp
+  
+  home1_local_weather:
+    - platform: sensor
+      name: Home1.LocalWeather.Temperature
+      class: temperature
+      unit_of_measurement: "°C"
+      initial_value: 18
+
+    - platform: sensor
+      name: Home1.LocalWeather.Humidity
+      class: humidity
+      unit_of_measurement: "%"
+      initial_value: 65
+
+    - platform: sensor
+      name: Home1.LocalWeather.Pressure
+      class: pressure
+      unit_of_measurement: "hPa"
+      initial_value: 1012
+
+    - platform: sensor
+      name: Home1.LocalWeather.Condition
+      initial_value: "cloudy"
+  
+  home1_user_location:
+    - platform: sensor
+      name: Home1.UserLocation.Latitude
+      unit_of_measurement: "°"
+      initial_value: 44.4353        # example: Bucharest
+
+    - platform: sensor
+      name: Home1.UserLocation.Longitude
+      unit_of_measurement: "°"
+      initial_value: 26.1024        # example: Bucharest
+
+    - platform: sensor
+      name: Home1.UserLocation.Accuracy
+      unit_of_measurement: "m"
+      initial_value: 10
+
+    - platform: sensor
+      name: Home1.UserLocation.State
+      initial_value: "home"         # home / away / work / unknown
+
+  home1_kitchen_sensors:
+    - platform: binary_sensor
+      name: Home1.Kitchen.AreaMotion
+      class: motion
+      initial_value: "off"
+
+    - platform: binary_sensor
+      name: Home1.Kitchen.FridgeMotion
+      class: motion
+      initial_value: "off"
+
+    - platform: binary_sensor
+      name: Home1.Kitchen.FreezerMotion
+      class: motion
+      initial_value: "off"
+
+  home1_dining_sensors:
+    - platform: binary_sensor
+      name: Home1.Dining.AreaMotion
+      class: motion
+      initial_value: "off"
+
+  home1_living_room_sensors:
+    - platform: binary_sensor
+      name: Home1.LivingRoom.AreaMotion
+      class: motion
+      initial_value: "off"
+
+    - platform: binary_sensor
+      name: Home1.LivingRoom.CouchMotion
+      class: occupancy          # sitting / lying on couch
+      initial_value: "off"
+
+    - platform: sensor
+      name: Home1.LivingRoom.Temperature
+      class: temperature
+      unit_of_measurement: "°C"
+      initial_value: 21
+
+    - platform: sensor
+      name: Home1.LivingRoom.Luminosity
+      class: illuminance
+      unit_of_measurement: "lx"
+      initial_value: 120
+
+  home1_bedroom_sensors:
+    - platform: binary_sensor
+      name: Home1.Bedroom.AreaMotion
+      class: motion
+      initial_value: "off"
+
+    - platform: binary_sensor
+      name: Home1.Bedroom.BedMotion
+      class: occupancy          # in bed / not in bed
+      initial_value: "off"
+
+    - platform: sensor
+      name: Home1.Bedroom.Luminosity
+      class: illuminance
+      unit_of_measurement: "lx"
+      initial_value: 50
+
+  home1_entry_sensors:
+    - platform: binary_sensor
+      name: Home1.Entry.AreaMotion
+      class: motion
+      initial_value: "off"
+
+    - platform: sensor
+      name: Home1.Entry.Temperature
+      class: temperature
+      unit_of_measurement: "°C"
+      initial_value: 20
+
+  home1_hall_sensors:
+    - platform: binary_sensor
+      name: Home1.Hall.AreaMotion
+      class: motion
+      initial_value: "off"
+
+  home1_bath_sensors:
+    - platform: binary_sensor
+      name: Home1.Bath.AreaMotion
+      class: motion
+      initial_value: "off"
+
+    - platform: sensor
+      name: Home1.Bath.Temperature
+      class: temperature
+      unit_of_measurement: "°C"
+      initial_value: 22

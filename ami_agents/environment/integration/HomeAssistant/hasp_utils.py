@@ -4,7 +4,6 @@
 from __future__ import annotations
 import httpx
 import json
-import os
 import urllib.parse
 from typing import Any, Dict, List, Optional
 
@@ -22,7 +21,7 @@ except ImportError:
     _LOGGER_AVAILABLE = False
 
 # Namespaces
-BASE_FALLBACK = os.getenv("BASE_WS_URI", "http://localhost:8080/").rstrip("/") + "/"
+BASE_FALLBACK = "http://localhost:8080/"
 WEBSUB = Namespace("https://purl.org/hmas/websub/")
 HCTL   = Namespace("https://www.w3.org/2019/wot/hypermedia#")
 JS     = Namespace("https://www.w3.org/2019/wot/json-schema#")
@@ -49,8 +48,10 @@ class HomeAssistantWS:
         if json.loads(await self._ws.recv()).get("type") != "auth_required":
             raise RuntimeError("Unexpected handshake")
         await self._ws.send(json.dumps({"type": "auth", "access_token": self.token}))
-        if json.loads(await self._ws.recv()).get("type") != "auth_ok":
-            raise RuntimeError("Auth failed")
+        auth_reply = json.loads(await self._ws.recv())
+        if auth_reply.get("type") != "auth_ok":
+            reason = auth_reply.get("message") or auth_reply.get("type") or "unknown auth error"
+            raise RuntimeError(f"Auth failed for HA_URL={self.url}: {reason}")
 
     async def _call(self, payload: Dict[str, Any]) -> Any:
         await self._ensure()
@@ -166,6 +167,7 @@ class HomeAssistantRDF:
             self.g.add((act, TD.hasInputSchema, input_schema))
         if output_schema:
             self.g.add((act, TD.hasOutputSchema, output_schema))
+        return act
 
     # ---- Schema helpers to mirror your sample ----
     def _schema_set_color(self) -> BNode:
@@ -534,7 +536,7 @@ class HomeAssistantRDF:
             areas: List of Home Assistant areas (which map to workspaces)
         """
         platform_uri = URIRef(f"{self.base}#platform")
-        profile_uri = URIRef(self.base)
+        profile_uri = URIRef(self.base.rstrip("/"))
 
         # Platform instance
         self.g.add((platform_uri, RDF.type, HMAS.HypermediaMASPlatform))

@@ -11,8 +11,12 @@ IMPORTANT NOTES:
 - rdflib is used for all RDF graph parsing and validation
 """
 
+from types import SimpleNamespace
+
 import pytest
+from rdflib import Graph
 from ami_agents.environment.integration.integration_engine import YggdrasilIntegration
+import ami_agents.environment.integration.integration_engine as integration_engine_module
 
 
 class TestYggdrasilIntegration:
@@ -112,6 +116,41 @@ class TestYggdrasilIntegration:
 
         assert result is False, "Initialization should fail with invalid URL"
         assert integration.platform_uri is None, "Platform URI should remain None after failed initialization"
+
+    @pytest.mark.asyncio
+    async def test_initialize_accepts_resource_profile_without_trailing_slash(self, monkeypatch):
+        sample_ttl = """
+        @prefix hmas: <https://purl.org/hmas/> .
+
+        <http://localhost:8080> a hmas:ResourceProfile ;
+            hmas:isProfileOf <http://localhost:8080/#platform> .
+
+        <http://localhost:8080/#platform> a hmas:HypermediaMASPlatform .
+        """
+
+        class FakeOntology:
+            base_iri = "https://purl.org/hmas/"
+
+            def get_namespace(self, base):
+                return SimpleNamespace(
+                    HypermediaMASPlatform=SimpleNamespace(iri=f"{base}HypermediaMASPlatform"),
+                    ResourceProfile=SimpleNamespace(iri=f"{base}ResourceProfile"),
+                    isProfileOf=SimpleNamespace(iri=f"{base}isProfileOf"),
+                )
+
+        original_parse = Graph.parse
+
+        def fake_parse(self, source=None, *args, **kwargs):
+            return original_parse(self, data=sample_ttl, format="turtle")
+
+        monkeypatch.setattr(integration_engine_module, "get_hmas_ontology", lambda: FakeOntology())
+        monkeypatch.setattr(Graph, "parse", fake_parse)
+
+        integration = YggdrasilIntegration("http://localhost:8080/")
+        result = await integration.initialize({})
+
+        assert result is True
+        assert str(integration.platform_uri) == "http://localhost:8080/#platform"
 
     @pytest.mark.asyncio
     async def test_find_workspaces(self):

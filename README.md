@@ -40,7 +40,7 @@ spade run   # in a separate terminal
 python tests/manual_test_full_flow_plan.py --sequence 3 --clear-signifiers
 ```
 
-Full setup (HomeAssistant, Yggdrasil adapter): [docs/installation.md](docs/installation.md)
+Full setup (HomeAssistant, HASP): [docs/installation.md](docs/installation.md)
 
 ---
 
@@ -89,9 +89,9 @@ The fast-path vs. LLM-path decision logic from Algorithm 1 is implemented in:
 
 | Component | Description | Code |
 |---|---|---|
-| Yggdrasil–HA adapter | Maps HA areas/devices → HMAS workspaces/artifacts with WoT TDs | [`ami_agents/environment/integration/HomeAssistant/ygg_ha_adapter.py`](ami_agents/environment/integration/HomeAssistant/ygg_ha_adapter.py) |
+| HASP | Maps HA areas/devices → HMAS workspaces/artifacts with WoT TDs | [`ami_agents/environment/integration/HomeAssistant/hasp.py`](ami_agents/environment/integration/HomeAssistant/hasp.py) |
 | Lab308 device config | Virtual Lab308 device definitions (light, blinds, sensors) | [`ami_agents/environment/integration/HomeAssistant/lab308.yaml`](ami_agents/environment/integration/HomeAssistant/lab308.yaml) |
-| Setup guide | Step-by-step HA + adapter setup | [`ami_agents/environment/integration/HomeAssistant/README.md`](ami_agents/environment/integration/HomeAssistant/README.md) |
+| Setup guide | Step-by-step HA + HASP setup | [`ami_agents/environment/integration/HomeAssistant/README.md`](ami_agents/environment/integration/HomeAssistant/README.md) |
 
 ---
 
@@ -146,7 +146,7 @@ Full demo guide with all sequences and environment variables: [docs/demo.md](doc
 
 | Document | Contents |
 |---|---|
-| [docs/installation.md](docs/installation.md) | Full setup: Python env, HomeAssistant, Yggdrasil adapter, SPADE |
+| [docs/installation.md](docs/installation.md) | Full setup: Python env, HomeAssistant, HASP, SPADE |
 | [docs/configuration.md](docs/configuration.md) | YAML config files, environment variables, multi-environment setup |
 | [docs/evaluation.md](docs/evaluation.md) | Reproducing Tables 1 and 2 from the paper |
 | [docs/demo.md](docs/demo.md) | Demo sequences (Seq. 2–4) with expected outputs |
@@ -166,4 +166,3 @@ Full demo guide with all sequences and environment variables: [docs/demo.md](doc
 - **[HMAS ontology](https://purl.org/hmas/)** — Hypermedia MAS vocabulary
 - **[CASHMERE ontology](https://github.com/aimas-upb/cashmere)** — Signifier context vocabulary
 - **OpenAI API** — LLM provider (GPT-4o, GPT-4o-mini, GPT-5-mini, GPT-5-nano tested)
-

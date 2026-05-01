@@ -175,10 +175,7 @@ async def main():
     base_url = _base_url(ha_url)
     headers = {"Authorization": f"Bearer {ha_token}", "Content-Type": "application/json"}
 
-    # Get timeout from environment or use default
-    ha_timeout = float(os.getenv("HA_API_TIMEOUT", "10.0"))
-
-    async with httpx.AsyncClient(base_url=base_url, headers=headers, timeout=ha_timeout) as client:
+    async with httpx.AsyncClient(base_url=base_url, headers=headers, timeout=10.0) as client:
         services = await _get_services(client)
         ws = await _ws_handshake(ha_url, ha_token)
         try:
