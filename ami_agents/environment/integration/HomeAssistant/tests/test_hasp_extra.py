@@ -238,6 +238,48 @@ def test_focus_hub_update_delete(monkeypatch):
     assert client.delete("/workspaces/ws/artifacts/a").status_code == 200
 
 
+def test_platform_profile_uri_rewrites_to_request_base(monkeypatch):
+    class WS:
+        async def get_areas(self):
+            return [{"area_id": "lab", "name": "Lab"}]
+
+        async def get_devices(self):
+            return []
+
+        async def get_entities(self):
+            return []
+
+    class REST:
+        async def get_states(self):
+            return []
+
+        async def get_services(self):
+            return []
+
+    monkeypatch.setattr(appmod, "ha_client", WS())
+    monkeypatch.setattr(appmod, "ha_rest", REST())
+    cache = appmod.HASPGraphCache(
+        ws_client=appmod.ha_client,
+        rest_client=appmod.ha_rest,
+        base_uri="http://localhost:8008/",
+        allowed_workspaces=set(),
+        artifact_builder=appmod._build_cached_artifact_ttl,
+    )
+    monkeypatch.setattr(appmod.app.state, "graph_cache", cache, raising=False)
+
+    async def fake_ensure():
+        await cache.refresh()
+        return cache
+
+    monkeypatch.setattr(appmod, "_ensure_graph_cache", fake_ensure)
+    client = TestClient(appmod.app)
+    response = client.get("http://localhost:8080/")
+
+    assert response.status_code == 200
+    assert "<http://localhost:8080> a hmas:ResourceProfile" in response.text
+    assert "localhost:8008" not in response.text
+
+
 @pytest.mark.asyncio
 async def test_process_state_changed_event_updates_cache_and_notifies(monkeypatch):
     events = []

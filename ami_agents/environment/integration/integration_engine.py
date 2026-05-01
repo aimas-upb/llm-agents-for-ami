@@ -851,17 +851,29 @@ class YggdrasilIntegration(IIntegrationEngine):
 
             logger.debug(f"Successfully parsed RDF graph with {len(self.platform_graph)} triples")
 
+            # Accept both slash and no-slash forms for the dereferenced root URL.
+            normalized_url = self.yggdrasil_url.rstrip("/")
+            candidate_refs = []
+            for candidate in (self.yggdrasil_url, normalized_url):
+                if not candidate:
+                    continue
+                ref = URIRef(candidate)
+                if ref not in candidate_refs:
+                    candidate_refs.append(ref)
+
             # Case A: The URL itself is the subject identifying the HypermediaMASPlatform
-            url_ref = URIRef(self.yggdrasil_url)
-            if (url_ref, RDF.type, HypermediaMASPlatform_iri) in self.platform_graph:
-                logger.info(f"Found HypermediaMASPlatform directly at URL: {self.yggdrasil_url}")
-                self.platform_uri = url_ref
-                self.hmas_root_uri = url_ref
-                return True
+            for url_ref in candidate_refs:
+                if (url_ref, RDF.type, HypermediaMASPlatform_iri) in self.platform_graph:
+                    logger.info(f"Found HypermediaMASPlatform directly at URL: {url_ref}")
+                    self.platform_uri = url_ref
+                    self.hmas_root_uri = url_ref
+                    return True
 
             # Case B: The URL is a ResourceProfile with an isProfileOf property
-            if (url_ref, RDF.type, ResourceProfile_iri) in self.platform_graph:
-                logger.info(f"URL is a ResourceProfile, searching for isProfileOf property")
+            for url_ref in candidate_refs:
+                if (url_ref, RDF.type, ResourceProfile_iri) not in self.platform_graph:
+                    continue
+                logger.info(f"URL is a ResourceProfile, searching for isProfileOf property: {url_ref}")
 
                 # Find the platform URI via isProfileOf
                 for _, _, platform in self.platform_graph.triples((url_ref, isProfileOf_iri, None)):
@@ -870,8 +882,7 @@ class YggdrasilIntegration(IIntegrationEngine):
                         logger.info(f"Found HypermediaMASPlatform via ResourceProfile: {platform}")
                         self.platform_uri = platform
                         return True
-                    else:
-                        logger.warning(f"isProfileOf target {platform} is not a HypermediaMASPlatform")
+                    logger.warning(f"isProfileOf target {platform} is not a HypermediaMASPlatform")
 
                 logger.error("ResourceProfile found but no valid HypermediaMASPlatform linked via isProfileOf")
                 return False

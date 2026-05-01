@@ -136,7 +136,12 @@ def _ttl_for_request(ttl: str, request: Request, cache: HASPGraphCache) -> str:
     cache_base = getattr(cache, "base_uri", BASE_WS_URI.rstrip("/") + "/")
     if cache_base == request_base:
         return ttl
-    return ttl.replace(cache_base, request_base)
+    normalized_cache_base = cache_base.rstrip("/")
+    normalized_request_base = request_base.rstrip("/")
+    rewritten = ttl.replace(cache_base, request_base)
+    if normalized_cache_base != normalized_request_base:
+        rewritten = rewritten.replace(normalized_cache_base, normalized_request_base)
+    return rewritten
 
 @app.on_event("shutdown")
 async def _shutdown():
