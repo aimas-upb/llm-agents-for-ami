@@ -238,6 +238,42 @@ def test_focus_hub_update_delete(monkeypatch):
     assert client.delete("/workspaces/ws/artifacts/a").status_code == 200
 
 
+def test_artifact_slug_prefers_entity_object_id(monkeypatch):
+    class WS:
+        async def get_areas(self):
+            return [{"area_id": "lab", "name": "Lab"}]
+
+        async def get_devices(self):
+            return [{"id": "d1", "name": "Blinds Device", "area_id": "lab"}]
+
+        async def get_entities(self):
+            return [{"entity_id": "cover.blinds_308", "device_id": "d1", "name": "blinds_308 cover", "area_id": "lab"}]
+
+    class REST:
+        async def get_states(self):
+            return [{
+                "entity_id": "cover.blinds_308",
+                "state": "open",
+                "attributes": {"current_position": 100},
+            }]
+
+        async def get_services(self):
+            return [{"domain": "cover", "services": {}}]
+
+    monkeypatch.setattr(appmod, "ha_client", WS())
+    monkeypatch.setattr(appmod, "ha_rest", REST())
+    client = TestClient(appmod.app)
+
+    listing = client.get("/workspaces/lab/artifacts")
+    assert listing.status_code == 200
+    assert "artifacts/blinds_308#artifact" in listing.text
+    assert "artifacts/blinds_308%20cover#artifact" not in listing.text
+
+    artifact = client.get("/workspaces/lab/artifacts/blinds_308")
+    assert artifact.status_code == 200
+    assert 'td:title "blinds_308 cover"' in artifact.text
+
+
 def test_platform_profile_uri_rewrites_to_request_base(monkeypatch):
     class WS:
         async def get_areas(self):

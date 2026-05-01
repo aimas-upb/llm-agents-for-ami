@@ -158,10 +158,10 @@ def test_list_artifacts(sample_data):
     r = client.get("/workspaces/lab308/artifacts")
     assert r.status_code == 200
     ttl = r.text
-    assert "Lab308%20Light%20System#artifact" in ttl
-    assert "Lab308.Entry.Temperature#artifact" in ttl
-    assert "Lab308.Entry.Motion#artifact" in ttl
-    assert "Home2.Kitchen.Thermostat#artifact" in ttl
+    assert "lab308_light#artifact" in ttl
+    assert "temperature_sensing_308#artifact" in ttl
+    assert "occupancy_sensor_308#artifact" in ttl
+    assert "home2_kitchen_thermostat#artifact" in ttl
 
 
 def test_get_artifact_builds_dynamic_actions(sample_data):

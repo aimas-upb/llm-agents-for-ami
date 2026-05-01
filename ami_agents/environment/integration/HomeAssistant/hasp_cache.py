@@ -80,6 +80,15 @@ def _entity_display_name(entity: Optional[Dict[str, Any]], devices_by_id: Dict[s
     return object_id or ent_id or "artifact"
 
 
+def _artifact_slug_from_entity(entity: Dict[str, Any], fallback_label: str) -> str:
+    entity_id = entity.get("entity_id", "")
+    if isinstance(entity_id, str) and "." in entity_id:
+        object_id = entity_id.split(".", 1)[1].strip()
+        if object_id:
+            return object_id
+    return fallback_label
+
+
 def _pick_entity(device_entities: List[Dict[str, Any]], domain: str) -> Optional[str]:
     for entity in device_entities:
         ent_id = entity.get("entity_id", "")
@@ -412,6 +421,7 @@ class HASPGraphCache:
             filtered_devices = [dict(d) for d in devices if d["id"] in workspace_device_ids]
             dev_by_id = {d["id"]: d for d in filtered_devices}
             label_counts: Dict[str, int] = {}
+            slug_counts: Dict[str, int] = {}
 
             def _register(ent: Dict[str, Any]) -> None:
                 label = _entity_display_name(ent, dev_by_id)
@@ -439,7 +449,15 @@ class HASPGraphCache:
                     object_id = suffix.split(".", 1)[1] if isinstance(suffix, str) and "." in suffix else suffix
                     label = f"{base_label} ({object_id})"
                 ent["_artifact_label"] = label
-                ent["_artifact_slug"] = urllib.parse.quote(label, safe="")
+                base_slug = _artifact_slug_from_entity(ent, label)
+                slug_counts[base_slug] = slug_counts.get(base_slug, 0) + 1
+                if slug_counts[base_slug] > 1:
+                    entity_id = ent.get("entity_id", "")
+                    if isinstance(entity_id, str) and entity_id:
+                        base_slug = entity_id.replace(".", "_")
+                    else:
+                        base_slug = label
+                ent["_artifact_slug"] = urllib.parse.quote(base_slug, safe="")
             self.workspace_devices[workspace_id] = filtered_devices
             self.workspace_entities[workspace_id] = workspace_entities
 

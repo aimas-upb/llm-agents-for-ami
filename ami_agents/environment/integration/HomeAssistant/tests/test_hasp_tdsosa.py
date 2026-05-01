@@ -92,7 +92,7 @@ def _ttl_graph(ttl: str) -> Graph:
 
 def test_tdsosa_action_effect_added_for_light_turn_on():
     client = TestClient(appmod.app)
-    artifact = urllib.parse.quote("Main Light", safe="")
+    artifact = "main_light"
     r = client.get(f"/workspaces/lab308/artifacts/{artifact}")
     assert r.status_code == 200
     g = _ttl_graph(r.text)
@@ -112,7 +112,7 @@ def test_tdsosa_action_effect_added_for_light_turn_on():
 
 def test_tdsosa_observable_property_links_added_for_sensor_state():
     client = TestClient(appmod.app)
-    artifact = urllib.parse.quote("Temp Sensor", safe="")
+    artifact = "temp_sensor"
     r = client.get(f"/workspaces/lab308/artifacts/{artifact}")
     assert r.status_code == 200
     g = _ttl_graph(r.text)
@@ -154,7 +154,7 @@ def test_tdsosa_action_effect_uses_override_env_var(monkeypatch):
     )
 
     client = TestClient(appmod.app)
-    artifact = urllib.parse.quote("Main Light", safe="")
+    artifact = "main_light"
     r = client.get(f"/workspaces/lab308/artifacts/{artifact}")
     assert r.status_code == 200
     g = _ttl_graph(r.text)
@@ -166,7 +166,7 @@ def test_tdsosa_action_effect_uses_override_env_var(monkeypatch):
 
 def test_temperature_sensor_exposes_temperature_action():
     client = TestClient(appmod.app)
-    artifact = urllib.parse.quote("Temp Sensor", safe="")
+    artifact = "temp_sensor"
     r = client.get(f"/workspaces/lab308/artifacts/{artifact}")
     assert r.status_code == 200
     assert "getTemperatureInDegc" in r.text
@@ -174,7 +174,7 @@ def test_temperature_sensor_exposes_temperature_action():
 
 def test_temperature_sensor_state_property_returns_number():
     client = TestClient(appmod.app)
-    artifact = urllib.parse.quote("Temp Sensor", safe="")
+    artifact = "temp_sensor"
     r = client.get(f"/workspaces/lab308/artifacts/{artifact}/properties/state")
     assert r.status_code == 200
     assert r.json() == 21.5
@@ -188,7 +188,7 @@ def test_temperature_sensor_state_override_applies_to_tdsosa(monkeypatch):
     )
 
     client = TestClient(appmod.app)
-    artifact = urllib.parse.quote("Temp Sensor", safe="")
+    artifact = "temp_sensor"
     r = client.get(f"/workspaces/lab308/artifacts/{artifact}")
     assert r.status_code == 200
     g = _ttl_graph(r.text)
@@ -216,7 +216,7 @@ def test_query_actions_affecting_observable_property():
 
     assert {"LightTurnOn", "LightTurnOff", "CoverOpenCover", "CoverCloseCover"} <= action_names
     assert {"increase", "decrease"} <= directions
-    assert "http://localhost:8080/workspaces/lab308/artifacts/Main%20Light/ha/light/turn_on" in action_targets
-    assert "http://localhost:8080/workspaces/lab308/artifacts/Main%20Light/ha/light/turn_off" in action_targets
-    assert "http://localhost:8080/workspaces/lab308/artifacts/Blinds/ha/cover/open_cover" in action_targets
-    assert "http://localhost:8080/workspaces/lab308/artifacts/Blinds/ha/cover/close_cover" in action_targets
+    assert "http://localhost:8080/workspaces/lab308/artifacts/main_light/ha/light/turn_on" in action_targets
+    assert "http://localhost:8080/workspaces/lab308/artifacts/main_light/ha/light/turn_off" in action_targets
+    assert "http://localhost:8080/workspaces/lab308/artifacts/blinds/ha/cover/open_cover" in action_targets
+    assert "http://localhost:8080/workspaces/lab308/artifacts/blinds/ha/cover/close_cover" in action_targets
