@@ -1,6 +1,6 @@
-# Home Assistant Adapter Setup
+# HASP Setup
 
-Follow these steps to run Home Assistant and the Yggdrasil ↔ Home Assistant adapter locally.
+Follow these steps to run Home Assistant and HASP locally.
 
 ## 1) Run Home Assistant (Docker)
 Replace `MY_TIME_ZONE` and `PATH_TO_YOUR_CONFIG` with your values.
@@ -31,7 +31,7 @@ Open Home Assistant at http://localhost:8123/ (or http://your-server:8123) and c
   - File: `/config/custom_components/virtual/lab308.yaml`
   - Create an area named `lab308` when prompted.
 
-## 4) Install adapter dependencies
+## 4) Install HASP dependencies
 ```
 pip install -r requirements.txt
 ```
@@ -46,20 +46,86 @@ export AREAS="lab308"                              # area_id created above
 export BASE_WS_URI="http://localhost:8080"        # public base for adapter URIs
 ```
 
-## 6) Start the adapter
+## 6) Start HASP
 ```
 source prepare-adapter-env.sh
-uvicorn ygg_ha_adapter:app --reload --port 8080 --log-level debug
+uvicorn hasp:app --reload --port 8080 --log-level debug
 ```
 
-Health check: `GET http://localhost:8080/_forwarder/status`.
+## 7) Subscriptions
+HASP supports two callback-based notification entry points:
+
+- `POST /workspaces/{workspace_id}/focus`
+- `POST /hub/`
+
+### Focus
+Use `focus` to subscribe to a workspace or a specific artifact with a JSON body:
+
+```json
+{
+  "callbackUrl": "http://listener.example/callback",
+  "artifactName": "Temp Sensor"
+}
+```
+
+Notes:
+- `callbackUrl` is required.
+- Omit `artifactName` to subscribe to the whole workspace.
+- Include `artifactName` to subscribe only to that artifact.
+- HASP performs callback intent verification before accepting the subscription.
+
+Callback verification:
+- HASP sends a `GET` to the callback URL with `hub.mode`, `hub.topic`, `hub.callback`, and `hub.challenge`.
+- The callback must respond with the exact `hub.challenge` value as the response body.
+
+### WebSub
+Use `POST /hub/` for WebSub-style subscribe/unsubscribe requests.
+
+Form fields:
+- `hub.mode`: `subscribe` or `unsubscribe`
+- `hub.topic`: workspace or artifact topic URI
+- `hub.callback`: callback URL
+- `hub.lease_seconds`: optional
+- `hub.secret`: optional
+
+Example:
+
+```bash
+curl -X POST http://localhost:8080/hub/ \
+  -d "hub.mode=subscribe" \
+  -d "hub.topic=http://localhost:8080/workspaces/lab308/artifacts/Temp%20Sensor#artifact" \
+  -d "hub.callback=http://listener.example/callback"
+```
+
+### Notification Payload
+When Home Assistant emits an unsolicited `state_changed` event, HASP updates its cache and sends a JSON `POST` to matching subscribers:
+
+```json
+{
+  "topic": "http://localhost:8080/workspaces/lab308/artifacts/Temp%20Sensor#artifact",
+  "workspaceId": "lab308",
+  "artifactUri": "http://localhost:8080/workspaces/lab308/artifacts/Temp%20Sensor#artifact",
+  "artifactTitle": "Temp Sensor",
+  "entityId": "sensor.temp_sensor",
+  "timestamp": "2025-01-01T00:00:00Z",
+  "state": "21.5",
+  "attributes": {
+    "device_class": "temperature",
+    "unit_of_measurement": "°C"
+  }
+}
+```
+
+Topic shapes:
+- workspace topic: `http://localhost:8080/workspaces/lab308`
+- artifact topic: `http://localhost:8080/workspaces/lab308/artifacts/Temp%20Sensor#artifact`
 
 ### 7) Useful scripts
 ./tick_clock.py will update the clock in lab_308 with the current time every second
 ./adjust_lux_on_events.py will react to lights being turned on or off and to the blinds being moved by updating the value of the luminosity sensor
 
 ## Utilities
-set_property.py - set a property in HomeAssistant using the same environment varibles. Examples:
+set_property.py - set a property in HomeAssistant using the same environment variables. Examples:
 - ./set-property.py person_counter_308 state 1
 - ./set-property.py internal_light_sensing_308 state 350
 - ./set-property.py temperature_sensing_308 state 25

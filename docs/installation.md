@@ -31,7 +31,7 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r agents-requirements.txt
 ```
 
-## Step 3 — HomeAssistant and Yggdrasil–HA Adapter
+## Step 3 — HomeAssistant and HASP
 
 The integration pipeline described in Section 3.1 of the paper maps a HomeAssistant deployment into a W3C WoT / HMAS environment. Follow these steps to set it up.
 
@@ -70,10 +70,10 @@ In HomeAssistant: Settings → Devices & Services → Virtual Components → **A
 - File: `/config/custom_components/virtual/lab308.yaml`
 - Create an area named `lab308` when prompted.
 
-### 3d. Configure and start the Yggdrasil–HA adapter
+### 3d. Configure and start HASP
 
 ```bash
-# Install adapter-specific dependencies
+# Install HASP-specific dependencies
 pip install -r ami_agents/environment/integration/HomeAssistant/requirements.txt
 
 # Set environment variables
@@ -82,12 +82,16 @@ export HA_TOKEN="<your-long-lived-access-token>"   # HA Profile → Security →
 export AREAS="lab308"
 export BASE_WS_URI="http://localhost:8080"
 
-# Start the adapter (exposes the HMAS platform on port 8080)
+# Start HASP (exposes the HMAS platform on port 8080)
 cd ami_agents/environment/integration/HomeAssistant
-uvicorn ygg_ha_adapter:app --reload --port 8080 --log-level debug
+uvicorn hasp:app --reload --port 8080 --log-level debug
 ```
 
-Verify with: `GET http://localhost:8080/_forwarder/status`
+HASP also exposes callback subscription endpoints:
+- `POST /workspaces/{workspace_id}/focus`
+- `POST /hub/`
+
+See [ami_agents/environment/integration/HomeAssistant/README.md](../ami_agents/environment/integration/HomeAssistant/README.md) for payload examples and notification format.
 
 ### 3e. Optional utility scripts (Lab308 simulation)
 
