@@ -12,12 +12,21 @@ from ....shared.models.messages import (
 )
 from ....shared.utils.demo_log import demo
 from ...user_assistant.models import Intent
-
-logger = logging.getLogger("InteractionSolver")
+from ....shared.utils.logger import LoggerFactory
 
 
 class GoalRequestBehaviour(CyclicBehaviour):
     """Parse GOAL_REQUEST payload, ensure env is ready, and reply with a plan."""
+
+    def __init__(self, logger=None):
+        """
+        Initialize with optional self.logger.
+
+        Args:
+            logger: Logger instance. If None, creates a basic self.logger.
+        """
+        super().__init__()
+        self.logger = logger or LoggerFactory.get_logger("InteractionSolver")
 
     async def run(self):
         msg = await self.receive(timeout=1)
@@ -60,7 +69,7 @@ class GoalRequestBehaviour(CyclicBehaviour):
             return
 
         intent_strings = [i.to_query_string() for i in intent_objects]
-        logger.info(
+        self.logger.info(
             demo("Received GOAL_REQUEST: intents=%s workspace_id=%r from=%s"),
             intent_strings,
             workspace_id,
@@ -79,7 +88,7 @@ class GoalRequestBehaviour(CyclicBehaviour):
             workspace_id=workspace_id,
             intent_type=intent_type,
         )
-        self._log_plan_summary(plan_json)
+        self._log_plan_summary(plan_json, self.logger)
         await self._reply_plan(msg, plan_json)
 
     async def _reply_missing_intent(self, msg) -> None:
@@ -123,7 +132,7 @@ class GoalRequestBehaviour(CyclicBehaviour):
             reply_msg.thread = src_msg.thread
 
     @staticmethod
-    def _log_plan_summary(plan_json: str) -> None:
+    def _log_plan_summary(plan_json: str, logger) -> None:
         try:
             parsed = json.loads(plan_json or "{}")
             if not isinstance(parsed, dict):

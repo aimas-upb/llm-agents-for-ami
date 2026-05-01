@@ -10,12 +10,21 @@ import re
 from spade.behaviour import CyclicBehaviour
 
 from ....shared.utils.demo_log import demo
-
-logger = logging.getLogger("UserAssistant")
+from ....shared.utils.logger import LoggerFactory
 
 
 class DemoRequestClassifierBehaviour(CyclicBehaviour):
     """Demo-only logging helper: classify user requests as EXPLICIT vs IMPLICIT."""
+
+    def __init__(self, logger=None):
+        """
+        Initialize with optional logger.
+
+        Args:
+            logger: Logger instance. If None, creates a basic logger.
+        """
+        super().__init__()
+        self.logger = logger or LoggerFactory.get_logger("UserAssistant")
 
     async def run(self):
         msg = await self.receive(timeout=1)
@@ -51,4 +60,4 @@ class DemoRequestClassifierBehaviour(CyclicBehaviour):
             if has_action and mentions_device:
                 kind = "EXPLICIT"
 
-        logger.info(demo("Request classified as %s: %r"), kind, text)
+        self.logger.info(demo("Request classified as %s: %r"), kind, text)

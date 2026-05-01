@@ -7,12 +7,21 @@ from typing import Any, Dict
 from spade.behaviour import CyclicBehaviour
 
 from ....shared.models.messages import MessageType
-
-logger = logging.getLogger("InteractionSolver")
+from ....shared.utils.logger import LoggerFactory
 
 
 class EnvironmentReadyBehaviour(CyclicBehaviour):
     """One-shot behaviour: marks the agent ready on ENV_DISCOVERY_COMPLETE."""
+
+    def __init__(self, logger=None):
+        """
+        Initialize with optional logger.
+
+        Args:
+            logger: Logger instance. If None, creates a basic logger.
+        """
+        super().__init__()
+        self.logger = logger or LoggerFactory.get_logger("InteractionSolver")
 
     async def run(self):
         msg = await self.receive(timeout=1)
@@ -29,5 +38,5 @@ class EnvironmentReadyBehaviour(CyclicBehaviour):
             payload = {"raw": msg.body or ""}
 
         self.agent.mark_environment_ready(sender_jid=str(msg.sender), payload=payload)
-        logger.info(f"Environment ready (notified by {msg.sender}).")
+        self.logger.info(f"Environment ready (notified by {msg.sender}).")
         self.kill()

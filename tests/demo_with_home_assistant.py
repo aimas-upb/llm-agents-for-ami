@@ -186,26 +186,50 @@ class _StripDemoPrefixFilter(logging.Filter):
         return True
 
 
-def _configure_console_logging() -> None:
+def _configure_console_logging(test_logging_config: dict = None) -> None:
     """
-    Make the manual test output readable:
-    - Root logger at WARNING (quiet by default)
-    - Keep key project loggers at INFO
-    - Silence chatty dependencies (slixmpp/aiohttp/httpx/spade_llm)
-    - Filter clock308 timeOfDay update spam
+    Configure logging using LoggerFactory for both console and file output.
+    This replaces manual basicConfig to enable proper file logging.
     """
-    logging.basicConfig(
-        level=logging.WARNING,
-        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-        force=True,
-    )
+    from ami_agents.shared.utils.logger import LoggerFactory
+
+    # Use provided config or create a basic console-only config
+    if test_logging_config is None:
+        test_logging_config = {
+            "level": "WARNING",
+            "format": "%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+            "console_logging": {"enabled": True},
+            "file_logging": {"enabled": False}
+        }
+
+    # Set root logger level
+    root = logging.getLogger()
+    root.setLevel(getattr(logging, test_logging_config.get("level", "WARNING")))
+
+    # Clear any existing handlers to avoid conflicts
+    for handler in root.handlers[:]:
+        root.removeHandler(handler)
+
+    # Create console handler using LoggerFactory
+    console_handler = LoggerFactory.create_console_handler(test_logging_config)
+    if console_handler:
+        formatter = logging.Formatter(test_logging_config.get("format", "%(asctime)s [%(name)s] %(levelname)s: %(message)s"))
+        console_handler.setFormatter(formatter)
+        root.addHandler(console_handler)
+
+    # Create file handler using LoggerFactory if enabled
+    file_handler = LoggerFactory.create_file_handler(test_logging_config)
+    if file_handler:
+        formatter = logging.Formatter(test_logging_config.get("format", "%(asctime)s [%(name)s] %(levelname)s: %(message)s"))
+        file_handler.setFormatter(formatter)
+        root.addHandler(file_handler)
 
     # Keep our high-signal logs.
     for name in [
         "ManualFullFlowPlan",
-        "UserAssistant",
-        "InteractionSolver",
-        "ami_agents.agents.env_explorer.env_explorer_agent",
+        "UserAssistant[user_assistant@localhost]",
+        "InteractionSolver[interaction_solver@localhost]",
+        "EnvExplorerAgent[env_explorer@localhost]",
         "ami_agents.environment.integration.integration_engine",
     ]:
         logging.getLogger(name).setLevel(logging.INFO)
@@ -225,10 +249,8 @@ def _configure_console_logging() -> None:
 
     # Drop only high-frequency sensor spam, keep important state changes (e.g., light/blinds updates).
     filt = _DropHighFrequencyStateUpdateSpamFilter()
-    root = logging.getLogger()
     root.addFilter(filt)
-    logging.getLogger("ami_agents.agents.env_explorer.env_explorer_agent").addFilter(filt)
-    for h in list(getattr(root, "handlers", []) or []):
+    for h in root.handlers:
         h.addFilter(filt)
 
 
@@ -250,8 +272,8 @@ def _strip_demo_prefix_from_logs() -> None:
         handler.addFilter(strip_filter)
 
 
-_configure_console_logging()
-logger = logging.getLogger("ManualFullFlowPlan")
+# Logger will be configured early in main()
+logger = None
 
 _NO_COLOR = os.getenv("AMI_NO_COLOR") or os.getenv("NO_COLOR")
 _RED = "" if _NO_COLOR else "\033[31m"
@@ -1431,7 +1453,20 @@ class OrchestratorAgent(Agent):
 
 
 async def main():
+    global logger
     args = _parse_args(sys.argv[1:])
+
+    # Load configuration EARLY to configure logging before first use
+    env_config = ConfigLoader.merge_configs(
+        ConfigLoader.load_with_env_vars("ami_agents/config/agents.yaml"),
+        ConfigLoader.load_with_env_vars("ami_agents/config/environment.yaml")
+    )
+
+    # Configure logging using the loaded configuration
+    _configure_console_logging(env_config.get("logging", {}))
+    from ami_agents.shared.utils.logger import LoggerFactory
+    logger = LoggerFactory.get_logger("ManualFullFlowPlan", env_config.get("logging", {}))
+
     if args.demo:
         _enable_demo_only_logging()
         _strip_demo_prefix_from_logs()
@@ -1473,12 +1508,6 @@ async def main():
     # CLI convenience: keep the internal demo sequence env toggles working.
     if args.pause_for_sensor:
         os.environ["PAUSE_FOR_SENSOR"] = "1"
-
-    # Load configuration from files using ConfigLoader
-    env_config = ConfigLoader.merge_configs(
-        ConfigLoader.load_with_env_vars("ami_agents/config/agents.yaml"),
-        ConfigLoader.load_with_env_vars("ami_agents/config/environment.yaml")
-    )
 
     # Override specific demo settings
     env_config["yggdrasil_url"] = yggdrasil_url
@@ -1552,6 +1581,12 @@ async def main():
             },
             "context_gathering": {"timeout": 60},
         },
+        # Add logging configuration from env_config
+        "logging": env_config.get("logging", {}),
+        # Add other shared configurations that agents might need
+        "timeouts": env_config.get("timeouts", {}),
+        "bt_execution": env_config.get("bt_execution", {}),
+        "http": env_config.get("http", {}),
     }
 
     explorer = EnvExplorerAgent(explorer_jid, password, env_config, hmas_client=DummyHMASClient())

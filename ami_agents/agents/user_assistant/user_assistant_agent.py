@@ -8,7 +8,6 @@ signifier recording — is handled by deterministic SPADE behaviours.
 """
 
 import asyncio
-import logging
 import os
 from typing import Any, Dict
 
@@ -29,6 +28,7 @@ from ...shared.models.messages import (
 from ...shared.utils.spade_rpc import send_via_router
 from ...shared.utils.config_resolver import resolve_yggdrasil_url
 from ...shared.utils.demo_log import demo
+from ...shared.utils.logger import LoggerFactory
 from ...shared.state_memory import StateMemoryCache
 from ...shared.community.community_client import CommunitySignifierClient
 
@@ -38,7 +38,8 @@ from .models import ConversationState
 from .behaviours import UserMessageBehaviour, DemoRequestClassifierBehaviour
 from .utils import build_llm_client, build_llm_call_kwargs, LLMClientConfig
 
-logger = logging.getLogger("UserAssistant")
+# Global logger will be replaced by per-instance loggers
+# logger = logging.getLogger("UserAssistant")
 
 # Fallback defaults when yaml is missing a key. Every production deployment
 # provides these via ``config/agents.yaml``; the constants here just keep the
@@ -66,6 +67,11 @@ class UserAssistantAgent(Agent, IAgent):
         super().__init__(jid, password, verify_security=False)
         self.config = config
         self.target_jids = target_jids
+
+        # Initialize logger with configuration
+        # The logging config passed from main.py already contains merged global + agent-specific
+        logging_config = self.config.get("logging", {})
+        self.logger = LoggerFactory.get_logger(f"UserAssistant[{jid}]", logging_config)
 
         # ── LLM client (component, not base class) ──────────────────
         self._llm_cfg: LLMClientConfig = build_llm_client(config)
@@ -115,7 +121,7 @@ class UserAssistantAgent(Agent, IAgent):
         self.community_client = None
         if community_url:
             self.community_client = CommunitySignifierClient(api_url=community_url)
-            logger.info("Community signifier client enabled (url=%s)", community_url)
+            self.logger.info("Community signifier client enabled (url=%s)", community_url)
 
     # ── Conversation state helpers ──────────────────────────────────
 
@@ -157,7 +163,7 @@ class UserAssistantAgent(Agent, IAgent):
         await super().setup()
 
         temp_display = "default" if self.llm_model.startswith("o") else self.llm_temperature
-        logger.info(
+        self.logger.info(
             demo(
                 "UserAssistant booting (model=%s, base_url=%s, temperature=%s, reasoning_effort=%s)"
             ),
@@ -170,10 +176,10 @@ class UserAssistantAgent(Agent, IAgent):
         # Register behaviours with template routing
         t = Template()
         t.set_metadata("message_type", "llm")
-        self.add_behaviour(UserMessageBehaviour(), template=t)
-        self.add_behaviour(DemoRequestClassifierBehaviour(), template=t)
+        self.add_behaviour(UserMessageBehaviour(self.logger), template=t)
+        self.add_behaviour(DemoRequestClassifierBehaviour(self.logger), template=t)
 
-        logger.info("UserAssistantAgent initialized (composable behaviours).")
+        self.logger.info("UserAssistantAgent initialized (composable behaviours).")
 
     async def start(self, *args, **kwargs) -> None:
         return await super().start(*args, **kwargs)

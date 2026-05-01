@@ -46,11 +46,9 @@ async def ensure_experience_engine_ready(agent_instance) -> bool:
                 enable_authoring_validation=enable_authoring_validation,
             )
 
-            # Default to v0 to avoid downloading embedding models unexpectedly.
-            matcher_registry = IntentMatcherRegistry(default_version="v0")
-            preferred_version = str(cfg.get("matcher_version") or "v0")
-            if preferred_version in matcher_registry.list_versions():
-                matcher_registry.set_default_version(preferred_version)
+            # Use configured default matcher version from agent config
+            preferred_version = str(agent_instance._experience_engine_default_matcher_version or "v0")
+            matcher_registry = IntentMatcherRegistry(default_version=preferred_version)
             agent_instance._experience_engine_matcher_registry = matcher_registry
             agent_instance._experience_engine_default_matcher_version = matcher_registry.get_default_version()
 

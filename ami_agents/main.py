@@ -17,6 +17,7 @@ from ami_agents.agents.env_explorer.env_explorer_agent import EnvExplorerAgent
 from ami_agents.agents.interaction_solver.interaction_solver_agent import InteractionSolverAgent
 from ami_agents.environment.discovery.discovery_service import DiscoveryFactory
 from ami_agents.environment.integration.integration_engine import IntegrationEngineFactory
+from ami_agents.shared.utils.logger import LoggerFactory
 
 
 def load_environment():
@@ -77,40 +78,22 @@ class AMIAgentsOrchestrator:
 
     def setup_logging(self) -> None:
         """
-        Setup logging for the system.
+        Setup logging for the system using LoggerFactory.
         """
-        import logging
-        from logging.handlers import RotatingFileHandler
-
         log_config = self.config.get("logging", {})
+
+        # Create system logger
+        self.logger = LoggerFactory.create_logger(__name__, log_config)
+
+        # Store logging config for agent initialization
+        self.logging_config = log_config
+
         level = log_config.get("level", "INFO")
-        log_file = log_config.get("file", "logs/ami_agents.log")
-        max_bytes = log_config.get("max_bytes", 10485760)  # 10MB
-        backup_count = log_config.get("backup_count", 5)
+        file_enabled = log_config.get("file_logging", {}).get("enabled", False)
+        console_enabled = log_config.get("console_logging", {}).get("enabled", True)
 
-        # Create logs directory if not exists
-        if log_file:
-            os.makedirs(os.path.dirname(log_file), exist_ok=True)
-
-        # Configure root logger
-        logging.basicConfig(
-            level=getattr(logging, level.upper()),
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-
-        # Add file handler if log file is configured
-        if log_file:
-            handler = RotatingFileHandler(
-                log_file,
-                maxBytes=max_bytes,
-                backupCount=backup_count
-            )
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            logging.getLogger().addHandler(handler)
-
-        self.logger = logging.getLogger(__name__)
-        self.logger.info("Logging configured: level=%s, file=%s", level, log_file)
+        self.logger.info("Logging configured: level=%s, file_enabled=%s, console_enabled=%s",
+                        level, file_enabled, console_enabled)
 
     def load_configurations(self) -> None:
         """
@@ -204,24 +187,33 @@ class AMIAgentsOrchestrator:
             "solver": is_config["jid"]
         }
 
+        # Merge global logging config with agent-specific overrides
+        ua_logging_config = LoggerFactory.merge_configs(self.logging_config, ua_config.get("logging"))
+        ee_logging_config = LoggerFactory.merge_configs(self.logging_config, ee_config.get("logging"))
+        is_logging_config = LoggerFactory.merge_configs(self.logging_config, is_config.get("logging"))
+
+        ua_config_with_logging = {**ua_config, "logging": ua_logging_config}
+        ee_config_with_logging = {**ee_config, "logging": ee_logging_config}
+        is_config_with_logging = {**is_config, "logging": is_logging_config}
+
         # Create agents (but don't start them yet)
         self.agents["user_assistant"] = UserAssistantAgent(
             jid=ua_config["jid"],
             password=ua_config["password"],
-            config=ua_config,
+            config=ua_config_with_logging,
             target_jids=target_jids
         )
 
         self.agents["env_explorer"] = EnvExplorerAgent(
             jid=ee_config["jid"],
             password=ee_config["password"],
-            config=ee_config
+            config=ee_config_with_logging
         )
 
         self.agents["interaction_solver"] = InteractionSolverAgent(
             jid=is_config["jid"],
             password=is_config["password"],
-            config=is_config,
+            config=is_config_with_logging,
             target_jids=target_jids,
         )
 
@@ -308,13 +300,16 @@ async def main():
 
     orchestrator = AMIAgentsOrchestrator()
 
+    # Create a simple logger for system messages
+    system_logger = LoggerFactory.get_logger("AMI.System")
+
     try:
         await orchestrator.run()
     except KeyboardInterrupt:
-        print("\nShutting down AMI Agents system...")
+        system_logger.info("Shutting down AMI Agents system...")
         await orchestrator.stop()
     except Exception as e:
-        print(f"Error running AMI Agents system: {e}")
+        system_logger.error("Error running AMI Agents system: %s", e)
         await orchestrator.stop()
         raise
 

@@ -11,6 +11,16 @@ from typing import Any, Dict, List, Optional
 import websockets
 from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
 
+# Safe import for LoggerFactory - works both as standalone and as package module
+try:
+    from ....shared.utils.logger import LoggerFactory
+    _LOGGER_AVAILABLE = True
+except ImportError:
+    # Fallback for standalone execution
+    import logging
+    LoggerFactory = None
+    _LOGGER_AVAILABLE = False
+
 # Namespaces
 BASE_FALLBACK = os.getenv("BASE_WS_URI", "http://localhost:8080/").rstrip("/") + "/"
 WEBSUB = Namespace("https://purl.org/hmas/websub/")
@@ -86,6 +96,11 @@ class HomeAssistantREST:
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
         })
+        # Create logger with fallback for standalone execution
+        if _LOGGER_AVAILABLE and LoggerFactory:
+            self.logger = LoggerFactory.get_logger("HomeAssistantREST")
+        else:
+            self.logger = logging.getLogger("HomeAssistantREST")
 
     async def get_states(self) -> List[Dict[str, Any]]:
         resp = await self.client.get("/api/states")
@@ -100,7 +115,7 @@ class HomeAssistantREST:
     async def call_service(self, domain: str, service: str, data: Dict[str, Any]) -> Dict[str, Any]:
         resp = await self.client.post(f"/api/services/{domain}/{service}", json=data)
         resp.raise_for_status()
-        print("Calling ", domain, "/", service, " with ", data)
+        self.logger.debug("Calling %s/%s with %s", domain, service, data)
         # HA returns a list of changed states; normalize to dict
         try:
             return resp.json()

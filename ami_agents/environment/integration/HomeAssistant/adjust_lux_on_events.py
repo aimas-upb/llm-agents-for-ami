@@ -35,6 +35,19 @@ from typing import Any, Dict, Optional
 import httpx
 import websockets
 
+# Safe import for LoggerFactory - works both as standalone and as package module
+try:
+    # Try relative import first (when run as part of package)
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).parent.parent.parent.parent))
+    from shared.utils.logger import LoggerFactory
+    logger = LoggerFactory.get_logger("AdjustLuxOnEvents")
+except ImportError:
+    # Fallback for standalone execution
+    import logging
+    logger = logging.getLogger("AdjustLuxOnEvents")
+
 
 def _env(name: str, default: Optional[str] = None) -> str:
     val = os.getenv(name, default)
@@ -170,7 +183,7 @@ async def main():
         ws = await _ws_handshake(ha_url, ha_token)
         try:
             await ws.send(json.dumps({"id": 1, "type": "subscribe_events", "event_type": "state_changed"}))
-            print("Subscribed to state_changed events")
+            logger.info("Subscribed to state_changed events")
             while True:
                 msg = json.loads(await ws.recv())
                 if msg.get("type") != "event":
@@ -187,11 +200,11 @@ async def main():
                         cur_val = 0.0
                     new_val = max(0.0, cur_val + float(delta))
                     await _set_sensor_value(client, services, sensor_entity, new_val)
-                    print(f"{sensor_entity} ← {new_val} (from {src}, delta={delta})")
+                    logger.info("%s ← %s (from %s, delta=%s)", sensor_entity, new_val, src, delta)
                 except Exception as e:
-                    print("Adjust failed:", e)
+                    logger.error("Adjust failed: %s", e)
         except KeyboardInterrupt:
-            print("Interrupted; closing")
+            logger.info("Interrupted; closing")
         finally:
             await ws.close()
 
@@ -200,4 +213,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("Interrupted")
+        logger.info("Interrupted")

@@ -7,8 +7,9 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional
 from ....shared.community.community_client import CommunitySignifierClient
 from ....shared.models.messages import MessageType
 from ....shared.utils.demo_log import demo
+from ....shared.utils.logger import LoggerFactory
 
-logger = logging.getLogger("InteractionSolver")
+logger = LoggerFactory.get_logger("InteractionSolver")
 
 # A query callable matches the signature of
 # ``InteractionSolverAgent._query_env_explorer``: given a message type,

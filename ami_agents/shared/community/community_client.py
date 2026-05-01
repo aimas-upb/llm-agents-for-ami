@@ -7,12 +7,12 @@ HTTP client for querying the shared community signifier registry
 Used by InteractionSolver to discover cross-environment signifiers.
 """
 
-import logging
 from typing import Any, Optional
 
 import aiohttp
+from ..utils.logger import LoggerFactory
 
-logger = logging.getLogger(__name__)
+logger = LoggerFactory.get_logger(__name__)
 
 
 class CommunitySignifierClient:

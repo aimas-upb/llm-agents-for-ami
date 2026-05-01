@@ -78,17 +78,49 @@ class _DemoOnlyFilter(logging.Filter):
         return "[DEMO]" in msg
 
 
-def _configure_logging(*, demo_only: bool, no_logs: bool) -> None:
+def _configure_logging(test_logging_config: dict = None, *, demo_only: bool = False, no_logs: bool = False) -> None:
+    """
+    Configure logging using LoggerFactory for both console and file output.
+    This replaces manual basicConfig to enable proper file logging.
+    """
+    from ami_agents.shared.utils.logger import LoggerFactory
+
     if no_logs:
         logging.disable(logging.CRITICAL)
         return
 
-    logging.basicConfig(
-        level=logging.WARNING,
-        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-        force=True,
-    )
+    # Use provided config or create a basic console-only config
+    if test_logging_config is None:
+        test_logging_config = {
+            "level": "WARNING",
+            "format": "%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+            "console_logging": {"enabled": True},
+            "file_logging": {"enabled": False}
+        }
 
+    # Set root logger level
+    root = logging.getLogger()
+    root.setLevel(getattr(logging, test_logging_config.get("level", "WARNING")))
+
+    # Clear any existing handlers to avoid conflicts
+    for handler in root.handlers[:]:
+        root.removeHandler(handler)
+
+    # Create console handler using LoggerFactory
+    console_handler = LoggerFactory.create_console_handler(test_logging_config)
+    if console_handler:
+        formatter = logging.Formatter(test_logging_config.get("format", "%(asctime)s [%(name)s] %(levelname)s: %(message)s"))
+        console_handler.setFormatter(formatter)
+        root.addHandler(console_handler)
+
+    # Create file handler using LoggerFactory if enabled
+    file_handler = LoggerFactory.create_file_handler(test_logging_config)
+    if file_handler:
+        formatter = logging.Formatter(test_logging_config.get("format", "%(asctime)s [%(name)s] %(levelname)s: %(message)s"))
+        file_handler.setFormatter(formatter)
+        root.addHandler(file_handler)
+
+    # Keep our high-signal logs.
     for name in [
         "ManualInteractiveCLI",
         "UserAssistant",
@@ -98,6 +130,7 @@ def _configure_logging(*, demo_only: bool, no_logs: bool) -> None:
     ]:
         logging.getLogger(name).setLevel(logging.INFO)
 
+    # Silence very chatty libs.
     for noisy in [
         "spade",
         "slixmpp",
@@ -110,12 +143,11 @@ def _configure_logging(*, demo_only: bool, no_logs: bool) -> None:
     ]:
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
+    # Drop only high-frequency sensor spam, keep important state changes (e.g., light/blinds updates).
     filt = _HighFrequencyFilter()
-    root = logging.getLogger()
     root.addFilter(filt)
-    logging.getLogger("ami_agents.agents.env_explorer.env_explorer_agent").addFilter(filt)
-    for handler in list(getattr(root, "handlers", []) or []):
-        handler.addFilter(filt)
+    for h in root.handlers:
+        h.addFilter(filt)
 
     if demo_only:
         demo_filter = _DemoOnlyFilter()
@@ -282,8 +314,6 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
 async def main():
     args = _parse_args(sys.argv[1:])
-    _configure_logging(demo_only=args.demo, no_logs=args.no_logs)
-    logger = logging.getLogger("ManualInteractiveCLI")
 
     xmpp_server = os.getenv("SPADE_SERVER", "localhost")
     password = os.getenv("SPADE_PASSWORD", "password")
@@ -295,25 +325,6 @@ async def main():
     assistant_jid = f"user_assistant@{xmpp_server}"
     solver_jid = f"interaction_solver@{xmpp_server}"
     console_jid = f"console_cli@{xmpp_server}"
-
-    if args.clear_signifiers:
-        storage_dir = PROJECT_ROOT / "ami_agents" / "shared" / "memory" / "storage"
-        for subdir in ["rdf", "json", "indexes"]:
-            subpath = storage_dir / subdir
-            if subpath.exists():
-                shutil.rmtree(subpath)
-        logger.info("Cleared signifier storage at %s", storage_dir)
-
-    logger.info(demo("Starting interactive CLI (Yggdrasil=%s)"), yggdrasil_url)
-
-    env_config = {
-        "yggdrasil_url": yggdrasil_url,
-        "yggdrasil": {"url": yggdrasil_url},
-        "discovery": {
-            "notify_on_discovery_complete": True,
-            "notify_agents": [solver_jid],
-        },
-    }
 
     model = os.getenv("OPENAI_MODEL", "o3")
     base_url = os.getenv("OPENAI_BASE_URL")
@@ -331,57 +342,82 @@ async def main():
     except Exception:
         api_timeout_s = 120.0 if model.startswith("o") and "openai.com" in base_url else 30.0
 
-    # Load configuration for provider settings
+    # Load complete configuration from agents.yaml and environment.yaml
     try:
         config = ConfigLoader.merge_configs(
             ConfigLoader.load_with_env_vars("ami_agents/config/agents.yaml"),
             ConfigLoader.load_with_env_vars("ami_agents/config/environment.yaml")
         )
-        llm_config = config.get("llm", {})
-        provider_name = llm_config.get("default_provider", "openai")
-        provider_cfg = llm_config.get("providers", {}).get(provider_name, {})
-    except:
-        # Fallback if config loading fails
-        provider_cfg = {"temperature": 0.7, "max_tokens": 1500}
+    except Exception as e:
+        raise RuntimeError(f"Failed to load agent configuration: {e}")
 
-    llm_cfg = {
-        "llm": {
-            "default_provider": "openai",
-            "providers": {
-                "openai": {
-                    "api_key": os.getenv("OPENAI_API_KEY"),
-                    "base_url": base_url,
-                    "model": model,
-                    **({} if model.startswith("o") else {"temperature": float(os.getenv("OPENAI_TEMPERATURE") or str(provider_cfg.get("temperature", 0.7)))}),
-                    **({} if model.startswith("o") else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS") or str(provider_cfg.get("max_tokens", 1500)))}),
-                    **({"reasoning_effort": reasoning_effort} if reasoning_effort else {}),
-                }
-            },
-            "retry": {"timeout": api_timeout_s},
-        },
-        "planning": {
-            "timeout": float(os.getenv("AMI_PLANNING_TIMEOUT", "180" if model.startswith("o") else "90")),
-            "llm_planning": {
-                "model": model,
-                **({} if model.startswith("o") else {"temperature": float(os.getenv("OPENAI_TEMPERATURE") or str(provider_cfg.get("temperature", 0.7)))}),
-                **({} if model.startswith("o") else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS") or str(provider_cfg.get("max_tokens", 1500)))}),
-                **({"reasoning_effort": reasoning_effort} if reasoning_effort else {}),
-            },
-            "context_gathering": {"timeout": 10},
-        },
+    # Configure logging using the loaded configuration
+    _configure_logging(config.get("logging", {}), demo_only=args.demo, no_logs=args.no_logs)
+    from ami_agents.shared.utils.logger import LoggerFactory
+    logger = LoggerFactory.get_logger("ManualInteractiveCLI", config.get("logging", {}))
+
+    if args.clear_signifiers:
+        storage_dir = PROJECT_ROOT / "ami_agents" / "shared" / "memory" / "storage"
+        for subdir in ["rdf", "json", "indexes"]:
+            subpath = storage_dir / subdir
+            if subpath.exists():
+                shutil.rmtree(subpath)
+        logger.info("Cleared signifier storage at %s", storage_dir)
+
+    logger.info(demo("Starting interactive CLI (Yggdrasil=%s)"), yggdrasil_url)
+
+    # Add runtime environment configuration to the base config
+    config["yggdrasil_url"] = yggdrasil_url
+    config["yggdrasil"] = {"url": yggdrasil_url}
+    config["discovery"] = {
+        "notify_on_discovery_complete": True,
+        "notify_agents": [solver_jid],
     }
 
-    explorer = EnvExplorerAgent(explorer_jid, password, env_config, hmas_client=DummyHMASClient())
+    # Override LLM configuration with CLI/environment settings
+    if "llm" not in config:
+        config["llm"] = {}
+    if "providers" not in config["llm"]:
+        config["llm"]["providers"] = {}
+    if "openai" not in config["llm"]["providers"]:
+        config["llm"]["providers"]["openai"] = {}
+
+    config["llm"]["providers"]["openai"].update({
+        "api_key": os.getenv("OPENAI_API_KEY"),
+        "base_url": base_url,
+        "model": model,
+    })
+    if not model.startswith("o"):
+        config["llm"]["providers"]["openai"].update({
+            "temperature": float(os.getenv("OPENAI_TEMPERATURE") or
+                               str(config["llm"]["providers"]["openai"].get("temperature", 0.7))),
+            "max_tokens": int(os.getenv("OPENAI_MAX_TOKENS") or
+                             str(config["llm"]["providers"]["openai"].get("max_tokens", 1500))),
+        })
+    if reasoning_effort:
+        config["llm"]["providers"]["openai"]["reasoning_effort"] = reasoning_effort
+
+    if "retry" not in config["llm"]:
+        config["llm"]["retry"] = {}
+    config["llm"]["retry"]["timeout"] = api_timeout_s
+
+    # Override planning timeout
+    if "planning" not in config:
+        config["planning"] = {}
+    config["planning"]["timeout"] = float(os.getenv("AMI_PLANNING_TIMEOUT",
+                                                   "180" if model.startswith("o") else "90"))
+
+    explorer = EnvExplorerAgent(explorer_jid, password, config, hmas_client=DummyHMASClient())
     assistant = UserAssistantAgent(
         assistant_jid,
         password,
-        config=llm_cfg,
+        config=config,
         target_jids={"explorer": explorer_jid, "solver": solver_jid},
     )
     solver = InteractionSolverAgent(
         solver_jid,
         password,
-        config=llm_cfg,
+        config=config,
         target_jids={"explorer": explorer_jid},
     )
     console = ConsoleUserAgent(

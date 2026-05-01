@@ -44,11 +44,21 @@ from ..utils import (
     bt_preview,
     loose_json_loads,
 )
-
-logger = logging.getLogger("UserAssistant")
+from ....shared.utils.logger import LoggerFactory
 
 
 class UserMessageBehaviour(CyclicBehaviour):
+    """UserMessage behavior with configurable self.logger."""
+
+    def __init__(self, logger=None):
+        """
+        Initialize with optional self.logger.
+
+        Args:
+            logger: Logger instance. If None, creates a basic self.logger.
+        """
+        super().__init__()
+        self.logger = logger or LoggerFactory.get_logger("UserAssistant")
     """Main behaviour handling the full user-message conversation flow.
 
     Registered with ``Template(metadata={"message_type": "llm"})``.
@@ -123,10 +133,10 @@ class UserMessageBehaviour(CyclicBehaviour):
             parsed = loose_json_loads(raw)
             if isinstance(parsed, dict):
                 return parsed
-            logger.warning("LLM intent extraction returned non-dict: %r", raw[:200])
+            self.logger.warning("LLM intent extraction returned non-dict: %r", raw[:200])
             return {"classification": "unclear", "question": "Could you clarify what you would like?"}
         except Exception as exc:
-            logger.error("LLM intent extraction failed: %s", exc)
+            self.logger.error("LLM intent extraction failed: %s", exc)
             return {"classification": "unclear", "question": "Something went wrong. Could you try again?"}
 
     # ------------------------------------------------------------------
@@ -149,7 +159,7 @@ class UserMessageBehaviour(CyclicBehaviour):
                 "Plan ready. Does this plan look good to you?"
             )
         except Exception as exc:
-            logger.error("LLM plan summary failed: %s", exc)
+            self.logger.error("LLM plan summary failed: %s", exc)
             return "I have a plan ready. Does this plan look good to you?"
 
     # ------------------------------------------------------------------
@@ -170,7 +180,7 @@ class UserMessageBehaviour(CyclicBehaviour):
             )
             return (response.choices[0].message.content or "").strip() or raw_data
         except Exception as exc:
-            logger.error("LLM query formatting failed: %s", exc)
+            self.logger.error("LLM query formatting failed: %s", exc)
             return raw_data
 
     # ------------------------------------------------------------------
@@ -194,7 +204,7 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         intent_type = validate_intent_type(intent_strings, intent_type, conv.user_message.lower())
 
-        logger.info(demo("Derived intents: %s  workspace=%s  intent_type=%s"), intent_strings, conv.workspace_id, intent_type.upper())
+        self.logger.info(demo("Derived intents: %s  workspace=%s  intent_type=%s"), intent_strings, conv.workspace_id, intent_type.upper())
 
         solver_jid = self.agent.target_jids.get("solver")
         if not solver_jid:
@@ -212,7 +222,7 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         timeout = self.agent.goal_request_timeout
 
-        logger.info(demo("UA -> InteractionSolver GOAL_REQUEST: intents=%s intent_type=%s"), intent_strings, intent_type.upper())
+        self.logger.info(demo("UA -> InteractionSolver GOAL_REQUEST: intents=%s intent_type=%s"), intent_strings, intent_type.upper())
         try:
             result = await rpc_call(
                 self.agent,
@@ -228,7 +238,7 @@ class UserMessageBehaviour(CyclicBehaviour):
             await self._reply(msg, "Planning timed out. Could you try again?")
             conv.phase = ConversationPhase.IDLE
         except Exception as exc:
-            logger.error("Goal request failed: %s", exc)
+            self.logger.error("Goal request failed: %s", exc)
             await self._reply(msg, f"Planning failed: {exc}")
             conv.phase = ConversationPhase.IDLE
 
@@ -256,7 +266,7 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         node_count = count_bt_nodes(tree)
         preview = bt_preview(tree)
-        logger.info(demo("Plan stored: hash=%s nodes=%d preview=%s"), plan_hash, node_count, preview)
+        self.logger.info(demo("Plan stored: hash=%s nodes=%d preview=%s"), plan_hash, node_count, preview)
 
         conv.phase = ConversationPhase.SUMMARIZING_PLAN
         summary = await self._summarize_plan(plan_body if isinstance(plan_body, str) else json.dumps(plan_obj))
@@ -276,7 +286,7 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         if low in CONFIRM_TOKENS:
             conv.phase = ConversationPhase.EXECUTING
-            logger.info(demo("User confirmed plan: thread=%s"), thread)
+            self.logger.info(demo("User confirmed plan: thread=%s"), thread)
             exec_result = await self._execute_plan(thread, conv)
 
             if exec_result.success:
@@ -289,13 +299,13 @@ class UserMessageBehaviour(CyclicBehaviour):
             conv.phase = ConversationPhase.IDLE
 
         elif low in REJECT_TOKENS:
-            logger.info(demo("User rejected plan: thread=%s"), thread)
+            self.logger.info(demo("User rejected plan: thread=%s"), thread)
             conv.clear_plan()
             conv.phase = ConversationPhase.IDLE
             await self._reply(msg, "Okay, I've discarded that plan. What would you like to change?")
 
         else:
-            logger.info(demo("New request while awaiting confirmation, discarding plan: thread=%s"), thread)
+            self.logger.info(demo("New request while awaiting confirmation, discarding plan: thread=%s"), thread)
             conv.clear_plan()
             conv.phase = ConversationPhase.IDLE
 
@@ -346,7 +356,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         await self.agent.ensure_execution_engine_ready()
 
         node_count = count_bt_nodes(tree_spec)
-        logger.info(demo("Executing BT: thread=%s nodes=%d signifier_reuse=%s intent_type=%s"), thread, node_count, is_signifier_reuse, intent_type)
+        self.logger.info(demo("Executing BT: thread=%s nodes=%d signifier_reuse=%s intent_type=%s"), thread, node_count, is_signifier_reuse, intent_type)
 
         executor = IRExecutor(max_ticks=self.agent.bt_max_ticks)
         loop = asyncio.get_event_loop()
@@ -357,16 +367,16 @@ class UserMessageBehaviour(CyclicBehaviour):
                 tree_spec,
             )
         except Exception as exc:
-            logger.warning(demo("BT execution failed: %s"), exc)
+            self.logger.warning(demo("BT execution failed: %s"), exc)
             return ExecutionResult(success=False, error=str(exc))
 
-        logger.info(
+        self.logger.info(
             demo("BT execution complete: success=%s ticks=%d status=%s"),
             exec_result.success, exec_result.ticks, exec_result.final_status,
         )
 
         self.agent.state_memory.clear()
-        logger.info(demo("State memory cache cleared after BT execution"))
+        self.logger.info(demo("State memory cache cleared after BT execution"))
 
         if exec_result.success and not is_signifier_reuse:
             await self._record_signifiers(tree_spec, intents, exec_result, thread, intent_type, workspace_id)
@@ -401,7 +411,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         explorer_jid = self.agent.target_jids.get("explorer")
         if explorer_jid and workspace_id:
             try:
-                logger.info(demo("Querying environment state for signifier context (workspace_id=%r)"), workspace_id)
+                self.logger.info(demo("Querying environment state for signifier context (workspace_id=%r)"), workspace_id)
 
                 state_response = await rpc_call(
                     self.agent,
@@ -429,12 +439,12 @@ class UserMessageBehaviour(CyclicBehaviour):
                                     filtered_artifacts[artifact_id] = artifact_info
 
                         state_snapshot = {"artifacts": filtered_artifacts}
-                        logger.info(
+                        self.logger.info(
                             demo("State snapshot retrieved: %d artifacts for workspace_id=%r"),
                             len(filtered_artifacts), workspace_id
                         )
             except Exception as e:
-                logger.warning(demo("Failed to query state snapshot: %s (continuing without state)"), e)
+                self.logger.warning(demo("Failed to query state snapshot: %s (continuing without state)"), e)
 
         signifiers = extract_signifiers_from_bt(
             tree_spec=tree_spec,
@@ -446,10 +456,10 @@ class UserMessageBehaviour(CyclicBehaviour):
             structured_intents=structured_intents,
         )
         if not signifiers:
-            logger.info(demo("No signifiers extracted from BT"))
+            self.logger.info(demo("No signifiers extracted from BT"))
             return
 
-        logger.info(demo("Recording %d signifiers from BT execution (intent_type=%s)"), len(signifiers), intent_type)
+        self.logger.info(demo("Recording %d signifiers from BT execution (intent_type=%s)"), len(signifiers), intent_type)
 
         # 1. Record locally via EnvExplorer
         if explorer_jid:
@@ -475,9 +485,9 @@ class UserMessageBehaviour(CyclicBehaviour):
                         created_count = rec_payload.get("created_count")
                 except Exception:
                     pass
-                logger.info(demo("Local signifier recording: created_count=%s"), created_count or "?")
+                self.logger.info(demo("Local signifier recording: created_count=%s"), created_count or "?")
             except Exception as exc:
-                logger.info(demo("Failed to record signifiers locally: %s"), exc)
+                self.logger.info(demo("Failed to record signifiers locally: %s"), exc)
 
         # 2. Publish to community
         community_client = self.agent.community_client
@@ -490,7 +500,7 @@ class UserMessageBehaviour(CyclicBehaviour):
                         published += 1
                 except Exception:
                     pass
-            logger.info(demo("Community signifier publishing: %d/%d published"), published, len(signifiers))
+            self.logger.info(demo("Community signifier publishing: %d/%d published"), published, len(signifiers))
 
     # ------------------------------------------------------------------
     # DETERMINISTIC: query handlers
@@ -522,7 +532,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         state_memory = self.agent.state_memory
         if property_uri and state_memory.has(property_uri):
             cached = state_memory.get(property_uri)
-            logger.info(demo("State cache HIT: property_uri=%r value=%r"), property_uri, cached)
+            self.logger.info(demo("State cache HIT: property_uri=%r value=%r"), property_uri, cached)
             raw_data = json.dumps({"property_uri": property_uri, "value": cached, "source": "cache"})
             formatted = await self._format_query_response(raw_data, conv.user_message)
             await self._reply(msg, formatted)
@@ -541,7 +551,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         if property_uri:
             payload["property_uri"] = property_uri
 
-        logger.info(
+        self.logger.info(
             demo("UA -> EnvExplorer ENV_STATE_REQUEST: artifact_id=%r property_uri=%r"),
             artifact_id, property_uri,
         )
@@ -595,7 +605,7 @@ class UserMessageBehaviour(CyclicBehaviour):
             )
             return result.body or ""
         except Exception as exc:
-            logger.warning("Failed to fetch capabilities: %s", exc)
+            self.logger.warning("Failed to fetch capabilities: %s", exc)
             return ""
 
     async def _reply(self, original_msg, text: str) -> None:

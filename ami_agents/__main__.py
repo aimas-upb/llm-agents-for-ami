@@ -3,6 +3,7 @@ import asyncio
 import sys
 from dotenv import load_dotenv
 from .main import AMIAgentsOrchestrator
+from .shared.utils.logger import LoggerFactory
 
 
 def main():
@@ -13,13 +14,16 @@ def main():
     # Create and run orchestrator
     orchestrator = AMIAgentsOrchestrator()
 
+    # Create a simple logger for system messages
+    system_logger = LoggerFactory.get_logger("AMI.System")
+
     try:
         asyncio.run(orchestrator.run())
     except KeyboardInterrupt:
-        print("System stopped by user")
+        system_logger.info("System stopped by user")
         sys.exit(0)
     except Exception as e:
-        print(f"System failed: {e}")
+        system_logger.error("System failed: %s", e)
         sys.exit(1)
 
 

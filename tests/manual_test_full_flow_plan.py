@@ -178,19 +178,43 @@ class _StripDemoPrefixFilter(logging.Filter):
         return True
 
 
-def _configure_console_logging() -> None:
+def _configure_console_logging(test_logging_config: dict = None) -> None:
     """
-    Make the manual test output readable:
-    - Root logger at WARNING (quiet by default)
-    - Keep key project loggers at INFO
-    - Silence chatty dependencies (slixmpp/aiohttp/httpx/spade_llm)
-    - Filter clock308 timeOfDay update spam
+    Configure logging using LoggerFactory for both console and file output.
+    This replaces manual basicConfig to enable proper file logging.
     """
-    logging.basicConfig(
-        level=logging.WARNING,
-        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-        force=True,
-    )
+    from ami_agents.shared.utils.logger import LoggerFactory
+
+    # Use provided config or create a basic console-only config
+    if test_logging_config is None:
+        test_logging_config = {
+            "level": "WARNING",
+            "format": "%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+            "console_logging": {"enabled": True},
+            "file_logging": {"enabled": False}
+        }
+
+    # Set root logger level
+    root = logging.getLogger()
+    root.setLevel(getattr(logging, test_logging_config.get("level", "WARNING")))
+
+    # Clear any existing handlers to avoid conflicts
+    for handler in root.handlers[:]:
+        root.removeHandler(handler)
+
+    # Create console handler using LoggerFactory
+    console_handler = LoggerFactory.create_console_handler(test_logging_config)
+    if console_handler:
+        formatter = logging.Formatter(test_logging_config.get("format", "%(asctime)s [%(name)s] %(levelname)s: %(message)s"))
+        console_handler.setFormatter(formatter)
+        root.addHandler(console_handler)
+
+    # Create file handler using LoggerFactory if enabled
+    file_handler = LoggerFactory.create_file_handler(test_logging_config)
+    if file_handler:
+        formatter = logging.Formatter(test_logging_config.get("format", "%(asctime)s [%(name)s] %(levelname)s: %(message)s"))
+        file_handler.setFormatter(formatter)
+        root.addHandler(file_handler)
 
     # Keep our high-signal logs.
     for name in [
@@ -217,10 +241,8 @@ def _configure_console_logging() -> None:
 
     # Drop only high-frequency sensor spam, keep important state changes (e.g., light/blinds updates).
     filt = _DropHighFrequencyStateUpdateSpamFilter()
-    root = logging.getLogger()
     root.addFilter(filt)
-    logging.getLogger("ami_agents.agents.env_explorer.env_explorer_agent").addFilter(filt)
-    for h in list(getattr(root, "handlers", []) or []):
+    for h in root.handlers:
         h.addFilter(filt)
 
 
@@ -242,8 +264,8 @@ def _strip_demo_prefix_from_logs() -> None:
         handler.addFilter(strip_filter)
 
 
-_configure_console_logging()
-logger = logging.getLogger("ManualFullFlowPlan")
+# Logging will be configured in main() after loading config
+logger = None  # Will be set in main()
 
 _NO_COLOR = os.getenv("AMI_NO_COLOR") or os.getenv("NO_COLOR")
 _RED = "" if _NO_COLOR else "\033[31m"
@@ -1142,9 +1164,6 @@ class OrchestratorAgent(Agent):
 
 async def main():
     args = _parse_args(sys.argv[1:])
-    if args.demo:
-        _enable_demo_only_logging()
-        _strip_demo_prefix_from_logs()
 
     xmpp_server = os.getenv("SPADE_SERVER", "localhost")
     password = os.getenv("SPADE_PASSWORD", "password")
@@ -1153,6 +1172,25 @@ async def main():
     _require_env("OPENAI_API_KEY")
 
     yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8080/").strip()
+
+    # Load configuration from files using ConfigLoader
+    try:
+        config = ConfigLoader.merge_configs(
+            ConfigLoader.load_with_env_vars("ami_agents/config/agents.yaml"),
+            ConfigLoader.load_with_env_vars("ami_agents/config/environment.yaml")
+        )
+    except Exception as e:
+        raise RuntimeError(f"Failed to load agent configuration: {e}")
+
+    # Configure logging using the loaded configuration
+    _configure_console_logging(config.get("logging", {}))
+    global logger
+    from ami_agents.shared.utils.logger import LoggerFactory
+    logger = LoggerFactory.get_logger("ManualFullFlowPlan", config.get("logging", {}))
+
+    if args.demo:
+        _enable_demo_only_logging()
+        _strip_demo_prefix_from_logs()
 
     explorer_jid = f"env_explorer@{xmpp_server}"
     assistant_jid = f"user_assistant@{xmpp_server}"
@@ -1181,24 +1219,25 @@ async def main():
     if args.pause_for_sensor:
         os.environ["PAUSE_FOR_SENSOR"] = "1"
 
-    # EnvExplorer: configure discovery notifications (optional but helpful)
-    env_config = {
-        "yggdrasil_url": yggdrasil_url,
-        "yggdrasil": {"url": yggdrasil_url},
-        "discovery": {
-            "notify_on_discovery_complete": True,
-            "notify_agents": [solver_jid],
-        },
-        "signifiers": {
-            "matcher_version": args.signifier_matcher,
-            "min_similarity": float(args.signifier_min_similarity),
-        },
+    # Create env_config based on loaded configuration, with demo-specific overrides
+    env_config = config.copy()
+
+    # Override demo-specific settings
+    env_config["yggdrasil_url"] = yggdrasil_url
+    env_config["yggdrasil"] = {"url": yggdrasil_url}
+    env_config["discovery"] = {
+        "notify_on_discovery_complete": True,
+        "notify_agents": [solver_jid],
     }
+
+    # Override signifier settings from CLI args if provided
     if args.signifier_matcher or args.signifier_min_similarity is not None:
-        env_config["signifiers"] = {
-            **({"matcher_version": args.signifier_matcher} if args.signifier_matcher else {}),
-            **({"min_similarity": float(args.signifier_min_similarity)} if args.signifier_min_similarity is not None else {}),
-        }
+        if "signifiers" not in env_config:
+            env_config["signifiers"] = {}
+        if args.signifier_matcher:
+            env_config["signifiers"]["matcher_version"] = args.signifier_matcher
+        if args.signifier_min_similarity is not None:
+            env_config["signifiers"]["min_similarity"] = float(args.signifier_min_similarity)
 
     # UserAssistant and Solver configs (new agents.yaml-compatible structure)
     # Default model requested by user:
@@ -1226,17 +1265,13 @@ async def main():
     os.environ.setdefault("AMI_PLAN_TIMEOUT_S", str(planning_timeout_s))
     os.environ.setdefault("AMI_EXEC_TIMEOUT_S", str(max(planning_timeout_s, 180.0)))
 
-    # Load configuration for provider settings
+    # Use already loaded configuration for provider settings
     try:
-        config = ConfigLoader.merge_configs(
-            ConfigLoader.load_with_env_vars("ami_agents/config/agents.yaml"),
-            ConfigLoader.load_with_env_vars("ami_agents/config/environment.yaml")
-        )
         llm_config = config.get("llm", {})
         provider_name = llm_config.get("default_provider", "openai")
         provider_cfg = llm_config.get("providers", {}).get(provider_name, {})
     except:
-        # Fallback if config loading fails
+        # Fallback if config parsing fails
         provider_cfg = {"temperature": 0.7, "max_tokens": 1500}
 
     llm_cfg = {
@@ -1264,6 +1299,12 @@ async def main():
             },
             "context_gathering": {"timeout": 60},
         },
+        # Add logging configuration from config
+        "logging": config.get("logging", {}),
+        # Add other shared configurations that agents might need
+        "timeouts": config.get("timeouts", {}),
+        "bt_execution": config.get("bt_execution", {}),
+        "http": config.get("http", {}),
     }
 
     explorer = EnvExplorerAgent(explorer_jid, password, env_config, hmas_client=DummyHMASClient())

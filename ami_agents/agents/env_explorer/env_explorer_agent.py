@@ -5,7 +5,6 @@ Refactored SPADE agent with proper package structure for behaviors and utilities
 """
 
 import asyncio
-import logging
 import re
 from typing import Any, Dict, Optional
 from spade.agent import Agent
@@ -21,6 +20,7 @@ from ...shared.models.environment import (
 from ...shared.models.plan import BehaviorTreePlan
 from ...shared.utils.config_resolver import resolve_yggdrasil_url
 from ...shared.utils.demo_log import demo
+from ...shared.utils.logger import LoggerFactory
 from ...environment.connection.hmas_client import IHMASClient
 from ...environment.integration.integration_engine import YggdrasilIntegration
 
@@ -89,7 +89,11 @@ class EnvExplorerAgent(Agent, IAgent):
 
         # Agent state
         self.discovery_complete = False
-        self.logger = logging.getLogger(f"EnvExplorerAgent[{jid}]")
+
+        # Initialize logger with configuration
+        # The logging config passed from main.py already contains merged global + agent-specific
+        logging_config = self.config.get("logging", {})
+        self.logger = LoggerFactory.get_logger(f"EnvExplorerAgent[{jid}]", logging_config)
 
         # Experience engine state
         self._experience_engine_ready = False

@@ -9,13 +9,13 @@ Functions:
 - build_bt_from_signifiers: Construct BT JSON IR from signifier matches (fast path)
 """
 
-import logging
 from typing import Any, Optional
 
 from ami_agents.agents.user_assistant.models import Intent
 from ..shared.utils.demo_log import demo
+from ..shared.utils.logger import LoggerFactory
 
-logger = logging.getLogger(__name__)
+logger = LoggerFactory.get_logger(__name__)
 
 
 def extract_signifiers_from_bt(
@@ -264,7 +264,8 @@ def _extract_conditions_from_state(
         }
     """
     # Debug with both logging and print (logging may not be configured for this module)
-    print(f"[DEBUG] _extract_conditions_from_state CALLED: state_snapshot type={type(state_snapshot).__name__ if state_snapshot else 'None'}, workspace_id={workspace_id!r}")
+    logger.debug("_extract_conditions_from_state CALLED: state_snapshot type=%s, workspace_id=%r",
+                 type(state_snapshot).__name__ if state_snapshot else 'None', workspace_id)
     logger.info(
         demo("_extract_conditions_from_state: state_snapshot type=%s, has_data=%s, workspace_id=%r"),
         type(state_snapshot).__name__ if state_snapshot else "None",
@@ -273,12 +274,14 @@ def _extract_conditions_from_state(
     )
 
     if not state_snapshot or not isinstance(state_snapshot, dict):
-        print("[DEBUG] _extract_conditions_from_state: early return (no state_snapshot or not dict)")
+        logger.debug("_extract_conditions_from_state: early return (no state_snapshot or not dict)")
         logger.info(demo("_extract_conditions_from_state: early return (no state_snapshot or not dict)"))
         return []
 
     artifacts = state_snapshot.get("artifacts", {})
-    print(f"[DEBUG] _extract_conditions_from_state: artifacts count={len(artifacts) if isinstance(artifacts, dict) else 0}, keys={list(artifacts.keys())[:3] if isinstance(artifacts, dict) else []}")
+    logger.debug("_extract_conditions_from_state: artifacts count=%d, keys=%s",
+                 len(artifacts) if isinstance(artifacts, dict) else 0,
+                 list(artifacts.keys())[:3] if isinstance(artifacts, dict) else [])
     logger.info(
         demo("_extract_conditions_from_state: artifacts type=%s, count=%d, keys=%s"),
         type(artifacts).__name__,
@@ -371,7 +374,8 @@ def _extract_conditions_from_state(
 
     # Limit to prevent excessive context (keep max 10 conditions)
     result = conditions[:10]
-    print(f"[DEBUG] _extract_conditions_from_state: returning {len(result)} conditions (total found: {len(conditions)})")
+    logger.debug("_extract_conditions_from_state: returning %d conditions (total found: %d)",
+                 len(result), len(conditions))
     logger.info(demo("_extract_conditions_from_state: returning %d conditions (total found: %d)"), len(result), len(conditions))
     return result
 
