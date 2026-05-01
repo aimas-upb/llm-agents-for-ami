@@ -511,7 +511,7 @@ class HASPGraphCache:
         for workspace_id, area in self.areas_by_id.items():
             devices = self.workspace_devices.get(workspace_id, [])
             entities = self.workspace_entities.get(workspace_id, [])
-            self.workspace_ttls[workspace_id] = self._build_workspace_ttl(area, devices)
+            self.workspace_ttls[workspace_id] = self._build_workspace_ttl(area, devices, entities)
             self.artifacts_ttls[workspace_id] = self._build_artifacts_ttl(workspace_id, devices, entities)
             self.full_graph.parse(data=self.workspace_ttls[workspace_id], format="turtle")
             self.full_graph.parse(data=self.artifacts_ttls[workspace_id], format="turtle")
@@ -523,9 +523,25 @@ class HASPGraphCache:
                 self.artifact_ttls[(workspace_id, safe_name)] = ttl
                 self.full_graph.parse(data=ttl, format="turtle")
 
-    def _build_workspace_ttl(self, area: Dict[str, Any], devices: List[Dict[str, Any]]) -> str:
+    def _build_workspace_ttl(
+        self,
+        area: Dict[str, Any],
+        devices: List[Dict[str, Any]],
+        entities: Optional[List[Dict[str, Any]]] = None,
+    ) -> str:
         rdf = HomeAssistantRDF(self.base_uri)
-        rdf.workspace_to_rdf(area, devices)
+        rdf.workspace_to_rdf(area, [])
+        if entities:
+            aid = area["area_id"]
+            ws = URIRef(f"{rdf.base}workspaces/{aid}#workspace")
+            art_dir = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/")
+            for ent in entities:
+                label = ent.get("_artifact_label") or ent.get("_artifact_base_label") or _entity_display_name(ent, self.devices_by_id)
+                safe_name = ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
+                art = URIRef(f"{art_dir}{safe_name}#artifact")
+                rdf.g.add((art, RDF.type, HMAS.Artifact))
+                rdf.g.add((ws, HMAS.contains, art))
+                rdf.g.add((art, TD.title, Literal(label)))
         return rdf.serialize()
 
     def _build_artifacts_ttl(self, workspace_id: str, devices: List[Dict[str, Any]], entities: List[Dict[str, Any]]) -> str:

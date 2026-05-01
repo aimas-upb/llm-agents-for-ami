@@ -273,6 +273,11 @@ def test_artifact_slug_prefers_entity_object_id(monkeypatch):
     assert artifact.status_code == 200
     assert 'td:title "blinds_308 cover"' in artifact.text
 
+    workspace = client.get("/workspaces/lab")
+    assert workspace.status_code == 200
+    assert "artifacts/blinds_308#artifact" in workspace.text
+    assert "artifacts/blinds_308_cover#artifact" not in workspace.text
+
 
 def test_platform_profile_uri_rewrites_to_request_base(monkeypatch):
     class WS:
