@@ -266,7 +266,7 @@ class TestBTPlannerWithSignifiers:
 
     @pytest.mark.asyncio
     async def test_signifier_hint_influences_plan(
-        self, planner, openai_client, lab308_affordances, signifier_hints
+        self, planner, openai_client, lab308_affordances, signifier_hints, test_model
     ):
         """Providing signifier hints should produce a valid plan that uses the hinted affordance."""
         result = await planner.generate_bt(
@@ -300,7 +300,7 @@ class TestBTPlannerWithSignifiers:
 
     @pytest.mark.asyncio
     async def test_no_signifier_plans_independently(
-        self, planner, openai_client, lab308_affordances
+        self, planner, openai_client, lab308_affordances, test_model
     ):
         """Without signifier hints, planner should still generate a valid plan."""
         result = await planner.generate_bt(
@@ -318,7 +318,7 @@ class TestBTPlannerWithSignifiers:
 
     @pytest.mark.asyncio
     async def test_signifier_from_different_env(
-        self, planner, openai_client
+        self, planner, openai_client, test_model
     ):
         """
         Signifier hint from Lab308, affordances from HomeBench Home 17.
