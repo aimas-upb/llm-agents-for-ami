@@ -87,6 +87,7 @@ class EnvExplorerAgent(Agent, IAgent):
 
         # Agent state
         self.discovery_complete = False
+        self.semantic_capabilities: Dict[str, Any] = {"td_sosa_supported": False}
 
         # Initialize logger with configuration
         # The logging config passed from main.py already contains merged global + agent-specific

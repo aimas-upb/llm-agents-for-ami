@@ -80,6 +80,8 @@ class InteractionSolverAgent(Agent, IAgent):
         self._environment_ready_event: asyncio.Event = asyncio.Event()
         self._last_env_ready_payload: Optional[Dict[str, Any]] = None
         self.env_explorer_jid: Optional[str] = None
+        self.semantic_capabilities: Dict[str, Any] = {"td_sosa_supported": False}
+        self.td_sosa_supported: bool = False
 
         # Cache the last known environment context so we can build plans from
         # signifiers without re-querying EnvExplorer for capabilities/state.
@@ -137,8 +139,18 @@ class InteractionSolverAgent(Agent, IAgent):
             self.env_explorer_jid = sender_jid
         if payload is not None:
             self._last_env_ready_payload = payload
+            self._update_semantic_capabilities(payload)
         if not self._environment_ready_event.is_set():
             self._environment_ready_event.set()
+
+    def _update_semantic_capabilities(self, payload: Dict[str, Any]) -> None:
+        if not isinstance(payload, dict):
+            return
+        semantic_capabilities = payload.get("semantic_capabilities")
+        if not isinstance(semantic_capabilities, dict):
+            return
+        self.semantic_capabilities = dict(semantic_capabilities)
+        self.td_sosa_supported = bool(self.semantic_capabilities.get("td_sosa_supported", False))
 
     async def await_environment_ready(self, timeout: float = 10.0) -> bool:
         """Wait until EnvExplorer has completed initial discovery.
@@ -423,6 +435,7 @@ class InteractionSolverAgent(Agent, IAgent):
 
         aff_payload = parse_or_empty(raw_aff)
         state_payload = parse_or_empty(raw_state)
+        self._update_semantic_capabilities(aff_payload)
 
         affordances = aff_payload.get("affordances") or aff_payload.get("capabilities") or []
         try:
