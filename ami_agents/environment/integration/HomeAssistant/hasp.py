@@ -143,6 +143,23 @@ def _ttl_for_request(ttl: str, request: Request, cache: HASPGraphCache) -> str:
         rewritten = rewritten.replace(normalized_cache_base, normalized_request_base)
     return rewritten
 
+
+def _sanitize_service_payload(
+    payload: Dict[str, Any],
+    service_definition: Optional[Dict[str, Any]],
+    *,
+    entity_id: str,
+) -> Tuple[Dict[str, Any], List[str]]:
+    fields = (service_definition or {}).get("fields") or {}
+    allowed_fields = {key for key in fields if isinstance(key, str)}
+    sanitized = {key: value for key, value in payload.items() if key in allowed_fields}
+    sanitized["entity_id"] = entity_id
+    dropped = sorted(
+        key for key in payload
+        if key != "entity_id" and key not in allowed_fields
+    )
+    return sanitized, dropped
+
 @app.on_event("shutdown")
 async def _shutdown():
     task = getattr(app.state, "sync_task", None)
@@ -1272,9 +1289,39 @@ async def action_ha_service(workspace_id: str, artifact_name: str, domain: str, 
             payload = await request.json()
         except Exception:
             payload = {}
-    payload = {**payload, "entity_id": ent}
+    payload, dropped_fields = _sanitize_service_payload(payload, svc, entity_id=ent)
+    if dropped_fields:
+        print(
+            f"HASP dropped unsupported service payload fields: domain={domain} service={service} "
+            f"entity_id={ent} dropped={dropped_fields}"
+        )
 
-    result = await ha_rest.call_service(domain, service, payload)
+    print(
+        f"HASP forwarding service call: workspace={workspace_id} artifact={artifact_name} "
+        f"domain={domain} service={service} entity_id={ent} payload={payload}"
+    )
+    try:
+        result = await ha_rest.call_service(domain, service, payload)
+    except httpx.HTTPStatusError as exc:
+        response_text = ""
+        with contextlib.suppress(Exception):
+            response_text = exc.response.text
+        detail = {
+            "error": "home_assistant_service_call_failed",
+            "domain": domain,
+            "service": service,
+            "artifact_name": artifact_name,
+            "entity_id": ent,
+            "payload": payload,
+            "home_assistant_status": exc.response.status_code if exc.response is not None else None,
+            "home_assistant_response": response_text,
+        }
+        print(
+            f"HASP service forward failed: domain={domain} service={service} "
+            f"entity_id={ent} status={detail['home_assistant_status']} "
+            f"response={response_text}"
+        )
+        raise HTTPException(status_code=502, detail=detail)
     await cache.apply_service_result(result)
     if isinstance(result, list):
         for item in result:

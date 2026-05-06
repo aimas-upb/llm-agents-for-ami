@@ -185,6 +185,40 @@ def test_action_ha_service_forwarder(sample_data):
     assert ("light", "turn_on", {"entity_id": "light.lab308_light"}) in calls
 
 
+def test_action_ha_service_drops_unsupported_payload_fields(monkeypatch):
+    areas = [{"area_id": "lab308", "name": "Lab 308"}]
+    devices_by_area = {
+        "lab308": [{"id": "dev1", "name": "blinds_308_cover", "area_id": "lab308"}],
+    }
+    entities = [
+        {"entity_id": "cover.blinds_308_cover", "device_id": "dev1", "name": "blinds_308_cover", "area_id": "lab308"},
+    ]
+    states = [
+        {"entity_id": "cover.blinds_308_cover", "state": "closed", "attributes": {}},
+    ]
+    services = [
+        {
+            "domain": "cover",
+            "services": {
+                "open_cover": {"fields": {}},
+            },
+        },
+    ]
+
+    fake_ws = FakeHAWS(areas, devices_by_area, entities, states)
+    fake_rest = FakeHAREST(states, services)
+    monkeypatch.setattr(appmod, "ha_client", fake_ws)
+    monkeypatch.setattr(appmod, "ha_rest", fake_rest)
+
+    client = TestClient(appmod.app)
+    r = client.post(
+        "/workspaces/lab308/artifacts/blinds_308_cover/ha/cover/open_cover",
+        json={"open_close": False},
+    )
+    assert r.status_code == 200
+    assert ("cover", "open_cover", {"entity_id": "cover.blinds_308_cover"}) in appmod.ha_rest.calls
+
+
 def test_action_ha_service_no_entity(sample_data):
     client = TestClient(appmod.app)
     # Use sensor device but request light domain → should 404 for missing entity

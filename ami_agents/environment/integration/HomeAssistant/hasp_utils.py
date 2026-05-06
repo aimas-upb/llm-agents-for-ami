@@ -114,9 +114,19 @@ class HomeAssistantREST:
         return resp.json()
 
     async def call_service(self, domain: str, service: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        self.logger.info("Calling Home Assistant service %s/%s with payload=%s", domain, service, data)
         resp = await self.client.post(f"/api/services/{domain}/{service}", json=data)
+        if resp.status_code >= 400:
+            error_text = resp.text
+            self.logger.error(
+                "Home Assistant service %s/%s failed [%s]: payload=%s response=%s",
+                domain,
+                service,
+                resp.status_code,
+                data,
+                error_text,
+            )
         resp.raise_for_status()
-        self.logger.debug("Calling %s/%s with %s", domain, service, data)
         # HA returns a list of changed states; normalize to dict
         try:
             return resp.json()
