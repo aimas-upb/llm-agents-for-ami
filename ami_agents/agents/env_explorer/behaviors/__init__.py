@@ -5,6 +5,7 @@ Behaviors package for EnvExplorer agent.
 from .initial_discovery_behaviour import InitialDiscoveryBehaviour
 from .event_processing_behaviour import EventProcessingBehaviour
 from .environment_request_handler import EnvironmentRequestHandler
+from .experience_engine_init_behaviour import InitializeExperienceEngineBehaviour
 from .signifier_match_behaviour import SignifierMatchBehaviour
 from .signifier_record_behaviour import SignifierRecordBehaviour
 from .signifier_list_behaviour import SignifierListBehaviour
@@ -15,6 +16,7 @@ __all__ = [
     'InitialDiscoveryBehaviour',
     'EventProcessingBehaviour',
     'EnvironmentRequestHandler',
+    'InitializeExperienceEngineBehaviour',
     'SignifierMatchBehaviour',
     'SignifierRecordBehaviour',
     'SignifierListBehaviour',

@@ -27,6 +27,7 @@ from ...environment.integration.integration_engine import YggdrasilIntegration
 # Import extracted behaviors
 from .behaviors import (
     InitialDiscoveryBehaviour,
+    InitializeExperienceEngineBehaviour,
     EventProcessingBehaviour,
     SignifierMatchBehaviour,
     SignifierRecordBehaviour,
@@ -125,6 +126,11 @@ class EnvExplorerAgent(Agent, IAgent):
 
         sign_list_template = Template()
         sign_list_template.set_metadata("type", MessageType.SIGNIFIER_LIST_REQUEST.value)
+
+        # Bootstrap the Experience Engine explicitly during setup so engine
+        # readiness is a discrete, observable lifecycle event rather than a
+        # side-effect of the first incoming SIGNIFIER_MATCH_REQUEST.
+        self.add_behaviour(InitializeExperienceEngineBehaviour())
 
         self.add_behaviour(InitialDiscoveryBehaviour())
         self.add_behaviour(EnvironmentCapabilitiesBehaviour(), template=env_cap_template)
