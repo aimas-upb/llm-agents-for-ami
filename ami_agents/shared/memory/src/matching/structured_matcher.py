@@ -72,6 +72,7 @@ class StructuredIntentMatcher(IntentMatcher):
         query_action = query_structured_intent.get("action", "").lower()
         query_artifact = query_structured_intent.get("artifact", "").lower()
         query_parameter = query_structured_intent.get("parameter", "").lower()
+        query_value = query_structured_intent.get("value")
 
         if not query_artifact:
             logger.warning("No artifact in query structured_intent, cannot match")
@@ -83,6 +84,7 @@ class StructuredIntentMatcher(IntentMatcher):
                 query_action,
                 query_artifact,
                 query_parameter,
+                query_value,
                 signifier,
             )
 
@@ -95,7 +97,7 @@ class StructuredIntentMatcher(IntentMatcher):
                         metadata={
                             "matcher_version": self.version,
                             "matched_components": self._get_matched_components(
-                                query_action, query_artifact, query_parameter, signifier
+                                query_action, query_artifact, query_parameter, query_value, signifier
                             ),
                         },
                     )
@@ -113,6 +115,7 @@ class StructuredIntentMatcher(IntentMatcher):
         query_action: str,
         query_artifact: str,
         query_parameter: str,
+        query_value: Any,
         signifier: Dict[str, Any],
     ) -> float:
         """Compute similarity score based on structured intent components.
@@ -141,11 +144,13 @@ class StructuredIntentMatcher(IntentMatcher):
             sig_action = sig_structured_intent.get("action", "").lower()
             sig_artifact = sig_structured_intent.get("artifact", "").lower()
             sig_parameter = sig_structured_intent.get("parameter", "").lower()
+            sig_value = sig_structured_intent.get("value")
         else:
             # Fallback: try to extract from action_name (backward compatibility)
             sig_action = ""  # Cannot infer action from action_name reliably
             sig_artifact = ""  # Cannot infer artifact without structured_intent
             sig_parameter = ""
+            sig_value = None
 
             # If no structured_intent, cannot do structured matching
             logger.debug(
@@ -154,9 +159,10 @@ class StructuredIntentMatcher(IntentMatcher):
             return 0.0
 
         # Component-based scoring with weights
-        action_weight = 0.3
-        artifact_weight = 0.6
+        action_weight = 0.25
+        artifact_weight = 0.5
         parameter_weight = 0.1
+        value_weight = 0.15
 
         # 1. Action similarity
         action_score = 1.0 if sig_action == query_action else 0.0
@@ -169,11 +175,21 @@ class StructuredIntentMatcher(IntentMatcher):
         if query_parameter and sig_parameter:
             parameter_score = 1.0 if sig_parameter == query_parameter else 0.0
 
+        # 4. Value similarity. For structured "set" intents, the target value is
+        # semantically significant and opposite boolean values should not match.
+        value_score = 0.0
+        has_comparable_value = query_value is not None and sig_value is not None
+        if has_comparable_value:
+            value_score = 1.0 if self._normalize_value(query_value) == self._normalize_value(sig_value) else 0.0
+            if query_action == "set" and value_score == 0.0:
+                return 0.0
+
         # Weighted combination
         total_score = (
             action_weight * action_score
             + artifact_weight * artifact_score
             + parameter_weight * parameter_score
+            + value_weight * value_score
         )
 
         # If artifact doesn't match at all, return 0 (critical component)
@@ -239,11 +255,23 @@ class StructuredIntentMatcher(IntentMatcher):
         # No numeric suffix, return as-is
         return artifact_id
 
+    def _normalize_value(self, value: Any) -> Any:
+        """Normalize structured intent values for comparison."""
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered == "true":
+                return True
+            if lowered == "false":
+                return False
+            return lowered
+        return value
+
     def _get_matched_components(
         self,
         query_action: str,
         query_artifact: str,
         query_parameter: str,
+        query_value: Any,
         signifier: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Get information about which components matched.
@@ -267,12 +295,16 @@ class StructuredIntentMatcher(IntentMatcher):
         sig_action = sig_structured_intent.get("action", "").lower()
         sig_artifact = sig_structured_intent.get("artifact", "").lower()
         sig_parameter = sig_structured_intent.get("parameter", "").lower()
+        sig_value = sig_structured_intent.get("value")
 
         return {
             "action_match": sig_action == query_action,
             "artifact_match": sig_artifact == query_artifact,
             "artifact_type_match": self._extract_artifact_type(sig_artifact) == self._extract_artifact_type(query_artifact),
             "parameter_match": sig_parameter == query_parameter if query_parameter and sig_parameter else None,
+            "value_match": self._normalize_value(sig_value) == self._normalize_value(query_value)
+            if query_value is not None and sig_value is not None
+            else None,
         }
 
     def get_info(self) -> Dict[str, Any]:

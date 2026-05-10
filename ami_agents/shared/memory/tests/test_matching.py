@@ -11,6 +11,7 @@ from src.matching import (
     IntentMatcherRegistry,
     StringContainsMatcher,
 )
+from src.matching.structured_matcher import StructuredIntentMatcher
 
 
 class TestStringContainsMatcher:
@@ -317,6 +318,82 @@ class TestIntentMatcherRegistry:
         matcher_v0 = registry.get_matcher("v0")
         assert matcher_v0.get_version() == "v0"
         assert isinstance(matcher_v0, StringContainsMatcher)
+
+
+class TestStructuredIntentMatcher:
+    """Tests for Structured Intent Matcher (IM v2)."""
+
+    def test_set_intent_value_mismatch_is_rejected(self):
+        matcher = StructuredIntentMatcher()
+
+        signifiers = [
+            {
+                "signifier_id": "sig_off",
+                "intent": {
+                    "nl_text": "turn off the lights",
+                    "structured": {
+                        "structured_intent": {
+                            "action": "set",
+                            "artifact": "light",
+                            "parameter": "on_off",
+                            "value": False,
+                        }
+                    },
+                },
+            }
+        ]
+
+        results = matcher.match(
+            intent_query="it's dark in here",
+            signifiers=signifiers,
+            k=5,
+            min_similarity=0.5,
+            query_structured_intent={
+                "action": "set",
+                "artifact": "light",
+                "parameter": "on_off",
+                "value": True,
+            },
+        )
+
+        assert results == []
+
+    def test_set_intent_value_match_scores_perfectly(self):
+        matcher = StructuredIntentMatcher()
+
+        signifiers = [
+            {
+                "signifier_id": "sig_on",
+                "intent": {
+                    "nl_text": "turn on the lights",
+                    "structured": {
+                        "structured_intent": {
+                            "action": "set",
+                            "artifact": "light",
+                            "parameter": "on_off",
+                            "value": True,
+                        }
+                    },
+                },
+            }
+        ]
+
+        results = matcher.match(
+            intent_query="it's dark in here",
+            signifiers=signifiers,
+            k=5,
+            min_similarity=0.5,
+            query_structured_intent={
+                "action": "set",
+                "artifact": "light",
+                "parameter": "on_off",
+                "value": True,
+            },
+        )
+
+        assert len(results) == 1
+        assert results[0].signifier_id == "sig_on"
+        assert results[0].similarity == 1.0
 
     def test_get_default_matcher(self):
         """Test retrieving default matcher."""
