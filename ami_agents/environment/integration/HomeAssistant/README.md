@@ -120,9 +120,72 @@ Topic shapes:
 - workspace topic: `http://localhost:8080/workspaces/lab308`
 - artifact topic: `http://localhost:8080/workspaces/lab308/artifacts/Temp%20Sensor#artifact`
 
-### 7) Useful scripts
-./tick_clock.py will update the clock in lab_308 with the current time every second
-./adjust_lux_on_events.py will react to lights being turned on or off and to the blinds being moved by updating the value of the luminosity sensor
+## 8) Useful scripts
+- `./tick_clock.py` updates the `clock_308` artifact every second.
+- `./adjust_lux_on_events.py` reacts to light and cover changes by updating one illuminance sensor.
+
+## 9) Extended lab308e scenario
+`lab308e.yaml` is a denser variant of `lab308` intended to make ambiguous requests harder without TD-SOSA semantics.
+
+It adds:
+- multiple light sources: `ambient_lights_308e`, `task_lights_308e`, `desk_lamp_308e`
+- multiple covers: `blinds_308e`, `blackout_blinds_308e`, `window_308e`
+- presentation/display context: `projector_308e`, `display_wall_308e`, `presentation_mode_308e`
+- multiple climate actuators: `air_conditioner_308e`, `heater_308e`, `ceiling_fan_308e`
+- more sensors: desk light, glare, humidity, CO2, presence
+
+Import it the same way as `lab308.yaml`:
+- copy `lab308e.yaml` to `PATH_TO_YOUR_CONFIG/custom_components/virtual/lab308e.yaml`
+- add a new Virtual Components entry:
+  - Group name: `lab308e`
+  - File: `/config/custom_components/virtual/lab308e.yaml`
+  - Create an area named `lab308e`
+
+When running HASP for this workspace:
+- set `AREAS` to the Home Assistant `area_id` created for `lab308e`
+- keep `BASE_WS_URI` aligned with the port you use to start `uvicorn`
+
+## 10) lab308e simulator loop
+`./simulate_lab308e.py` is a hardcoded real-time environment loop for `lab308e`.
+
+What it updates:
+- `clock_308e`
+- `external_light_sensing_308e` from real time of day
+- `internal_light_sensing_308e`
+- `desk_light_sensing_308e`
+- `glare_sensing_308e`
+- `temperature_sensing_308e`
+- `humidity_sensing_308e`
+- `co2_sensing_308e`
+
+What it reads from Home Assistant before computing the next state:
+- lights, covers, projector/display state
+- presentation mode
+- heater, AC, fan
+- occupancy and person count
+
+How it runs:
+- subscribes to Home Assistant `state_changed` events over WebSocket
+- recomputes immediately when relevant `lab308e` entities change
+- also performs a periodic refresh so daylight and outdoor conditions continue to evolve with real time
+
+Examples of modeled interactions:
+- `desk_light_sensing_308e` is affected by `desk_lamp_308e`, `task_lights_308e`, `ambient_lights_308e`, blinds state, blackout blinds state, and presentation/projector context
+- `internal_light_sensing_308e` depends on ambient/task/desk lighting plus daylight through the blinds
+- `glare_sensing_308e` depends on daylight, blinds openness, and projector/display context
+- temperature, humidity, and CO2 depend on occupancy, window openness, and climate actuator state
+
+Run it with:
+
+```bash
+source prepare-adapter-env.sh
+python simulate_lab308e.py
+```
+
+Optional environment variables:
+- `LAB308E_TICK_SECONDS` default `5`
+
+This script is hardcoded to the entity names generated from `lab308e.yaml`. If the Virtual Components integration creates different entity ids in your HA instance, update the `ENTITY` mapping inside `simulate_lab308e.py`.
 
 ## Utilities
 set_property.py - set a property in HomeAssistant using the same environment variables. Examples:
