@@ -12,7 +12,6 @@
   "device:heater_308e": "thermal_comfort",
   "device:person_counter_308e": "occupancy_presence",
   "device:presence_sensing_308e": "occupancy_presence",
-  "device:presentation_mode_308e": "activity_state",
   "device:clock_308e": "activity_state",
 
   "entity:sensor.internal_light_sensing_308e:state": "luminosity",
@@ -24,7 +23,6 @@
   "entity:sensor.co2_sensing_308e:state": "air_quality",
   "entity:sensor.person_counter_308e:state": "occupancy_presence",
   "entity:binary_sensor.presence_sensing_308e:state": "occupancy_presence",
-  "entity:binary_sensor.presentation_mode_308e:state": "activity_state",
   "entity:sensor.clock_308e:state": "activity_state",
 
   "entity:light.ambient_lights_308e:action:light.turn_on": "luminosity",

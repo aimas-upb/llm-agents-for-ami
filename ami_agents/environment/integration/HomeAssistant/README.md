@@ -130,7 +130,7 @@ Topic shapes:
 It adds:
 - multiple light sources: `ambient_lights_308e`, `task_lights_308e`, `desk_lamp_308e`
 - multiple covers: `blinds_308e`, `blackout_blinds_308e`, `window_308e`
-- presentation/display context: `projector_308e`, `display_wall_308e`, `presentation_mode_308e`
+- presentation/display context: `projector_308e`, `display_wall_308e`
 - multiple climate actuators: `air_conditioner_308e`, `heater_308e`, `ceiling_fan_308e`
 - more sensors: desk light, glare, humidity, CO2, presence
 
@@ -160,7 +160,6 @@ What it updates:
 
 What it reads from Home Assistant before computing the next state:
 - lights, covers, projector/display state
-- presentation mode
 - heater, AC, fan
 - occupancy and person count
 
@@ -170,7 +169,7 @@ How it runs:
 - also performs a periodic refresh so daylight and outdoor conditions continue to evolve with real time
 
 Examples of modeled interactions:
-- `desk_light_sensing_308e` is affected by `desk_lamp_308e`, `task_lights_308e`, `ambient_lights_308e`, blinds state, blackout blinds state, and presentation/projector context
+- `desk_light_sensing_308e` is affected by `desk_lamp_308e`, `task_lights_308e`, `ambient_lights_308e`, blinds state, blackout blinds state, and projector/display context
 - `internal_light_sensing_308e` depends on ambient/task/desk lighting plus daylight through the blinds
 - `glare_sensing_308e` depends on daylight, blinds openness, and projector/display context
 - temperature, humidity, and CO2 depend on occupancy, window openness, and climate actuator state

@@ -7,7 +7,7 @@ What it does:
 - computes outdoor light from real time of day
 - reads current actuator/device states from Home Assistant
 - updates the derived light sensors based on lights, blinds, blackout blinds,
-  projector/display usage, and presentation mode
+  and projector/display usage
 - updates temperature, humidity, and CO2 based on occupancy and HVAC/window state
 - recomputes immediately when relevant Home Assistant entities change
 
@@ -61,7 +61,6 @@ ENTITY = {
     "co2": "sensor.co2_sensing_308e",
     "person_counter": "sensor.person_counter_308e",
     "presence": "binary_sensor.presence_sensing_308e",
-    "presentation_mode": "binary_sensor.presentation_mode_308e",
 }
 
 
@@ -192,7 +191,6 @@ class Lab308eSimulator:
 
         projector_on = _media_is_on(world["projector"])
         display_on = _media_is_on(world["display_wall"])
-        presentation_mode = str(world["presentation_mode"].get("state", "")).lower() == "on"
 
         daylight_room = external_lux * (0.55 * blinds_open + 0.08 * blackout_open)
         daylight_desk = external_lux * (0.35 * blinds_open + 0.05 * blackout_open)
@@ -204,7 +202,6 @@ class Lab308eSimulator:
             + task_level * 300.0
             + desk_level * 80.0
             - (140.0 if projector_on else 0.0)
-            - (90.0 if presentation_mode else 0.0)
         )
 
         desk_lux = (
@@ -214,7 +211,6 @@ class Lab308eSimulator:
             + task_level * 220.0
             + desk_level * 520.0
             - (60.0 if projector_on else 0.0)
-            - (40.0 if presentation_mode else 0.0)
         )
 
         glare = (
@@ -327,7 +323,6 @@ def _relevant_entity_ids() -> set[str]:
         ENTITY["heater"],
         ENTITY["person_counter"],
         ENTITY["presence"],
-        ENTITY["presentation_mode"],
     }
 
 

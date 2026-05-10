@@ -52,15 +52,9 @@ devices:
       initial_volume: 0.0
 
   ceiling_fan_308e:
-    - platform: speaker
+    - platform: switch
       name: ceiling_fan_308e
       initial_value: "off"
-      initial_volume: 0.0
-      initial_muted: true
-      volume_step: 0.1
-      support_volume_set: false
-      support_volume_step: false
-      support_mute: true
 
   air_conditioner_308e:
     - platform: climate
@@ -138,11 +132,6 @@ devices:
       name: presence_sensing_308e
       class: occupancy
       initial_value: "on"
-
-  presentation_mode_308e:
-    - platform: binary_sensor
-      name: presentation_mode_308e
-      initial_value: "off"
 
   clock_308e:
     - platform: sensor
