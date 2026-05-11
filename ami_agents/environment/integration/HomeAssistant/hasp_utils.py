@@ -900,6 +900,33 @@ def get_supported_service_fields(domain: str, entity_attributes: Dict[str, Any],
 
     return supported
 
+
+def is_service_supported_for_entity(
+    domain: str,
+    service_name: str,
+    entity_attributes: Dict[str, Any],
+) -> bool:
+    """Return whether a service should be exposed/invoked for a specific entity."""
+    if domain != "cover":
+        return True
+
+    supported_features = int(entity_attributes.get("supported_features", 0) or 0)
+
+    tilt_services = {
+        "open_cover_tilt",
+        "close_cover_tilt",
+        "stop_cover_tilt",
+        "set_cover_tilt_position",
+    }
+    if service_name in tilt_services:
+        return bool(supported_features & 128)
+
+    if service_name == "set_cover_position":
+        return bool(supported_features & 4)
+
+    return True
+
 __all__ = ["HomeAssistantWS", "HomeAssistantRDF", "HomeAssistantREST",
            "get_operational_attributes", "get_metadata_attributes",
-           "get_writable_fields_from_services", "get_supported_service_fields"]
+           "get_writable_fields_from_services", "get_supported_service_fields",
+           "is_service_supported_for_entity"]

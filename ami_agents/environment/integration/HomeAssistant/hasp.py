@@ -19,7 +19,7 @@ from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
 
 from http import HTTPStatus
 from hasp_utils import (HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST,
-                        get_supported_service_fields)
+                        get_supported_service_fields, is_service_supported_for_entity)
 from hasp_cache import HASPGraphCache
 
 # Namespaces
@@ -933,6 +933,8 @@ def _build_cached_artifact_ttl(
             )
             if not (legacy_applies or modern_applies):
                 continue
+            if not is_service_supported_for_entity(domain, svc_name, domain_entity_attrs):
+                continue
             action_name = f"{_camel_token(domain)}{_camel_token(svc_name)}"
             all_service_fields = definition.get("fields", {})
             supported_fields = get_supported_service_fields(domain, domain_entity_attrs, all_service_fields)
@@ -1282,6 +1284,10 @@ async def action_ha_service(workspace_id: str, artifact_name: str, domain: str, 
     svc = await cache.get_service_definition(domain, service)
     if not svc:
         raise HTTPException(status_code=404, detail="Service not found for domain")
+    ent_state = cache.states_by_entity_id.get(ent, {}) if hasattr(cache, "states_by_entity_id") else {}
+    ent_attrs = ent_state.get("attributes", {}) if isinstance(ent_state, dict) else {}
+    if not is_service_supported_for_entity(domain, service, ent_attrs):
+        raise HTTPException(status_code=404, detail="Service not supported by this entity")
 
     payload = {}
     if request.headers.get("content-length") not in (None, "0"):

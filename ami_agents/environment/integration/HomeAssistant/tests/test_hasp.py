@@ -219,6 +219,82 @@ def test_action_ha_service_drops_unsupported_payload_fields(monkeypatch):
     assert ("cover", "open_cover", {"entity_id": "cover.blinds_308_cover"}) in appmod.ha_rest.calls
 
 
+def test_cover_artifact_hides_tilt_services_for_non_tilt_entity(monkeypatch):
+    areas = [{"area_id": "lab308", "name": "Lab 308"}]
+    devices_by_area = {
+        "lab308": [{"id": "dev1", "name": "window_308_cover", "area_id": "lab308"}],
+    }
+    entities = [
+        {"entity_id": "cover.window_308_cover", "device_id": "dev1", "name": "window_308_cover", "area_id": "lab308"},
+    ]
+    states = [
+        {
+            "entity_id": "cover.window_308_cover",
+            "state": "closed",
+            "attributes": {"supported_features": 0},
+        },
+    ]
+    services = [
+        {
+            "domain": "cover",
+            "services": {
+                "open_cover": {"fields": {"entity_id": {}}},
+                "open_cover_tilt": {"fields": {"entity_id": {}}},
+                "set_cover_tilt_position": {"fields": {"tilt_position": {}}},
+            },
+        },
+    ]
+
+    fake_ws = FakeHAWS(areas, devices_by_area, entities, states)
+    fake_rest = FakeHAREST(states, services)
+    monkeypatch.setattr(appmod, "ha_client", fake_ws)
+    monkeypatch.setattr(appmod, "ha_rest", fake_rest)
+
+    client = TestClient(appmod.app)
+    r = client.get("/workspaces/lab308/artifacts/window_308_cover")
+    assert r.status_code == 200
+    ttl = r.text
+    assert "/ha/cover/open_cover" in ttl
+    assert "/ha/cover/open_cover_tilt" not in ttl
+    assert "/ha/cover/set_cover_tilt_position" not in ttl
+
+
+def test_action_ha_service_rejects_tilt_service_for_non_tilt_cover(monkeypatch):
+    areas = [{"area_id": "lab308", "name": "Lab 308"}]
+    devices_by_area = {
+        "lab308": [{"id": "dev1", "name": "window_308_cover", "area_id": "lab308"}],
+    }
+    entities = [
+        {"entity_id": "cover.window_308_cover", "device_id": "dev1", "name": "window_308_cover", "area_id": "lab308"},
+    ]
+    states = [
+        {
+            "entity_id": "cover.window_308_cover",
+            "state": "closed",
+            "attributes": {"supported_features": 0},
+        },
+    ]
+    services = [
+        {
+            "domain": "cover",
+            "services": {
+                "open_cover_tilt": {"fields": {}},
+            },
+        },
+    ]
+
+    fake_ws = FakeHAWS(areas, devices_by_area, entities, states)
+    fake_rest = FakeHAREST(states, services)
+    monkeypatch.setattr(appmod, "ha_client", fake_ws)
+    monkeypatch.setattr(appmod, "ha_rest", fake_rest)
+
+    client = TestClient(appmod.app)
+    r = client.post("/workspaces/lab308/artifacts/window_308_cover/ha/cover/open_cover_tilt", json={})
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Service not supported by this entity"
+    assert appmod.ha_rest.calls == []
+
+
 def test_action_ha_service_no_entity(sample_data):
     client = TestClient(appmod.app)
     # Use sensor device but request light domain → should 404 for missing entity
