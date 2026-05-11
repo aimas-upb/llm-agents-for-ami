@@ -295,6 +295,99 @@ def test_action_ha_service_rejects_tilt_service_for_non_tilt_cover(monkeypatch):
     assert appmod.ha_rest.calls == []
 
 
+def test_climate_artifact_hides_turn_off_and_turn_on_services(monkeypatch):
+    areas = [{"area_id": "lab308", "name": "Lab 308"}]
+    devices_by_area = {
+        "lab308": [{"id": "dev1", "name": "heater_308e", "area_id": "lab308"}],
+    }
+    entities = [
+        {"entity_id": "climate.heater_308e", "device_id": "dev1", "name": "heater_308e", "area_id": "lab308"},
+    ]
+    states = [
+        {
+            "entity_id": "climate.heater_308e",
+            "state": "heat",
+            "attributes": {
+                "hvac_mode": "heat",
+                "hvac_modes": ["off", "heat"],
+                "temperature": 20,
+                "current_temperature": 21,
+                "min_temp": 16,
+                "max_temp": 28,
+            },
+        },
+    ]
+    services = [
+        {
+            "domain": "climate",
+            "services": {
+                "turn_off": {"fields": {"entity_id": {}}},
+                "turn_on": {"fields": {"entity_id": {}}},
+                "set_hvac_mode": {"fields": {"entity_id": {}, "hvac_mode": {}}},
+                "set_temperature": {"fields": {"entity_id": {}, "temperature": {}}},
+            },
+        },
+    ]
+
+    fake_ws = FakeHAWS(areas, devices_by_area, entities, states)
+    fake_rest = FakeHAREST(states, services)
+    monkeypatch.setattr(appmod, "ha_client", fake_ws)
+    monkeypatch.setattr(appmod, "ha_rest", fake_rest)
+
+    client = TestClient(appmod.app)
+    r = client.get("/workspaces/lab308/artifacts/heater_308e")
+    assert r.status_code == 200
+    ttl = r.text
+    assert "/ha/climate/turn_off" not in ttl
+    assert "/ha/climate/turn_on" not in ttl
+    assert "/ha/climate/set_hvac_mode" in ttl
+    assert "/ha/climate/set_temperature" in ttl
+
+
+def test_action_ha_service_rejects_turn_off_for_climate_entity(monkeypatch):
+    areas = [{"area_id": "lab308", "name": "Lab 308"}]
+    devices_by_area = {
+        "lab308": [{"id": "dev1", "name": "heater_308e", "area_id": "lab308"}],
+    }
+    entities = [
+        {"entity_id": "climate.heater_308e", "device_id": "dev1", "name": "heater_308e", "area_id": "lab308"},
+    ]
+    states = [
+        {
+            "entity_id": "climate.heater_308e",
+            "state": "heat",
+            "attributes": {
+                "hvac_mode": "heat",
+                "hvac_modes": ["off", "heat"],
+                "temperature": 20,
+                "current_temperature": 21,
+                "min_temp": 16,
+                "max_temp": 28,
+            },
+        },
+    ]
+    services = [
+        {
+            "domain": "climate",
+            "services": {
+                "turn_off": {"fields": {}},
+                "set_hvac_mode": {"fields": {"hvac_mode": {}}},
+            },
+        },
+    ]
+
+    fake_ws = FakeHAWS(areas, devices_by_area, entities, states)
+    fake_rest = FakeHAREST(states, services)
+    monkeypatch.setattr(appmod, "ha_client", fake_ws)
+    monkeypatch.setattr(appmod, "ha_rest", fake_rest)
+
+    client = TestClient(appmod.app)
+    r = client.post("/workspaces/lab308/artifacts/heater_308e/ha/climate/turn_off", json={})
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Service not supported by this entity"
+    assert appmod.ha_rest.calls == []
+
+
 def test_action_ha_service_no_entity(sample_data):
     client = TestClient(appmod.app)
     # Use sensor device but request light domain → should 404 for missing entity

@@ -907,6 +907,15 @@ def is_service_supported_for_entity(
     entity_attributes: Dict[str, Any],
 ) -> bool:
     """Return whether a service should be exposed/invoked for a specific entity."""
+    if domain == "climate":
+        # Prefer the explicit HVAC-mode affordance for thermostat-like entities.
+        # The virtual climate devices used in this repo reliably support
+        # ``set_hvac_mode`` but can reject generic ``turn_on`` / ``turn_off``
+        # service forwards with backend 500s.
+        if service_name in {"turn_on", "turn_off"}:
+            return False
+        return True
+
     if domain != "cover":
         return True
 
