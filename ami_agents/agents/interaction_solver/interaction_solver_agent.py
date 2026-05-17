@@ -32,6 +32,7 @@ from ...shared.utils.logger import LoggerFactory
 from ...shared.utils.spade_rpc import RpcTimeoutError, rpc_call, send_via_router
 from .behaviours import EnvironmentReadyBehaviour, GoalRequestBehaviour
 from .utils import LLMClientConfig, build_llm_client
+from ..user_assistant.models import Intent
 
 
 # Fallback defaults used only when yaml is missing a key.
