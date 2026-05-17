@@ -85,6 +85,7 @@ def format_capabilities_payload(agent_instance) -> Dict[str, Any]:
             "workspaces": [],
             "artifacts": [],
             "affordances": [],
+            "semantic_capabilities": dict(getattr(agent_instance, "semantic_capabilities", {}) or {}),
         }
 
     artifacts = list(agent_instance.artifacts.values())
@@ -95,6 +96,7 @@ def format_capabilities_payload(agent_instance) -> Dict[str, Any]:
             "workspaces": [],
             "artifacts": [],
             "affordances": [],
+            "semantic_capabilities": dict(getattr(agent_instance, "semantic_capabilities", {}) or {}),
         }
 
     # Workspaces (for multi-workspace UX and scoping)
@@ -176,6 +178,6 @@ def format_capabilities_payload(agent_instance) -> Dict[str, Any]:
         "workspaces": workspaces_out,
         "artifacts": artifacts_out,
         "affordances": affordances_out,
+        "semantic_capabilities": dict(getattr(agent_instance, "semantic_capabilities", {}) or {}),
     }
-
 

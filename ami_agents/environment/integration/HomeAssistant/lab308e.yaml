@@ -1,0 +1,139 @@
+version: 1
+
+devices:
+  ambient_lights_308e:
+    - platform: light
+      support_brightness: true
+      support_color: true
+      initial_value: "off"
+      initial_brightness: 96
+
+  task_lights_308e:
+    - platform: light
+      support_brightness: true
+      support_color: true
+      initial_value: "off"
+      initial_brightness: 128
+
+  desk_lamp_308e:
+    - platform: light
+      support_brightness: true
+      initial_value: "off"
+      initial_brightness: 140
+
+  blinds_308e:
+    - platform: cover
+      initial_value: "closed"
+      open_close_duration: 30
+      open_close_tick: 1
+
+  blackout_blinds_308e:
+    - platform: cover
+      initial_value: "open"
+      open_close_duration: 20
+      open_close_tick: 1
+
+  window_308e:
+    - platform: cover
+      initial_value: "closed"
+      open_close_duration: 15
+      open_close_tick: 1
+
+  projector_308e:
+    - platform: media_player
+      name: projector_308e
+      initial_value: "off"
+      initial_volume: 0.15
+
+  display_wall_308e:
+    - platform: media_player
+      name: display_wall_308e
+      initial_value: "on"
+      initial_volume: 0.0
+
+  ceiling_fan_308e:
+    - platform: switch
+      name: ceiling_fan_308e
+      initial_value: "off"
+
+  air_conditioner_308e:
+    - platform: climate
+      name: air_conditioner_308e
+      initial_hvac_mode: "cool"
+      initial_temperature: 24
+      min_temp: 18
+      max_temp: 30
+      target_temp_step: 0.5
+
+  heater_308e:
+    - platform: climate
+      name: heater_308e
+      initial_hvac_mode: "heat"
+      initial_temperature: 20
+      min_temp: 16
+      max_temp: 28
+      target_temp_step: 0.5
+
+  internal_light_sensing_308e:
+    - platform: sensor
+      name: internal_light_sensing_308e
+      class: illuminance
+      unit_of_measurement: lx
+      initial_value: 180
+
+  desk_light_sensing_308e:
+    - platform: sensor
+      name: desk_light_sensing_308e
+      class: illuminance
+      unit_of_measurement: lx
+      initial_value: 120
+
+  glare_sensing_308e:
+    - platform: sensor
+      name: glare_sensing_308e
+      unit_of_measurement: "%"
+      initial_value: 75
+
+  external_light_sensing_308e:
+    - platform: sensor
+      name: external_light_sensing_308e
+      class: illuminance
+      unit_of_measurement: lx
+      initial_value: 5200
+
+  temperature_sensing_308e:
+    - platform: sensor
+      name: temperature_sensing_308e
+      class: temperature
+      unit_of_measurement: "°C"
+      initial_value: 26
+
+  humidity_sensing_308e:
+    - platform: sensor
+      name: humidity_sensing_308e
+      class: humidity
+      unit_of_measurement: "%"
+      initial_value: 62
+
+  co2_sensing_308e:
+    - platform: sensor
+      name: co2_sensing_308e
+      unit_of_measurement: ppm
+      initial_value: 980
+
+  person_counter_308e:
+    - platform: sensor
+      name: person_counter_308e
+      unit_of_measurement: persons
+      initial_value: 3
+
+  presence_sensing_308e:
+    - platform: binary_sensor
+      name: presence_sensing_308e
+      class: occupancy
+      initial_value: "on"
+
+  clock_308e:
+    - platform: sensor
+      name: clock_308e
+      class: timestamp

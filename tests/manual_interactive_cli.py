@@ -48,6 +48,31 @@ from ami_agents.agents.user_assistant.user_assistant_agent import UserAssistantA
 from ami_agents.environment.connection.hmas_client import IHMASClient
 from ami_agents.shared.utils.demo_log import demo
 
+_NO_COLOR = bool(os.getenv("AMI_NO_COLOR")) or bool(os.getenv("NO_COLOR"))
+_ANSI_RESET = "\x1b[0m"
+_ANSI_BOLD_GREEN = "\x1b[1;32m"
+_ANSI_GREEN = "\x1b[32m"
+_ANSI_RED = "\x1b[31m"
+
+
+def _green(text: str, *, bold: bool = False) -> str:
+    if _NO_COLOR:
+        return text
+    color = _ANSI_BOLD_GREEN if bold else _ANSI_GREEN
+    return f"{color}{text}{_ANSI_RESET}"
+
+
+def _red(text: str) -> str:
+    if _NO_COLOR:
+        return text
+    return f"{_ANSI_RED}{text}{_ANSI_RESET}"
+
+
+def _user_prompt() -> str:
+    if _NO_COLOR:
+        return "You> "
+    return f"{_ANSI_BOLD_GREEN}You>{_ANSI_RESET} "
+
 
 class _HighFrequencyFilter(logging.Filter):
     """Drop ultra-frequent sensor state updates to keep console readable."""
@@ -249,7 +274,7 @@ class ConsoleUserAgent(Agent):
 
             loop = asyncio.get_running_loop()
             try:
-                text = await loop.run_in_executor(None, input, "You> ")
+                text = await loop.run_in_executor(None, input, _user_prompt())
             except (EOFError, KeyboardInterrupt):
                 text = "exit"
 
@@ -261,7 +286,7 @@ class ConsoleUserAgent(Agent):
                 return
 
             if normalized.lower() in {"exit", "quit", "q"}:
-                print("Exiting interactive session...")
+                print(_green("Exiting interactive session..."))
                 self.agent._stop_requested = True
                 await self.agent.stop()
                 return
@@ -272,17 +297,17 @@ class ConsoleUserAgent(Agent):
             msg.body = normalized
             await self.send(msg)
 
-            print("Assistant> (thinking...)")
+            print(_red("Assistant> (thinking...)"))
             try:
                 reply = await asyncio.wait_for(
                     self.agent.reply_queue.get(),
                     timeout=self.agent.response_timeout,
                 )
             except asyncio.TimeoutError:
-                print("Assistant> No reply received within timeout.")
+                print(_red("Assistant> No reply received within timeout."))
                 return
 
-            print("\nAssistant>\n" + reply + "\n")
+            print(_red("\nAssistant>\n" + reply + "\n"))
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
@@ -345,8 +370,8 @@ async def main():
     # Load complete configuration from agents.yaml and environment.yaml
     try:
         config = ConfigLoader.merge_configs(
-            ConfigLoader.load_with_env_vars("ami_agents/config/agents.yaml"),
-            ConfigLoader.load_with_env_vars("ami_agents/config/environment.yaml")
+            ConfigLoader.load_with_env_vars(str(PROJECT_ROOT / "ami_agents" / "config" / "agents.yaml")),
+            ConfigLoader.load_with_env_vars(str(PROJECT_ROOT / "ami_agents" / "config" / "environment.yaml"))
         )
     except Exception as e:
         raise RuntimeError(f"Failed to load agent configuration: {e}")

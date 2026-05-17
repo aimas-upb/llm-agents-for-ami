@@ -114,9 +114,19 @@ class HomeAssistantREST:
         return resp.json()
 
     async def call_service(self, domain: str, service: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        self.logger.info("Calling Home Assistant service %s/%s with payload=%s", domain, service, data)
         resp = await self.client.post(f"/api/services/{domain}/{service}", json=data)
+        if resp.status_code >= 400:
+            error_text = resp.text
+            self.logger.error(
+                "Home Assistant service %s/%s failed [%s]: payload=%s response=%s",
+                domain,
+                service,
+                resp.status_code,
+                data,
+                error_text,
+            )
         resp.raise_for_status()
-        self.logger.debug("Calling %s/%s with %s", domain, service, data)
         # HA returns a list of changed states; normalize to dict
         try:
             return resp.json()
@@ -890,6 +900,42 @@ def get_supported_service_fields(domain: str, entity_attributes: Dict[str, Any],
 
     return supported
 
+
+def is_service_supported_for_entity(
+    domain: str,
+    service_name: str,
+    entity_attributes: Dict[str, Any],
+) -> bool:
+    """Return whether a service should be exposed/invoked for a specific entity."""
+    if domain == "climate":
+        # Prefer the explicit HVAC-mode affordance for thermostat-like entities.
+        # The virtual climate devices used in this repo reliably support
+        # ``set_hvac_mode`` but can reject generic ``turn_on`` / ``turn_off``
+        # service forwards with backend 500s.
+        if service_name in {"turn_on", "turn_off"}:
+            return False
+        return True
+
+    if domain != "cover":
+        return True
+
+    supported_features = int(entity_attributes.get("supported_features", 0) or 0)
+
+    tilt_services = {
+        "open_cover_tilt",
+        "close_cover_tilt",
+        "stop_cover_tilt",
+        "set_cover_tilt_position",
+    }
+    if service_name in tilt_services:
+        return bool(supported_features & 128)
+
+    if service_name == "set_cover_position":
+        return bool(supported_features & 4)
+
+    return True
+
 __all__ = ["HomeAssistantWS", "HomeAssistantRDF", "HomeAssistantREST",
            "get_operational_attributes", "get_metadata_attributes",
-           "get_writable_fields_from_services", "get_supported_service_fields"]
+           "get_writable_fields_from_services", "get_supported_service_fields",
+           "is_service_supported_for_entity"]

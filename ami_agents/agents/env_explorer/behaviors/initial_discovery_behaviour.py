@@ -4,11 +4,33 @@ Initial discovery behavior for EnvExplorer agent.
 
 import asyncio
 import json
+from rdflib import Graph, Namespace
 from spade.behaviour import OneShotBehaviour
 from spade.message import Message as SpadeMessage
 
 from ....shared.models.messages import MessageType, META_CORRELATION_ID, ensure_correlation_id
 from ....shared.utils.demo_log import demo
+
+
+TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
+
+
+def _detect_tdsosa_support(agent) -> bool:
+    for artifact in (agent.artifacts or {}).values():
+        td = getattr(artifact, "thing_description", None)
+        rdf = getattr(td, "rdf", None)
+        if not isinstance(rdf, str) or not rdf.strip():
+            continue
+        try:
+            graph = Graph()
+            graph.parse(data=rdf, format="turtle")
+        except Exception:
+            continue
+        if any(str(pred).startswith(str(TDSOSA)) for _, pred, _ in graph):
+            return True
+        if any(str(obj).startswith(str(TDSOSA)) for _, _, obj in graph):
+            return True
+    return False
 
 
 class InitialDiscoveryBehaviour(OneShotBehaviour):
@@ -46,6 +68,9 @@ class InitialDiscoveryBehaviour(OneShotBehaviour):
             self.agent.environment_map = self.agent.integration_engine.workspace_map
             self.agent.artifacts = self.agent.integration_engine.artifact_map
             self.agent.affordances = self.agent.integration_engine.affordance_map
+            self.agent.semantic_capabilities = {
+                "td_sosa_supported": _detect_tdsosa_support(self.agent),
+            }
 
             self.agent.logger.info("Subscribing to artifact events...")
             for artifact_id, artifact in self.agent.artifacts.items():
@@ -98,6 +123,7 @@ class InitialDiscoveryBehaviour(OneShotBehaviour):
             "artifacts_count": len(self.agent.artifacts or {}),
             "affordances_count": len(self.agent.affordances or {}),
             "yggdrasil_url": getattr(self.agent, "yggdrasil_url", None),
+            "semantic_capabilities": dict(getattr(self.agent, "semantic_capabilities", {}) or {}),
         }
 
         sent = 0

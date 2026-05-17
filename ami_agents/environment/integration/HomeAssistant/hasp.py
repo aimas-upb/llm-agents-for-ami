@@ -19,7 +19,7 @@ from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
 
 from http import HTTPStatus
 from hasp_utils import (HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST,
-                        get_supported_service_fields)
+                        get_supported_service_fields, is_service_supported_for_entity)
 from hasp_cache import HASPGraphCache
 
 # Namespaces
@@ -142,6 +142,23 @@ def _ttl_for_request(ttl: str, request: Request, cache: HASPGraphCache) -> str:
     if normalized_cache_base != normalized_request_base:
         rewritten = rewritten.replace(normalized_cache_base, normalized_request_base)
     return rewritten
+
+
+def _sanitize_service_payload(
+    payload: Dict[str, Any],
+    service_definition: Optional[Dict[str, Any]],
+    *,
+    entity_id: str,
+) -> Tuple[Dict[str, Any], List[str]]:
+    fields = (service_definition or {}).get("fields") or {}
+    allowed_fields = {key for key in fields if isinstance(key, str)}
+    sanitized = {key: value for key, value in payload.items() if key in allowed_fields}
+    sanitized["entity_id"] = entity_id
+    dropped = sorted(
+        key for key in payload
+        if key != "entity_id" and key not in allowed_fields
+    )
+    return sanitized, dropped
 
 @app.on_event("shutdown")
 async def _shutdown():
@@ -916,6 +933,8 @@ def _build_cached_artifact_ttl(
             )
             if not (legacy_applies or modern_applies):
                 continue
+            if not is_service_supported_for_entity(domain, svc_name, domain_entity_attrs):
+                continue
             action_name = f"{_camel_token(domain)}{_camel_token(svc_name)}"
             all_service_fields = definition.get("fields", {})
             supported_fields = get_supported_service_fields(domain, domain_entity_attrs, all_service_fields)
@@ -1265,6 +1284,10 @@ async def action_ha_service(workspace_id: str, artifact_name: str, domain: str, 
     svc = await cache.get_service_definition(domain, service)
     if not svc:
         raise HTTPException(status_code=404, detail="Service not found for domain")
+    ent_state = cache.states_by_entity_id.get(ent, {}) if hasattr(cache, "states_by_entity_id") else {}
+    ent_attrs = ent_state.get("attributes", {}) if isinstance(ent_state, dict) else {}
+    if not is_service_supported_for_entity(domain, service, ent_attrs):
+        raise HTTPException(status_code=404, detail="Service not supported by this entity")
 
     payload = {}
     if request.headers.get("content-length") not in (None, "0"):
@@ -1272,9 +1295,39 @@ async def action_ha_service(workspace_id: str, artifact_name: str, domain: str, 
             payload = await request.json()
         except Exception:
             payload = {}
-    payload = {**payload, "entity_id": ent}
+    payload, dropped_fields = _sanitize_service_payload(payload, svc, entity_id=ent)
+    if dropped_fields:
+        print(
+            f"HASP dropped unsupported service payload fields: domain={domain} service={service} "
+            f"entity_id={ent} dropped={dropped_fields}"
+        )
 
-    result = await ha_rest.call_service(domain, service, payload)
+    print(
+        f"HASP forwarding service call: workspace={workspace_id} artifact={artifact_name} "
+        f"domain={domain} service={service} entity_id={ent} payload={payload}"
+    )
+    try:
+        result = await ha_rest.call_service(domain, service, payload)
+    except httpx.HTTPStatusError as exc:
+        response_text = ""
+        with contextlib.suppress(Exception):
+            response_text = exc.response.text
+        detail = {
+            "error": "home_assistant_service_call_failed",
+            "domain": domain,
+            "service": service,
+            "artifact_name": artifact_name,
+            "entity_id": ent,
+            "payload": payload,
+            "home_assistant_status": exc.response.status_code if exc.response is not None else None,
+            "home_assistant_response": response_text,
+        }
+        print(
+            f"HASP service forward failed: domain={domain} service={service} "
+            f"entity_id={ent} status={detail['home_assistant_status']} "
+            f"response={response_text}"
+        )
+        raise HTTPException(status_code=502, detail=detail)
     await cache.apply_service_result(result)
     if isinstance(result, list):
         for item in result:

@@ -53,9 +53,18 @@ async def ensure_experience_engine_ready(agent_instance) -> bool:
             agent_instance._experience_engine_default_matcher_version = matcher_registry.get_default_version()
 
             try:
-                agent_instance._experience_engine_default_min_similarity = float(cfg.get("min_similarity", 0.0))
+                configured_min_similarity = cfg.get(
+                    "min_similarity",
+                    cfg.get(
+                        "default_min_similarity",
+                        getattr(agent_instance, "_experience_engine_default_min_similarity", 0.5),
+                    ),
+                )
+                agent_instance._experience_engine_default_min_similarity = float(configured_min_similarity)
             except Exception:
-                agent_instance._experience_engine_default_min_similarity = 0.0
+                agent_instance._experience_engine_default_min_similarity = float(
+                    getattr(agent_instance, "_experience_engine_default_min_similarity", 0.5)
+                )
 
             agent_instance._experience_engine_context_builder = ContextGraphBuilder()
             agent_instance._experience_engine_shacl_validator = SHACLValidator(enable_caching=bool(cfg.get("enable_shacl_cache", False)))
