@@ -86,6 +86,7 @@ class PromptDumpState:
     enabled: bool = False
     output_dir: Optional[Path] = None
     case_name: Optional[str] = None
+    case_timestamp: Optional[str] = None
     prompt_entries: List[str] = []
 
     @classmethod
@@ -98,6 +99,7 @@ class PromptDumpState:
     @classmethod
     def start_case(cls, case_name: str) -> None:
         cls.case_name = case_name
+        cls.case_timestamp = datetime.now().astimezone().strftime("%Y-%m-%dT%H-%M-%S")
         cls.prompt_entries = []
 
     @classmethod
@@ -145,7 +147,8 @@ class PromptDumpState:
         if not cls.enabled or cls.output_dir is None or not cls.case_name:
             return None
         safe_name = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in cls.case_name)
-        out_path = cls.output_dir / f"{safe_name}.txt"
+        timestamp_prefix = f"{cls.case_timestamp}_" if cls.case_timestamp else ""
+        out_path = cls.output_dir / f"{timestamp_prefix}{safe_name}.txt"
         content = "\n\n".join(cls.prompt_entries).strip()
         out_path.write_text(content + ("\n" if content else ""), encoding="utf-8")
         return out_path
@@ -276,6 +279,13 @@ class HeadlessUserAgent(Agent):
     async def wait_for_reply(self, timeout_s: float) -> str:
         return await asyncio.wait_for(self.reply_queue.get(), timeout=timeout_s)
 
+    def drain_replies(self) -> None:
+        while True:
+            try:
+                self.reply_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+
     class ReceiveLLMReply(CyclicBehaviour):
         async def run(self):
             msg = await self.receive(timeout=1)
@@ -331,6 +341,11 @@ class Lab308eHarness:
         lowered = reply.lower()
         if lowered.startswith("would you like me to ") and reply.endswith("?"):
             action_text = reply[len("Would you like me to ") :].rstrip("?").strip()
+            if action_text:
+                action_text = action_text[0].upper() + action_text[1:]
+                return action_text
+        if lowered.startswith("do you want me to ") and reply.endswith("?"):
+            action_text = reply[len("Do you want me to ") :].rstrip("?").strip()
             if action_text:
                 action_text = action_text[0].upper() + action_text[1:]
                 return action_text
@@ -394,6 +409,35 @@ class Lab308eHarness:
             details["plan_summary"] = plan_summary
         if plan_hash:
             details["plan_hash"] = plan_hash
+
+    @staticmethod
+    def _is_terminal_reply(text: str) -> bool:
+        lowered = (text or "").strip().lower()
+        terminal_markers = (
+            "done! the plan was executed successfully.",
+            "execution failed:",
+            "i don't have a pending plan right now.",
+            "okay, i've discarded that plan.",
+        )
+        return any(marker in lowered for marker in terminal_markers)
+
+    async def _wait_for_terminal_reply(self, details: Dict[str, Any], timeout_s: float) -> str:
+        deadline = asyncio.get_running_loop().time() + timeout_s
+        last_reply = ""
+        while True:
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                if last_reply:
+                    return last_reply
+                raise asyncio.TimeoutError("Timed out waiting for terminal assistant reply")
+
+            reply = await self.user.wait_for_reply(remaining)
+            last_reply = reply
+            details["transcript"].append({"role": "assistant", "phase": "execution", "text": reply})
+            details["final_reply"] = reply
+            self._capture_plan(details)
+            if self._is_terminal_reply(reply):
+                return reply
 
     @staticmethod
     def _requires_default_temperature(model: str, base_url: str) -> bool:
@@ -568,11 +612,9 @@ class Lab308eHarness:
                     details["clarification_followup"] = followup_text
                     await self.user.ask(followup_text)
                 else:
+                    self.user.drain_replies()
                     await self.user.ask(confirm_text)
-                final_reply = await self.user.wait_for_reply(self.response_timeout)
-                details["transcript"].append({"role": "assistant", "phase": "execution", "text": final_reply})
-                details["final_reply"] = final_reply
-                self._capture_plan(details)
+                final_reply = await self._wait_for_terminal_reply(details, self.response_timeout)
 
             if not details.get("plan"):
                 details["failure_stage"] = "clarification"
