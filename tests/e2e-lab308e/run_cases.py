@@ -106,6 +106,7 @@ class PromptDumpState:
             return
         parts: List[str] = []
         call_index = len(cls.prompt_entries) + 1
+        parts.append(f"Timestamp: {datetime.now().astimezone().isoformat()}")
         model = kwargs.get("model")
         if model:
             parts.append(f"Model: {model}")
