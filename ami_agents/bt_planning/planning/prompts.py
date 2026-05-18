@@ -31,15 +31,22 @@ You generate executable behavior tree specifications in JSON format using the ge
 - Actions are invoked via HTTP POST to action_url with JSON parameters
 - Properties are read via HTTP GET from property_url returning JSON values
 - All URLs come from the affordances list provided below
+- Semantic environment property IDs are not directly readable unless an explicit readable property_url is provided
 
 ## Rules
 
 - If a requested action is impossible (no matching affordance exists), set "impossible": true and explain why.
 - If partial actions are possible, generate a tree for the possible ones and explain what's missing.
 - Always use the exact action_url and property_url from the provided affordances.
+- Never use a semantic environment property ID such as `/workspaces/.../environment/...` as a condition `property_url` unless it is explicitly marked as readable.
 - Use appropriate BT control patterns based on command relationships.
+- For numeric or continuous sensor properties such as glare, illuminance, temperature, humidity, CO2, volume, or percentages, do not use exact equality checks unless the user explicitly requested an exact target value.
+- For those continuous properties, prefer range comparisons with an operator such as `<=`, `>=`, `<`, or `>`.
+- Use exact equality checks mainly for discrete states such as `on`, `off`, `open`, `closed`, `heat`, or `cool`.
 
 {signifier_hints}
+
+{observable_property_hints}
 
 ## Available Devices, Affordances, and Current State
 
@@ -173,5 +180,51 @@ def format_signifier_hints(signifier_matches: dict | None) -> str:
             if source:
                 lines.append(f"  Source: {source}")
             lines.append("")
+
+    return "\n".join(lines)
+
+
+def format_observable_property_hints(observable_property_matches: dict | None) -> str:
+    """Format observable-property effect queries for the planning prompt."""
+    if not observable_property_matches:
+        return ""
+
+    results = observable_property_matches.get("results")
+    if not isinstance(results, list) or not results:
+        return ""
+
+    lines = ["## Observable Property Effects", ""]
+    lines.append(
+        "These queries describe which artifacts can affect environment-level properties "
+        "and whether they increase or decrease them. Use them to resolve implicit requests."
+    )
+    lines.append("")
+
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        prop_uri = result.get("property_uri") or result.get("observable_property") or "unknown"
+        actions = result.get("actions")
+        lines.append(f"Semantic property id (not a readable endpoint): {prop_uri}")
+        readable_property_urls = result.get("readable_property_urls")
+        if isinstance(readable_property_urls, list) and readable_property_urls:
+            lines.append("  Readable sensor property URLs for conditions:")
+            for property_url in readable_property_urls:
+                lines.append(f"  - {property_url}")
+        if not isinstance(actions, list) or not actions:
+            lines.append("  No affecting artifacts were found.")
+            lines.append("")
+            continue
+        for action in actions:
+            if not isinstance(action, dict):
+                continue
+            title = action.get("artifact_title") or action.get("artifact_uri") or "unknown artifact"
+            direction = action.get("direction") or "affects"
+            action_name = action.get("action_name") or "unknown_action"
+            action_target = action.get("action_target") or ""
+            lines.append(
+                f"  - {title}: {action_name} -> {direction} ({action_target})"
+            )
+        lines.append("")
 
     return "\n".join(lines)

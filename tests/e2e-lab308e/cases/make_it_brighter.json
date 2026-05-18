@@ -1,0 +1,66 @@
+{
+  "name": "make_it_brighter_increases_workspace_light",
+  "initial_state": [
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/lab308e/artifacts/ambient_lights_308e/ha/light/turn_off",
+      "json": {},
+      "expect_status": 200
+    },
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/lab308e/artifacts/task_lights_308e/ha/light/turn_off",
+      "json": {},
+      "expect_status": 200
+    },
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/lab308e/artifacts/desk_lamp_308e/ha/light/turn_off",
+      "json": {},
+      "expect_status": 200
+    },
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/lab308e/artifacts/blinds_308e_cover/ha/cover/close_cover",
+      "json": {},
+      "expect_status": 200
+    },
+    {
+      "type": "sleep",
+      "seconds": 2
+    }
+  ],
+  "query": "make it brighter",
+  "auto_confirm": true,
+  "confirmation_text": "yes",
+  "settle_seconds": 3,
+  "pass_criteria": [
+    {
+      "type": "all_of",
+      "assertions": [
+        {
+          "type": "property_gte",
+          "path": "/workspaces/lab308e/artifacts/internal_light_sensing_308e/properties/state",
+          "gte": 250,
+          "timeout_seconds": 30,
+          "poll_interval_seconds": 1
+        },
+        {
+          "type": "property_gte",
+          "path": "/workspaces/lab308e/artifacts/desk_light_sensing_308e/properties/state",
+          "gte": 300,
+          "timeout_seconds": 30,
+          "poll_interval_seconds": 1
+        }
+      ]
+    },
+    {
+      "type": "final_reply_contains",
+      "value": "success"
+    }
+  ]
+}

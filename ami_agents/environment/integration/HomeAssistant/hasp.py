@@ -19,7 +19,8 @@ from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
 
 from http import HTTPStatus
 from hasp_utils import (HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST,
-                        get_supported_service_fields, is_service_supported_for_entity)
+                        get_supported_service_fields, is_service_supported_for_entity,
+                        validate_service_payload_for_entity)
 from hasp_cache import HASPGraphCache
 
 # Namespaces
@@ -938,6 +939,16 @@ def _build_cached_artifact_ttl(
             action_name = f"{_camel_token(domain)}{_camel_token(svc_name)}"
             all_service_fields = definition.get("fields", {})
             supported_fields = get_supported_service_fields(domain, domain_entity_attrs, all_service_fields)
+            if domain == "climate":
+                required_fields = {
+                    "set_fan_mode": "fan_mode",
+                    "set_hvac_mode": "hvac_mode",
+                    "set_preset_mode": "preset_mode",
+                    "set_swing_mode": "swing_mode",
+                }
+                required_field = required_fields.get(svc_name)
+                if required_field and required_field not in supported_fields:
+                    continue
             # Modern HA services may target entities without requiring any
             # explicit input fields. Those should still be exposed as actions.
             if not supported_fields and not (legacy_applies or modern_applies):
@@ -1301,6 +1312,9 @@ async def action_ha_service(workspace_id: str, artifact_name: str, domain: str, 
             f"HASP dropped unsupported service payload fields: domain={domain} service={service} "
             f"entity_id={ent} dropped={dropped_fields}"
         )
+    payload_error = validate_service_payload_for_entity(domain, service, ent_attrs, payload)
+    if payload_error:
+        raise HTTPException(status_code=400, detail=payload_error)
 
     print(
         f"HASP forwarding service call: workspace={workspace_id} artifact={artifact_name} "

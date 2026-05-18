@@ -213,14 +213,21 @@ class Lab308eSimulator:
             - (60.0 if projector_on else 0.0)
         )
 
+        # Model glare as strongly driven by outdoor light and screen use, with
+        # aggressive reduction when covers are closed. This makes blackout
+        # blinds the dominant anti-glare actuator in the lab308e scenario.
         glare = (
-            5.0
-            + external_lux / 140.0
-            + blinds_open * 25.0
-            + blackout_open * 5.0
-            + (18.0 if display_on else 0.0)
-            + (25.0 if projector_on else 0.0)
-            - ambient_level * 8.0
+            3.0
+            + external_lux / 180.0
+            + blinds_open * 18.0
+            + blackout_open * 20.0
+            + window_open * 14.0
+            + (14.0 if display_on else 0.0)
+            + (22.0 if projector_on else 0.0)
+            - (1.0 - blinds_open) * 12.0
+            - (1.0 - blackout_open) * 38.0
+            - (1.0 - window_open) * 8.0
+            - ambient_level * 6.0
         )
 
         outside_temp = 19.0 + 8.0 * math.sin((((now.hour + now.minute / 60.0) - 8.0) / 24.0) * 2.0 * math.pi)
@@ -231,6 +238,14 @@ class Lab308eSimulator:
         fan_on = _entity_is_on(world["ceiling_fan"])
         people = max(0.0, _as_float(world["person_counter"].get("state"), 0.0))
         presence = str(world["presence"].get("state", "")).lower() == "on"
+
+        # Allow tests to seed the derived environment sensors directly via
+        # Home Assistant state updates; the simulator picks up those values as
+        # its starting point for the next dynamics step.
+        self.state.temperature_c = _as_float(world["temperature"].get("state"), self.state.temperature_c)
+        self.state.humidity_pct = _as_float(world["humidity"].get("state"), self.state.humidity_pct)
+        self.state.co2_ppm = _as_float(world["co2"].get("state"), self.state.co2_ppm)
+
         elapsed_seconds = self.tick_seconds
         if self.state.last_update is not None:
             elapsed_seconds = max(0.5, (now - self.state.last_update).total_seconds())
@@ -259,7 +274,9 @@ class Lab308eSimulator:
 
         co2 = self.state.co2_ppm
         co2 += people * 18.0 * time_factor if presence else 0.0
-        co2 -= (14.0 + 30.0 * window_open) * time_factor
+        # Ventilation through the motorized window should noticeably improve
+        # stale air even with a few occupants present.
+        co2 -= (14.0 + 120.0 * window_open) * time_factor
         if fan_on:
             co2 -= 6.0 * time_factor
         co2 = _clamp(co2, 420.0, 2200.0)

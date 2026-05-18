@@ -1,0 +1,45 @@
+{
+  "name": "reduce_glare_closes_blackout_blinds",
+  "initial_state": [
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/ha/cover/open_cover",
+      "json": {},
+      "expect_status": 200
+    },
+    {
+      "type": "sleep",
+      "seconds": 2
+    }
+  ],
+  "query": "reduce glare",
+  "clarification_replies": [
+    {
+      "match_type": "regex",
+      "match": "(?i)reduce( the)? glare.*(closing the blinds|dimming the lights|lowering the blackout blinds)",
+      "reply": "lower the blackout blinds"
+    },
+    {
+      "match_type": "regex",
+      "match": "(?i)which device should i adjust to reduce glare.*(window blinds|blackout blinds|ambient/task lights|projector)",
+      "reply": "the blackout blinds"
+    }
+  ],
+  "auto_confirm": true,
+  "confirmation_text": "yes",
+  "settle_seconds": 2,
+  "pass_criteria": [
+    {
+      "type": "property_equals",
+      "path": "/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/properties/state",
+      "equals": "closed",
+      "timeout_seconds": 30,
+      "poll_interval_seconds": 1
+    },
+    {
+      "type": "final_reply_contains",
+      "value": "success"
+    }
+  ]
+}

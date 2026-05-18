@@ -10,6 +10,7 @@ from .signifier_record_behaviour import SignifierRecordBehaviour
 from .signifier_list_behaviour import SignifierListBehaviour
 from .environment_capabilities_behaviour import EnvironmentCapabilitiesBehaviour
 from .environment_state_behaviour import EnvironmentStateBehaviour
+from .environment_semantic_query_behaviour import EnvironmentSemanticQueryBehaviour
 
 __all__ = [
     'InitialDiscoveryBehaviour',
@@ -20,4 +21,5 @@ __all__ = [
     'SignifierListBehaviour',
     'EnvironmentCapabilitiesBehaviour',
     'EnvironmentStateBehaviour',
+    'EnvironmentSemanticQueryBehaviour',
 ]

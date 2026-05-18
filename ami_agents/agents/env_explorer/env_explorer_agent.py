@@ -88,6 +88,7 @@ class EnvExplorerAgent(Agent, IAgent):
         # Agent state
         self.discovery_complete = False
         self.semantic_capabilities: Dict[str, Any] = {"td_sosa_supported": False}
+        self.semantic_query_enabled = False
 
         # Initialize logger with configuration
         # The logging config passed from main.py already contains merged global + agent-specific
@@ -145,6 +146,10 @@ class EnvExplorerAgent(Agent, IAgent):
         """Stop the EnvExplorer agent and clean up resources."""
         self.logger.info(demo("Stopping EnvExplorer agent"))
         if self.integration_engine:
+            try:
+                await self.integration_engine.unsubscribe_all_artifacts()
+            except Exception as e:
+                self.logger.error(f"Error unsubscribing artifact callbacks: {e}")
             try:
                 await self.integration_engine.stop_notification_listener()
             except Exception as e:

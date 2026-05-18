@@ -817,6 +817,7 @@ class YggdrasilIntegration(IIntegrationEngine):
         self.agent_webid = agent_webid or f"{yggdrasil_url.rstrip('/')}/agents/alex"
         self.platform_graph: Optional[Graph] = None
         self.notification_listener: Optional[NotificationListener] = None
+        self.active_artifact_subscriptions: list[dict[str, str]] = []
 
     async def initialize(self, config: Dict[str, Any]) -> bool:
         """
@@ -1428,6 +1429,71 @@ class YggdrasilIntegration(IIntegrationEngine):
             await self.notification_listener.stop()
             self.notification_listener = None
 
+    async def unsubscribe_from_artifact(self, artifact_id: str, callback_url: Optional[str] = None) -> bool:
+        """
+        Remove an artifact subscription by callback URL.
+        Uses HASP's WebSub hub endpoint directly so it also tears down focus-created subscriptions.
+        """
+        if not callback_url:
+            if self.notification_listener and self.notification_listener.base_url:
+                callback_url = self.notification_listener.base_url
+            else:
+                callback_url = next(
+                    (
+                        entry.get("callback_url")
+                        for entry in self.active_artifact_subscriptions
+                        if entry.get("artifact_id") == artifact_id and entry.get("callback_url")
+                    ),
+                    None,
+                )
+        if not callback_url:
+            logger.warning("Cannot unsubscribe %s: missing callback URL", artifact_id)
+            return False
+
+        base = self.yggdrasil_url.rstrip("/")
+        url = f"{base}/hub/"
+        payload = {
+            "hub.mode": "unsubscribe",
+            "hub.topic": artifact_id,
+            "hub.callback": callback_url,
+        }
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.post(url, json=payload) as response:
+                    text = await response.text()
+                    if response.status == 202:
+                        self.active_artifact_subscriptions = [
+                            entry
+                            for entry in self.active_artifact_subscriptions
+                            if not (
+                                entry.get("artifact_id") == artifact_id
+                                and entry.get("callback_url") == callback_url
+                            )
+                        ]
+                        logger.info("Unsubscribed from %s via %s", artifact_id, callback_url)
+                        return True
+                    logger.warning(
+                        "Failed to unsubscribe %s via %s: HTTP %s %s",
+                        artifact_id,
+                        callback_url,
+                        response.status,
+                        text,
+                    )
+                    return False
+            except Exception as e:
+                logger.warning("Error unsubscribing %s via %s: %s", artifact_id, callback_url, e)
+                return False
+
+    async def unsubscribe_all_artifacts(self) -> None:
+        """Attempt to remove every tracked artifact subscription before the listener stops."""
+        pending = list(self.active_artifact_subscriptions)
+        for entry in pending:
+            artifact_id = entry.get("artifact_id")
+            callback_url = entry.get("callback_url")
+            if not artifact_id or not callback_url:
+                continue
+            await self.unsubscribe_from_artifact(artifact_id, callback_url=callback_url)
+
     @property
     def event_queue(self) -> asyncio.Queue:
         """Access the mailbox queue."""
@@ -1468,6 +1534,9 @@ class YggdrasilIntegration(IIntegrationEngine):
             result = await self.execute_affordance(focus_affordance_id, payload)
             if result is not None:
                 logger.info(f"Successfully focused on {artifact.name}")
+                self.active_artifact_subscriptions.append(
+                    {"artifact_id": artifact_id, "callback_url": callback_url}
+                )
                 return True
             else:
                 logger.warning(f"Focus failed for {artifact.name}, trying fallback...")
@@ -1499,8 +1568,61 @@ class YggdrasilIntegration(IIntegrationEngine):
 
         logger.info(f"Subscribing to {artifact.name} (WebSub) at {callback_url}...")
         result = await self.execute_affordance(subscribe_affordance_id, payload)
-        
-        return result is not None
+        if result is not None:
+            self.active_artifact_subscriptions.append(
+                {"artifact_id": artifact_id, "callback_url": callback_url}
+            )
+            return True
+        return False
+
+    async def query_actions_affecting_observable_property(
+        self,
+        workspace_id: str,
+        observable_property: str,
+    ) -> Dict[str, Any]:
+        """Query the environment for actions affecting an observable property."""
+        base = self.yggdrasil_url.rstrip("/")
+        url = f"{base}/_graph/query/actions-affecting-observable-property"
+        payload = {
+            "workspace_id": workspace_id,
+            "observable_property": observable_property,
+        }
+
+        async with aiohttp.ClientSession() as session:
+            try:
+                headers = {"Content-Type": "application/json"}
+                async with session.post(url, headers=headers, data=json.dumps(payload)) as response:
+                    text = await response.text()
+                    if response.status >= 400:
+                        logger.error(
+                            "Semantic query failed [%s] for workspace=%s property=%s: %s",
+                            response.status,
+                            workspace_id,
+                            observable_property,
+                            text,
+                        )
+                        return {
+                            "workspace_id": workspace_id,
+                            "observable_property": observable_property,
+                            "error": f"http_{response.status}",
+                            "detail": text,
+                            "actions": [],
+                        }
+                    return json.loads(text or "{}")
+            except Exception as e:
+                logger.error(
+                    "Failed semantic query for workspace=%s property=%s: %s",
+                    workspace_id,
+                    observable_property,
+                    e,
+                )
+                return {
+                    "workspace_id": workspace_id,
+                    "observable_property": observable_property,
+                    "error": "semantic_query_failed",
+                    "detail": str(e),
+                    "actions": [],
+                }
 
 
 class IntegrationEngineFactory:

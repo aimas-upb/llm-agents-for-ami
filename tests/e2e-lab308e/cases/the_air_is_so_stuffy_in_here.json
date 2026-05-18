@@ -1,0 +1,100 @@
+{
+  "name": "the_air_is_so_stuffy_in_here_opens_window_and_reduces_co2",
+  "initial_state": [
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/lab308e/artifacts/window_308e_cover/ha/cover/close_cover",
+      "json": {},
+      "expect_status": 200
+    },
+    {
+      "type": "request",
+      "method": "POST",
+      "url": "http://localhost:8123/api/states/sensor.co2_sensing_308e",
+      "headers": {
+        "Authorization": "Bearer ${HA_TOKEN}"
+      },
+      "json": {
+        "state": 1600,
+        "attributes": {
+          "unit_of_measurement": "ppm",
+          "friendly_name": "co2_sensing_308e"
+        }
+      },
+      "expect_status": 200
+    },
+    {
+      "type": "request",
+      "method": "POST",
+      "url": "http://localhost:8123/api/states/sensor.person_counter_308e",
+      "headers": {
+        "Authorization": "Bearer ${HA_TOKEN}"
+      },
+      "json": {
+        "state": 1,
+        "attributes": {
+          "unit_of_measurement": "persons",
+          "friendly_name": "person_counter_308e"
+        }
+      },
+      "expect_status": 200
+    },
+    {
+      "type": "request",
+      "method": "POST",
+      "url": "http://localhost:8123/api/states/binary_sensor.presence_sensing_308e",
+      "headers": {
+        "Authorization": "Bearer ${HA_TOKEN}"
+      },
+      "json": {
+        "state": "on",
+        "attributes": {
+          "device_class": "occupancy",
+          "friendly_name": "presence_sensing_308e"
+        }
+      },
+      "expect_status": 200
+    },
+    {
+      "type": "sleep",
+      "seconds": 2
+    }
+  ],
+  "query": "the air is so stuffy in here",
+  "clarification_replies": [
+    {
+      "match_type": "regex",
+      "match": "(?i)would you like me to turn on the air conditioner to improve the air\\?",
+      "reply": "open the window and turn on the fan"
+    },
+    {
+      "match_type": "regex",
+      "match": "(?i)would you like me to turn on the air conditioner, open the window, or turn on the fan to improve the air\\?",
+      "reply": "open the window and turn on the fan"
+    }
+  ],
+  "auto_confirm": true,
+  "confirmation_text": "yes",
+  "settle_seconds": 8,
+  "pass_criteria": [
+    {
+      "type": "property_equals",
+      "path": "/workspaces/lab308e/artifacts/window_308e_cover/properties/state",
+      "equals": "open",
+      "timeout_seconds": 30,
+      "poll_interval_seconds": 1
+    },
+    {
+      "type": "property_lte",
+      "path": "/workspaces/lab308e/artifacts/co2_sensing_308e/properties/state",
+      "lte": 2100,
+      "timeout_seconds": 60,
+      "poll_interval_seconds": 1
+    },
+    {
+      "type": "final_reply_contains",
+      "value": "success"
+    }
+  ]
+}

@@ -15,6 +15,7 @@ from .schema import GENERATE_BT_TOOL
 from .prompts import (
     BT_PLANNING_SYSTEM_PROMPT,
     format_capability_context,
+    format_observable_property_hints,
     format_signifier_hints,
 )
 
@@ -56,6 +57,7 @@ class AsyncBTPlanner:
         affordances: list[dict],
         state: Optional[dict] = None,
         signifier_hints: Optional[dict] = None,
+        observable_property_hints: Optional[dict] = None,
         client: Optional[AsyncOpenAI] = None,
         model: str = "gpt-4",
         temperature: Optional[float] = None,
@@ -86,10 +88,12 @@ class AsyncBTPlanner:
         # Build the planning prompt
         capability_context = format_capability_context(affordances, state)
         sig_hints_text = format_signifier_hints(signifier_hints)
+        obs_hints_text = format_observable_property_hints(observable_property_hints)
 
         system_prompt = BT_PLANNING_SYSTEM_PROMPT.format(
             capability_context=capability_context,
             signifier_hints=sig_hints_text,
+            observable_property_hints=obs_hints_text,
         )
 
         # Format user message with intents
@@ -112,12 +116,36 @@ class AsyncBTPlanner:
         # Retry loop for validation
         last_explanation = ""
         validation_errors: list[str] = []
+        state_artifact_count = len((state or {}).get("artifacts", {})) if isinstance(state, dict) else 0
+        signifier_match_count = len((signifier_hints or {}).get("matches", [])) if isinstance(signifier_hints, dict) else 0
+        observable_result_count = len((observable_property_hints or {}).get("results", [])) if isinstance(observable_property_hints, dict) else 0
+        prompt_debug = {
+            "model": model,
+            "temperature": temperature,
+            "reasoning_effort": reasoning_effort,
+            "max_completion_tokens": max_completion_tokens,
+            "intents": intents,
+            "intent_count": len(intents),
+            "affordance_count": len(affordances),
+            "state_artifact_count": state_artifact_count,
+            "signifier_match_count": signifier_match_count,
+            "observable_result_count": observable_result_count,
+            "system_prompt_chars": len(system_prompt),
+            "user_message_chars": len(user_message),
+        }
 
         for attempt in range(self.max_attempts):
             try:
                 response = await client.chat.completions.create(**api_kwargs)
             except Exception as e:
-                logger.error(f"LLM call failed: {e}")
+                logger.error(
+                    "LLM call failed on attempt %d/%d: %s (%s) context=%s",
+                    attempt + 1,
+                    self.max_attempts,
+                    e,
+                    type(e).__name__,
+                    prompt_debug,
+                )
                 return {
                     "tree": {},
                     "explanation": f"LLM call failed: {e}",

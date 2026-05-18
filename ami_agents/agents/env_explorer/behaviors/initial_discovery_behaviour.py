@@ -7,9 +7,11 @@ import json
 from rdflib import Graph, Namespace
 from spade.behaviour import OneShotBehaviour
 from spade.message import Message as SpadeMessage
+from spade.template import Template
 
 from ....shared.models.messages import MessageType, META_CORRELATION_ID, ensure_correlation_id
 from ....shared.utils.demo_log import demo
+from .environment_semantic_query_behaviour import EnvironmentSemanticQueryBehaviour
 
 
 TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
@@ -71,6 +73,15 @@ class InitialDiscoveryBehaviour(OneShotBehaviour):
             self.agent.semantic_capabilities = {
                 "td_sosa_supported": _detect_tdsosa_support(self.agent),
             }
+            self.agent.logger.info(
+                demo("TD-SOSA support detected: %s"),
+                "enabled" if self.agent.semantic_capabilities.get("td_sosa_supported") else "disabled",
+            )
+            if self.agent.semantic_capabilities.get("td_sosa_supported") and not getattr(self.agent, "semantic_query_enabled", False):
+                env_semantic_template = Template()
+                env_semantic_template.set_metadata("type", MessageType.ENV_SEMANTIC_QUERY_REQUEST.value)
+                self.agent.add_behaviour(EnvironmentSemanticQueryBehaviour(), template=env_semantic_template)
+                self.agent.semantic_query_enabled = True
 
             self.agent.logger.info("Subscribing to artifact events...")
             for artifact_id, artifact in self.agent.artifacts.items():

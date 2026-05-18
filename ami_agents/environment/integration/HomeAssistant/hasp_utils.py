@@ -789,6 +789,17 @@ def get_supported_service_fields(domain: str, entity_attributes: Dict[str, Any],
 
     supported = {}
 
+    def _narrow_select_field(field_def: Dict[str, Any], allowed_values: List[Any]) -> Dict[str, Any]:
+        narrowed = dict(field_def)
+        selector = dict(field_def.get("selector") or {})
+        if "select" in selector:
+            select_cfg = dict(selector.get("select") or {})
+            select_cfg["options"] = [str(value) for value in allowed_values]
+            selector["select"] = select_cfg
+        narrowed["selector"] = selector
+        narrowed["enum"] = [str(value) for value in allowed_values]
+        return narrowed
+
     if domain == "light":
         # Get supported color modes
         supported_color_modes = set(entity_attributes.get("supported_color_modes", []))
@@ -850,25 +861,25 @@ def get_supported_service_fields(domain: str, entity_attributes: Dict[str, Any],
             # HVAC mode
             if field_name == "hvac_mode":
                 if hvac_modes:
-                    supported[field_name] = field_def
+                    supported[field_name] = _narrow_select_field(field_def, hvac_modes)
                 continue
 
             # Preset mode
             if field_name == "preset_mode":
                 if preset_modes:
-                    supported[field_name] = field_def
+                    supported[field_name] = _narrow_select_field(field_def, preset_modes)
                 continue
 
             # Fan mode
             if field_name == "fan_mode":
                 if fan_modes:
-                    supported[field_name] = field_def
+                    supported[field_name] = _narrow_select_field(field_def, fan_modes)
                 continue
 
             # Swing mode
             if field_name == "swing_mode":
                 if swing_modes:
-                    supported[field_name] = field_def
+                    supported[field_name] = _narrow_select_field(field_def, swing_modes)
                 continue
 
             # Include by default
@@ -899,6 +910,51 @@ def get_supported_service_fields(domain: str, entity_attributes: Dict[str, Any],
         return service_fields
 
     return supported
+
+
+def validate_service_payload_for_entity(
+    domain: str,
+    service_name: str,
+    entity_attributes: Dict[str, Any],
+    payload: Dict[str, Any],
+) -> Optional[str]:
+    """Return an error string if a payload value is unsupported by the entity."""
+    if domain != "climate" or not payload:
+        return None
+
+    if service_name in {"set_hvac_mode", "set_temperature"} and "hvac_mode" in payload:
+        allowed_modes = entity_attributes.get("hvac_modes", []) or []
+        if allowed_modes:
+            hvac_mode = str(payload.get("hvac_mode"))
+            allowed = {str(mode) for mode in allowed_modes}
+            if hvac_mode not in allowed:
+                return f"Unsupported hvac_mode {hvac_mode!r}; supported values: {sorted(allowed)}"
+
+    if service_name == "set_fan_mode" and "fan_mode" in payload:
+        allowed_modes = entity_attributes.get("fan_modes", []) or []
+        if allowed_modes:
+            fan_mode = str(payload.get("fan_mode"))
+            allowed = {str(mode) for mode in allowed_modes}
+            if fan_mode not in allowed:
+                return f"Unsupported fan_mode {fan_mode!r}; supported values: {sorted(allowed)}"
+
+    if service_name == "set_preset_mode" and "preset_mode" in payload:
+        allowed_modes = entity_attributes.get("preset_modes", []) or []
+        if allowed_modes:
+            preset_mode = str(payload.get("preset_mode"))
+            allowed = {str(mode) for mode in allowed_modes}
+            if preset_mode not in allowed:
+                return f"Unsupported preset_mode {preset_mode!r}; supported values: {sorted(allowed)}"
+
+    if service_name == "set_swing_mode" and "swing_mode" in payload:
+        allowed_modes = entity_attributes.get("swing_modes", []) or []
+        if allowed_modes:
+            swing_mode = str(payload.get("swing_mode"))
+            allowed = {str(mode) for mode in allowed_modes}
+            if swing_mode not in allowed:
+                return f"Unsupported swing_mode {swing_mode!r}; supported values: {sorted(allowed)}"
+
+    return None
 
 
 def is_service_supported_for_entity(
@@ -938,4 +994,4 @@ def is_service_supported_for_entity(
 __all__ = ["HomeAssistantWS", "HomeAssistantRDF", "HomeAssistantREST",
            "get_operational_attributes", "get_metadata_attributes",
            "get_writable_fields_from_services", "get_supported_service_fields",
-           "is_service_supported_for_entity"]
+           "validate_service_payload_for_entity", "is_service_supported_for_entity"]

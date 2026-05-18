@@ -88,6 +88,8 @@ class MessageType(Enum):
     ENV_STATE_RESPONSE = "env_state_response"
     ENV_CAPABILITIES_REQUEST = "env_capabilities_request"
     ENV_CAPABILITIES_RESPONSE = "env_capabilities_response"
+    ENV_SEMANTIC_QUERY_REQUEST = "env_semantic_query_request"
+    ENV_SEMANTIC_QUERY_RESPONSE = "env_semantic_query_response"
 
     # Goal and planning messages
     GOAL_REQUEST = "goal_request"

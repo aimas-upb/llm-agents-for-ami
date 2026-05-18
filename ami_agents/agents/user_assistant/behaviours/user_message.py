@@ -81,31 +81,63 @@ class UserMessageBehaviour(CyclicBehaviour):
         conv = self.agent.get_conversation(thread)
 
         if conv.phase == ConversationPhase.AWAITING_CONFIRMATION:
+            self.logger.info(
+                demo("Confirmation path entered: thread=%s text=%r has_pending_plan=%s"),
+                thread,
+                text,
+                bool(conv.plan_json),
+            )
             await self._handle_confirmation(msg, thread, text, conv)
             return
 
         conv.phase = ConversationPhase.EXTRACTING_INTENTS
         conv.user_message = text
+        self.logger.info(
+            demo("Received user message: thread=%s phase=%s text=%r"),
+            thread,
+            conv.phase.value,
+            text,
+        )
 
         capabilities_ctx = await self._fetch_capabilities()
 
         extraction = await self._extract_intents(text, capabilities_ctx)
         classification = extraction.get("classification", "unclear")
+        self.logger.info(
+            demo(
+                "Intent extraction result: thread=%s classification=%s workspace_id=%r intent_type=%r "
+                "artifact_id=%r property_uri=%r intents_count=%d question=%r"
+            ),
+            thread,
+            classification,
+            extraction.get("workspace_id"),
+            extraction.get("intent_type"),
+            extraction.get("artifact_id"),
+            extraction.get("property_uri"),
+            len(extraction.get("intents", []) or []),
+            extraction.get("question"),
+        )
 
         if classification == "goal":
+            self.logger.info(demo("Routing message as GOAL: thread=%s"), thread)
             await self._handle_goal(msg, thread, conv, extraction)
         elif classification == "query_capabilities":
+            self.logger.info(demo("Routing message as QUERY_CAPABILITIES: thread=%s"), thread)
             await self._handle_query_capabilities(msg, thread, conv, capabilities_ctx)
         elif classification == "query_state":
+            self.logger.info(demo("Routing message as QUERY_STATE: thread=%s"), thread)
             await self._handle_query_state(msg, thread, conv, extraction)
         elif classification == "confirmation":
+            self.logger.info(demo("Routing message as CONFIRMATION_WITHOUT_PENDING_PLAN: thread=%s"), thread)
             await self._reply(msg, "I don't have a pending plan right now. What would you like to do?")
             conv.phase = ConversationPhase.IDLE
         elif classification == "unclear":
             question = extraction.get("question", "Could you clarify what you would like?")
+            self.logger.info(demo("Routing message as UNCLEAR: thread=%s question=%r"), thread, question)
             await self._reply(msg, question)
             conv.phase = ConversationPhase.IDLE
         else:
+            self.logger.info(demo("Routing message as UNKNOWN_CLASSIFICATION: thread=%s classification=%r"), thread, classification)
             await self._reply(msg, "I'm not sure I understood that. Could you rephrase?")
             conv.phase = ConversationPhase.IDLE
 
@@ -130,6 +162,7 @@ class UserMessageBehaviour(CyclicBehaviour):
                 **self.agent.build_llm_kwargs(),
             )
             raw = (response.choices[0].message.content or "").strip()
+            self.logger.info(demo("Raw intent extraction output: %s"), raw[:1000])
             parsed = loose_json_loads(raw)
             if isinstance(parsed, dict):
                 return parsed
@@ -196,6 +229,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         intent_type = extraction.get("intent_type", "implicit")
 
         if not conv.intents:
+            self.logger.info(demo("Goal rejected after extraction: no concrete intents derived for thread=%s"), thread)
             await self._reply(msg, "I couldn't derive any specific intents. Could you be more precise?")
             conv.phase = ConversationPhase.IDLE
             return
@@ -208,6 +242,7 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         solver_jid = self.agent.target_jids.get("solver")
         if not solver_jid:
+            self.logger.info(demo("Goal handling failed: missing solver JID for thread=%s"), thread)
             await self._reply(msg, "Error: InteractionSolver is not configured.")
             conv.phase = ConversationPhase.IDLE
             return
@@ -235,6 +270,7 @@ class UserMessageBehaviour(CyclicBehaviour):
             )
             await self._process_plan_response(msg, thread, conv, result.body)
         except RpcTimeoutError:
+            self.logger.info(demo("Goal request timed out: thread=%s timeout=%s"), thread, timeout)
             await self._reply(msg, "Planning timed out. Could you try again?")
             conv.phase = ConversationPhase.IDLE
         except Exception as exc:
@@ -314,6 +350,18 @@ class UserMessageBehaviour(CyclicBehaviour):
             capabilities_ctx = await self._fetch_capabilities()
             extraction = await self._extract_intents(text, capabilities_ctx)
             classification = extraction.get("classification", "unclear")
+            self.logger.info(
+                demo(
+                    "Re-extraction after pending-plan interruption: thread=%s classification=%s "
+                    "workspace_id=%r intent_type=%r question=%r intents_count=%d"
+                ),
+                thread,
+                classification,
+                extraction.get("workspace_id"),
+                extraction.get("intent_type"),
+                extraction.get("question"),
+                len(extraction.get("intents", []) or []),
+            )
 
             if classification == "goal":
                 await self._handle_goal(msg, thread, conv, extraction)
@@ -593,6 +641,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         """Fetch environment capabilities from EnvExplorer via RPC."""
         explorer_jid = self.agent.target_jids.get("explorer")
         if not explorer_jid:
+            self.logger.info(demo("Capability fetch skipped: no explorer JID configured"))
             return ""
         try:
             result = await rpc_call(
@@ -602,6 +651,10 @@ class UserMessageBehaviour(CyclicBehaviour):
                 body={"query": "all"},
                 expect_type=MessageType.ENV_CAPABILITIES_RESPONSE.value,
                 timeout=self.agent.rpc_call_timeout,
+            )
+            self.logger.info(
+                demo("Capabilities fetched: body_len=%d"),
+                len(result.body or ""),
             )
             return result.body or ""
         except Exception as exc:
