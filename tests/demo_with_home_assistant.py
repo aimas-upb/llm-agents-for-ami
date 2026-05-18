@@ -289,17 +289,23 @@ def _print_red_line(text: str) -> None:
         print(str(text))
 
 
-async def _reset_lab308_state() -> None:
-    """Ensure lights are off and blinds at 50% before the demo starts."""
-    light_off_url = f"{LAB308_BASE}/artifacts/lights_308/ha/light/turn_off"
+async def _reset_lab308_state(*, light_state: str = "off", blinds_position: int = 50) -> None:
+    """
+    Reset lab308 environment to specified state.
+
+    Args:
+        light_state: "on" or "off"
+        blinds_position: Position as percentage (0-100)
+    """
+    light_url = f"{LAB308_BASE}/artifacts/lights_308/ha/light/turn_{'on' if light_state == 'on' else 'off'}"
     blinds_url = f"{LAB308_BASE}/artifacts/blinds_308/ha/cover/set_cover_position"
     try:
         async with aiohttp.ClientSession() as session:
-            await session.post(light_off_url, json={})
-            await session.post(blinds_url, json={"position": 50})
-        logger.info("Reset lab308 state: lights_308 off, blinds_308 50%.")
+            await session.post(light_url, json={})
+            await session.post(blinds_url, json={"position": blinds_position})
+        logger.info("Reset lab308 state: lights_308 %s, blinds_308 %d%%.", light_state, blinds_position)
     except Exception as exc:
-        logger.warning("Failed to reset lab308 state before demo: %s", exc)
+        logger.warning("Failed to reset lab308 state: %s", exc)
 
 
 class DummyHMASClient(IHMASClient):
@@ -516,6 +522,25 @@ class OrchestratorAgent(Agent):
                 if isinstance(info, dict) and token in str(info.get("name") or "").lower():
                     return str(aid)
             return ""
+
+        async def _reset_environment_state(self, *, light_state: str = "off", blinds_position: int = 50) -> None:
+            """
+            Reset lab308 environment to specified state.
+
+            Args:
+                light_state: "on" or "off"
+                blinds_position: Position as percentage (0-100)
+            """
+            light_url = f"{LAB308_BASE}/artifacts/lights_308/ha/light/turn_{'on' if light_state == 'on' else 'off'}"
+            blinds_url = f"{LAB308_BASE}/artifacts/blinds_308/ha/cover/set_cover_position"
+
+            try:
+                async with aiohttp.ClientSession() as session:
+                    await session.post(light_url, json={})
+                    await session.post(blinds_url, json={"position": blinds_position})
+                logger.info(demo("Environment reset: lights_308 %s, blinds_308 %d%%"), light_state, blinds_position)
+            except Exception as exc:
+                logger.warning(demo("Failed to reset environment state: %s"), exc)
 
         async def _print_selected_states(self, title: str, *, tokens: list[str]) -> None:
             snapshot = await self._get_state_snapshot()
@@ -1017,6 +1042,9 @@ class OrchestratorAgent(Agent):
             - state query (light)
             - explicit request (execute + record signifiers)
             - implicit request (approve + execute + record signifier)
+
+            NOTE: Environment state is reset before each major step to ensure
+            consistent signifier context recording (addresses sequence 3/4 signifier reuse issues).
             """
             try:
                 simple_timeout_s = float(os.getenv("AMI_SIMPLE_TIMEOUT_S", "90"))
@@ -1038,6 +1066,11 @@ class OrchestratorAgent(Agent):
             implicit_query = "In lab308, it's kind of dark in here."
 
             # 1) Capabilities / workspaces
+            logger.info(demo(">>> DEMO Step 1: Preparing to set initial environment state (light OFF, blinds 50%)"))
+            await asyncio.sleep(5.0)  # Wait before reset
+            await self._reset_environment_state(light_state="off", blinds_position=50)
+            await asyncio.sleep(5.0)  # Wait after reset for state propagation
+
             logger.info('DEMO: Asking UserAssistant: "%s"', list_devices_query)
             reply = await self._ask_user_assistant(list_devices_query, timeout_s=simple_timeout_s)
             if reply is None:
@@ -1050,6 +1083,11 @@ class OrchestratorAgent(Agent):
             print("=" * 60 + "\n")
 
             # 2) State query (forces UA <-> EnvExplorer state conversation)
+            logger.info(demo(">>> DEMO Step 2: Ensuring initial environment state (light OFF, blinds 50%)"))
+            await asyncio.sleep(5.0)  # Wait before reset
+            await self._reset_environment_state(light_state="off", blinds_position=50)
+            await asyncio.sleep(5.0)  # Wait after reset for state propagation
+
             logger.info('DEMO: Asking UserAssistant: "%s"', state_query)
             reply = await self._ask_user_assistant(state_query, timeout_s=simple_timeout_s)
             if reply is None:
@@ -1062,6 +1100,11 @@ class OrchestratorAgent(Agent):
             print("=" * 60 + "\n")
 
             # 3) Turn on the light
+            logger.info(demo(">>> DEMO Step 3: Ensuring initial environment state before turn-on (light OFF, blinds 50%)"))
+            await asyncio.sleep(5.0)  # Wait before reset
+            await self._reset_environment_state(light_state="off", blinds_position=50)
+            await asyncio.sleep(5.0)  # Wait after reset for state propagation
+
             logger.info('DEMO: Asking UserAssistant: "%s"', turn_on_query)
             reply = await self._ask_user_assistant(turn_on_query, timeout_s=simple_timeout_s)
             if reply is None:
@@ -1084,7 +1127,12 @@ class OrchestratorAgent(Agent):
             _print_red_line(exec_reply)
             print("=" * 60 + "\n")
 
-            # 3) EXPLICIT request (execute to create signifiers)
+            # 4) EXPLICIT request (execute to create signifiers)
+            logger.info(demo(">>> DEMO Step 4: Setting expected state after turn-on (light ON, blinds 50%) for EXPLICIT signifier context"))
+            await asyncio.sleep(5.0)  # Wait before reset
+            await self._reset_environment_state(light_state="on", blinds_position=50)
+            await asyncio.sleep(5.0)  # Wait after reset for state propagation
+
             logger.info('DEMO: Sending EXPLICIT request: "%s"', explicit_query)
             proposal = await self._ask_user_assistant(explicit_query, timeout_s=plan_timeout_s)
             if proposal is None:
@@ -1143,7 +1191,12 @@ class OrchestratorAgent(Agent):
                 prompt = "Press Enter to continue to the IMPLICIT request... "
                 await asyncio.get_running_loop().run_in_executor(None, input, prompt)
 
-            # 4) IMPLICIT request (approve + execute + record signifier)
+            # 5) IMPLICIT request (approve + execute + record signifier)
+            logger.info(demo(">>> DEMO Step 5: Setting expected state after EXPLICIT execution (light OFF, blinds 80%) for IMPLICIT signifier context"))
+            await asyncio.sleep(5.0)  # Wait before reset
+            await self._reset_environment_state(light_state="off", blinds_position=80)
+            await asyncio.sleep(5.0)  # Wait after reset for state propagation
+
             logger.info('DEMO: Sending IMPLICIT request: "%s"', implicit_query)
             proposal = await self._ask_user_assistant(implicit_query, timeout_s=plan_timeout_s)
             if proposal is None:
