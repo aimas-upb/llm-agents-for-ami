@@ -835,6 +835,25 @@ class YggdrasilIntegration(IIntegrationEngine):
         try:
             logger.info(f"Dereferencing Yggdrasil URL: {self.yggdrasil_url}")
 
+            raw_body_preview = ""
+            response_status = None
+            response_content_type = None
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(self.yggdrasil_url, headers={"Accept": "text/turtle, application/ld+json, application/rdf+xml, */*"}) as resp:
+                        response_status = resp.status
+                        response_content_type = resp.headers.get("Content-Type")
+                        raw_body = await resp.text()
+                        raw_body_preview = raw_body[:500]
+                logger.info(
+                    "Yggdrasil dereference response: status=%s content_type=%r body_preview=%r",
+                    response_status,
+                    response_content_type,
+                    raw_body_preview,
+                )
+            except Exception as fetch_exc:
+                logger.warning("Failed to prefetch Yggdrasil URL %s: %s", self.yggdrasil_url, fetch_exc)
+
             # Load the HMAS ontology to get vocabulary terms
             hmas_onto = get_hmas_ontology()
             if hmas_onto is None:
@@ -859,11 +878,16 @@ class YggdrasilIntegration(IIntegrationEngine):
             self.platform_graph.parse(self.yggdrasil_url)
 
             logger.debug(f"Successfully parsed RDF graph with {len(self.platform_graph)} triples")
+            logger.info(
+                "Parsed Yggdrasil graph: triples=%d subjects=%d",
+                len(self.platform_graph),
+                len(set(self.platform_graph.subjects())),
+            )
 
             # Accept both slash and no-slash forms for the dereferenced root URL.
             normalized_url = self.yggdrasil_url.rstrip("/")
             candidate_refs = []
-            for candidate in (self.yggdrasil_url, normalized_url):
+            for candidate in (self.yggdrasil_url, normalized_url, f"{normalized_url}/"):
                 if not candidate:
                     continue
                 ref = URIRef(candidate)
@@ -897,9 +921,38 @@ class YggdrasilIntegration(IIntegrationEngine):
                 return False
 
             # Neither case matched
+            candidate_summaries = []
+            for url_ref in candidate_refs:
+                types = [str(obj) for obj in self.platform_graph.objects(url_ref, RDF.type)]
+                linked_profiles = [str(obj) for obj in self.platform_graph.objects(url_ref, isProfileOf_iri)]
+                candidate_summaries.append(
+                    {
+                        "candidate": str(url_ref),
+                        "types": types,
+                        "isProfileOf": linked_profiles,
+                    }
+                )
+
+            sample_subjects = []
+            for subject in list(dict.fromkeys(self.platform_graph.subjects()))[:10]:
+                sample_subjects.append(
+                    {
+                        "subject": str(subject),
+                        "types": [str(obj) for obj in self.platform_graph.objects(subject, RDF.type)],
+                    }
+                )
+
             logger.error(
                 f"URL {self.yggdrasil_url} is neither a HypermediaMASPlatform "
                 f"nor a ResourceProfile with isProfileOf property"
+            )
+            logger.error(
+                "Yggdrasil validation details: candidates=%s sample_subjects=%s response_status=%s content_type=%r body_preview=%r",
+                candidate_summaries,
+                sample_subjects,
+                response_status,
+                response_content_type,
+                raw_body_preview,
             )
             return False
 
