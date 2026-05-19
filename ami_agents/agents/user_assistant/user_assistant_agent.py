@@ -9,6 +9,7 @@ signifier recording — is handled by deterministic SPADE behaviours.
 
 import asyncio
 import os
+from pathlib import Path
 from typing import Any, Dict
 
 from spade.agent import Agent
@@ -161,6 +162,16 @@ class UserAssistantAgent(Agent, IAgent):
 
     async def setup(self):
         await super().setup()
+
+        # Load ontology file for per-span intent parsing
+        ontology_path = Path(__file__).resolve().parents[3] / "ontologies" / "homeont.ttl"
+        try:
+            self.ontology_ttl = ontology_path.read_text() if ontology_path.exists() else ""
+            if not self.ontology_ttl:
+                self.logger.warning("Ontology file not found at %s", ontology_path)
+        except Exception as e:
+            self.logger.warning("Failed to load ontology: %s", e)
+            self.ontology_ttl = ""
 
         temp_display = "default" if self.llm_model.startswith("o") else self.llm_temperature
         self.logger.info(

@@ -241,3 +241,171 @@ Use ASCII only.  Be concise and friendly.
 
 Respond with the formatted text only.  No JSON wrapper.
 """
+
+
+ENV_CAPABILITIES_REQUEST_PARSER_PROMPT = """\
+You are a smart home capability-request parser. You are given a SINGLE atomic intent that has already been classified as an ENV_CAPABILITIES_REQUEST — a request about what the environment is able to do (what it can actuate or what it can perceive/read).
+
+Your job is to extract structured information from this one atomic intent. Do not split it further; it is already atomic.
+
+## What to extract
+
+- **text_intent**: the natural language fragment from the request that describes this atomic intent. Copy it verbatim from the input — do not paraphrase, restate, or rephrase.
+- **capability_request**: either "actuate" or "read".
+  - "actuate" — the user asks whether the environment can CHANGE something / perform an action (e.g. "can you modify the light intensity?", "are you able to turn things on in the kitchen?").
+  - "read" — the user asks whether the environment can PERCEIVE / SENSE / report something (e.g. "can you perceive the temperature in the living room?", "do you know how humid the bathroom is?").
+- **actuation_request**: the name of the command referenced by the request, as a natural-language phrase (e.g. "turn on", "set the brightness"). Fill this ONLY when capability_request is "actuate". Set to "NA" if capability_request is "read", or if no command name can be determined from the text.
+- **property_request**: the name of the property referenced by the request, as a natural-language phrase (e.g. "temperature", "humidity"). Fill this ONLY when capability_request is "read". Set to "NA" if capability_request is "actuate", or if no property name can be determined from the text.
+
+## Rules
+
+- Exactly one of actuation_request / property_request will carry a value; the other is always "NA".
+- Extract command/property names as the user phrased them. Do NOT map them to ontology identifiers — this prompt does not require ontology alignment.
+- If the request is ambiguous between "actuate" and "read", choose based on the verb: verbs of changing/doing → "actuate"; verbs of knowing/sensing/telling → "read".
+
+## Ontology Reference
+
+Use the following ontology only as reference to understand what kinds of commands and properties are meaningful in this domain. Do not output ontology identifiers.
+
+```turtle
+{ontology}
+```
+
+## Output
+
+Return ONLY a JSON object, no prose, no markdown fences:
+
+{
+  "text_intent": string,
+  "capability_request": "actuate" | "read",
+  "actuation_request": string,
+  "property_request": string
+}
+"""
+
+ENV_STATE_REQUEST_PARSER_PROMPT = """\
+You are a smart home state-request parser. You are given a SINGLE atomic intent that has already been classified as an ENV_STATE_REQUEST — a request to know the current state of a device or the environment.
+
+Your job is to extract structured information from this one atomic intent and align it to the environment's capabilities. Do not split it further; it is already atomic.
+
+## What to extract
+
+- **text_intent**: the natural language fragment from the request that describes this atomic intent. Copy it verbatim from the input.
+- **artifact_type**: the ontology device class that the request targets, in namespace:localname format (e.g. ex:Light, ex:AirConditioner, ex:MediaPlayer). Use "NA" if the device type cannot be determined from the text.
+- **workspace_type**: the ontology workspace class for the room targeted, in namespace:localname format (e.g. ex:Bathroom, ex:Kitchen, ex:LivingRoom). Use "NA" if the workspace cannot be determined from the text.
+- **artifact_name**: the name of the specific artifact (e.g. "light308"), matched against the artifact list below. Use "NA" if the text does not identify a specific named artifact.
+- **property_name**: the name of the property being asked about, chosen from the property affordances of the matched artifact type in the artifact list below. Use "NA" if no property can be discerned from the text.
+- **parameter_name**: a named parameter of the property's output schema, used ONLY when property_name is set AND that property's output schema is an object exposing several named parameters (e.g. a "state" property exposing "brightness", "color_rgb", "effects"). Set to "NA" when this does not apply or cannot be determined from the text.
+
+## Alignment rules
+
+- For artifact_type and workspace_type, always use EXACT namespace:localname identifiers, case-sensitive, exactly as written in the ontology and the lists below. Never invent identifiers.
+- Choose artifact_type and workspace_type only from the types present in the lists below. property_name and parameter_name must come from the affordances listed for the matched artifact type.
+- If multiple artifacts could match, prefer the one consistent with any workspace or name mentioned in the text; if still ambiguous, leave artifact_name as "NA" but still fill artifact_type if the device class is clear.
+
+## Environment context
+
+Workspace types available in this environment (semantic type — description):
+{workspace_type_list}
+
+Artifacts available in this environment (semantic type — description — property affordances, with output parameter names where the property schema is an object):
+{artifact_list}
+
+## Ontology Reference
+
+```turtle
+{ontology}
+```
+
+## Output
+
+Return ONLY a JSON object, no prose, no markdown fences:
+
+{
+  "text_intent": string,
+  "artifact_type": string,
+  "workspace_type": string,
+  "artifact_name": string,
+  "property_name": string,
+  "parameter_name": string
+}
+"""
+
+GOAL_REQUEST_PARSER_PROMPT = """\
+You are a smart home goal-request parser. You are given a SINGLE atomic intent that has already been classified as a GOAL_REQUEST — a request to change the state of the environment or a device. Do not split it further; it is already atomic.
+
+Your first task is to classify the goal as "explicit" or "implicit". Your second task is to extract structured fields — full fields for an explicit goal, minimal fields for an implicit one.
+
+## Explicit vs. implicit
+
+Consider these three core identity fields: action.affordance_type, target.artifact_name, target.artifact_type (action.parameter is supporting, not decisive).
+
+- The goal is **explicit** if the action AND the target device can be DIRECTLY determined from the text — that is, action.affordance_type can be resolved to an ontology command class, AND at least one of target.artifact_name / target.artifact_type can be resolved. The user names what to do and what to do it to.
+- The goal is **implicit** otherwise — including when the user only describes a sensation, discomfort, or desired outcome without naming a device or command (e.g. "make the room brighter", "it's too stuffy in here"). 
+- "implicit" is the safety fallback: if the intent cannot be confidently filled into the explicit template, classify it as implicit.
+- Note: an explicit goal MAY still leave some identity fields as "NA" (see below) — e.g. an unknown room. But if the action and BOTH target-identity fields would all be unknown, the goal is implicit, not explicit-with-NAs.
+
+## Output for an IMPLICIT goal
+
+{
+  "category": "implicit",
+  "text_intent": string,
+  "reason": string
+}
+
+- text_intent: the verbatim natural-language fragment describing this intent.
+- reason: brief justification of why it could not be resolved to the explicit template.
+
+## Output for an EXPLICIT goal
+
+{
+  "category": "explicit",
+  "text_intent": string,
+  "action": {
+    "affordance_type": string,
+    "parameter": string | null,
+    "value": string | null,
+    "verb": "set" | "modify"
+  },
+  "target": {
+    "artifact_name": string,
+    "artifact_type": string,
+    "workspace_type": string,
+    "workspace_name": string
+  }
+}
+
+Field rules:
+
+- **text_intent**: the verbatim natural-language fragment from the original request describing this atomic intent.
+- **action.affordance_type**: the ontology command class in namespace:localname format that best matches the requested action (e.g. ex:TurnOnCommand, ex:SetBrightnessCommand). "NA" if not extractable from text.
+- **action.parameter**: the name of the parameter the affordance_type requires as payload (e.g. brightness, mode), determined from the rdfs:comment of the ActionAffordance subclass in the ontology. Use JSON null if the command is parameterless (e.g. TurnOnCommand, CloseCommand).
+- **action.value**: the value to set the parameter to, or the amount of a relative change. Extract ONLY the numeric or enum value as a string, WITHOUT units — "63" not "63%", "24" not "24 degrees". Use JSON null if no value is mentioned or the command is parameterless.
+- **action.verb**: "set" if the action sets an attribute to a specific value or is parameterless (turn on/off, open/close, play, pause, stop, pack); "modify" if the action is a relative change (increase by, decrease by, raise, lower, reduce, boost).
+- **target.artifact_name**: the artifact name matched to td:name / td:title in the environment capabilities (e.g. "light308", "kitchen light", "bedroom blinds"). "NA" if not extractable from text.
+- **target.artifact_type**: the ontology device class in namespace:localname format (e.g. ex:Light, ex:AirConditioner, ex:MediaPlayer). "NA" if not extractable from text.
+- **target.workspace_type**: the ontology workspace class in namespace:localname format (e.g. ex:Bathroom, ex:Kitchen, ex:LivingRoom). "NA" if not extractable from text.
+- **target.workspace_name**: the workspace name (e.g. "Lab 308"); multiple workspaces may share a type but have distinct names. "NA" if not extractable from text.
+
+Alignment requirement: for every field aligned to a semantic type (action.affordance_type, target.artifact_type, target.workspace_type), use EXACT namespace:localname identifiers from the ontology prefixes and class names, case-sensitive. Never invent identifiers. Choose artifact and workspace identifiers consistent with the lists below.
+
+Distinction between "NA" and null: identity fields (affordance_type, artifact_name, artifact_type, workspace_type, workspace_name) use the string "NA" when the field is applicable but not extractable from text. action.parameter and action.value use JSON null when the field is not applicable (parameterless command / no value given).
+
+## Environment context
+
+Workspaces in this environment (semantic type — name):
+{workspace_list}
+
+Artifacts in this environment (semantic type — name):
+{artifact_list}
+
+## Ontology Reference
+
+```turtle
+{ontology}
+```
+
+## Output
+
+Return ONLY the single JSON object for the determined category — no prose, no markdown fences, no commentary.
+"""

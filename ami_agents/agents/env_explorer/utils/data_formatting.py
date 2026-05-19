@@ -243,6 +243,7 @@ def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:
                     "name": aff.name,
                     "description": description,
                     "parameters": parameters,
+                    "semantic_types": list(aff.semantic_types or []),
                 })
 
             if affordances_list:  # Only include artifacts with affordances

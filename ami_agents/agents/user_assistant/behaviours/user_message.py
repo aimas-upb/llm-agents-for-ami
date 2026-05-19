@@ -31,13 +31,19 @@ from ..models import (
     Intent,
     CONFIRM_TOKENS,
     REJECT_TOKENS,
-    validate_intent_type,
 )
 from ..prompts import (
     ATOMIC_SEGMENTATION_SYSTEM_PROMPT,
-    INTENT_EXTRACTION_SYSTEM_PROMPT,
+    ENV_CAPABILITIES_REQUEST_PARSER_PROMPT,
+    ENV_STATE_REQUEST_PARSER_PROMPT,
+    GOAL_REQUEST_PARSER_PROMPT,
     PLAN_SUMMARY_SYSTEM_PROMPT,
     QUERY_RESPONSE_SYSTEM_PROMPT,
+)
+from ....shared.models.intents import (
+    ImplicitGoalIntent,
+    ExplicitGoalIntent,
+    goal_intent_from_dict,
 )
 from ..utils import (
     coerce_plan_dict,
@@ -47,6 +53,100 @@ from ..utils import (
     loose_json_loads,
 )
 from ....shared.utils.logger import LoggerFactory
+
+
+# ============================================================================
+# Context builder helpers for per-span LLM prompt template variables
+# ============================================================================
+
+
+def _build_workspace_context(caps_data: dict) -> tuple[str, str]:
+    """Build workspace context strings for prompt templates.
+
+    Returns:
+        (workspace_type_list, workspace_list) — two formatted strings for injection
+    """
+    if not caps_data or "workspaces" not in caps_data:
+        return "", ""
+
+    def _walk_workspaces(workspaces, parent_name=""):
+        """Recursively walk workspace hierarchy and yield (type, name, full_name) tuples."""
+        for ws in workspaces:
+            ws_type = ws.get("id", "unknown")  # workspace_id as simple identifier
+            ws_name = ws.get("name", "unknown")
+            ws_full = f"{ws_name} ({ws_type})" if parent_name == "" else f"{ws_name} ({ws_type}, parent: {parent_name})"
+            yield (ws_type, ws_name, ws_full)
+
+            # Recurse into sub-workspaces
+            for sub_node in _walk_workspaces(ws.get("sub_workspaces", []), ws_name):
+                yield sub_node
+
+    lines_type_list = []
+    lines_list = []
+    for ws_type, ws_name, ws_full in _walk_workspaces(caps_data.get("workspaces", [])):
+        lines_type_list.append(f"ex:{ws_type.title()} — {ws_name}")
+        lines_list.append(f"ex:{ws_type.title()} — {ws_full}")
+
+    return "\n".join(lines_type_list), "\n".join(lines_list)
+
+
+def _build_artifact_context(caps_data: dict) -> str:
+    """Build artifact list context string for prompt templates.
+
+    Returns:
+        Formatted string for injection into {artifact_list} placeholder
+    """
+    if not caps_data or "workspaces" not in caps_data:
+        return ""
+
+    lines = []
+
+    def _walk_artifacts(workspaces, workspace_name=""):
+        """Recursively walk workspaces and extract artifacts."""
+        for ws in workspaces:
+            ws_name = ws.get("name", "unknown")
+
+            # Process artifacts in this workspace
+            for artifact in ws.get("artifacts", []):
+                artifact_id = artifact.get("id", "unknown")
+                artifact_name = artifact.get("name", "unknown")
+
+                # Build action and property lists
+                actions = []
+                properties = []
+                for aff in artifact.get("affordances", []):
+                    aff_name = aff.get("name", "")
+                    aff_type = aff.get("type", "")
+                    params = aff.get("parameters", [])
+                    param_str = f"params: {', '.join(params)}" if params else ""
+
+                    if aff_type == "action_affordance":
+                        if param_str:
+                            actions.append(f"{aff_name} ({param_str})")
+                        else:
+                            actions.append(aff_name)
+                    elif aff_type == "property_affordance":
+                        if param_str:
+                            properties.append(f"{aff_name} ({param_str})")
+                        else:
+                            properties.append(aff_name)
+
+                action_str = "actions=[" + ", ".join(actions) + "]" if actions else ""
+                prop_str = "properties=[" + ", ".join(properties) + "]" if properties else ""
+                combined = ", ".join([s for s in [action_str, prop_str] if s])
+
+                lines.append(f"ex:Device — {artifact_name} ({artifact_id}, workspace: {ws_name}): {combined}")
+
+            # Recurse into sub-workspaces
+            _walk_artifacts(ws.get("sub_workspaces", []), ws_name)
+
+    _walk_artifacts(caps_data.get("workspaces", []))
+    return "\n".join(lines)
+
+
+# ============================================================================
+# UserMessageBehaviour class
+# ============================================================================
 
 
 class UserMessageBehaviour(CyclicBehaviour):
@@ -92,6 +192,12 @@ class UserMessageBehaviour(CyclicBehaviour):
         # Fetch capabilities once for use in segmentation and handlers
         capabilities_ctx = await self._fetch_capabilities()
 
+        # Parse capabilities JSON for use in per-span parsers
+        try:
+            caps_data = json.loads(capabilities_ctx) if capabilities_ctx else {}
+        except (json.JSONDecodeError, AttributeError):
+            caps_data = {}
+
         # Segment the user text into atomic intents
         atomic_intents = await self._segment_into_atomic_intents(text, capabilities_ctx)
         if not atomic_intents:
@@ -108,22 +214,22 @@ class UserMessageBehaviour(CyclicBehaviour):
         if caps_intents:
             conv.phase = ConversationPhase.EXTRACTING_INTENTS
             for intent in caps_intents:
-                stub = self._parse_atomic_intent(intent.span, intent.category, capabilities_ctx)
+                extraction = await self._parse_atomic_intent(intent.span, intent.category, caps_data)
                 await self._handle_query_capabilities(msg, thread, conv, capabilities_ctx)
 
         # Phase 2: ENV_STATE_REQUEST (if any)
         if state_intents:
             conv.phase = ConversationPhase.EXTRACTING_INTENTS
             for intent in state_intents:
-                stub = self._parse_atomic_intent(intent.span, intent.category, capabilities_ctx)
-                await self._handle_query_state(msg, thread, conv, stub)
+                extraction = await self._parse_atomic_intent(intent.span, intent.category, caps_data)
+                await self._handle_query_state(msg, thread, conv, extraction)
 
         # Phase 3: GOAL_REQUEST (if any) — sequential to avoid conflicting confirmation states
         if goal_intents:
             conv.phase = ConversationPhase.EXTRACTING_INTENTS
             for intent in goal_intents:
-                stub = self._parse_atomic_intent(intent.span, intent.category, capabilities_ctx)
-                await self._handle_goal(msg, thread, conv, stub)
+                extraction = await self._parse_atomic_intent(intent.span, intent.category, caps_data)
+                await self._handle_goal(msg, thread, conv, extraction)
 
     # ------------------------------------------------------------------
     # Atomic segmentation and per-span parsing (LLM calls)
@@ -169,18 +275,68 @@ class UserMessageBehaviour(CyclicBehaviour):
             self.logger.error("LLM atomic segmentation failed: %s", exc)
             return []
 
-    def _parse_atomic_intent(
-        self, span: str, category: str, capabilities_ctx: str = ""
+    async def _parse_atomic_intent(
+        self, span: str, category: str, caps_data: dict
     ) -> dict:
-        """Parse a single atomic intent span (stub for now).
+        """Parse a single atomic intent span using LLM per-span prompts.
 
-        Returns a minimal dict with the span and category.
-        Full per-span parsing will be added in a follow-up.
+        Args:
+            span: The verbatim user text for this atomic intent
+            category: One of "GOAL_REQUEST", "ENV_STATE_REQUEST", "ENV_CAPABILITIES_REQUEST"
+            caps_data: Parsed capabilities JSON dict from _fetch_capabilities()
+
+        Returns:
+            Dict with parsed structured intent fields (LLM output), or fallback dict on error
         """
-        return {
-            "classification": category.lower().replace("_request", ""),
-            "span": span,
-        }
+        # Choose prompt and template variables by category
+        if category == "GOAL_REQUEST":
+            prompt_template = GOAL_REQUEST_PARSER_PROMPT
+            workspace_list, _ = _build_workspace_context(caps_data)
+            artifact_list = _build_artifact_context(caps_data)
+            ontology = self.agent.ontology_ttl
+            prompt = prompt_template.format(
+                workspace_list=workspace_list,
+                artifact_list=artifact_list,
+                ontology=ontology,
+            )
+        elif category == "ENV_STATE_REQUEST":
+            prompt_template = ENV_STATE_REQUEST_PARSER_PROMPT
+            workspace_type_list, _ = _build_workspace_context(caps_data)
+            artifact_list = _build_artifact_context(caps_data)
+            ontology = self.agent.ontology_ttl
+            prompt = prompt_template.format(
+                workspace_type_list=workspace_type_list,
+                artifact_list=artifact_list,
+                ontology=ontology,
+            )
+        elif category == "ENV_CAPABILITIES_REQUEST":
+            prompt_template = ENV_CAPABILITIES_REQUEST_PARSER_PROMPT
+            ontology = self.agent.ontology_ttl
+            prompt = prompt_template.format(ontology=ontology)
+        else:
+            # Unknown category — return minimal fallback
+            return {"text_intent": span}
+
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": span},
+        ]
+
+        try:
+            response = await self.agent.llm_client.chat.completions.create(
+                model=self.agent.llm_model,
+                messages=messages,
+                **self.agent.build_llm_kwargs(),
+            )
+            raw = (response.choices[0].message.content or "").strip()
+            parsed = loose_json_loads(raw)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception as exc:
+            self.logger.warning("LLM per-span parsing failed for [%s]: %s", category, exc)
+
+        # Fallback: minimal dict with only text_intent
+        return {"text_intent": span}
 
     # ------------------------------------------------------------------
     # NLG: plan summary (LLM call)
@@ -233,21 +389,13 @@ class UserMessageBehaviour(CyclicBehaviour):
     async def _handle_goal(
         self, msg, thread: str, conv: ConversationState, extraction: dict
     ) -> None:
-        raw_intents = extraction.get("intents", [])
-        conv.intents = [Intent.from_dict(i) for i in raw_intents if isinstance(i, dict)]
-        conv.workspace_id = extraction.get("workspace_id")
-        intent_type = extraction.get("intent_type", "implicit")
+        # Parse the per-span extraction into a typed goal intent
+        parsed = goal_intent_from_dict(extraction)
+        conv.intents = [parsed]
+        intent_type = parsed.intent_type
 
-        if not conv.intents:
-            await self._reply(msg, "I couldn't derive any specific intents. Could you be more precise?")
-            conv.phase = ConversationPhase.IDLE
-            return
-
-        intent_strings = [intent.to_query_string() for intent in conv.intents]
-
-        intent_type = validate_intent_type(intent_strings, intent_type, conv.user_message.lower())
-
-        self.logger.info(demo("Derived intents: %s  workspace=%s  intent_type=%s"), intent_strings, conv.workspace_id, intent_type.upper())
+        intent_text = parsed.to_query_string()
+        self.logger.info(demo("Derived intent: %s  intent_type=%s"), intent_text, intent_type.upper())
 
         solver_jid = self.agent.target_jids.get("solver")
         if not solver_jid:
@@ -257,7 +405,7 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         conv.phase = ConversationPhase.AWAITING_PLAN
         body: Dict[str, Any] = {
-            "intents": [i.to_dict() for i in conv.intents],
+            "intents": [i.to_wire_dict() for i in conv.intents],
             "intent_type": intent_type,
         }
         if conv.workspace_id:
@@ -265,7 +413,7 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         timeout = self.agent.goal_request_timeout
 
-        self.logger.info(demo("UA -> InteractionSolver GOAL_REQUEST: intents=%s intent_type=%s"), intent_strings, intent_type.upper())
+        self.logger.info(demo("UA -> InteractionSolver GOAL_REQUEST: intent=%s intent_type=%s"), intent_text, intent_type.upper())
         try:
             result = await rpc_call(
                 self.agent,
@@ -399,11 +547,18 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         tree_spec = plan_obj.get("tree", {})
         raw_intents = plan_obj.get("intents", [])
-        intents = [
-            Intent.from_dict(d) if isinstance(d, dict)
-            else Intent(action="unknown", artifact="unknown", intent_text=str(d))
-            for d in raw_intents
-        ]
+
+        # Reconstruct typed goal intents from the wire format
+        intents = []
+        for d in raw_intents:
+            if isinstance(d, dict) and d.get("category") in ("implicit", "explicit"):
+                intents.append(goal_intent_from_dict(d))
+            elif isinstance(d, dict):
+                # Fallback for non-goal intents (state/capabilities requests)
+                intents.append(Intent(intent_text=d.get("text_intent", str(d))))
+            else:
+                intents.append(Intent(intent_text=str(d)))
+
         is_signifier_reuse = plan_obj.get("signifier_reuse", False)
         intent_type = plan_obj.get("intent_type")
         workspace_id = plan_obj.get("workspace_id")
@@ -436,7 +591,8 @@ class UserMessageBehaviour(CyclicBehaviour):
         self.agent.state_memory.clear()
         self.logger.info(demo("State memory cache cleared after BT execution"))
 
-        if exec_result.success and not is_signifier_reuse:
+        # Only record signifiers for implicit goal intents (explicit goals don't produce experiences)
+        if exec_result.success and not is_signifier_reuse and intent_type == "implicit":
             await self._record_signifiers(tree_spec, intents, exec_result, thread, intent_type, workspace_id)
 
         return exec_result
@@ -454,13 +610,14 @@ class UserMessageBehaviour(CyclicBehaviour):
         intent_type: Optional[str] = None,
         workspace_id: Optional[str] = None,
     ) -> None:
-        """Extract and record signifiers from an executed BT."""
-        intent_strings = [
-            i.to_query_string() if isinstance(i, Intent) else str(i)
-            for i in intents
-        ]
+        """Extract and record signifiers from an executed BT.
+
+        Only called for implicit goals (where the system inferred the device from context).
+        """
+        intent_strings = [i.to_query_string() for i in intents]
         structured_intents = [
-            i.to_dict() if isinstance(i, Intent) else (i if isinstance(i, dict) else None)
+            i.to_wire_dict() if isinstance(i, (ImplicitGoalIntent, ExplicitGoalIntent, Intent))
+            else (i if isinstance(i, dict) else None)
             for i in intents
         ]
         structured_intents = [s for s in structured_intents if s is not None]

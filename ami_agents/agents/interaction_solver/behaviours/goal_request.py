@@ -7,13 +7,14 @@ matching, community lookup, BT plan generation).
 """
 
 import json
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from spade.behaviour import CyclicBehaviour
 
 from ....shared.models.messages import META_CORRELATION_ID, MessageType
 from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
+from ....shared.models.intents import ImplicitGoalIntent, ExplicitGoalIntent, goal_intent_from_dict
 from ...user_assistant.models import Intent
 from ..utils.plan_envelope import (
     envelope_error,
@@ -91,7 +92,7 @@ class GoalRequestBehaviour(CyclicBehaviour):
     @staticmethod
     def _parse_request(msg):
         """Extract intents, workspace, and intent_type from the GOAL_REQUEST body."""
-        intent_objects: List[Intent] = []
+        intent_objects: List[Union[ImplicitGoalIntent, ExplicitGoalIntent, Intent]] = []
         workspace_id: Optional[str] = None
         intent_type: Optional[str] = None
         try:
@@ -107,15 +108,14 @@ class GoalRequestBehaviour(CyclicBehaviour):
             if isinstance(raw_intents, list):
                 for item in raw_intents:
                     if isinstance(item, dict):
-                        intent_objects.append(Intent.from_dict(item))
+                        # Check if this is a goal intent with category field (new format)
+                        if item.get("category") in ("implicit", "explicit"):
+                            intent_objects.append(goal_intent_from_dict(item))
+                        else:
+                            # Fallback for other intent types
+                            intent_objects.append(Intent(intent_text=item.get("text_intent", str(item))))
                     elif isinstance(item, str) and item.strip():
-                        intent_objects.append(
-                            Intent(
-                                action="unknown",
-                                artifact="unknown",
-                                intent_text=item.strip(),
-                            )
-                        )
+                        intent_objects.append(Intent(intent_text=item.strip()))
             else:
                 goal_text = (
                     (payload.get("intent") or payload.get("goal"))
@@ -123,22 +123,10 @@ class GoalRequestBehaviour(CyclicBehaviour):
                     else None
                 )
                 if goal_text:
-                    intent_objects.append(
-                        Intent(
-                            action="unknown",
-                            artifact="unknown",
-                            intent_text=str(goal_text).strip(),
-                        )
-                    )
+                    intent_objects.append(Intent(intent_text=str(goal_text).strip()))
         except json.JSONDecodeError:
             if msg.body:
-                intent_objects.append(
-                    Intent(
-                        action="unknown",
-                        artifact="unknown",
-                        intent_text=str(msg.body).strip(),
-                    )
-                )
+                intent_objects.append(Intent(intent_text=str(msg.body).strip()))
         return intent_objects, workspace_id, intent_type
 
     async def _reply(self, src_msg, reply_type: str, envelope: dict) -> None:
