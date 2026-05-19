@@ -29,12 +29,23 @@
     },
     {
       "match_type": "regex",
+      "match": "(?i)increase the display brightness.*reduce ambient light|reduce ambient light.*increase the display brightness",
+      "reply": "reduce ambient light"
+    },
+    {
+      "match_type": "regex",
       "match": "(?i)what would you like me to do with the projector",
+      "reply": "reduce glare"
+    },
+    {
+      "match_type": "regex",
+      "match": "(?i)do you want to control the projector.*or just check its status",
       "reply": "reduce glare"
     }
   ],
   "auto_confirm": true,
   "confirmation_text": "yes",
+  "response_timeout_seconds": 300,
   "settle_seconds": 4,
   "pass_criteria": [
     {

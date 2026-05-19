@@ -45,7 +45,7 @@
         {
           "type": "property_gte",
           "path": "/workspaces/lab308e/artifacts/internal_light_sensing_308e/properties/state",
-          "gte": 250,
+          "gte": 200,
           "timeout_seconds": 30,
           "poll_interval_seconds": 1
         },

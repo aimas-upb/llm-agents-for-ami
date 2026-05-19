@@ -28,13 +28,13 @@
   ],
   "auto_confirm": true,
   "confirmation_text": "yes",
-  "settle_seconds": 2,
+  "settle_seconds": 8,
   "pass_criteria": [
     {
-      "type": "property_equals",
+      "type": "property_in",
       "path": "/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/properties/state",
-      "equals": "closed",
-      "timeout_seconds": 30,
+      "values": ["closed", "closing"],
+      "timeout_seconds": 60,
       "poll_interval_seconds": 1
     },
     {

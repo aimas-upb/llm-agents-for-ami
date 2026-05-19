@@ -555,6 +555,7 @@ class Lab308eHarness:
         case = json.loads(case_path.read_text())
         details: Dict[str, Any] = {"case": case, "transcript": [], "assertions": [], "model_name": self.model_name}
         name = case.get("name") or case_path.stem
+        case_response_timeout = float(case.get("response_timeout_seconds", self.response_timeout))
         self.logger.info("Running case: %s", name)
         if self.args.clear_signifiers_per_case:
             storage_dir = _clear_signifier_storage()
@@ -569,7 +570,7 @@ class Lab308eHarness:
 
             query = str(case["query"])
             await self.user.ask(query)
-            first_reply = await self.user.wait_for_reply(self.response_timeout)
+            first_reply = await self.user.wait_for_reply(case_response_timeout)
             details["transcript"].append({"role": "assistant", "phase": "proposal", "text": first_reply})
             details["first_reply"] = first_reply
             self._capture_plan(details)
@@ -590,7 +591,7 @@ class Lab308eHarness:
                 )
                 clarification_steps.append({"assistant": current_reply, "reply": scripted_reply})
                 await self.user.ask(scripted_reply)
-                current_reply = await self.user.wait_for_reply(self.response_timeout)
+                current_reply = await self.user.wait_for_reply(case_response_timeout)
                 details["transcript"].append(
                     {"role": "assistant", "phase": f"clarification_{clarification_turn}", "text": current_reply}
                 )
@@ -614,7 +615,7 @@ class Lab308eHarness:
                 else:
                     self.user.drain_replies()
                     await self.user.ask(confirm_text)
-                final_reply = await self._wait_for_terminal_reply(details, self.response_timeout)
+                final_reply = await self._wait_for_terminal_reply(details, case_response_timeout)
 
             if not details.get("plan"):
                 details["failure_stage"] = "clarification"

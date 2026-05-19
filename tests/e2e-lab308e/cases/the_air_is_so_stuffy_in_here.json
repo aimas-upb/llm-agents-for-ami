@@ -65,13 +65,13 @@
   "clarification_replies": [
     {
       "match_type": "regex",
-      "match": "(?i)would you like me to turn on the air conditioner to improve the air\\?",
-      "reply": "open the window and turn on the fan"
+      "match": "(?i)would you like me to turn on the air conditioner to improve (the air|ventilation)\\?",
+      "reply": "improve ventilation by opening the window"
     },
     {
       "match_type": "regex",
-      "match": "(?i)would you like me to turn on the air conditioner, open the window, or turn on the fan to improve the air\\?",
-      "reply": "open the window and turn on the fan"
+      "match": "(?i)would you like me to turn on the air conditioner, open the window(?:/vent)?, or turn on the fan to improve (the air|ventilation)\\?",
+      "reply": "improve ventilation by opening the window"
     }
   ],
   "auto_confirm": true,
