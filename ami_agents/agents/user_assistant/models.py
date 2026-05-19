@@ -17,11 +17,24 @@ class ConversationPhase(Enum):
     """State machine phases for a single conversation."""
 
     IDLE = "idle"
+    SEGMENTING = "segmenting"
     EXTRACTING_INTENTS = "extracting_intents"
     AWAITING_PLAN = "awaiting_plan"
     SUMMARIZING_PLAN = "summarizing_plan"
     AWAITING_CONFIRMATION = "awaiting_confirmation"
     EXECUTING = "executing"
+
+
+@dataclass
+class AtomicIntent:
+    """Atomic intent segment from the LLM segmentation stage.
+
+    Represents one indivisible request as identified by the atomic segmenter.
+    """
+
+    span: str  # verbatim text from user input for this intent
+    category: str  # "GOAL_REQUEST" | "ENV_STATE_REQUEST" | "ENV_CAPABILITIES_REQUEST"
+    reason: str  # LLM justification for the categorization
 
 
 @dataclass

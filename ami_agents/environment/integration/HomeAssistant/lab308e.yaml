@@ -1,5 +1,89 @@
 version: 1
 
+semantic:
+  workspace_type: "ex:StudyRoom"
+  devices:
+    ambient_lights_308e:
+      artifact_type: "ex:Light"
+      service_types:
+        turn_on: "ex:TurnOnCommand"
+        turn_off: "ex:TurnOffCommand"
+        set_brightness: "ex:SetBrightnessCommand"
+        rgb_color: "ex:SetColorCommand"
+    task_lights_308e:
+      artifact_type: "ex:Light"
+      service_types:
+        turn_on: "ex:TurnOnCommand"
+        turn_off: "ex:TurnOffCommand"
+        set_brightness: "ex:SetBrightnessCommand"
+        rgb_color: "ex:SetColorCommand"
+    desk_lamp_308e:
+      artifact_type: "ex:Light"
+      service_types:
+        turn_on: "ex:TurnOnCommand"
+        turn_off: "ex:TurnOffCommand"
+        set_brightness: "ex:SetBrightnessCommand"
+    blinds_308e:
+      artifact_type: "ex:Blinds"
+      service_types:
+        open_cover: "ex:OpenCommand"
+        close_cover: "ex:CloseCommand"
+        set_cover_position: "ex:SetDegreeCommand"
+    blackout_blinds_308e:
+      artifact_type: "ex:Blinds"
+      service_types:
+        open_cover: "ex:OpenCommand"
+        close_cover: "ex:CloseCommand"
+        set_cover_position: "ex:SetDegreeCommand"
+    window_308e:
+      artifact_type: "ex:Blinds"
+      service_types:
+        open_cover: "ex:OpenCommand"
+        close_cover: "ex:CloseCommand"
+        set_cover_position: "ex:SetDegreeCommand"
+    projector_308e:
+      artifact_type: "ex:MediaPlayer"
+      service_types:
+        turn_on: "ex:TurnOnCommand"
+        turn_off: "ex:TurnOffCommand"
+        media_play: "ex:PlayCommand"
+        media_pause: "ex:PauseCommand"
+        media_stop: "ex:StopCommand"
+        volume_set: "ex:SetVolumeCommand"
+        select_source: "ex:SetModeCommand"
+    display_wall_308e:
+      artifact_type: "ex:MediaPlayer"
+      service_types:
+        turn_on: "ex:TurnOnCommand"
+        turn_off: "ex:TurnOffCommand"
+        media_play: "ex:PlayCommand"
+        media_pause: "ex:PauseCommand"
+        media_stop: "ex:StopCommand"
+        volume_set: "ex:SetVolumeCommand"
+        select_source: "ex:SetModeCommand"
+    ceiling_fan_308e:
+      artifact_type: "ex:Fan"
+      service_types:
+        turn_on: "ex:TurnOnCommand"
+        turn_off: "ex:TurnOffCommand"
+    air_conditioner_308e:
+      artifact_type: "ex:AirConditioner"
+      service_types:
+        turn_on: "ex:TurnOnCommand"
+        turn_off: "ex:TurnOffCommand"
+        set_temperature: "ex:SetTemperatureCommand"
+        set_hvac_mode: "ex:SetModeCommand"
+        set_fan_mode: "ex:SetFanSpeedCommand"
+        set_swing_mode: "ex:SetSwingCommand"
+    heater_308e:
+      artifact_type: "ex:Heating"
+      service_types:
+        turn_on: "ex:TurnOnCommand"
+        turn_off: "ex:TurnOffCommand"
+        set_temperature: "ex:SetTemperatureCommand"
+        set_hvac_mode: "ex:SetModeCommand"
+        set_fan_mode: "ex:SetFanSpeedCommand"
+
 devices:
   ambient_lights_308e:
     - platform: light

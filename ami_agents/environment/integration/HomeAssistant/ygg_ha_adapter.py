@@ -21,6 +21,8 @@ from dotenv import load_dotenv
 from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
 
 from http import HTTPStatus
+import yaml
+
 from ha_utils import (HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST,
                       get_supported_service_fields)
 
@@ -50,6 +52,61 @@ JACAMO = Namespace("https://purl.org/hmas/jacamo/")
 TD     = Namespace("https://www.w3.org/2019/wot/td#")
 
 WEBHOOK_VERIFY_TIMEOUT = 5.0 # seconds for webhook verification requests
+
+# ---------------- Semantic config loader -----------------
+def _load_semantic_config() -> Dict[str, Any]:
+    """Load semantic type mappings from the YAML file pointed to by SEMANTIC_CONFIG env var."""
+    path = os.getenv("SEMANTIC_CONFIG", "").strip()
+    if not path:
+        return {}
+    # If path is relative, try relative to the HomeAssistant directory
+    if not os.path.isabs(path):
+        ha_dir = os.path.dirname(os.path.abspath(__file__))
+        resolved = os.path.join(ha_dir, os.path.basename(path))
+        if os.path.exists(resolved):
+            path = resolved
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path) as f:
+            data = yaml.safe_load(f)
+        return (data or {}).get("semantic", {})
+    except Exception as exc:
+        print(f"Warning: could not load SEMANTIC_CONFIG from {path!r}: {exc}")
+        return {}
+
+_SEMANTIC_CFG: Dict[str, Any] = _load_semantic_config()
+if _SEMANTIC_CFG:
+    print(f"✓ Loaded semantic config: workspace_type={_SEMANTIC_CFG.get('workspace_type')}, {len(_SEMANTIC_CFG.get('devices', {}))} devices")
+else:
+    cfg_env = os.getenv("SEMANTIC_CONFIG", "NOT SET")
+    print(f"⚠ Semantic config not loaded (SEMANTIC_CONFIG={cfg_env!r})")
+
+
+def _semantic_workspace_type() -> Optional[URIRef]:
+    """Return the ex: URIRef for the workspace type declared in the semantic config, or None."""
+    raw = _SEMANTIC_CFG.get("workspace_type", "")
+    if not raw or not raw.startswith("ex:"):
+        return None
+    return EX[raw[3:]]
+
+
+def _semantic_artifact_type(device_name: str) -> Optional[URIRef]:
+    """Return the ex: URIRef for the artifact type of the named device, or None."""
+    devices = _SEMANTIC_CFG.get("devices", {})
+    raw = (devices.get(device_name) or {}).get("artifact_type", "")
+    if not raw or not raw.startswith("ex:"):
+        return None
+    return EX[raw[3:]]
+
+
+def _semantic_action_type(device_name: str, svc_name: str) -> URIRef:
+    """Return the ex: URIRef for the action type of device+service, falling back to EX.StatusCommand."""
+    devices = _SEMANTIC_CFG.get("devices", {})
+    raw = (devices.get(device_name) or {}).get("service_types", {}).get(svc_name, "")
+    if raw and raw.startswith("ex:"):
+        return EX[raw[3:]]
+    return EX.StatusCommand
 
 # XSD value type URIs for event payloads
 XSD_BOOL   = "http://www.w3.org/2001/XMLSchema#boolean"
@@ -588,6 +645,17 @@ async def workspace(workspace_id: str, request: Request):
         devices, _ = await _get_workspace_devices_and_entities(workspace_id)
         rdf = HomeAssistantRDF(str(request.base_url))
         rdf.workspace_to_rdf(area, devices)
+        ws_type = _semantic_workspace_type()
+        if ws_type:
+            ws_uri = URIRef(f"{rdf.base}workspaces/{workspace_id}#workspace")
+            rdf.g.add((ws_uri, RDF.type, ws_type))
+        for d in devices:
+            device_name = d.get("name", d.get("id"))
+            art_type = _semantic_artifact_type(device_name)
+            if art_type:
+                safe_name = urllib.parse.quote(device_name, safe="")
+                art_uri = URIRef(f"{rdf.base}workspaces/{workspace_id}/artifacts/{safe_name}#artifact")
+                rdf.g.add((art_uri, RDF.type, art_type))
         return Response(rdf.serialize(), media_type="text/turtle")
     except HTTPException:
         raise
@@ -612,6 +680,9 @@ async def list_artifacts(workspace_id: str, request: Request):
             safe_name = ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
             art = URIRef(f"{art_dir}{safe_name}#artifact")
             rdf.g.add((art, RDF.type, HMAS.Artifact))
+            art_type = _semantic_artifact_type(label)
+            if art_type:
+                rdf.g.add((art, RDF.type, art_type))
             rdf.g.add((ws, HMAS.contains, art))
             rdf.g.add((art, TD.title, Literal(label)))
         return Response(rdf.serialize(), media_type="text/turtle")
@@ -643,8 +714,9 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
         rdf.g.add((art, RDF.type, HMAS.Artifact))
         rdf.g.add((art, TD.title, Literal(artifact_label)))
         domains = {e["entity_id"].split(".")[0] for e in device_entities}
-        if "light" in domains:
-            rdf.g.add((art, RDF.type, EX.HueLamp))
+        art_type = _semantic_artifact_type(artifact_label)
+        if art_type:
+            rdf.g.add((art, RDF.type, art_type))
         sec = BNode()
         rdf.g.add((art, TD.hasSecurityConfiguration, sec))
         rdf.g.add((sec, RDF.type, WOTSEC.NoSecurityScheme))
@@ -699,7 +771,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                 rdf._add_action(
                     art,
                     action_name,
-                    EX.StatusCommand,
+                    _semantic_action_type(artifact_label, svc_name),
                     "POST",
                     URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/ha/{urllib.parse.quote(domain, safe='')}/{urllib.parse.quote(svc_name, safe='')}"),
                     "application/json",

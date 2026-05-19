@@ -1,9 +1,9 @@
 """UserMessageBehaviour: the main conversation state machine.
 
 The LLM is invoked only for:
-- NLU  (intent extraction)   via ``_extract_intents``
-- NLG  (plan summary)        via ``_summarize_plan``
-- NLG  (query formatting)    via ``_format_query_response``
+- NLU  (atomic segmentation)  via ``_segment_into_atomic_intents``
+- NLG  (plan summary)         via ``_summarize_plan``
+- NLG  (query formatting)     via ``_format_query_response``
 
 Everything else (plan requesting, confirmation handling, execution,
 signifier recording) is deterministic.
@@ -25,6 +25,7 @@ from ....bt_planning.signifier_bridge import extract_signifiers_from_bt
 from ....shared.community.community_client import CommunitySignifierClient
 
 from ..models import (
+    AtomicIntent,
     ConversationPhase,
     ConversationState,
     Intent,
@@ -33,6 +34,7 @@ from ..models import (
     validate_intent_type,
 )
 from ..prompts import (
+    ATOMIC_SEGMENTATION_SYSTEM_PROMPT,
     INTENT_EXTRACTION_SYSTEM_PROMPT,
     PLAN_SUMMARY_SYSTEM_PROMPT,
     QUERY_RESPONSE_SYSTEM_PROMPT,
@@ -84,44 +86,57 @@ class UserMessageBehaviour(CyclicBehaviour):
             await self._handle_confirmation(msg, thread, text, conv)
             return
 
-        conv.phase = ConversationPhase.EXTRACTING_INTENTS
+        conv.phase = ConversationPhase.SEGMENTING
         conv.user_message = text
 
+        # Fetch capabilities once for use in segmentation and handlers
         capabilities_ctx = await self._fetch_capabilities()
 
-        extraction = await self._extract_intents(text, capabilities_ctx)
-        classification = extraction.get("classification", "unclear")
+        # Segment the user text into atomic intents
+        atomic_intents = await self._segment_into_atomic_intents(text, capabilities_ctx)
+        if not atomic_intents:
+            await self._reply(msg, "I couldn't understand your request. Could you rephrase?")
+            conv.phase = ConversationPhase.IDLE
+            return
 
-        if classification == "goal":
-            await self._handle_goal(msg, thread, conv, extraction)
-        elif classification == "query_capabilities":
-            await self._handle_query_capabilities(msg, thread, conv, capabilities_ctx)
-        elif classification == "query_state":
-            await self._handle_query_state(msg, thread, conv, extraction)
-        elif classification == "confirmation":
-            await self._reply(msg, "I don't have a pending plan right now. What would you like to do?")
-            conv.phase = ConversationPhase.IDLE
-        elif classification == "unclear":
-            question = extraction.get("question", "Could you clarify what you would like?")
-            await self._reply(msg, question)
-            conv.phase = ConversationPhase.IDLE
-        else:
-            await self._reply(msg, "I'm not sure I understood that. Could you rephrase?")
-            conv.phase = ConversationPhase.IDLE
+        # Group intents by category
+        caps_intents = [a for a in atomic_intents if a.category == "ENV_CAPABILITIES_REQUEST"]
+        state_intents = [a for a in atomic_intents if a.category == "ENV_STATE_REQUEST"]
+        goal_intents = [a for a in atomic_intents if a.category == "GOAL_REQUEST"]
+
+        # Phase 1: ENV_CAPABILITIES_REQUEST (if any)
+        if caps_intents:
+            conv.phase = ConversationPhase.EXTRACTING_INTENTS
+            for intent in caps_intents:
+                stub = self._parse_atomic_intent(intent.span, intent.category, capabilities_ctx)
+                await self._handle_query_capabilities(msg, thread, conv, capabilities_ctx)
+
+        # Phase 2: ENV_STATE_REQUEST (if any)
+        if state_intents:
+            conv.phase = ConversationPhase.EXTRACTING_INTENTS
+            for intent in state_intents:
+                stub = self._parse_atomic_intent(intent.span, intent.category, capabilities_ctx)
+                await self._handle_query_state(msg, thread, conv, stub)
+
+        # Phase 3: GOAL_REQUEST (if any) — sequential to avoid conflicting confirmation states
+        if goal_intents:
+            conv.phase = ConversationPhase.EXTRACTING_INTENTS
+            for intent in goal_intents:
+                stub = self._parse_atomic_intent(intent.span, intent.category, capabilities_ctx)
+                await self._handle_goal(msg, thread, conv, stub)
 
     # ------------------------------------------------------------------
-    # NLU: intent extraction (LLM call)
+    # Atomic segmentation and per-span parsing (LLM calls)
     # ------------------------------------------------------------------
 
-    async def _extract_intents(self, user_text: str, capabilities: str) -> dict:
-        """Call LLM to classify the user message and extract structured intents."""
-        user_content = f"User message: {user_text}"
-        if capabilities:
-            user_content = f"Capabilities:\n{capabilities}\n\n{user_content}"
-
+    async def _segment_into_atomic_intents(
+        self, user_text: str, capabilities_ctx: str = ""
+    ) -> list[AtomicIntent]:
+        """Call LLM to segment user message into atomic intents with categories."""
+        prompt = ATOMIC_SEGMENTATION_SYSTEM_PROMPT.format(capabilities=capabilities_ctx)
         messages = [
-            {"role": "system", "content": INTENT_EXTRACTION_SYSTEM_PROMPT},
-            {"role": "user", "content": user_content},
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": user_text},
         ]
         try:
             response = await self.agent.llm_client.chat.completions.create(
@@ -131,13 +146,41 @@ class UserMessageBehaviour(CyclicBehaviour):
             )
             raw = (response.choices[0].message.content or "").strip()
             parsed = loose_json_loads(raw)
-            if isinstance(parsed, dict):
-                return parsed
-            self.logger.warning("LLM intent extraction returned non-dict: %r", raw[:200])
-            return {"classification": "unclear", "question": "Could you clarify what you would like?"}
+            if not isinstance(parsed, dict):
+                self.logger.warning("LLM atomic segmentation returned non-dict: %r", raw[:200])
+                return []
+
+            intents_data = parsed.get("intents", [])
+            if not isinstance(intents_data, list):
+                self.logger.warning("LLM atomic segmentation returned non-list intents")
+                return []
+
+            result = []
+            for item in intents_data:
+                if not isinstance(item, dict):
+                    continue
+                span = item.get("span", "").strip()
+                category = item.get("category", "").strip()
+                reason = item.get("reason", "").strip()
+                if span and category in ("GOAL_REQUEST", "ENV_STATE_REQUEST", "ENV_CAPABILITIES_REQUEST") and reason:
+                    result.append(AtomicIntent(span=span, category=category, reason=reason))
+            return result
         except Exception as exc:
-            self.logger.error("LLM intent extraction failed: %s", exc)
-            return {"classification": "unclear", "question": "Something went wrong. Could you try again?"}
+            self.logger.error("LLM atomic segmentation failed: %s", exc)
+            return []
+
+    def _parse_atomic_intent(
+        self, span: str, category: str, capabilities_ctx: str = ""
+    ) -> dict:
+        """Parse a single atomic intent span (stub for now).
+
+        Returns a minimal dict with the span and category.
+        Full per-span parsing will be added in a follow-up.
+        """
+        return {
+            "classification": category.lower().replace("_request", ""),
+            "span": span,
+        }
 
     # ------------------------------------------------------------------
     # NLG: plan summary (LLM call)
@@ -310,24 +353,39 @@ class UserMessageBehaviour(CyclicBehaviour):
             conv.phase = ConversationPhase.IDLE
 
             conv.user_message = text
-            conv.phase = ConversationPhase.EXTRACTING_INTENTS
+            conv.phase = ConversationPhase.SEGMENTING
             capabilities_ctx = await self._fetch_capabilities()
-            extraction = await self._extract_intents(text, capabilities_ctx)
-            classification = extraction.get("classification", "unclear")
+            atomic_intents = await self._segment_into_atomic_intents(text, capabilities_ctx)
+            if not atomic_intents:
+                await self._reply(msg, "I couldn't understand your request. Could you rephrase?")
+                conv.phase = ConversationPhase.IDLE
+                return
 
-            if classification == "goal":
-                await self._handle_goal(msg, thread, conv, extraction)
-            elif classification == "query_capabilities":
-                await self._handle_query_capabilities(msg, thread, conv, capabilities_ctx)
-            elif classification == "query_state":
-                await self._handle_query_state(msg, thread, conv, extraction)
-            elif classification == "unclear":
-                question = extraction.get("question", "Could you clarify what you would like?")
-                await self._reply(msg, question)
-                conv.phase = ConversationPhase.IDLE
-            else:
-                await self._reply(msg, "I'm not sure I understood that. Could you rephrase?")
-                conv.phase = ConversationPhase.IDLE
+            # Group intents by category
+            caps_intents = [a for a in atomic_intents if a.category == "ENV_CAPABILITIES_REQUEST"]
+            state_intents = [a for a in atomic_intents if a.category == "ENV_STATE_REQUEST"]
+            goal_intents = [a for a in atomic_intents if a.category == "GOAL_REQUEST"]
+
+            # Phase 1: ENV_CAPABILITIES_REQUEST (if any)
+            if caps_intents:
+                conv.phase = ConversationPhase.EXTRACTING_INTENTS
+                for intent in caps_intents:
+                    stub = self._parse_atomic_intent(intent.span, intent.category, capabilities_ctx)
+                    await self._handle_query_capabilities(msg, thread, conv, capabilities_ctx)
+
+            # Phase 2: ENV_STATE_REQUEST (if any)
+            if state_intents:
+                conv.phase = ConversationPhase.EXTRACTING_INTENTS
+                for intent in state_intents:
+                    stub = self._parse_atomic_intent(intent.span, intent.category, capabilities_ctx)
+                    await self._handle_query_state(msg, thread, conv, stub)
+
+            # Phase 3: GOAL_REQUEST (if any)
+            if goal_intents:
+                conv.phase = ConversationPhase.EXTRACTING_INTENTS
+                for intent in goal_intents:
+                    stub = self._parse_atomic_intent(intent.span, intent.category, capabilities_ctx)
+                    await self._handle_goal(msg, thread, conv, stub)
 
     # ------------------------------------------------------------------
     # DETERMINISTIC: plan execution
@@ -589,8 +647,13 @@ class UserMessageBehaviour(CyclicBehaviour):
     # Helpers
     # ------------------------------------------------------------------
 
-    async def _fetch_capabilities(self) -> str:
-        """Fetch environment capabilities from EnvExplorer via RPC."""
+    async def _fetch_capabilities(self, detail_level: str = "summary") -> str:
+        """Fetch environment capabilities from EnvExplorer via RPC.
+
+        Args:
+            detail_level: One of "summary" (default, lightweight hierarchical JSON)
+                         or "detailed" (full RDF/Turtle graph).
+        """
         explorer_jid = self.agent.target_jids.get("explorer")
         if not explorer_jid:
             return ""
@@ -599,7 +662,7 @@ class UserMessageBehaviour(CyclicBehaviour):
                 self.agent,
                 to_jid=str(explorer_jid),
                 request_type=MessageType.ENV_CAPABILITIES_REQUEST.value,
-                body={"query": "all"},
+                body={"query": "all", "detail_level": detail_level},
                 expect_type=MessageType.ENV_CAPABILITIES_RESPONSE.value,
                 timeout=self.agent.rpc_call_timeout,
             )

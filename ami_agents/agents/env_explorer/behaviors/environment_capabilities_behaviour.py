@@ -3,7 +3,11 @@ from spade.behaviour import CyclicBehaviour
 
 from ....shared.models.messages import MessageType, META_CORRELATION_ID
 from ....shared.utils.demo_log import demo
-from ..utils.data_formatting import format_capabilities_payload
+from ..utils.data_formatting import (
+    format_capabilities_payload,
+    format_capabilities_summary_hierarchical,
+    format_capabilities_detailed_rdf,
+)
 
 
 class EnvironmentCapabilitiesBehaviour(CyclicBehaviour):
@@ -25,12 +29,26 @@ class EnvironmentCapabilitiesBehaviour(CyclicBehaviour):
 
         self.agent.logger.info(demo("Received ENV_CAPABILITIES_REQUEST from %s"), str(msg.sender))
 
+        # Parse request body to extract detail_level
+        detail_level = "summary"  # default
+        try:
+            if msg.body:
+                body = json.loads(msg.body)
+                detail_level = body.get("detail_level", "summary")
+        except (json.JSONDecodeError, AttributeError):
+            pass
+
         # Generate capabilities response payload
-        response_payload = self._generate_capabilities_payload()
+        response_payload = self._generate_capabilities_payload(detail_level)
 
         # Send response
         reply = msg.make_reply()
-        reply.body = json.dumps(response_payload)
+        # For detailed RDF response, payload is a string; otherwise a dict
+        if isinstance(response_payload, dict):
+            reply.body = json.dumps(response_payload)
+        else:
+            # detailed RDF - wrap in JSON with detail_level indicator
+            reply.body = json.dumps({"detail_level": detail_level, "payload": response_payload})
         reply.set_metadata("type", MessageType.ENV_CAPABILITIES_RESPONSE.value)
 
         # Preserve correlation ID and thread
@@ -44,22 +62,32 @@ class EnvironmentCapabilitiesBehaviour(CyclicBehaviour):
 
         self.agent.logger.debug(f"Sent capabilities response with {len(response_payload.get('workspaces', {}))} workspaces")
 
-    def _generate_capabilities_payload(self) -> dict:
+    def _generate_capabilities_payload(self, detail_level: str = "summary"):
         """
-        Generate comprehensive capabilities payload.
+        Generate capabilities payload at the specified detail level.
 
-        Returns a machine-readable JSON payload containing information about
-        the agent's workspaces, artifacts, affordances, and capabilities.
+        Args:
+            detail_level: One of "summary" or "detailed". If "summary", returns
+                         hierarchical JSON. If "detailed", returns Turtle RDF string.
+                         Unknown values default to "summary".
+
+        Returns:
+            For "summary": dict with hierarchical workspace/artifact/affordance tree.
+            For "detailed": Turtle RDF string.
+            For missing/legacy: dict with full format_capabilities_payload output.
         """
         try:
-            # Generate capabilities payload using utility function directly
-            # This follows SPADE principles by avoiding thin wrapper methods
-            return format_capabilities_payload(self.agent)
+            if detail_level == "detailed":
+                return format_capabilities_detailed_rdf(self.agent)
+            elif detail_level == "summary":
+                return format_capabilities_summary_hierarchical(self.agent)
+            else:
+                # Unknown detail_level - use default legacy payload
+                return format_capabilities_payload(self.agent)
         except Exception as e:
             self.agent.logger.error(f"Error generating capabilities payload: {e}", exc_info=True)
             return {
                 "error": "capabilities_generation_failed",
                 "detail": str(e),
-                "workspaces": {},
-                "summary": "Capabilities generation failed due to internal error"
+                "discovery_complete": False,
             }

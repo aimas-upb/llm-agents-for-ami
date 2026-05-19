@@ -1,0 +1,277 @@
+@prefix cnt: <http://www.w3.org/2011/content#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix http: <http://www.w3.org/2011/http#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://www.w3.org/2011/http> rdf:type owl:Ontology ;
+rdfs:comment "A namespace for describing HTTP messages (http://www.w3.org/Protocols/rfc2616/rfc2616.html)"@en ;
+rdfs:isDefinedBy <http://www.w3.org/TR/HTTP-in-RDF/> ;
+rdfs:label "HTTP in RDF"@en ;
+rdfs:seeAlso <http://www.w3.org/TR/Content-in-RDF/> ,
+<http://www.w3.org/WAI/intro/earl> ;
+owl:imports <http://purl.org/dc/terms/> ,
+<http://www.w3.org/2011/content#> ;
+owl:versionInfo "Working Draft 29 April 2011"@en .
+
+http:absolutePath rdf:type rdf:Property ;
+rdfs:comment "The absolute path sort of request URI."@en ;
+rdfs:label "Absolute path"@en ;
+rdfs:subPropertyOf http:requestURI .
+
+http:absoluteURI rdf:type rdf:Property ;
+rdfs:comment "The absolute request URI."@en ;
+rdfs:label "Absolute URI"@en ;
+rdfs:subPropertyOf http:requestURI .
+
+http:authority rdf:type rdf:Property ;
+rdfs:comment "The authority sort of request URI."@en ;
+rdfs:label "Authority"@en ;
+rdfs:subPropertyOf http:requestURI .
+
+http:body rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The entity body of an HTTP message."@en ;
+rdfs:domain http:Message ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Entity Body"@en ;
+rdfs:range cnt:ContentAsBase64 .
+
+http:Connection rdf:type rdfs:Class ,
+owl:Class ;
+rdfs:comment "A connection used for HTTP transfer."@en ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Connection"@en .
+
+http:connectionAuthority rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The authority of a connection used for the HTTP transfer."@en ;
+rdfs:domain http:Connection ;
+rdfs:label "Connection authority"@en ;
+rdfs:range rdfs:Literal .
+
+http:elementName rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The name of a header element."@en ;
+rdfs:domain http:HeaderElement ;
+rdfs:label "Header element name"@en ;
+rdfs:range rdfs:Literal .
+
+http:elementValue rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The value of a header element."@en ;
+rdfs:domain http:HeaderElement ;
+rdfs:label "Header element value"@en ;
+rdfs:range rdfs:Literal .
+
+http:EntityHeader rdf:type rdfs:Class ,
+owl:Class ;
+rdfs:comment "An entity header in an HTTP message."@en ;
+rdfs:label "Entity Header"@en ;
+rdfs:subClassOf http:MessageHeader .
+
+http:fieldName rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The name of an HTTP header field."@en ;
+rdfs:domain http:MessageHeader ;
+rdfs:label "Field name"@en ;
+rdfs:range rdfs:Literal .
+
+http:fieldValue rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The value of an HTTP header field."@en ;
+rdfs:domain http:MessageHeader ;
+rdfs:label "Field value"@en ;
+rdfs:range rdfs:Literal .
+
+http:GeneralHeader rdf:type rdfs:Class ,
+owl:Class ;
+rdfs:comment "A general header in an HTTP message."@en ;
+rdfs:label "General Header"@en ;
+rdfs:subClassOf http:MessageHeader .
+
+http:hdrName rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The name of an HTTP header."@en ;
+rdfs:domain http:MessageHeader ;
+rdfs:label "Header name"@en ;
+rdfs:range http:HeaderName .
+
+http:HeaderElement rdf:type rdfs:Class ,
+owl:Class ;
+rdfs:comment "A part of a deconstructed header value."@en ;
+rdfs:label "Header Element"@en .
+
+http:headerElements rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The deconstructed parts of an HTTP header value."@en ;
+rdfs:domain http:MessageHeader ;
+rdfs:label "Header elements"@en .
+
+http:HeaderName rdf:type rdfs:Class ,
+owl:Class ;
+rdfs:comment "A header name."@en ;
+rdfs:label "Header Name"@en .
+
+http:headers rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The headers in an HTTP message."@en ;
+rdfs:domain http:Message ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Headers"@en .
+
+http:httpVersion rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The HTTP version of an HTTP message."@en ;
+rdfs:domain http:Message ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "HTTP version"@en ;
+rdfs:range rdfs:Literal .
+
+http:Message rdf:type rdfs:Class ,
+owl:Class ;
+rdfs:comment "An HTTP message."@en ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Message"@en .
+
+http:MessageHeader rdf:type rdfs:Class ,
+owl:Class ;
+rdfs:comment "A header in an HTTP message."@en ;
+rdfs:label "Message Header"@en .
+
+http:Method rdf:type rdfs:Class ,
+owl:Class ;
+rdfs:comment "The HTTP method used for the request."@en ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Method"@en .
+
+http:methodName rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The HTTP method name used for the HTTP request."@en ;
+rdfs:domain http:Request ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Method name"@en ;
+rdfs:range rdfs:Literal .
+
+http:mthd rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The HTTP method used for the HTTP request."@en ;
+rdfs:domain http:Request ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Method"@en ;
+rdfs:range http:Method .
+
+http:Parameter rdf:type rdfs:Class ,
+owl:Class ;
+rdfs:comment "A parameter for a part of a header value."@en ;
+rdfs:label "Parameter"@en .
+
+http:paramName rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The name of a parameter in a part of a deconstructed HTTP header value."@en ;
+rdfs:domain http:Parameter ;
+rdfs:label "Parameter name"@en ;
+rdfs:range rdfs:Literal .
+
+http:params rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The parameters in a part of a deconstructed HTTP header value."@en ;
+rdfs:domain http:HeaderElement ;
+rdfs:label "Header parameters"@en .
+
+http:paramValue rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The value of a parameter in a part of a deconstructed HTTP header value."@en ;
+rdfs:domain http:Parameter ;
+rdfs:label "Parameter value"@en ;
+rdfs:range rdfs:Literal .
+
+http:reasonPhrase rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The reason phrase (status text) of an HTTP response."@en ;
+rdfs:domain http:Response ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Reason phrase"@en ;
+rdfs:range rdfs:Literal .
+
+http:Request rdf:type rdfs:Class ,
+owl:Class ;
+rdfs:comment "An HTTP request."@en ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Request"@en ;
+rdfs:subClassOf http:Message .
+
+http:RequestHeader rdf:type rdfs:Class ,
+owl:Class ;
+rdfs:comment "A header in an HTTP request message."@en ;
+rdfs:label "Request Header"@en ;
+rdfs:subClassOf http:MessageHeader .
+
+http:requests rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The HTTP requests made via a connection."@en ;
+rdfs:domain http:Connection ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Requests"@en .
+
+http:requestURI rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The request URI of an HTTP request."@en ;
+rdfs:domain http:Request ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Request URI"@en ;
+rdfs:range rdfs:Literal .
+
+http:resp rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The HTTP response sent in answer to an HTTP request."@en ;
+rdfs:domain http:Request ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Response"@en ;
+rdfs:range http:Response .
+
+http:Response rdf:type rdfs:Class ,
+owl:Class ;
+rdfs:comment "An HTTP response."@en ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Response"@en ;
+rdfs:subClassOf http:Message .
+
+http:ResponseHeader rdf:type rdfs:Class ,
+owl:Class ;
+rdfs:comment "A header in an HTTP response message."@en ;
+rdfs:label "Response Header"@en ;
+rdfs:subClassOf http:MessageHeader .
+
+http:sc rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The status code of an HTTP response."@en ;
+rdfs:domain http:Response ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Status code"@en ;
+rdfs:range http:StatusCode .
+
+http:StatusCode rdf:type rdfs:Class ,
+owl:Class ;
+rdfs:comment "The status code of an HTTP response."@en ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Status code"@en .
+
+http:statusCodeNumber rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The status code number."@en ;
+rdfs:domain http:StatusCode ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Status code"@en ;
+rdfs:range xsd:int ;
+rdfs:subPropertyOf dct:identifier .
+
+http:statusCodeValue rdf:type rdf:Property ,
+owl:ObjectProperty ;
+rdfs:comment "The status code value of an HTTP response."@en ;
+rdfs:domain http:Response ;
+rdfs:isDefinedBy <http://www.ietf.org/rfc/rfc2616.txt> ;
+rdfs:label "Status code"@en ;
+rdfs:range rdfs:Literal .

@@ -774,14 +774,16 @@ def get_supported_service_fields(domain: str, entity_attributes: Dict[str, Any],
 
             # Brightness fields
             if field_name in ("brightness", "brightness_pct", "brightness_step", "brightness_step_pct"):
-                if "brightness" in supported_color_modes or "onoff" in supported_color_modes:
+                # Include if device has brightness attribute or supports brightness/onoff modes
+                if "brightness" in entity_attributes or "brightness" in supported_color_modes or "onoff" in supported_color_modes:
                     supported[field_name] = field_def
                 continue
 
             # Color fields - check against supported_color_modes
+            # rgb_color is supported if device supports any of: hs, xy, rgb, rgbw, rgbww
             if field_name in ("rgb_color", "rgbw_color", "rgbww_color"):
-                mode = field_name  # e.g., "rgb_color" mode
-                if mode in supported_color_modes or "rgb" in supported_color_modes:
+                compatible_modes = {"hs", "xy", "rgb", "rgbw", "rgbww"}
+                if supported_color_modes & compatible_modes:  # intersection check
                     supported[field_name] = field_def
                 continue
 

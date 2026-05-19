@@ -1,5 +1,22 @@
 version: 1
 
+semantic:
+  workspace_type: "ex:StudyRoom"
+  devices:
+    lights_308:
+      artifact_type: "ex:Light"
+      service_types:
+        turn_on: "ex:TurnOnCommand"
+        turn_off: "ex:TurnOffCommand"
+        set_brightness: "ex:SetBrightnessCommand"
+        rgb_color: "ex:SetColorCommand"
+    blinds_308:
+      artifact_type: "ex:Blinds"
+      service_types:
+        open_cover: "ex:OpenCommand"
+        close_cover: "ex:CloseCommand"
+        set_cover_position: "ex:SetDegreeCommand"
+
 devices:
   lights_308:
     - platform: light

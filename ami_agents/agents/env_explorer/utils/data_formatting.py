@@ -5,6 +5,7 @@ Data formatting utilities for EnvExplorer agent.
 import json
 from typing import Any, Dict, List, Optional
 
+from rdflib import Graph
 from ....shared.models.environment import AffordanceType
 
 
@@ -180,4 +181,176 @@ def format_capabilities_payload(agent_instance) -> Dict[str, Any]:
         "affordances": affordances_out,
         "semantic_capabilities": dict(getattr(agent_instance, "semantic_capabilities", {}) or {}),
     }
+
+
+def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:
+    """
+    Format capabilities as a hierarchical JSON structure.
+
+    Organizes workspaces → sub-workspaces → artifacts → affordances with
+    name, description, and parameter lists. LLM-friendly for segmentation.
+
+    Args:
+        agent_instance: The EnvExplorerAgent instance
+
+    Returns:
+        Hierarchical dict following workspace → artifact → affordance structure
+    """
+    if not agent_instance.discovery_complete:
+        return {
+            "type": "environment",
+            "discovery_complete": False,
+            "workspaces": [],
+        }
+
+    def build_workspace_node(workspace_id: str) -> Dict[str, Any]:
+        """Recursively build a workspace node with sub-workspaces and artifacts."""
+        ws = agent_instance.environment_map.get(workspace_id)
+        if not ws:
+            return None
+
+        artifacts_list = []
+        for artifact_id in (ws.artifacts or []):
+            artifact = agent_instance.artifacts.get(artifact_id)
+            if not artifact:
+                continue
+
+            affordances_list = []
+            affs = agent_instance.integration_engine.get_affordances_for_artifact(artifact_id)
+            for aff in affs:
+                # Include ACTION and PROPERTY affordances (skip EVENT)
+                if aff.affordance_type not in (AffordanceType.ACTION, AffordanceType.PROPERTY):
+                    continue
+
+                # Extract parameters from input_schema (ACTION) or output_schema (PROPERTY)
+                parameters = []
+                if aff.affordance_type == AffordanceType.ACTION and aff.input_schema:
+                    props = aff.input_schema.get("properties", {})
+                    if isinstance(props, dict):
+                        parameters = list(props.keys())
+                elif aff.affordance_type == AffordanceType.PROPERTY and aff.output_schema:
+                    props = aff.output_schema.get("properties", {})
+                    if isinstance(props, dict):
+                        parameters = list(props.keys())
+
+                # Filter out synthetic descriptions (e.g., "Action affordance: ...")
+                description = aff.description or ""
+                if description.startswith("Action affordance:") or description.startswith("Property affordance:"):
+                    description = ""
+
+                affordances_list.append({
+                    "type": f"{aff.affordance_type.value}_affordance",
+                    "name": aff.name,
+                    "description": description,
+                    "parameters": parameters,
+                })
+
+            if affordances_list:  # Only include artifacts with affordances
+                artifacts_list.append({
+                    "type": "artifact",
+                    "id": artifact_id,
+                    "name": artifact.name,
+                    "description": "",
+                    "affordances": affordances_list,
+                })
+
+        # Recursively process sub-workspaces
+        sub_workspaces_list = []
+        for sub_ws_id in (ws.sub_workspaces or []):
+            sub_node = build_workspace_node(sub_ws_id)
+            if sub_node:
+                sub_workspaces_list.append(sub_node)
+
+        return {
+            "type": "workspace",
+            "id": workspace_id,
+            "name": ws.name,
+            "description": "",
+            "sub_workspaces": sub_workspaces_list,
+            "artifacts": artifacts_list,
+        }
+
+    # Find root workspaces (those with no parent)
+    root_workspaces = []
+    for ws in (agent_instance.environment_map or {}).values():
+        if not ws.parent_workspace_id:
+            node = build_workspace_node(ws.workspace_id)
+            if node:
+                root_workspaces.append(node)
+
+    return {
+        "type": "environment",
+        "discovery_complete": True,
+        "workspaces": root_workspaces,
+    }
+
+
+def format_capabilities_detailed_rdf(agent_instance) -> str:
+    """
+    Format capabilities as a merged RDF/Turtle graph.
+
+    Assembles all Workspace.rdf and Artifact ThingDescription.rdf into a
+    single merged Turtle string with canonicalized prefixes.
+
+    Args:
+        agent_instance: The EnvExplorerAgent instance
+
+    Returns:
+        Turtle string with merged RDF graph and canonicalized prefixes
+    """
+    if not agent_instance.discovery_complete:
+        return ""
+
+    # Canonical prefix block
+    prefix_block = """\
+@prefix hmas: <https://purl.org/hmas/> .
+@prefix td: <https://www.w3.org/2019/wot/td#> .
+@prefix hctl: <https://www.w3.org/2019/wot/hypermedia#> .
+@prefix jsonschema: <https://www.w3.org/2019/wot/json-schema#> .
+@prefix http: <http://www.w3.org/2011/http#> .
+@prefix homeont: <https://example.org/homeont#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+"""
+
+    # Create a merged graph
+    merged_graph = Graph()
+
+    # Add all workspace RDF
+    for ws in (agent_instance.environment_map or {}).values():
+        if ws.rdf:
+            try:
+                g = Graph()
+                g.parse(data=ws.rdf, format="turtle")
+                merged_graph += g
+            except Exception:
+                # Skip malformed RDF
+                pass
+
+    # Add all artifact Thing Description RDF
+    for artifact in (agent_instance.artifacts or {}).values():
+        if artifact.thing_description and artifact.thing_description.rdf:
+            try:
+                g = Graph()
+                g.parse(data=artifact.thing_description.rdf, format="turtle")
+                merged_graph += g
+            except Exception:
+                # Skip malformed RDF
+                pass
+
+    # Serialize merged graph to Turtle
+    serialized = merged_graph.serialize(format="turtle")
+
+    # Strip any @prefix declarations emitted by rdflib (to avoid duplication)
+    # and prepend our canonical block
+    lines = serialized.split("\n")
+    filtered_lines = [line for line in lines if not line.strip().startswith("@prefix")]
+    filtered_content = "\n".join(filtered_lines).strip()
+
+    # Combine prefix block with filtered content
+    if filtered_content:
+        return prefix_block + filtered_content
+    else:
+        return prefix_block.rstrip()
 
