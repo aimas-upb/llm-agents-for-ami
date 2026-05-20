@@ -11,6 +11,7 @@ from .community_signifier_query import CommunitySignifierQueryBehaviour
 from .env_context_query import EnvContextQueryBehaviour
 from .environment_ready import EnvironmentReadyBehaviour
 from .goal_request import GoalRequestBehaviour
+from .planning_status import PlanningStatusBehaviour
 from .planning_workflow import PlanningWorkflowBehaviour
 from .signifier_match_query import SignifierMatchQueryBehaviour
 
@@ -20,6 +21,7 @@ __all__ = [
     "EnvContextQueryBehaviour",
     "EnvironmentReadyBehaviour",
     "GoalRequestBehaviour",
+    "PlanningStatusBehaviour",
     "PlanningWorkflowBehaviour",
     "SignifierMatchQueryBehaviour",
 ]

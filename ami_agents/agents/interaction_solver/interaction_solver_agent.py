@@ -30,7 +30,8 @@ from ...shared.protocols.agent_protocol import IAgent
 from ...shared.utils.demo_log import demo
 from ...shared.utils.logger import LoggerFactory
 from ...shared.utils.spade_rpc import RpcTimeoutError, rpc_call, send_via_router
-from .behaviours import EnvironmentReadyBehaviour, GoalRequestBehaviour
+from .behaviours import EnvironmentReadyBehaviour, GoalRequestBehaviour, PlanningStatusBehaviour
+from .utils.goal_status import GoalStatus
 from .utils import LLMClientConfig, build_llm_client
 from ..user_assistant.models import Intent
 
@@ -70,6 +71,9 @@ class InteractionSolverAgent(Agent, IAgent):
         self._cached_affordances: List[Dict[str, Any]] = []
         self._cached_state_payload: Dict[str, Any] = {}
         self._cached_affordance_by_id: Dict[str, Dict[str, Any]] = {}
+
+        # Goal tracking dictionary: goal_id -> GoalStatus
+        self.goal_statuses: Dict[str, GoalStatus] = {}
 
         # ── LLM client ──────────────────────────────────────────────
         self._llm_cfg: LLMClientConfig = build_llm_client(self.config)
@@ -203,6 +207,10 @@ class InteractionSolverAgent(Agent, IAgent):
         goal_template = Template()
         goal_template.set_metadata("type", MessageType.GOAL_REQUEST.value)
         self.add_behaviour(GoalRequestBehaviour(self.logger), template=goal_template)
+
+        status_template = Template()
+        status_template.set_metadata("type", MessageType.PLANNING_STATUS_REQUEST.value)
+        self.add_behaviour(PlanningStatusBehaviour(self.logger), template=status_template)
 
         temp_display = "default" if self.model.startswith("o") else self.temperature
         self.logger.info(

@@ -9,16 +9,17 @@
 
 # UserAssistant Agent Configuration
 user_assistant:
-  jid: "user_assistant@localhost"
+  jid: "${UA_JID:-user_assistant@localhost}"
   password: "${SPADE_USER_ASSISTANT_PASSWORD}"
 
 # EnvExplorer Agent Configuration
 env_explorer:
-  jid: "env_explorer@localhost"
+  jid: "${EE_JID:-env_explorer@localhost}"
   password: "${SPADE_ENV_EXPLORER_PASSWORD}"
 
   # Experience Engine — signifier registry, matcher, optional SHACL validator.
   experience_engine:
+    storage_dir: "${SIGNIFIER_STORAGE_DIR:-}"
     default_matcher_version: "${SIGNIFIER_MATCHER_VERSION:-v2}"
     default_min_similarity: "${SIGNIFIER_MIN_SIMILARITY:-0.5}"
     signifier_limit: "${SIGNIFIER_LIMIT:-10000}"
@@ -30,7 +31,7 @@ env_explorer:
 
 # InteractionSolver Agent Configuration
 interaction_solver:
-  jid: "interaction_solver@localhost"
+  jid: "${IS_JID:-interaction_solver@localhost}"
   password: "${SPADE_INTERACTION_SOLVER_PASSWORD}"
 
   planning:
@@ -85,7 +86,7 @@ logging:
 
   file_logging:
     enabled: true
-    path: "logs/ami_agents.log"
+    path: "${AMI_LOG_PATH:-logs/ami_agents.log}"
     max_bytes: 10485760  # 10 MB
     backup_count: 5
 

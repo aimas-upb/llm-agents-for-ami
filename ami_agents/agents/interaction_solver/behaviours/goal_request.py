@@ -7,6 +7,7 @@ matching, community lookup, BT plan generation).
 """
 
 import json
+import uuid
 from typing import List, Optional
 
 from spade.behaviour import CyclicBehaviour
@@ -19,6 +20,7 @@ from ..utils.plan_envelope import (
     envelope_error,
     envelope_missing_intents,
 )
+from ..utils.goal_status import GoalStatus, PlanningPhase
 from .planning_workflow import PlanningWorkflowBehaviour
 
 
@@ -36,14 +38,14 @@ class GoalRequestBehaviour(CyclicBehaviour):
         if msg.get_metadata("type") != MessageType.GOAL_REQUEST.value:
             return
 
-        intent_objects, workspace_id, intent_type = self._parse_request(msg)
+        intent_objects, workspace_id, intent_type, goal_id = self._parse_request(msg)
 
         intent_objects = [i for i in intent_objects if i.to_query_string().strip()]
         if not intent_objects:
             await self._reply(
                 msg,
                 MessageType.GOAL_RESPONSE.value,
-                envelope_missing_intents(intent_type),
+                envelope_missing_intents(intent_type, goal_id=goal_id),
             )
             return
 
@@ -64,15 +66,29 @@ class GoalRequestBehaviour(CyclicBehaviour):
                 "Environment discovery not completed (timeout).",
                 intent_objects,
                 intent_type,
+                goal_id=goal_id,
             )
             await self._reply(msg, MessageType.PLAN_CREATED.value, envelope)
             return
+
+        intent_strings = [i.to_query_string() for i in intent_objects]
+        if not goal_id:
+            goal_id = str(uuid.uuid4())
+
+        goal_status = GoalStatus(
+            goal_id=goal_id,
+            intents=intent_strings,
+            workspace_id=workspace_id,
+        )
+        goal_status.update_status(phase=PlanningPhase.INITIATED)
+        self.agent.goal_statuses[goal_id] = goal_status
 
         workflow = PlanningWorkflowBehaviour(
             intents=intent_objects,
             workspace_id=workspace_id,
             intent_type=intent_type,
             logger=self.logger,
+            goal_status=goal_status,
         )
         self.agent.add_behaviour(workflow)
         await workflow.join()
@@ -82,6 +98,7 @@ class GoalRequestBehaviour(CyclicBehaviour):
             "Planning workflow returned no envelope.",
             intent_objects,
             intent_type,
+            goal_id=goal_id,
         )
         self._log_plan_summary(envelope)
         await self._reply(msg, MessageType.PLAN_CREATED.value, envelope)
@@ -94,6 +111,7 @@ class GoalRequestBehaviour(CyclicBehaviour):
         intent_objects: List[Intent] = []
         workspace_id: Optional[str] = None
         intent_type: Optional[str] = None
+        goal_id: Optional[str] = None
         try:
             payload = json.loads(msg.body or "{}")
             if isinstance(payload, dict):
@@ -103,6 +121,9 @@ class GoalRequestBehaviour(CyclicBehaviour):
                 it = payload.get("intent_type")
                 if it and str(it).upper() in ("EXPLICIT", "IMPLICIT"):
                     intent_type = str(it).upper()
+                gid = payload.get("goal_id")
+                if gid:
+                    goal_id = str(gid)
             raw_intents = payload.get("intents") if isinstance(payload, dict) else None
             if isinstance(raw_intents, list):
                 for item in raw_intents:
@@ -139,7 +160,7 @@ class GoalRequestBehaviour(CyclicBehaviour):
                         intent_text=str(msg.body).strip(),
                     )
                 )
-        return intent_objects, workspace_id, intent_type
+        return intent_objects, workspace_id, intent_type, goal_id
 
     async def _reply(self, src_msg, reply_type: str, envelope: dict) -> None:
         reply = src_msg.make_reply()

@@ -93,6 +93,8 @@ class MessageType(Enum):
     GOAL_REQUEST = "goal_request"
     GOAL_RESPONSE = "goal_response"
     PLAN_CREATED = "plan_created"
+    PLANNING_STATUS_REQUEST = "planning_status_request"
+    PLANNING_STATUS_RESPONSE = "planning_status_response"
     PLAN_EXECUTION_STATUS = "plan_execution_status"
     PLAN_COMPLETED = "plan_completed"
     PLAN_FAILED = "plan_failed"

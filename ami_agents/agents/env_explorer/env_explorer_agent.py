@@ -61,7 +61,7 @@ class EnvExplorerAgent(Agent, IAgent):
     """
 
     def __init__(self, jid: str, password: str, config: Dict[str, Any],
-                 hmas_client: IHMASClient):
+                 hmas_client: Optional[IHMASClient] = None):
         """
         Initialize EnvExplorer agent.
 
@@ -69,7 +69,7 @@ class EnvExplorerAgent(Agent, IAgent):
             jid: SPADE JID for the agent.
             password: SPADE password.
             config: Agent configuration.
-            hmas_client: HMAS client instance.
+            hmas_client: Optional HMAS client instance.
         """
         super().__init__(jid, password)
 

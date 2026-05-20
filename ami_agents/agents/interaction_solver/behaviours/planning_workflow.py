@@ -20,6 +20,7 @@ from ..utils.plan_envelope import (
     envelope_llm_plan,
     envelope_signifier_reuse,
 )
+from ..utils.goal_status import GoalStatus, PlanningPhase
 from ..utils.signifier_fast_path import (
     collect_signifier_ids,
     try_build_signifier_only_tree,
@@ -40,17 +41,27 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
         workspace_id: Optional[str] = None,
         intent_type: Optional[str] = None,
         logger=None,
+        goal_status: Optional[GoalStatus] = None,
     ) -> None:
         super().__init__()
         self.intents = intents
         self.workspace_id = workspace_id
         self.intent_type = intent_type
         self.logger = logger or LoggerFactory.get_logger("InteractionSolver")
+        self.goal_status = goal_status
         # Final response envelope, set by ``run``.
         self.reply_envelope: Optional[Dict[str, Any]] = None
 
     async def run(self) -> None:
         intent_strings = [i.to_query_string() for i in self.intents]
+        if self.goal_status:
+            self.goal_status.update_status(
+                phase=PlanningPhase.GATHERING_REUSED_PLAN,
+                intents=intent_strings,
+                workspace_id=self.workspace_id,
+                error=None,
+                error_detail=None,
+            )
 
         # Step 1 — signifier matching (local + community in parallel).
         merged_matches = await self._gather_signifier_matches(intent_strings)
@@ -70,7 +81,16 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                 intents=self.intents,
                 workspace_id=self.workspace_id,
                 intent_type=self.intent_type,
+                goal_id=self.goal_status.goal_id if self.goal_status else None,
             )
+            if self.goal_status:
+                self.goal_status.update_status(
+                    phase=PlanningPhase.COMPLETED_SUCCESS,
+                    reused_plan=self.reply_envelope,
+                    reused_plan_source="signifier",
+                    best_plan=self.reply_envelope,
+                    best_plan_source="reused",
+                )
             return
 
         # Step 3 — LLM path: gather context, then generate.
@@ -78,6 +98,8 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
             demo("Gathering context from EnvExplorer (workspace_id=%r)"),
             self.workspace_id,
         )
+        if self.goal_status:
+            self.goal_status.update_status(phase=PlanningPhase.GENERATING_LOCAL_PLAN)
         ctx = EnvContextQueryBehaviour(
             workspace_id=self.workspace_id, logger=self.logger
         )
@@ -89,7 +111,14 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                 ctx.error,
                 self.intents,
                 self.intent_type,
+                goal_id=self.goal_status.goal_id if self.goal_status else None,
             )
+            if self.goal_status:
+                self.goal_status.update_status(
+                    phase=PlanningPhase.COMPLETED_FAILURE,
+                    error="context_gathering_failed",
+                    error_detail=ctx.error,
+                )
             return
 
         plan_gen = BTPlanGenerationBehaviour(
@@ -111,7 +140,14 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                 plan_gen.error,
                 self.intents,
                 self.intent_type,
+                goal_id=self.goal_status.goal_id if self.goal_status else None,
             )
+            if self.goal_status:
+                self.goal_status.update_status(
+                    phase=PlanningPhase.COMPLETED_FAILURE,
+                    error="plan_generation_failed",
+                    error_detail=plan_gen.error,
+                )
             return
 
         self.reply_envelope = envelope_llm_plan(
@@ -119,7 +155,16 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
             intents=self.intents,
             workspace_id=self.workspace_id,
             intent_type=self.intent_type,
+            goal_id=self.goal_status.goal_id if self.goal_status else None,
         )
+        if self.goal_status:
+            self.goal_status.update_status(
+                phase=PlanningPhase.COMPLETED_SUCCESS,
+                local_plan=self.reply_envelope,
+                local_plan_complete=True,
+                best_plan=self.reply_envelope,
+                best_plan_source="local",
+            )
 
     async def _gather_signifier_matches(
         self, intent_strings: List[str]

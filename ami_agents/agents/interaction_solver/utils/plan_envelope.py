@@ -13,9 +13,12 @@ from ...user_assistant.models import Intent
 PLAN_TYPE_BT = "behavior_tree"
 
 
-def envelope_missing_intents(intent_type: Optional[str]) -> Dict[str, Any]:
+def envelope_missing_intents(
+    intent_type: Optional[str],
+    goal_id: Optional[str] = None,
+) -> Dict[str, Any]:
     """Reply when the GOAL_REQUEST carried no usable intents."""
-    return {
+    out = {
         "plan_type": PLAN_TYPE_BT,
         "error": "missing_intents",
         "detail": "No intents provided.",
@@ -23,6 +26,9 @@ def envelope_missing_intents(intent_type: Optional[str]) -> Dict[str, Any]:
         "intents": [],
         "intent_type": intent_type,
     }
+    if goal_id:
+        out["goal_id"] = goal_id
+    return out
 
 
 def envelope_error(
@@ -30,9 +36,10 @@ def envelope_error(
     detail: str,
     intents: List[Intent],
     intent_type: Optional[str],
+    goal_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Reply when a planning stage fails (context or LLM)."""
-    return {
+    out = {
         "plan_type": PLAN_TYPE_BT,
         "error": error_code,
         "detail": detail,
@@ -40,6 +47,9 @@ def envelope_error(
         "intents": [i.to_dict() for i in intents],
         "intent_type": intent_type,
     }
+    if goal_id:
+        out["goal_id"] = goal_id
+    return out
 
 
 def envelope_llm_plan(
@@ -47,6 +57,7 @@ def envelope_llm_plan(
     intents: List[Intent],
     workspace_id: Optional[str],
     intent_type: Optional[str],
+    goal_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Reply for an LLM-generated plan (BTPlanGenerationBehaviour output)."""
     out: Dict[str, Any] = {
@@ -57,6 +68,8 @@ def envelope_llm_plan(
         "workspace_id": workspace_id,
         "intent_type": intent_type,
     }
+    if goal_id:
+        out["goal_id"] = goal_id
     if result.get("impossible"):
         out["impossible"] = True
     return out
@@ -68,9 +81,10 @@ def envelope_signifier_reuse(
     intents: List[Intent],
     workspace_id: Optional[str],
     intent_type: Optional[str],
+    goal_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Reply for the signifier-only fast-path (no LLM call)."""
-    return {
+    out = {
         "plan_type": PLAN_TYPE_BT,
         "tree": tree,
         "explanation": "Plan recovered from signifiers (no LLM call needed).",
@@ -80,3 +94,6 @@ def envelope_signifier_reuse(
         "signifier_reuse": True,
         "signifier_ids": signifier_ids,
     }
+    if goal_id:
+        out["goal_id"] = goal_id
+    return out

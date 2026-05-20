@@ -117,7 +117,7 @@ class AMIAgentsOrchestrator:
         self.config = ConfigLoader.merge_configs(agents_config, env_config, services_config)
 
         # Validate required fields
-        required_sections = ["spade", "user_assistant", "env_explorer", "interaction_solver"]
+        required_sections = ["user_assistant", "env_explorer", "interaction_solver"]
         for section in required_sections:
             if section not in self.config:
                 raise ValueError(f"Missing required configuration section: {section}")
@@ -140,10 +140,31 @@ class AMIAgentsOrchestrator:
         # For now, use a simple approach - get URL from environments config
         environments = self.config.get("environments", {})
         if environments:
-            # Use the first available environment
-            first_env = list(environments.values())[0]
-            yggdrasil_url = first_env.get("yggdrasil_url", os.getenv("BASE_WS_URI", "http://localhost:8080"))
-            self.logger.info("Using Yggdrasil environment: %s", yggdrasil_url)
+            current_env = env_config.get("current_environment")
+            selected_env = None
+            selected_name = None
+
+            if current_env:
+                selected_env = environments.get(current_env)
+                selected_name = current_env
+                if not selected_env:
+                    self.logger.warning(
+                        "Configured environment '%s' not found; falling back to first entry.",
+                        current_env,
+                    )
+
+            if not selected_env:
+                selected_name, selected_env = next(iter(environments.items()))
+
+            yggdrasil_url = selected_env.get(
+                "yggdrasil_url",
+                os.getenv("BASE_WS_URI", "http://localhost:8080"),
+            )
+            self.logger.info(
+                "Using Yggdrasil environment: %s (name=%s)",
+                yggdrasil_url,
+                selected_name,
+            )
             return yggdrasil_url
 
         # Fallback to default
