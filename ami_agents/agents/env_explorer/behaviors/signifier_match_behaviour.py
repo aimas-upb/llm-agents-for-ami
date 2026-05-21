@@ -42,11 +42,12 @@ class SignifierMatchBehaviour(CyclicBehaviour):
         min_similarity = payload.get("min_similarity")
         intent_type = payload.get("intent_type")
         query_structured_intent = payload.get("query_structured_intent")
+        affected_env_vars = payload.get("affected_env_vars")
 
         # Log request details
         self.agent.logger.debug(f"Processing signifier match: intent='{intent}', workspace_id={workspace_id}")
         self.agent.logger.debug(f"Parameters: k={k}, matcher_version={matcher_version}, min_similarity={min_similarity}")
-        self.agent.logger.debug(f"Intent type: {intent_type}, structured_intent={query_structured_intent}")
+        self.agent.logger.debug(f"Intent type: {intent_type}, structured_intent={query_structured_intent}, has_env_vars={bool(affected_env_vars)}")
 
         # Perform signifier matching
         response_payload = await self._match_signifiers(
@@ -57,6 +58,7 @@ class SignifierMatchBehaviour(CyclicBehaviour):
             min_similarity=float(min_similarity) if min_similarity is not None else None,
             intent_type=str(intent_type).upper() if intent_type and str(intent_type).upper() in ("EXPLICIT", "IMPLICIT") else None,
             query_structured_intent=query_structured_intent if isinstance(query_structured_intent, dict) else None,
+            affected_env_vars=affected_env_vars if isinstance(affected_env_vars, list) else None,
         )
 
         # Send response
@@ -82,12 +84,15 @@ class SignifierMatchBehaviour(CyclicBehaviour):
         min_similarity: Optional[float] = None,
         intent_type: Optional[str] = None,
         query_structured_intent: Optional[Dict[str, Any]] = None,
+        affected_env_vars: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
         """
         Match signifiers using Experience engine engine - complete business logic.
 
         This contains all the matching logic that was previously in the agent,
         now properly encapsulated in a behavior.
+
+        For implicit intents with affected_env_vars, use v3 environment-variable matching.
         """
         # Ensure Experience engine is ready
         await ensure_experience_engine_ready(self.agent)
@@ -142,35 +147,74 @@ class SignifierMatchBehaviour(CyclicBehaviour):
             self.agent.logger.debug(f"Calling matcher with {len(signifier_dicts)} signifiers")
             self.agent.logger.debug(f"Query: intent='{intent}', version='{version_to_use}', structured_intent={query_structured_intent}")
 
-            try:
-                match_results = self.agent._experience_engine_matcher_registry.match(
-                    intent_query=intent,
-                    signifiers=signifier_dicts,
-                    k=int(k),
-                    version=version_to_use,
-                    min_similarity=float(min_similarity),
-                    query_structured_intent=query_structured_intent,
+            # For v3 matching (implicit intents with affected_env_vars), use direct env-var matching
+            if affected_env_vars is not None:
+                self.agent.logger.info(
+                    demo("[V3 MATCHER] Using environment variable matching (v3) for implicit intent")
                 )
-                self.agent.logger.debug(f"Matcher returned {len(match_results) if match_results else 0} results")
-                for i, result in enumerate(match_results[:3]):  # Show first 3
-                    self.agent.logger.debug(f"Result {i}: similarity={getattr(result, 'similarity', 'N/A')}, signifier_id={getattr(result, 'signifier_id', 'N/A')}")
+                # Convert affected_env_vars to comparable format
+                query_vars = {(v["variable"], v["direction"]) for v in affected_env_vars}
+                match_results = []
 
-            except Exception as e:
-                self.agent.logger.error(
-                    demo("!!! V2 MATCHER FAILED, falling back to v0: %s - %s"),
-                    type(e).__name__,
-                    str(e),
-                    exc_info=True,
+                for signifier_dict in signifier_dicts:
+                    # Extract signifier's affected_env_vars
+                    signifier_vars_raw = signifier_dict.get("affected_env_vars", [])
+                    if not isinstance(signifier_vars_raw, list):
+                        continue
+
+                    signifier_vars = {(v.get("variable"), v.get("direction")) for v in signifier_vars_raw}
+
+                    # v3 match: exact match on affected_env_vars (both must have identical elements)
+                    if query_vars == signifier_vars:
+                        self.agent.logger.debug(
+                            f"[V3 MATCHER] Exact env-var match found: signifier_id={signifier_dict.get('signifier_id')}"
+                        )
+                        # Create a mock match result object
+                        class MockMatch:
+                            def __init__(self, sig_id):
+                                self.signifier_id = sig_id
+                                self.similarity = 1.0  # Exact match
+                        match_results.append(MockMatch(signifier_dict.get("signifier_id")))
+
+                self.agent.logger.info(
+                    demo("[V3 MATCHER] Found %d env-var matches"),
+                    len(match_results),
                 )
-                self.agent.logger.error(f"V2 Matcher exception: {type(e).__name__}: {str(e)}")
-                version_to_use = "v0"
-                match_results = self.agent._experience_engine_matcher_registry.match(
-                    intent_query=intent,
-                    signifiers=signifier_dicts,
-                    k=int(k),
-                    version=version_to_use,
-                    query_structured_intent=query_structured_intent,
-                )
+                if not match_results:
+                    self.agent.logger.info(
+                        demo("[V3 MATCHER] No exact matches on environment variables, returning empty")
+                    )
+                    return {"matches": [], "final_matches": [], "total_signifiers": len(signifier_dicts)}
+            else:
+                try:
+                    match_results = self.agent._experience_engine_matcher_registry.match(
+                        intent_query=intent,
+                        signifiers=signifier_dicts,
+                        k=int(k),
+                        version=version_to_use,
+                        min_similarity=float(min_similarity),
+                        query_structured_intent=query_structured_intent,
+                    )
+                    self.agent.logger.debug(f"Matcher returned {len(match_results) if match_results else 0} results")
+                    for i, result in enumerate(match_results[:3]):  # Show first 3
+                        self.agent.logger.debug(f"Result {i}: similarity={getattr(result, 'similarity', 'N/A')}, signifier_id={getattr(result, 'signifier_id', 'N/A')}")
+
+                except Exception as e:
+                    self.agent.logger.error(
+                        demo("!!! V2 MATCHER FAILED, falling back to v0: %s - %s"),
+                        type(e).__name__,
+                        str(e),
+                        exc_info=True,
+                    )
+                    self.agent.logger.error(f"V2 Matcher exception: {type(e).__name__}: {str(e)}")
+                    version_to_use = "v0"
+                    match_results = self.agent._experience_engine_matcher_registry.match(
+                        intent_query=intent,
+                        signifiers=signifier_dicts,
+                        k=int(k),
+                        version=version_to_use,
+                        query_structured_intent=query_structured_intent,
+                    )
 
             # Build context graph for SHACL validation
             context_graph, _ = self.agent._experience_engine_context_builder.normalize_context(context)

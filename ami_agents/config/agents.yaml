@@ -19,7 +19,7 @@ env_explorer:
 
   # Experience Engine — signifier registry, matcher, optional SHACL validator.
   experience_engine:
-    default_matcher_version: "${SIGNIFIER_MATCHER_VERSION:-v2}"
+    default_matcher_version: "${SIGNIFIER_MATCHER_VERSION:-v3}"
     default_min_similarity: "${SIGNIFIER_MIN_SIMILARITY:-0.5}"
     signifier_limit: "${SIGNIFIER_LIMIT:-10000}"
     shacl_validation_enabled: "${SHACL_VALIDATION_ENABLED:-true}"

@@ -16,10 +16,7 @@ from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
 from ....shared.models.intents import ImplicitGoalIntent, ExplicitGoalIntent, goal_intent_from_dict
 from ...user_assistant.models import Intent
-from ..utils.plan_envelope import (
-    envelope_error,
-    envelope_missing_intents,
-)
+from ..utils.plan_envelope import envelope_error
 from .planning_workflow import PlanningWorkflowBehaviour
 
 
@@ -37,16 +34,9 @@ class GoalRequestBehaviour(CyclicBehaviour):
         if msg.get_metadata("type") != MessageType.GOAL_REQUEST.value:
             return
 
-        intent_objects, workspace_id, intent_type = self._parse_request(msg)
+        intent_objects, workspace_id = self._parse_request(msg)
 
         intent_objects = [i for i in intent_objects if i.to_query_string().strip()]
-        if not intent_objects:
-            await self._reply(
-                msg,
-                MessageType.GOAL_RESPONSE.value,
-                envelope_missing_intents(intent_type),
-            )
-            return
 
         intent_strings = [i.to_query_string() for i in intent_objects]
         self.logger.info(
@@ -64,7 +54,6 @@ class GoalRequestBehaviour(CyclicBehaviour):
                 "env_not_ready",
                 "Environment discovery not completed (timeout).",
                 intent_objects,
-                intent_type,
             )
             await self._reply(msg, MessageType.PLAN_CREATED.value, envelope)
             return
@@ -72,7 +61,6 @@ class GoalRequestBehaviour(CyclicBehaviour):
         workflow = PlanningWorkflowBehaviour(
             intents=intent_objects,
             workspace_id=workspace_id,
-            intent_type=intent_type,
             logger=self.logger,
         )
         self.agent.add_behaviour(workflow)
@@ -82,7 +70,6 @@ class GoalRequestBehaviour(CyclicBehaviour):
             "plan_generation_failed",
             "Planning workflow returned no envelope.",
             intent_objects,
-            intent_type,
         )
         self._log_plan_summary(envelope)
         await self._reply(msg, MessageType.PLAN_CREATED.value, envelope)
@@ -91,19 +78,18 @@ class GoalRequestBehaviour(CyclicBehaviour):
 
     @staticmethod
     def _parse_request(msg):
-        """Extract intents, workspace, and intent_type from the GOAL_REQUEST body."""
+        """Extract intents and workspace from the GOAL_REQUEST body.
+
+        Each intent carries its own type (implicit/explicit) via its dataclass.
+        """
         intent_objects: List[Union[ImplicitGoalIntent, ExplicitGoalIntent, Intent]] = []
         workspace_id: Optional[str] = None
-        intent_type: Optional[str] = None
         try:
             payload = json.loads(msg.body or "{}")
             if isinstance(payload, dict):
                 ws = payload.get("workspace_id") or payload.get("workspace")
                 if ws:
                     workspace_id = str(ws)
-                it = payload.get("intent_type")
-                if it and str(it).upper() in ("EXPLICIT", "IMPLICIT"):
-                    intent_type = str(it).upper()
             raw_intents = payload.get("intents") if isinstance(payload, dict) else None
             if isinstance(raw_intents, list):
                 for item in raw_intents:
@@ -127,7 +113,7 @@ class GoalRequestBehaviour(CyclicBehaviour):
         except json.JSONDecodeError:
             if msg.body:
                 intent_objects.append(Intent(intent_text=str(msg.body).strip()))
-        return intent_objects, workspace_id, intent_type
+        return intent_objects, workspace_id
 
     async def _reply(self, src_msg, reply_type: str, envelope: dict) -> None:
         reply = src_msg.make_reply()

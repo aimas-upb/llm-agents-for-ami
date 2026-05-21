@@ -23,18 +23,24 @@ async def query_local_signifier_match(
     workspace_id: Optional[str],
     intent_type: Optional[str],
     structured_intent: Optional[Dict[str, Any]],
+    affected_env_vars: Optional[List[Dict[str, str]]] = None,
     k: int = 5,
 ) -> Dict[str, Any]:
-    """Send a SIGNIFIER_MATCH_REQUEST to EnvExplorer for one intent."""
+    """Send a SIGNIFIER_MATCH_REQUEST to EnvExplorer for one intent.
+
+    For implicit intents, affected_env_vars enables v3 environment-variable
+    based matching in the signifier engine.
+    """
     logger.info(
         demo(
             "[INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent=%r, "
-            "workspace_id=%r, intent_type=%r, has_structured_intent=%s"
+            "workspace_id=%r, intent_type=%r, has_structured_intent=%s, has_env_vars=%s"
         ),
         intent,
         workspace_id,
         intent_type,
         bool(structured_intent),
+        bool(affected_env_vars),
     )
     body: Dict[str, Any] = {
         "intent": intent,
@@ -42,6 +48,7 @@ async def query_local_signifier_match(
         **({"workspace_id": str(workspace_id)} if workspace_id else {}),
         **({"intent_type": str(intent_type)} if intent_type else {}),
         **({"query_structured_intent": structured_intent} if structured_intent else {}),
+        **({"affected_env_vars": affected_env_vars} if affected_env_vars else {}),
     }
     raw = await query_env_explorer(
         MessageType.SIGNIFIER_MATCH_REQUEST.value,

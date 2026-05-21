@@ -224,12 +224,28 @@ class UserMessageBehaviour(CyclicBehaviour):
                 extraction = await self._parse_atomic_intent(intent.span, intent.category, caps_data)
                 await self._handle_query_state(msg, thread, conv, extraction)
 
-        # Phase 3: GOAL_REQUEST (if any) — sequential to avoid conflicting confirmation states
+        # Phase 3: GOAL_REQUEST (if any) — batch all goal intents into a single request
         if goal_intents:
             conv.phase = ConversationPhase.EXTRACTING_INTENTS
-            for intent in goal_intents:
-                extraction = await self._parse_atomic_intent(intent.span, intent.category, caps_data)
-                await self._handle_goal(msg, thread, conv, extraction)
+            # Parse all goal intent spans in parallel
+            extractions = await asyncio.gather(
+                *[self._parse_atomic_intent(intent.span, intent.category, caps_data) for intent in goal_intents],
+                return_exceptions=True,
+            )
+            # Convert to typed intent objects, filtering errors
+            parsed_intents = []
+            for extraction in extractions:
+                if isinstance(extraction, Exception):
+                    self.logger.error("Failed to parse atomic intent: %s", extraction)
+                    continue
+                if isinstance(extraction, dict):
+                    parsed = goal_intent_from_dict(extraction)
+                    parsed_intents.append(parsed)
+
+            # Send all parsed intents to ISA in a single GOAL_REQUEST
+            if parsed_intents:
+                conv.intents = parsed_intents
+                await self._handle_goal(msg, thread, conv, parsed_intents)
 
     # ------------------------------------------------------------------
     # Atomic segmentation and per-span parsing (LLM calls)
@@ -387,15 +403,30 @@ class UserMessageBehaviour(CyclicBehaviour):
     # ------------------------------------------------------------------
 
     async def _handle_goal(
-        self, msg, thread: str, conv: ConversationState, extraction: dict
+        self, msg, thread: str, conv: ConversationState, parsed_intents: list
     ) -> None:
-        # Parse the per-span extraction into a typed goal intent
-        parsed = goal_intent_from_dict(extraction)
-        conv.intents = [parsed]
-        intent_type = parsed.intent_type
+        """Handle a batch of parsed goal intents and send to InteractionSolver.
 
-        intent_text = parsed.to_query_string()
-        self.logger.info(demo("Derived intent: %s  intent_type=%s"), intent_text, intent_type.upper())
+        Args:
+            parsed_intents: List of ExplicitGoalIntent or ImplicitGoalIntent objects
+        """
+        if not parsed_intents:
+            await self._reply(msg, "Could not parse your request. Could you rephrase?")
+            conv.phase = ConversationPhase.IDLE
+            return
+
+        # Store the parsed intents in conversation state
+        conv.intents = parsed_intents
+
+        # Log the intents being sent
+        intent_texts = [i.to_query_string() for i in parsed_intents]
+        intent_types = [i.intent_type for i in parsed_intents]
+        self.logger.info(
+            demo("Parsed %d goal intents: %s (types: %s)"),
+            len(parsed_intents),
+            intent_texts,
+            intent_types,
+        )
 
         solver_jid = self.agent.target_jids.get("solver")
         if not solver_jid:
@@ -405,15 +436,18 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         conv.phase = ConversationPhase.AWAITING_PLAN
         body: Dict[str, Any] = {
-            "intents": [i.to_wire_dict() for i in conv.intents],
-            "intent_type": intent_type,
+            "intents": [i.to_wire_dict() for i in parsed_intents],
         }
         if conv.workspace_id:
             body["workspace_id"] = str(conv.workspace_id)
 
         timeout = self.agent.goal_request_timeout
 
-        self.logger.info(demo("UA -> InteractionSolver GOAL_REQUEST: intent=%s intent_type=%s"), intent_text, intent_type.upper())
+        self.logger.info(
+            demo("UA -> InteractionSolver GOAL_REQUEST: %d intents, types: %s"),
+            len(parsed_intents),
+            intent_types,
+        )
         try:
             result = await rpc_call(
                 self.agent,

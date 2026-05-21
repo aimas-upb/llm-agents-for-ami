@@ -14,6 +14,7 @@ from spade.behaviour import OneShotBehaviour
 
 from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
+from ....shared.models.intents import ImplicitGoalIntent, ExplicitGoalIntent
 from ...user_assistant.models import Intent
 from ..utils.plan_envelope import (
     envelope_error,
@@ -28,6 +29,7 @@ from ..utils.signifier_matching import merge_signifier_matches
 from .bt_plan_generation import BTPlanGenerationBehaviour
 from .community_signifier_query import CommunitySignifierQueryBehaviour
 from .env_context_query import EnvContextQueryBehaviour
+from .implicit_goal_desire import ImplicitGoalDesireInferenceBehaviour
 from .signifier_match_query import SignifierMatchQueryBehaviour
 
 
@@ -38,13 +40,11 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
         self,
         intents: List[Intent],
         workspace_id: Optional[str] = None,
-        intent_type: Optional[str] = None,
         logger=None,
     ) -> None:
         super().__init__()
         self.intents = intents
         self.workspace_id = workspace_id
-        self.intent_type = intent_type
         self.logger = logger or LoggerFactory.get_logger("InteractionSolver")
         # Final response envelope, set by ``run``.
         self.reply_envelope: Optional[Dict[str, Any]] = None
@@ -52,8 +52,43 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
     async def run(self) -> None:
         intent_strings = [i.to_query_string() for i in self.intents]
 
+        # Step 0 — Infer affected environment variables for implicit_intent subtypes
+        affected_env_vars_by_intent: Dict[str, Optional[List[Dict[str, str]]]] = {}
+        for intent_obj in self.intents:
+            intent_str = intent_obj.to_query_string()
+
+            # Explicit intents: skip env var inference, skip signifier matching
+            if isinstance(intent_obj, ExplicitGoalIntent):
+                affected_env_vars_by_intent[intent_str] = None
+            # Implicit intents with subtype != "implicit_intent": skip env var inference, skip signifier matching
+            elif isinstance(intent_obj, ImplicitGoalIntent) and intent_obj.subtype != "implicit_intent":
+                affected_env_vars_by_intent[intent_str] = None
+            # Implicit intents with subtype == "implicit_intent": infer env vars
+            elif isinstance(intent_obj, ImplicitGoalIntent) and intent_obj.subtype == "implicit_intent":
+                inference = ImplicitGoalDesireInferenceBehaviour(
+                    intent_text=intent_obj.text_intent,
+                    logger=self.logger,
+                )
+                self.agent.add_behaviour(inference)
+                await inference.join()
+
+                if inference.error:
+                    self.logger.debug("Env var inference failed: %s", inference.error)
+                    affected_env_vars_by_intent[intent_str] = None
+                else:
+                    env_vars = inference.result.get("affected_env_vars")
+                    # Check if result is only unknown pairs
+                    if env_vars == [{"variable": "unknown", "direction": "unknown"}]:
+                        affected_env_vars_by_intent[intent_str] = None
+                    else:
+                        affected_env_vars_by_intent[intent_str] = env_vars
+
         # Step 1 — signifier matching (local + community in parallel).
-        merged_matches = await self._gather_signifier_matches(intent_strings)
+        # For intents with affected_env_vars, use v3 matching; others skip matching
+        merged_matches = await self._gather_signifier_matches(
+            intent_strings,
+            affected_env_vars_by_intent=affected_env_vars_by_intent,
+        )
         self._log_signifier_search(merged_matches)
 
         # Step 2 — try the signifier-only fast path.
@@ -69,7 +104,6 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                 signifier_ids=collect_signifier_ids(merged_matches, self.intents),
                 intents=self.intents,
                 workspace_id=self.workspace_id,
-                intent_type=self.intent_type,
             )
             return
 
@@ -88,9 +122,15 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                 "context_gathering_failed",
                 ctx.error,
                 self.intents,
-                self.intent_type,
             )
             return
+
+        # Convert affected_env_vars to only populated entries for BT planner
+        affected_env_vars_for_planner = {
+            intent_str: env_vars
+            for intent_str, env_vars in affected_env_vars_by_intent.items()
+            if env_vars is not None
+        } if affected_env_vars_by_intent else None
 
         plan_gen = BTPlanGenerationBehaviour(
             intent_strings=intent_strings,
@@ -101,6 +141,7 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                 else ctx.state_payload
             ),
             signifier_hints=merged_matches,
+            affected_env_vars=affected_env_vars_for_planner,
             logger=self.logger,
         )
         self.agent.add_behaviour(plan_gen)
@@ -110,7 +151,6 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                 "plan_generation_failed",
                 plan_gen.error,
                 self.intents,
-                self.intent_type,
             )
             return
 
@@ -118,17 +158,25 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
             result=plan_gen.result,
             intents=self.intents,
             workspace_id=self.workspace_id,
-            intent_type=self.intent_type,
         )
 
     async def _gather_signifier_matches(
-        self, intent_strings: List[str]
+        self,
+        intent_strings: List[str],
+        affected_env_vars_by_intent: Optional[Dict[str, Optional[List[Dict[str, str]]]]] = None,
     ) -> Dict[str, Any]:
         """Spawn local + community signifier behaviours in parallel and merge results."""
+        # Only pass affected_env_vars if they are populated (for v3 matching)
+        affected_env_vars_for_matching = {
+            intent_str: env_vars
+            for intent_str, env_vars in (affected_env_vars_by_intent or {}).items()
+            if env_vars is not None
+        } if affected_env_vars_by_intent else None
+
         local_b = SignifierMatchQueryBehaviour(
             intents=self.intents,
             workspace_id=self.workspace_id,
-            intent_type=self.intent_type,
+            affected_env_vars=affected_env_vars_for_matching,
             logger=self.logger,
         )
         self.agent.add_behaviour(local_b)

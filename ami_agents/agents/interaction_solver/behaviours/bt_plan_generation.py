@@ -21,6 +21,7 @@ class BTPlanGenerationBehaviour(OneShotBehaviour):
         affordances: List[Dict[str, Any]],
         state: Optional[Dict[str, Any]],
         signifier_hints: Dict[str, Any],
+        affected_env_vars: Optional[Dict[str, List[Dict[str, str]]]] = None,
         logger=None,
     ) -> None:
         super().__init__()
@@ -28,6 +29,7 @@ class BTPlanGenerationBehaviour(OneShotBehaviour):
         self.affordances = affordances
         self.state = state
         self.signifier_hints = signifier_hints
+        self.affected_env_vars = affected_env_vars  # Maps intent_str -> list of {variable, direction}
         self.logger = logger or LoggerFactory.get_logger("InteractionSolver")
         # Populated by ``run`` — either an LLM result dict or {"error": ...}.
         self.result: Dict[str, Any] = {}
@@ -41,6 +43,7 @@ class BTPlanGenerationBehaviour(OneShotBehaviour):
                 affordances=self.affordances,
                 state=self.state,
                 signifier_hints=self.signifier_hints,
+                affected_env_vars=self.affected_env_vars,
                 client=agent.llm_client,
                 model=agent.model,
                 temperature=agent.temperature if not agent.model.startswith("o") else None,
