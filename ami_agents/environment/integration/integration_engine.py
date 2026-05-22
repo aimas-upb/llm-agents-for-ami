@@ -76,18 +76,16 @@ class NotificationListener:
         self.site = web.TCPSite(self.runner, '0.0.0.0', self.port)
         await self.site.start()
 
-        # Auto-detect local IP for the callback URL
-        import socket
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            s.connect(('10.255.255.255', 1))
-            ip = s.getsockname()[0]
-        except Exception:
-            ip = '127.0.0.1'
-        finally:
-            s.close()
+        # Determine callback URL for Yggdrasil webhooks.
+        # Default to localhost for dev/local deployments (Yggdrasil on localhost:8080
+        # cannot reach arbitrary network IPs from its namespace).
+        # Override with NOTIFICATION_CALLBACK_URL env var for production.
+        callback_url = os.getenv("NOTIFICATION_CALLBACK_URL")
+        if not callback_url:
+            # Default to localhost for local/dev deployments
+            callback_url = f"http://localhost:{self.port}/webhook"
 
-        self.base_url = f"http://{ip}:{self.port}/webhook"
+        self.base_url = callback_url
         logger.info(f"Notification listener started at {self.base_url}")
 
     async def stop(self):
@@ -1211,10 +1209,19 @@ class YggdrasilIntegration(IIntegrationEngine):
 
                             for key, value in raw_state.items():
                                 if isinstance(key, str) and key.startswith("http"):
-                                    mapped_state[key] = value
+                                    prop_uri = key
                                 else:
-                                    prop_uri = f"{props_prefix}{key}"
-                                    mapped_state[prop_uri] = value
+                                    # Use canonical /properties/ form instead of /props/
+                                    properties_prefix = f"{base}/properties/"
+                                    prop_uri = f"{properties_prefix}{key}"
+
+                                # Normalize any /props/ URIs to /properties/ for consistency
+                                if "/props/" in prop_uri and "/properties/" not in prop_uri:
+                                    suffix = prop_uri.split("/props/", 1)[-1]
+                                    if suffix:
+                                        prop_uri = f"{base}/properties/{suffix}"
+
+                                mapped_state[prop_uri] = value
                     except json.JSONDecodeError:
                         logger.warning(f"State response for {artifact.name} was not JSON.")
             except Exception as e:
@@ -1272,11 +1279,15 @@ class YggdrasilIntegration(IIntegrationEngine):
                                 value = text
 
                         property_uri = affordance.affordance_id or href
-                        values[property_uri] = value
 
-                        alias_uri = self._property_alias_uri(artifact.artifact_id, property_uri)
-                        if alias_uri and alias_uri not in values:
-                            values[alias_uri] = value
+                        # Normalize property URI: prefer /properties/ over /props/ for canonical storage
+                        if "/props/" in property_uri and "/properties/" not in property_uri:
+                            base = artifact.artifact_id.split("#")[0].rstrip("/")
+                            suffix = property_uri.split("/props/", 1)[-1]
+                            if suffix:
+                                property_uri = f"{base}/properties/{suffix}"
+
+                        values[property_uri] = value
                 except Exception as exc:
                     logger.debug(
                         "Property poll error for %s (%s): %s",

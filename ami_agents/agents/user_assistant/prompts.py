@@ -39,11 +39,13 @@ Key segmentation rule for implicit input:
 These rules apply to all three categories — goal, state, and capability requests alike.
 
 - A request like "Increase the brightness of the lights in the master bedroom by 63%, set the air conditioner in the guest bedroom to auto swing mode, switch the air conditioner in the study room to heat mode" results in **three** atomic intents, because each sub-request is fully independent.
-- A request like "Is the bedroom light on, and what's the temperature in the kitchen?" results in **two** atomic intents (two independent state requests).
+- A request like "Is the bedroom light on, and what's the temperature in the kitchen?" results in **two** atomic intents (two independent state requests about **different devices/rooms**).
+- A request like "Show me the state of light308 (is it on and what is its intensity?)" results in **one** atomic intent, because all sub-questions target the **same device** and all ask about the **same concern** (the device's state). Multiple questions about a single device's state collapse into one atomic intent.
 - A single device targeted with two distinct changes is **two** atomic intents. For example, "set the AC to 24 degrees, auto mode" results in **two** atomic intents (one to set the temperature, one to set the mode), because the two changes are independent of each other.
 - A request like "Adjust the air conditioner in the living room to 24 degrees **whenever** the fan in the kitchen is set to low speed" results in a **single** atomic intent — conditional/compound phrasing cannot be split without losing the conditioning relationship.
-- Coordinate conjunctions ("and", "also", "then") between actions or questions on different devices or rooms almost always signal separate atomic intents.
+- Coordinate conjunctions ("and", "also", "then") between actions or questions on **different devices or rooms** almost always signal separate atomic intents. However, coordinate conjunctions within a single device/room query (e.g., "is it on and what is its brightness?") do NOT signal separate intents — they are elaborating aspects of a single device's state.
 - Conditional, causal, or temporal subordination ("whenever", "if", "once", "after", "until") means the whole clause is a single compound intent and must not be split.
+- **Same-device elaboration rule**: If a request contains multiple sub-questions or properties all about the **same single artifact** and the same **category** (all state questions, all capability questions, all changes to the same device), they form **one atomic intent**, not multiple.
 - Different categories can co-occur in one input, and each segment is classified independently. A request like "Turn on the kitchen light, what's the temperature in the bedroom, and can you control the blinds in the living room?" results in **three** atomic intents spanning all three categories: one GOAL_REQUEST ("turn on the kitchen light"), one ENV_STATE_REQUEST ("what's the temperature in the bedroom"), and one ENV_CAPABILITIES_REQUEST ("can you control the blinds in the living room"). Apply the same atomicity logic across categories as within a single category.
 
 ## Environment Capabilities Reference
@@ -275,12 +277,12 @@ Use the following ontology only as reference to understand what kinds of command
 
 Return ONLY a JSON object, no prose, no markdown fences:
 
-{
+{{
   "text_intent": string,
   "capability_request": "actuate" | "read",
   "actuation_request": string,
   "property_request": string
-}
+}}
 """
 
 ENV_STATE_REQUEST_PARSER_PROMPT = """\
@@ -305,11 +307,9 @@ Your job is to extract structured information from this one atomic intent and al
 
 ## Environment context
 
-Workspace types available in this environment (semantic type — description):
-{workspace_type_list}
+Workspaces and Artifacts available in this environment:
 
-Artifacts available in this environment (semantic type — description — property affordances, with output parameter names where the property schema is an object):
-{artifact_list}
+{capabilities_hierarchical}
 
 ## Ontology Reference
 
@@ -321,14 +321,14 @@ Artifacts available in this environment (semantic type — description — prope
 
 Return ONLY a JSON object, no prose, no markdown fences:
 
-{
+{{
   "text_intent": string,
   "artifact_type": string,
   "workspace_type": string,
   "artifact_name": string,
   "property_name": string,
   "parameter_name": string
-}
+}}
 """
 
 GOAL_REQUEST_PARSER_PROMPT = """\
@@ -399,12 +399,12 @@ When in doubt, choose implicit. Silent information loss from an over-eager expli
 
 ## Output for an IMPLICIT goal
 
-{
+{{
   "category": "implicit",
   "subtype": "conditioned_actions" | "composite_actions" | "implicit_intent",
   "text_intent": string,
   "reason": string
-}
+}}
 
 - subtype: one of the three values above, chosen per the precedence rule.
 - text_intent: the verbatim natural-language fragment describing this intent.
@@ -412,22 +412,22 @@ When in doubt, choose implicit. Silent information loss from an over-eager expli
 
 ## Output for an EXPLICIT goal
 
-{
+{{
   "category": "explicit",
   "text_intent": string,
-  "action": {
+  "action": {{
     "affordance_type": string,
     "parameter": string | null,
     "value": string | null,
     "verb": "set" | "modify"
-  },
-  "target": {
+  }},
+  "target": {{
     "artifact_name": string,
     "artifact_type": string,
     "workspace_type": string,
     "workspace_name": string
-  }
-}
+  }}
+}}
 
 Field rules:
 
@@ -447,15 +447,13 @@ Alignment requirement: for every field aligned to a semantic type (action.afford
 
 Distinction between "NA" and null: identity fields use the string "NA" when applicable but not extractable. action.parameter and action.value use JSON null when not applicable (parameterless command / no value given).
 
-## Environment context
+## Environment capabilities
 
-Workspaces in this environment (semantic type — name):
-{workspace_list}
+Workspaces and Artifacts available in this environment:
 
-Artifacts in this environment (semantic type — name):
-{artifact_list}
+{capabilities_hierarchical}
 
-## Ontology Reference
+## Ontology Reference (homeont)
 
 ```turtle
 {ontology}

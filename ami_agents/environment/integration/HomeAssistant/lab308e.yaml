@@ -8,6 +8,7 @@ semantic:
       service_types:
         turn_on: "ex:TurnOnCommand"
         turn_off: "ex:TurnOffCommand"
+        toggle: "ex:ToggleCommand"
         set_brightness: "ex:SetBrightnessCommand"
         rgb_color: "ex:SetColorCommand"
     task_lights_308e:
@@ -15,6 +16,7 @@ semantic:
       service_types:
         turn_on: "ex:TurnOnCommand"
         turn_off: "ex:TurnOffCommand"
+        toggle: "ex:ToggleCommand"
         set_brightness: "ex:SetBrightnessCommand"
         rgb_color: "ex:SetColorCommand"
     desk_lamp_308e:
@@ -22,6 +24,7 @@ semantic:
       service_types:
         turn_on: "ex:TurnOnCommand"
         turn_off: "ex:TurnOffCommand"
+        toggle: "ex:ToggleCommand"
         set_brightness: "ex:SetBrightnessCommand"
     blinds_308e:
       artifact_type: "ex:Blinds"
@@ -46,6 +49,7 @@ semantic:
       service_types:
         turn_on: "ex:TurnOnCommand"
         turn_off: "ex:TurnOffCommand"
+        toggle: "ex:ToggleCommand"
         media_play: "ex:PlayCommand"
         media_pause: "ex:PauseCommand"
         media_stop: "ex:StopCommand"
@@ -56,6 +60,7 @@ semantic:
       service_types:
         turn_on: "ex:TurnOnCommand"
         turn_off: "ex:TurnOffCommand"
+        toggle: "ex:ToggleCommand"
         media_play: "ex:PlayCommand"
         media_pause: "ex:PauseCommand"
         media_stop: "ex:StopCommand"
@@ -66,11 +71,13 @@ semantic:
       service_types:
         turn_on: "ex:TurnOnCommand"
         turn_off: "ex:TurnOffCommand"
+        toggle: "ex:ToggleCommand"
     air_conditioner_308e:
       artifact_type: "ex:AirConditioner"
       service_types:
         turn_on: "ex:TurnOnCommand"
         turn_off: "ex:TurnOffCommand"
+        toggle: "ex:ToggleCommand"
         set_temperature: "ex:SetTemperatureCommand"
         set_hvac_mode: "ex:SetModeCommand"
         set_fan_mode: "ex:SetFanSpeedCommand"
@@ -80,6 +87,7 @@ semantic:
       service_types:
         turn_on: "ex:TurnOnCommand"
         turn_off: "ex:TurnOffCommand"
+        toggle: "ex:ToggleCommand"
         set_temperature: "ex:SetTemperatureCommand"
         set_hvac_mode: "ex:SetModeCommand"
         set_fan_mode: "ex:SetFanSpeedCommand"

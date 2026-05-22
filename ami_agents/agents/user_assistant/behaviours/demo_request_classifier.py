@@ -39,25 +39,44 @@ class DemoRequestClassifierBehaviour(CyclicBehaviour):
             return
 
         kind = "IMPLICIT"
-        if low.startswith(("what", "show", "list", "which", "is", "are")) and (
-            "workspace" in low or "workspaces" in low or "device" in low
-            or "devices" in low or "state" in low
-        ):
-            kind = "QUERY"
-        else:
-            has_action = any(
-                kw in low
-                for kw in (
-                    "turn ", "toggle", "open", "close",
-                    "set ", "raise", "lower", "increase", "decrease",
-                )
-            )
-            mentions_device = (
-                any(tok in low for tok in ("light", "blinds"))
-                or re.search(r"\b\w+\d{3}\b", low) is not None
-                or "%" in low
-            )
-            if has_action and mentions_device:
-                kind = "EXPLICIT"
+        reason_parts = []
 
-        self.logger.info(demo("Request classified as %s: %r"), kind, text)
+        # Check for action patterns (EXPLICIT/IMPLICIT GOAL_REQUEST)
+        has_action = any(
+            kw in low
+            for kw in (
+                "turn ", "toggle", "open", "close",
+                "set ", "raise", "lower", "increase", "decrease",
+            )
+        )
+        mentions_device = (
+            any(tok in low for tok in ("light", "blinds"))
+            or re.search(r"\b\w+\d{3}\b", low) is not None
+            or "%" in low
+        )
+
+        if has_action and mentions_device:
+            kind = "EXPLICIT"
+            reason_parts.append("has_action+mentions_device")
+        elif has_action or any(kw in low for kw in ("make ", "it's ", "too ", "more ", "less ")):
+            kind = "IMPLICIT_GOAL"
+            reason_parts.append("implied_action_or_complaint")
+        elif any(kw in low for kw in ("list", "show", "what", "which", "can you", "able to", "do you")):
+            # Query about capabilities or state
+            if any(kw in low for kw in ("device", "devices", "command", "action", "can you", "able to")):
+                kind = "ENV_CAPABILITIES"
+                reason_parts.append("asks_about_capabilities")
+            elif any(kw in low for kw in ("state", "on", "off", "intensity", "brightness", "temperature", "humidity")):
+                kind = "ENV_STATE"
+                reason_parts.append("asks_about_state")
+            else:
+                kind = "QUERY"
+                reason_parts.append("generic_query")
+
+        reason = "[" + ", ".join(reason_parts) + "]" if reason_parts else "[default]"
+        self.logger.info(
+            demo("[HEURISTIC CLASSIFIER] Request classified as %s %s: %r"),
+            kind,
+            reason,
+            text,
+        )

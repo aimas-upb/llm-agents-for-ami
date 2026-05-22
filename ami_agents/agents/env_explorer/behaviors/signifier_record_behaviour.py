@@ -184,14 +184,18 @@ class SignifierRecordBehaviour(CyclicBehaviour):
                     intent_type,
                     signifier_id,
                 )
-                # Validate it's one of the expected values
-                if intent_type and str(intent_type).upper() not in ("EXPLICIT", "IMPLICIT"):
-                    self.agent.logger.warning(
-                        demo("[INTENT_TYPE] Invalid intent_type %r for signifier %s, setting to None"),
-                        intent_type,
-                        signifier_id,
-                    )
-                    intent_type = None
+                # Validate and normalize to uppercase
+                if intent_type:
+                    intent_type_upper = str(intent_type).upper()
+                    if intent_type_upper not in ("EXPLICIT", "IMPLICIT"):
+                        self.agent.logger.warning(
+                            demo("[INTENT_TYPE] Invalid intent_type %r for signifier %s, setting to None"),
+                            intent_type,
+                            signifier_id,
+                        )
+                        intent_type = None
+                    else:
+                        intent_type = intent_type_upper  # Normalize to uppercase
 
                 # Generate SHACL shapes from structured_conditions for context validation
                 shacl_shapes = generate_shacl_shapes_from_conditions(structured_conditions)

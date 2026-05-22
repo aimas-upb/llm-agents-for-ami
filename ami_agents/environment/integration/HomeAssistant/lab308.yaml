@@ -8,6 +8,7 @@ semantic:
       service_types:
         turn_on: "ex:TurnOnCommand"
         turn_off: "ex:TurnOffCommand"
+        toggle: "ex:ToggleCommand"
         set_brightness: "ex:SetBrightnessCommand"
         rgb_color: "ex:SetColorCommand"
     blinds_308:

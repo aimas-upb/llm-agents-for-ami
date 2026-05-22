@@ -12,10 +12,30 @@ user_assistant:
   jid: "user_assistant@localhost"
   password: "${SPADE_USER_ASSISTANT_PASSWORD}"
 
+  llm:
+    # LLM for atomic intent splitting and per-span intent parsing
+    atomic_segmentation:
+      model: "gpt-5-mini"
+      reasoning_effort: "medium"
+    intent_parsing:
+      model: "gpt-5-mini"
+      reasoning_effort: "medium"
+    plan_summarization:
+      model: "gpt-4o-mini"
+      temperature: 0.5
+      max_tokens: 4096
+
 # EnvExplorer Agent Configuration
 env_explorer:
   jid: "env_explorer@localhost"
   password: "${SPADE_ENV_EXPLORER_PASSWORD}"
+
+  llm:
+    # LLM for answering env state and env capability queries
+    query_response:
+      model: "gpt-4o-mini"
+      temperature: 0.0
+      max_tokens: 8192
 
   # Experience Engine — signifier registry, matcher, optional SHACL validator.
   experience_engine:
@@ -43,9 +63,9 @@ interaction_solver:
       timeout: "${COMMUNITY_API_TIMEOUT:-10.0}"
 
     llm_planning:
-      model: "gpt-4o-mini"
-      temperature: 0.5
-      max_tokens: 2000
+      model: "gpt-5-mini"
+      reasoning_effort: "medium"
+      max_completion_tokens: 8192
       max_planning_attempts: 3  # retries for BT generation
 
 # Request-type taxonomy used across agents (NLU classification labels).
@@ -60,20 +80,13 @@ request_types:
 
 # LLM Configuration (shared across agents)
 llm:
-  default_provider: "openai"
+  default_model: "gpt-4o-mini"
+  default_temperature: 0.0
+  default_max_tokens: 8192
 
   providers:
     openai:
       api_key: null  # Set via environment variable OPENAI_API_KEY
-      model: "gpt-4o-mini"
-      temperature: 0.5
-      max_tokens: 1500
-
-    anthropic:
-      api_key: null  # Set via environment variable ANTHROPIC_API_KEY
-      model: "claude-3-opus-20240229"
-      temperature: 0.5
-      max_tokens: 1500
 
   retry:
     timeout: "${LLM_TIMEOUT_DEFAULT:-30}"  # seconds

@@ -419,6 +419,11 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Show only log lines that include the [DEMO] prefix (filters all other logs).",
     )
+    p.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging (shows hierarchical capabilities text and other details).",
+    )
     return p.parse_args(argv)
 
 
@@ -1532,9 +1537,6 @@ async def main():
 
     yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8080/").strip()
 
-    explorer_jid = f"env_explorer@{xmpp_server}"
-    assistant_jid = f"user_assistant@{xmpp_server}"
-    solver_jid = f"interaction_solver@{xmpp_server}"
     orchestrator_jid = f"orchestrator@{xmpp_server}"
 
     # Optional: clear embedded Experience Engine signifier storage before starting (makes the run reproducible).
@@ -1554,9 +1556,51 @@ async def main():
     run_toggle_only_test_sequence = sequence == "toggle-only-test"
     run_startup_sequence = sequence == "startup"
 
+    # Set verbose flag in environment for agents to read
+    if args.verbose:
+        os.environ["VERBOSE_LOGGING"] = "1"
+
     logger.info(demo("Running manual test sequence=%s"), sequence)
     logger.info(demo("EnvExplorer entrypoint (Yggdrasil URL)=%s"), yggdrasil_url)
     await _reset_lab308_state()
+
+    # Load agent configs directly from agents.yaml (jid, password, llm settings)
+    agent_config = env_config.copy()
+
+    # Get individual agent config sections
+    ua_config = agent_config.get("user_assistant", {})
+    explorer_config = agent_config.get("env_explorer", {})
+    solver_config = agent_config.get("interaction_solver", {})
+
+    # Resolve JIDs and passwords from config, falling back to env vars
+    explorer_jid_from_config = explorer_config.get("jid")
+    ua_jid_from_config = ua_config.get("jid")
+    solver_jid_from_config = solver_config.get("jid")
+
+    # Use config JIDs if present, otherwise construct from xmpp_server
+    if not explorer_jid_from_config:
+        explorer_jid_from_config = f"env_explorer@{xmpp_server}"
+    if not ua_jid_from_config:
+        ua_jid_from_config = f"user_assistant@{xmpp_server}"
+    if not solver_jid_from_config:
+        solver_jid_from_config = f"interaction_solver@{xmpp_server}"
+
+    # Resolve passwords (substitute env vars from config)
+    def _resolve_password(password_str):
+        if not password_str:
+            return "password"
+        if password_str.startswith("${") and password_str.endswith("}"):
+            # Extract env var name
+            var_name = password_str[2:-1].split(":-")[0]
+            return os.getenv(var_name, "password")
+        return password_str
+
+    explorer_password = _resolve_password(explorer_config.get("password"))
+    ua_password = _resolve_password(ua_config.get("password"))
+    solver_password = _resolve_password(solver_config.get("password"))
+
+    # Orchestrator password (not in agents.yaml, use generic SPADE_PASSWORD)
+    orchestrator_password = password
 
     # CLI convenience: keep the internal demo sequence env toggles working.
     if args.pause_for_sensor:
@@ -1567,7 +1611,7 @@ async def main():
     env_config["yggdrasil"] = {"url": yggdrasil_url}
     env_config["discovery"] = {
         "notify_on_discovery_complete": True,
-        "notify_agents": [solver_jid],
+        "notify_agents": [solver_jid_from_config],
     }
 
     # Override signifier settings from CLI args if provided
@@ -1579,95 +1623,61 @@ async def main():
         if args.signifier_min_similarity is not None:
             env_config["signifiers"]["min_similarity"] = float(args.signifier_min_similarity)
 
-    # UserAssistant and Solver configs (new agents.yaml-compatible structure)
-    # Get model from configuration hierarchy: config -> env -> fallback
-    llm_config = env_config.get("llm", {})
-    provider_name = llm_config.get("default_provider", "openai")
-    provider_cfg = llm_config.get("providers", {}).get(provider_name, {})
-
-    model = os.getenv("OPENAI_MODEL") or provider_cfg.get("model", "gpt-4")
-    # This model name is typically served via OpenRouter's OpenAI-compatible API.
-    base_url = os.getenv("OPENAI_BASE_URL")
-    if not base_url:
-        base_url = "https://openrouter.ai/api/v1" if ":" in model or "/" in model else "https://api.openai.com/v1"
-
-    reasoning_effort = os.getenv("OPENAI_REASONING_EFFORT", "").strip() or (
-        "high" if model.startswith("o") and "openai.com" in base_url else ""
-    )
-    api_timeout = os.getenv("OPENAI_TIMEOUT", "").strip() or os.getenv("OPENAI_HTTP_TIMEOUT", "").strip()
-    try:
-        api_timeout_s = float(api_timeout) if api_timeout else (120.0 if model.startswith("o") and "openai.com" in base_url else 30.0)
-    except Exception:
-        api_timeout_s = 120.0 if model.startswith("o") and "openai.com" in base_url else 30.0
-
-    try:
-        planning_timeout_s = float(os.getenv("AMI_PLANNING_TIMEOUT", "").strip() or ("180" if model.startswith("o") else "90"))
-    except Exception:
-        planning_timeout_s = 180.0 if model.startswith("o") else 90.0
-
-    # Keep orchestrator wait times aligned with planning timeout unless explicitly overridden.
-    os.environ.setdefault("AMI_PLAN_TIMEOUT_S", str(planning_timeout_s))
-    os.environ.setdefault("AMI_EXEC_TIMEOUT_S", str(max(planning_timeout_s, 180.0)))
-
-    llm_cfg = {
-        "llm": {
-            "default_provider": "openai",
-            "providers": {
-                "openai": {
-                    "api_key": os.getenv("OPENAI_API_KEY"),
-                    "base_url": base_url,
-                    "model": model,
-                    **({} if model.startswith("o") else {"temperature": float(os.getenv("OPENAI_TEMPERATURE") or str(provider_cfg.get("temperature", 0.7)))}),
-                    **({} if model.startswith("o") else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS") or str(provider_cfg.get("max_tokens", 1500)))}),
-                    **({"reasoning_effort": reasoning_effort} if reasoning_effort else {}),
-                }
-            },
-            "retry": {"timeout": api_timeout_s},
-        },
-        "planning": {
-            "timeout": planning_timeout_s,
-            "llm_planning": {
-                "model": model,
-                **({} if model.startswith("o") else {"temperature": float(os.getenv("OPENAI_TEMPERATURE") or str(provider_cfg.get("temperature", 0.7)))}),
-                **({} if model.startswith("o") else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS") or str(provider_cfg.get("max_tokens", 1500)))}),
-                **({"reasoning_effort": reasoning_effort} if reasoning_effort else {}),
-            },
-            "context_gathering": {"timeout": 60},
-        },
-        # Add logging configuration from env_config
-        "logging": env_config.get("logging", {}),
-        # Add other shared configurations that agents might need
-        "timeouts": env_config.get("timeouts", {}),
-        "bt_execution": env_config.get("bt_execution", {}),
-        "http": env_config.get("http", {}),
+    # Create merged config that respects agents.yaml structure
+    # (Each agent gets its own section + shared sections like timeouts, logging, http)
+    shared_config = {
+        "logging": agent_config.get("logging", {}),
+        "timeouts": agent_config.get("timeouts", {}),
+        "bt_execution": agent_config.get("bt_execution", {}),
+        "http": agent_config.get("http", {}),
     }
 
-    explorer = EnvExplorerAgent(explorer_jid, password, env_config, hmas_client=DummyHMASClient())
+    # Build per-agent configs with their own llm sections
+    ua_full_config = {
+        **shared_config,
+        **ua_config,
+    }
+    explorer_full_config = {
+        **shared_config,
+        **explorer_config,
+    }
+    solver_full_config = {
+        **shared_config,
+        **solver_config,
+    }
+
+    # Initialize agents with proper configs
+    explorer = EnvExplorerAgent(
+        explorer_jid_from_config,
+        explorer_password,
+        explorer_full_config,
+        hmas_client=DummyHMASClient(),
+    )
 
     assistant = None
     if not run_reuse_flow:
         assistant = UserAssistantAgent(
-            assistant_jid,
-            password,
-            config=llm_cfg,
-            target_jids={"explorer": explorer_jid, "solver": solver_jid},
+            ua_jid_from_config,
+            ua_password,
+            config=ua_full_config,
+            target_jids={"explorer": explorer_jid_from_config, "solver": solver_jid_from_config},
         )
 
     solver = InteractionSolverAgent(
-        solver_jid,
-        password,
-        config=llm_cfg,
-        target_jids={"explorer": explorer_jid},
+        solver_jid_from_config,
+        solver_password,
+        config=solver_full_config,
+        target_jids={"explorer": explorer_jid_from_config},
     )
 
     orchestrator = None
     if not run_startup_sequence:
         orchestrator = OrchestratorAgent(
             orchestrator_jid,
-            password,
-            assistant_jid=assistant_jid,
-            explorer_jid=explorer_jid,
-            solver_jid=solver_jid,
+            orchestrator_password,
+            assistant_jid=ua_jid_from_config,
+            explorer_jid=explorer_jid_from_config,
+            solver_jid=solver_jid_from_config,
             run_reuse_flow=run_reuse_flow,
             run_demo_sequence=run_demo_sequence,
             run_reuse_demo_sequence=run_reuse_demo_sequence,

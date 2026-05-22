@@ -5,15 +5,98 @@ from spade.behaviour import CyclicBehaviour
 
 from ....shared.models.messages import MessageType, META_CORRELATION_ID
 from ....shared.utils.demo_log import demo
-from ..experience import intent_compatible, rank_signifier_matches
 from ..experience import ensure_experience_engine_ready, build_experience_engine_context_snapshot
 
 
 class SignifierMatchBehaviour(CyclicBehaviour):
     """
     Contains all the business logic for matching user intents against stored signifiers
-    using Experience engine engine, SHACL validation, and intent compatibility checking.
+    using the v3 experience engine matcher (environment variable exact matching) and SHACL validation.
+
+    For v3 matching: exact environment variable matches are returned if SHACL context validation passes.
+    Non-conforming matches are provided as affordance hints for BT planning.
     """
+
+    def _match_explicit_by_fields(
+        self, query_structured_intent: Optional[Dict[str, Any]], signifier_dicts: List[Dict]
+    ) -> List:
+        """Filter signifiers using exact-field matching for EXPLICIT intents.
+
+        Matches all populated (non-null, non-"NA") fields from the structured intent:
+        - action.affordance_type
+        - action.parameter
+        - target.artifact_type
+        - target.artifact_name
+        - target.workspace_type
+
+        Does NOT match on action.value (injected during BT construction).
+
+        Compares against signifier's stored structured_intent field.
+        """
+        if not query_structured_intent:
+            return []
+
+        query_action = query_structured_intent.get("action", {}) or {}
+        query_target = query_structured_intent.get("target", {}) or {}
+
+        # Build constraint fields (exclude "NA" and None)
+        constraints = {}
+        if query_action.get("affordance_type") not in (None, "NA"):
+            constraints["affordance_type"] = query_action.get("affordance_type")
+        if query_action.get("parameter") not in (None, "NA"):
+            constraints["parameter"] = query_action.get("parameter")
+        if query_target.get("artifact_type") not in (None, "NA"):
+            constraints["artifact_type"] = query_target.get("artifact_type")
+        if query_target.get("artifact_name") not in (None, "NA"):
+            constraints["artifact_name"] = query_target.get("artifact_name")
+        if query_target.get("workspace_type") not in (None, "NA"):
+            constraints["workspace_type"] = query_target.get("workspace_type")
+
+        self.agent.logger.debug(
+            f"EXPLICIT matching with constraints: {constraints}"
+        )
+
+        # Filter signifiers by exact match on all constraint fields
+        matching_signifiers = []
+        for sig_dict in signifier_dicts:
+            # Get structured_intent from signifier (stored during signifier recording)
+            sig_structured = sig_dict.get("structured_intent") or {}
+            sig_action = sig_structured.get("action", {}) or {}
+            sig_target = sig_structured.get("target", {}) or {}
+
+            # Check each constraint
+            match = True
+            for constraint_field, constraint_value in constraints.items():
+                if constraint_field == "affordance_type":
+                    sig_value = sig_action.get("affordance_type")
+                elif constraint_field == "parameter":
+                    sig_value = sig_action.get("parameter")
+                elif constraint_field == "artifact_type":
+                    sig_value = sig_target.get("artifact_type")
+                elif constraint_field == "artifact_name":
+                    sig_value = sig_target.get("artifact_name")
+                elif constraint_field == "workspace_type":
+                    sig_value = sig_target.get("workspace_type")
+                else:
+                    sig_value = None
+
+                if sig_value != constraint_value:
+                    match = False
+                    break
+
+            if match:
+                # Create a match result object (mimics matcher registry output)
+                matching_signifiers.append(
+                    type('MatchResult', (), {
+                        'signifier_id': sig_dict.get('signifier_id'),
+                        'similarity': 1.0,  # Exact match
+                    })()
+                )
+
+        self.agent.logger.info(
+            f"EXPLICIT exact-field matching: {len(matching_signifiers)} matches out of {len(signifier_dicts)} signifiers"
+        )
+        return matching_signifiers
 
     async def run(self):
         """Main behavior loop - handles signifier match requests."""
@@ -100,7 +183,7 @@ class SignifierMatchBehaviour(CyclicBehaviour):
             return {"ok": False, "error": "experience_engine_not_ready"}
 
         if not intent:
-            return {"error": "missing_intent", "matches": [], "final_matches": [], "total_signifiers": 0}
+            return {"ok": False, "error": "missing_intent", "exact_matches": [], "affordance_hints": [], "total_signifiers": 0}
 
         # Build context snapshot
         context = build_experience_engine_context_snapshot(self.agent, workspace_id=workspace_id)
@@ -112,7 +195,7 @@ class SignifierMatchBehaviour(CyclicBehaviour):
 
             if not signifier_dicts:
                 self.agent.logger.info(demo("Signifier match: 0 stored signifiers (storage empty)."))
-                return {"matches": [], "final_matches": [], "total_signifiers": 0}
+                return {"ok": True, "exact_matches": [], "affordance_hints": [], "total_signifiers": 0}
 
             # Determine matcher version and similarity threshold
             version_to_use = str(matcher_version or self.agent._experience_engine_default_matcher_version or "v0")
@@ -147,45 +230,20 @@ class SignifierMatchBehaviour(CyclicBehaviour):
             self.agent.logger.debug(f"Calling matcher with {len(signifier_dicts)} signifiers")
             self.agent.logger.debug(f"Query: intent='{intent}', version='{version_to_use}', structured_intent={query_structured_intent}")
 
-            # For v3 matching (implicit intents with affected_env_vars), use direct env-var matching
-            if affected_env_vars is not None:
-                self.agent.logger.info(
-                    demo("[V3 MATCHER] Using environment variable matching (v3) for implicit intent")
+            # Determine matcher version and routing
+            if intent_type == "EXPLICIT":
+                # EXPLICIT: Use exact-field matching from structured intent
+                match_results = self._match_explicit_by_fields(
+                    query_structured_intent, signifier_dicts
                 )
-                # Convert affected_env_vars to comparable format
-                query_vars = {(v["variable"], v["direction"]) for v in affected_env_vars}
-                match_results = []
-
-                for signifier_dict in signifier_dicts:
-                    # Extract signifier's affected_env_vars
-                    signifier_vars_raw = signifier_dict.get("affected_env_vars", [])
-                    if not isinstance(signifier_vars_raw, list):
-                        continue
-
-                    signifier_vars = {(v.get("variable"), v.get("direction")) for v in signifier_vars_raw}
-
-                    # v3 match: exact match on affected_env_vars (both must have identical elements)
-                    if query_vars == signifier_vars:
-                        self.agent.logger.debug(
-                            f"[V3 MATCHER] Exact env-var match found: signifier_id={signifier_dict.get('signifier_id')}"
-                        )
-                        # Create a mock match result object
-                        class MockMatch:
-                            def __init__(self, sig_id):
-                                self.signifier_id = sig_id
-                                self.similarity = 1.0  # Exact match
-                        match_results.append(MockMatch(signifier_dict.get("signifier_id")))
-
-                self.agent.logger.info(
-                    demo("[V3 MATCHER] Found %d env-var matches"),
-                    len(match_results),
-                )
-                if not match_results:
-                    self.agent.logger.info(
-                        demo("[V3 MATCHER] No exact matches on environment variables, returning empty")
-                    )
-                    return {"matches": [], "final_matches": [], "total_signifiers": len(signifier_dicts)}
             else:
+                # IMPLICIT: v3 if affected_env_vars provided, otherwise use configured version
+                if affected_env_vars is not None:
+                    self.agent.logger.info(
+                        demo("[V3 MATCHER] Using environment variable matching (v3) for implicit intent")
+                    )
+                    version_to_use = "v3"
+
                 try:
                     match_results = self.agent._experience_engine_matcher_registry.match(
                         intent_query=intent,
@@ -194,6 +252,7 @@ class SignifierMatchBehaviour(CyclicBehaviour):
                         version=version_to_use,
                         min_similarity=float(min_similarity),
                         query_structured_intent=query_structured_intent,
+                        affected_env_vars=affected_env_vars,
                     )
                     self.agent.logger.debug(f"Matcher returned {len(match_results) if match_results else 0} results")
                     for i, result in enumerate(match_results[:3]):  # Show first 3
@@ -201,20 +260,12 @@ class SignifierMatchBehaviour(CyclicBehaviour):
 
                 except Exception as e:
                     self.agent.logger.error(
-                        demo("!!! V2 MATCHER FAILED, falling back to v0: %s - %s"),
+                        demo("!!! MATCHER FAILED: %s - %s"),
                         type(e).__name__,
                         str(e),
                         exc_info=True,
                     )
-                    self.agent.logger.error(f"V2 Matcher exception: {type(e).__name__}: {str(e)}")
-                    version_to_use = "v0"
-                    match_results = self.agent._experience_engine_matcher_registry.match(
-                        intent_query=intent,
-                        signifiers=signifier_dicts,
-                        k=int(k),
-                        version=version_to_use,
-                        query_structured_intent=query_structured_intent,
-                    )
+                    return {"ok": False, "error": "matcher_failed", "detail": str(e), "exact_matches": [], "affordance_hints": [], "total_signifiers": len(signifier_dicts)}
 
             # Build context graph for SHACL validation
             context_graph, _ = self.agent._experience_engine_context_builder.normalize_context(context)
@@ -269,25 +320,11 @@ class SignifierMatchBehaviour(CyclicBehaviour):
 
                 self.agent.logger.debug(f"Final SHACL conforms value: {shacl_conforms}")
 
-                # Check intent compatibility
+                # v3 matching: exact environment variable match means intent is already validated.
+                # SHACL validation is the only remaining check. No additional compatibility filtering needed.
                 structured = getattr(getattr(s, "intent", None), "structured", None)
                 payload_hint = structured.get("payload") if isinstance(structured, dict) else None
                 signifier_intent = getattr(s.intent, "nl_text", "")
-
-                self.agent.logger.debug(f"Checking compatibility: query='{intent}' vs signifier='{signifier_intent}'")
-                is_compatible = intent_compatible(
-                    intent_query=intent,
-                    signifier_intent=signifier_intent,
-                    affordance_uri=s.affordance_uri,
-                    payload_hint=payload_hint,
-                )
-                self.agent.logger.debug(f"Compatibility result: {is_compatible}")
-
-                if not is_compatible:
-                    self.agent.logger.debug(f"FILTERED OUT: signifier '{signifier_intent}' not compatible with query '{intent}'")
-                    continue
-
-                self.agent.logger.debug(f"PASSED: signifier '{signifier_intent}' is compatible with query '{intent}'")
 
                 # Build match data
                 match_data = {
@@ -303,30 +340,38 @@ class SignifierMatchBehaviour(CyclicBehaviour):
                 }
                 matches.append(match_data)
 
-            # Filter by SHACL conformance if validating context
-            self.agent.logger.debug(f"Before SHACL filter: {len(matches)} matches")
+            # For EXPLICIT intents: return all matches (no context validation was done)
+            # For IMPLICIT intents: return all matches, but keep SHACL info to separate:
+            #   - exact_matches (SHACL conforming) for fast-path
+            #   - affordance_hints (SHACL non-conforming) for BT planner
+            self.agent.logger.debug(f"Total matches collected: {len(matches)}")
             for i, match in enumerate(matches):
-                self.agent.logger.debug(f"Match {i}: signifier_id={match.get('signifier_id')}, shacl_conforms={match.get('shacl_conforms')}")
+                self.agent.logger.debug(f"Match {i}: signifier_id={match.get('signifier_id')}, shacl_conforms={match.get('shacl_conforms')}, intent_type={match.get('intent_type')}")
 
-            if intent_type != "EXPLICIT":
-                original_count = len(matches)
-                matches = [m for m in matches if m.get("shacl_conforms", True)]
-                filtered_count = len(matches)
-                self.agent.logger.debug(f"SHACL filter applied: {original_count} -> {filtered_count} matches")
-                if original_count != filtered_count:
-                    self.agent.logger.debug(f"FILTERED OUT {original_count - filtered_count} matches due to SHACL validation")
-
-            # Rank matches by intent_type and similarity
-            if intent_type:
-                matches = rank_signifier_matches(matches, intent_type)
+            # Separate matches by intent type semantics
+            if intent_type == "EXPLICIT":
+                # EXPLICIT: user specified exact target, no context validation needed
+                # All matches are exact_matches; affordance_hints unused
+                exact_matches = matches
+                affordance_hints = []
+                self.agent.logger.info(f"EXPLICIT intent signifier match: {len(exact_matches)} matches returned (no context validation)")
             else:
-                matches.sort(key=lambda m: m.get("intent_similarity", 0.0), reverse=True)
+                # IMPLICIT: system inferred target, context validation required via SHACL
+                # Split by conformance: exact_matches (SHACL valid), affordance_hints (SHACL invalid)
+                exact_matches = [m for m in matches if m.get("shacl_conforms") is True]
+                affordance_hints = [m for m in matches if m.get("shacl_conforms") is not True]
+                self.agent.logger.info(f"IMPLICIT intent signifier match: {len(exact_matches)} exact (context valid), {len(affordance_hints)} hints (context invalid)")
+            for i, match in enumerate(exact_matches[:3]):  # Show first 3 exact matches
+                self.agent.logger.debug(f"Exact match {i}: signifier_id={match.get('signifier_id', 'N/A')}")
+            for i, match in enumerate(affordance_hints[:3]):  # Show first 3 hints
+                self.agent.logger.debug(f"Affordance hint {i}: signifier_id={match.get('signifier_id', 'N/A')}, violations={match.get('shacl_violations', [])}")
 
-            self.agent.logger.info(f"Returning {len(matches)} matches to requester")
-            for i, match in enumerate(matches[:3]):  # Show first 3
-                self.agent.logger.debug(f"Final match {i}: signifier_id={match.get('signifier_id', 'N/A')}, similarity={match.get('intent_similarity', 'N/A')}")
-
-            return {"matches": matches, "final_matches": matches, "total_signifiers": len(signifier_dicts)}
+            return {
+                "ok": True,
+                "exact_matches": exact_matches,
+                "affordance_hints": affordance_hints,
+                "total_signifiers": len(signifier_dicts)
+            }
 
         except Exception as e:
             self.agent.logger.error(f"Error matching signifiers: {e}", exc_info=True)

@@ -45,7 +45,8 @@ class IRExecutor:
     def __init__(self, max_ticks: int = None, config: dict = None):
         # Get max_ticks from config if not explicitly provided
         if max_ticks is None and config:
-            max_ticks = config.get("bt_execution", {}).get("max_ticks", {}).get("default", 10)
+            max_ticks_raw = config.get("bt_execution", {}).get("max_ticks", {}).get("default", 10)
+            max_ticks = int(max_ticks_raw)
         elif max_ticks is None:
             max_ticks = 10
 
@@ -74,6 +75,8 @@ class IRExecutor:
             )
 
         try:
+            import json
+            logger.info(f"[BT JSON IR] {json.dumps(tree_spec, indent=2)}")
             logger.info("Compiling JSON IR to py_trees")
             tree = self._compile(tree_spec)
             logger.info(f"Compiled tree: {tree.name}")

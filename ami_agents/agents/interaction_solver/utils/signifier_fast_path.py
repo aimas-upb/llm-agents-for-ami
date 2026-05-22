@@ -15,13 +15,14 @@ from ...user_assistant.models import Intent
 def collect_signifier_ids(
     signifier_matches: Dict[str, Any], intents: List[Intent]
 ) -> List[str]:
-    """Flatten the per-intent ``final_matches`` lists into one ordered list."""
+    """Flatten the per-intent ``exact_matches`` into one ordered list of signifier IDs."""
     ids: List[str] = []
     for intent in intents:
         match = signifier_matches.get(intent.to_query_string(), {})
         if isinstance(match, dict):
-            for f in match.get("final_matches", []) or []:
-                ids.append(str(f))
+            for m in match.get("exact_matches", []) or []:
+                if isinstance(m, dict):
+                    ids.append(str(m.get("signifier_id", "")))
     return ids
 
 

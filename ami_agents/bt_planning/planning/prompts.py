@@ -55,7 +55,7 @@ def format_capability_context(
     Format affordances and state into a context string for the planning prompt.
 
     Handles both BT-repo field names (affordance_uri, artifact_uri) and
-    EnvExplorer field names (affordance_id, artifact_id, target).
+    EnvExplorer field names (affordance_id, artifact_id, target, form).
 
     Args:
         affordances: List of affordance dicts from EnvExplorer
@@ -72,15 +72,30 @@ def format_capability_context(
         lines.append("")
         for aff in affordances:
             name = aff.get("action_name") or aff.get("name", "unknown")
-            # target is the callable URL (hctl:hasTarget) - use as action_url/property_url in BT nodes
-            target = aff.get("target") or aff.get("affordance_uri") or aff.get("href", "")
-            method = aff.get("method", "POST")
+            aff_type = aff.get("type", "unknown").replace("_affordance", "")
+
+            # Extract URL from various possible locations (hierarchical JSON has form.href)
+            form = aff.get("form")
+            if isinstance(form, dict):
+                target = form.get("href", "")
+                method = form.get("method", "POST")
+            else:
+                # Fallback to flat field names
+                target = aff.get("target") or aff.get("affordance_uri") or aff.get("href", "")
+                method = aff.get("method", "POST")
+
             artifact = aff.get("artifact_id") or aff.get("artifact_uri", "")
             input_schema = aff.get("input_schema")
+            semantic_types = aff.get("semantic_types", [])
+            description = aff.get("description", "")
 
-            lines.append(f"- **{name}** ({method} {target})")
+            lines.append(f"- **{name}** ({aff_type.upper()}: {method} {target})")
             if artifact:
                 lines.append(f"  Artifact: {artifact}")
+            if semantic_types:
+                lines.append(f"  Types: {', '.join(semantic_types)}")
+            if description:
+                lines.append(f"  Description: {description}")
             if input_schema:
                 lines.append(f"  Input: {input_schema}")
 

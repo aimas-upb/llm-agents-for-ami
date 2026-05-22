@@ -60,89 +60,6 @@ from ....shared.utils.logger import LoggerFactory
 # ============================================================================
 
 
-def _build_workspace_context(caps_data: dict) -> tuple[str, str]:
-    """Build workspace context strings for prompt templates.
-
-    Returns:
-        (workspace_type_list, workspace_list) — two formatted strings for injection
-    """
-    if not caps_data or "workspaces" not in caps_data:
-        return "", ""
-
-    def _walk_workspaces(workspaces, parent_name=""):
-        """Recursively walk workspace hierarchy and yield (type, name, full_name) tuples."""
-        for ws in workspaces:
-            ws_type = ws.get("id", "unknown")  # workspace_id as simple identifier
-            ws_name = ws.get("name", "unknown")
-            ws_full = f"{ws_name} ({ws_type})" if parent_name == "" else f"{ws_name} ({ws_type}, parent: {parent_name})"
-            yield (ws_type, ws_name, ws_full)
-
-            # Recurse into sub-workspaces
-            for sub_node in _walk_workspaces(ws.get("sub_workspaces", []), ws_name):
-                yield sub_node
-
-    lines_type_list = []
-    lines_list = []
-    for ws_type, ws_name, ws_full in _walk_workspaces(caps_data.get("workspaces", [])):
-        lines_type_list.append(f"ex:{ws_type.title()} — {ws_name}")
-        lines_list.append(f"ex:{ws_type.title()} — {ws_full}")
-
-    return "\n".join(lines_type_list), "\n".join(lines_list)
-
-
-def _build_artifact_context(caps_data: dict) -> str:
-    """Build artifact list context string for prompt templates.
-
-    Returns:
-        Formatted string for injection into {artifact_list} placeholder
-    """
-    if not caps_data or "workspaces" not in caps_data:
-        return ""
-
-    lines = []
-
-    def _walk_artifacts(workspaces, workspace_name=""):
-        """Recursively walk workspaces and extract artifacts."""
-        for ws in workspaces:
-            ws_name = ws.get("name", "unknown")
-
-            # Process artifacts in this workspace
-            for artifact in ws.get("artifacts", []):
-                artifact_id = artifact.get("id", "unknown")
-                artifact_name = artifact.get("name", "unknown")
-
-                # Build action and property lists
-                actions = []
-                properties = []
-                for aff in artifact.get("affordances", []):
-                    aff_name = aff.get("name", "")
-                    aff_type = aff.get("type", "")
-                    params = aff.get("parameters", [])
-                    param_str = f"params: {', '.join(params)}" if params else ""
-
-                    if aff_type == "action_affordance":
-                        if param_str:
-                            actions.append(f"{aff_name} ({param_str})")
-                        else:
-                            actions.append(aff_name)
-                    elif aff_type == "property_affordance":
-                        if param_str:
-                            properties.append(f"{aff_name} ({param_str})")
-                        else:
-                            properties.append(aff_name)
-
-                action_str = "actions=[" + ", ".join(actions) + "]" if actions else ""
-                prop_str = "properties=[" + ", ".join(properties) + "]" if properties else ""
-                combined = ", ".join([s for s in [action_str, prop_str] if s])
-
-                lines.append(f"ex:Device — {artifact_name} ({artifact_id}, workspace: {ws_name}): {combined}")
-
-            # Recurse into sub-workspaces
-            _walk_artifacts(ws.get("sub_workspaces", []), ws_name)
-
-    _walk_artifacts(caps_data.get("workspaces", []))
-    return "\n".join(lines)
-
 
 # ============================================================================
 # UserMessageBehaviour class
@@ -175,6 +92,8 @@ class UserMessageBehaviour(CyclicBehaviour):
         if not msg:
             return
 
+        self.logger.debug(demo("[UserMessageBehaviour.run] Received message: %s"), msg.body[:100] if msg.body else "(empty)")
+
         thread = str(getattr(msg, "thread", None) or "__default__")
         text = (msg.body or "").strip()
         if not text:
@@ -189,47 +108,64 @@ class UserMessageBehaviour(CyclicBehaviour):
         conv.phase = ConversationPhase.SEGMENTING
         conv.user_message = text
 
-        # Fetch capabilities once for use in segmentation and handlers
-        capabilities_ctx = await self._fetch_capabilities()
+        # Fetch capabilities in lightweight format for atomic segmentation and classification
+        capabilities_ctx = await self._fetch_capabilities(detail_level="summary")
 
-        # Parse capabilities JSON for use in per-span parsers
+        # Parse capabilities JSON for segmentation (lightweight summary format)
         try:
-            caps_data = json.loads(capabilities_ctx) if capabilities_ctx else {}
+            caps_summary = json.loads(capabilities_ctx) if capabilities_ctx else {}
         except (json.JSONDecodeError, AttributeError):
-            caps_data = {}
+            caps_summary = {}
 
         # Segment the user text into atomic intents
-        atomic_intents = await self._segment_into_atomic_intents(text, capabilities_ctx)
+        atomic_intents = await self._segment_into_atomic_intents(text, json.dumps(caps_summary))
         if not atomic_intents:
             await self._reply(msg, "I couldn't understand your request. Could you rephrase?")
             conv.phase = ConversationPhase.IDLE
             return
+
+        # Log atomic segmentation results
+        intent_summary = {}
+        for ai in atomic_intents:
+            intent_summary[ai.category] = intent_summary.get(ai.category, 0) + 1
+        self.logger.info(demo("[SEGMENTATION] %d atomic intent(s): %s"), len(atomic_intents), intent_summary)
+        for ai in atomic_intents:
+            self.logger.info(demo("[SEGMENTATION] - %s: span=%r reason=%s"), ai.category, ai.span, ai.reason)
 
         # Group intents by category
         caps_intents = [a for a in atomic_intents if a.category == "ENV_CAPABILITIES_REQUEST"]
         state_intents = [a for a in atomic_intents if a.category == "ENV_STATE_REQUEST"]
         goal_intents = [a for a in atomic_intents if a.category == "GOAL_REQUEST"]
 
+        # Fetch hierarchical capabilities text for all intent parsing phases
+        # Build this from the summary capabilities JSON to get workspace/artifact/affordance hierarchy
+        capabilities_hierarchical = ""
+        if caps_intents or state_intents or goal_intents:
+            capabilities_hierarchical = self._build_capabilities_hierarchical_text(caps_summary)
+            import os
+            if os.getenv("VERBOSE_LOGGING"):
+                self.logger.info(demo("=== HIERARCHICAL CAPABILITIES CONTEXT ===\n%s"), capabilities_hierarchical)
+
         # Phase 1: ENV_CAPABILITIES_REQUEST (if any)
         if caps_intents:
             conv.phase = ConversationPhase.EXTRACTING_INTENTS
             for intent in caps_intents:
-                extraction = await self._parse_atomic_intent(intent.span, intent.category, caps_data)
+                extraction = await self._parse_atomic_intent(intent.span, intent.category, capabilities_hierarchical)
                 await self._handle_query_capabilities(msg, thread, conv, capabilities_ctx)
 
         # Phase 2: ENV_STATE_REQUEST (if any)
         if state_intents:
             conv.phase = ConversationPhase.EXTRACTING_INTENTS
             for intent in state_intents:
-                extraction = await self._parse_atomic_intent(intent.span, intent.category, caps_data)
+                extraction = await self._parse_atomic_intent(intent.span, intent.category, capabilities_hierarchical)
                 await self._handle_query_state(msg, thread, conv, extraction)
 
         # Phase 3: GOAL_REQUEST (if any) — batch all goal intents into a single request
         if goal_intents:
             conv.phase = ConversationPhase.EXTRACTING_INTENTS
-            # Parse all goal intent spans in parallel
+            # Parse all goal intent spans in parallel (using the same capabilities_hierarchical fetched above)
             extractions = await asyncio.gather(
-                *[self._parse_atomic_intent(intent.span, intent.category, caps_data) for intent in goal_intents],
+                *[self._parse_atomic_intent(intent.span, intent.category, capabilities_hierarchical) for intent in goal_intents],
                 return_exceptions=True,
             )
             # Convert to typed intent objects, filtering errors
@@ -255,6 +191,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         self, user_text: str, capabilities_ctx: str = ""
     ) -> list[AtomicIntent]:
         """Call LLM to segment user message into atomic intents with categories."""
+        self.logger.info(demo("[LLM CALL] Calling ATOMIC_SEGMENTATION_SYSTEM_PROMPT for: %r"), user_text[:100])
         prompt = ATOMIC_SEGMENTATION_SYSTEM_PROMPT.format(capabilities=capabilities_ctx)
         messages = [
             {"role": "system", "content": prompt},
@@ -291,44 +228,121 @@ class UserMessageBehaviour(CyclicBehaviour):
             self.logger.error("LLM atomic segmentation failed: %s", exc)
             return []
 
+    def _build_capabilities_hierarchical_text(self, caps_summary: dict) -> str:
+        """Build human-readable hierarchical text from capabilities summary JSON.
+
+        Filters ACTION affordances to only show those with ex: semantic types,
+        but includes ALL PROPERTY affordances. Delegates to format_capabilities_hierarchical_text()
+        from env_explorer's data_formatting module, which handles the full formatting.
+
+        Args:
+            caps_summary: Hierarchical dict from format_capabilities_summary_hierarchical()
+
+        Returns:
+            Human-readable hierarchical string
+        """
+        if not caps_summary or not caps_summary.get("discovery_complete"):
+            return "Environment discovery not yet complete."
+
+        lines = []
+
+        def format_workspace(ws_node: dict, indent: str = "") -> None:
+            """Recursively format a workspace and its contents."""
+            ws_name = ws_node.get("name", "Unknown")
+            lines.append(f"{indent}Workspace: {ws_name}")
+            semantic_types = ws_node.get("semantic_types", [])
+            if semantic_types:
+                lines.append(f"{indent}  semantic_types: {', '.join(semantic_types)}")
+            description = ws_node.get("description", "")
+            if description:
+                lines.append(f"{indent}  description: {description}")
+
+            # Format artifacts in this workspace
+            for artifact in (ws_node.get("artifacts") or []):
+                artifact_name = artifact.get("name", "Unknown")
+                lines.append(f"{indent}  Artifact: {artifact_name}")
+                artifact_types = artifact.get("semantic_types", [])
+                if artifact_types:
+                    lines.append(f"{indent}    semantic_types: {', '.join(artifact_types)}")
+                artifact_desc = artifact.get("description", "")
+                if artifact_desc:
+                    lines.append(f"{indent}    description: {artifact_desc}")
+
+                # Format affordances: ACTION only if has ex: types, PROPERTY always
+                for aff in (artifact.get("affordances") or []):
+                    aff_type = aff.get("type", "").replace("_affordance", "")
+
+                    # For ACTION affordances, only include if they have ex: semantic types
+                    if aff_type == "action":
+                        semantic_types = aff.get("semantic_types", [])
+                        homeont_types = [st for st in semantic_types if isinstance(st, str) and st.startswith("ex:")]
+                        if not homeont_types:
+                            continue  # Skip actions without homeont types
+
+                    aff_name = aff.get("name", "Unknown")
+                    lines.append(f"{indent}    {aff_type}: {aff_name}")
+
+                    # Include semantic types if present
+                    aff_semantic_types = aff.get("semantic_types", [])
+                    if aff_semantic_types:
+                        lines.append(f"{indent}      semantic_types: {', '.join(aff_semantic_types)}")
+
+                    # Include description if present
+                    aff_desc = aff.get("description", "")
+                    if aff_desc:
+                        lines.append(f"{indent}      description: {aff_desc}")
+
+                    # Include parameters if present
+                    parameters = aff.get("parameters", [])
+                    if parameters:
+                        lines.append(f"{indent}      parameters: {', '.join(parameters)}")
+
+            # Format sub-workspaces
+            for sub_ws in (ws_node.get("sub_workspaces") or []):
+                format_workspace(sub_ws, indent + "  ")
+
+        # Process all root workspaces
+        for ws in (caps_summary.get("workspaces") or []):
+            format_workspace(ws)
+
+        return "\n".join(lines) if lines else "No environment capabilities found."
+
     async def _parse_atomic_intent(
-        self, span: str, category: str, caps_data: dict
+        self, span: str, category: str, capabilities_hierarchical: str
     ) -> dict:
         """Parse a single atomic intent span using LLM per-span prompts.
 
         Args:
             span: The verbatim user text for this atomic intent
             category: One of "GOAL_REQUEST", "ENV_STATE_REQUEST", "ENV_CAPABILITIES_REQUEST"
-            caps_data: Parsed capabilities JSON dict from _fetch_capabilities()
+            capabilities_hierarchical: Hierarchical text description of environment capabilities
 
         Returns:
             Dict with parsed structured intent fields (LLM output), or fallback dict on error
         """
+        self.logger.info(demo("[LLM CALL] Parsing %s: %r"), category, span[:80])
+
         # Choose prompt and template variables by category
+        ontology = self.agent.ontology_ttl
+
         if category == "GOAL_REQUEST":
             prompt_template = GOAL_REQUEST_PARSER_PROMPT
-            workspace_list, _ = _build_workspace_context(caps_data)
-            artifact_list = _build_artifact_context(caps_data)
-            ontology = self.agent.ontology_ttl
             prompt = prompt_template.format(
-                workspace_list=workspace_list,
-                artifact_list=artifact_list,
+                capabilities_hierarchical=capabilities_hierarchical,
                 ontology=ontology,
             )
         elif category == "ENV_STATE_REQUEST":
             prompt_template = ENV_STATE_REQUEST_PARSER_PROMPT
-            workspace_type_list, _ = _build_workspace_context(caps_data)
-            artifact_list = _build_artifact_context(caps_data)
-            ontology = self.agent.ontology_ttl
             prompt = prompt_template.format(
-                workspace_type_list=workspace_type_list,
-                artifact_list=artifact_list,
+                capabilities_hierarchical=capabilities_hierarchical,
                 ontology=ontology,
             )
         elif category == "ENV_CAPABILITIES_REQUEST":
             prompt_template = ENV_CAPABILITIES_REQUEST_PARSER_PROMPT
-            ontology = self.agent.ontology_ttl
-            prompt = prompt_template.format(ontology=ontology)
+            prompt = prompt_template.format(
+                capabilities_hierarchical=capabilities_hierarchical,
+                ontology=ontology,
+            )
         else:
             # Unknown category — return minimal fallback
             return {"text_intent": span}
@@ -418,15 +432,14 @@ class UserMessageBehaviour(CyclicBehaviour):
         # Store the parsed intents in conversation state
         conv.intents = parsed_intents
 
-        # Log the intents being sent
-        intent_texts = [i.to_query_string() for i in parsed_intents]
-        intent_types = [i.intent_type for i in parsed_intents]
-        self.logger.info(
-            demo("Parsed %d goal intents: %s (types: %s)"),
-            len(parsed_intents),
-            intent_texts,
-            intent_types,
-        )
+        # Log the intents being sent with full structure
+        for i, intent in enumerate(parsed_intents):
+            import json
+            self.logger.info(
+                demo("Parsed goal intent #%d: %s"),
+                i + 1,
+                json.dumps(intent.to_wire_dict(), indent=2),
+            )
 
         solver_jid = self.agent.target_jids.get("solver")
         if not solver_jid:
@@ -443,10 +456,16 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         timeout = self.agent.goal_request_timeout
 
+        # Extract intent categories from parsed intents
+        intent_categories = [
+            parsed_intents[i].to_wire_dict().get("category", "unknown")
+            for i in range(len(parsed_intents))
+        ]
+
         self.logger.info(
-            demo("UA -> InteractionSolver GOAL_REQUEST: %d intents, types: %s"),
+            demo("UA -> InteractionSolver GOAL_REQUEST: %d intents, categories: %s"),
             len(parsed_intents),
-            intent_types,
+            intent_categories,
         )
         try:
             result = await rpc_call(
@@ -470,28 +489,61 @@ class UserMessageBehaviour(CyclicBehaviour):
     async def _process_plan_response(
         self, msg, thread: str, conv: ConversationState, plan_body: str
     ) -> None:
-        """Store plan, summarise via LLM, and ask for confirmation."""
+        """Store plan(s), summarise via LLM, and ask for confirmation.
+
+        Handles both single-plan (legacy) and multi-plan (new per-intent) responses.
+        """
         plan_obj = coerce_plan_dict(plan_body)
         if not isinstance(plan_obj, dict):
             await self._reply(msg, "Received an invalid plan. Could you try rephrasing your request?")
             conv.phase = ConversationPhase.IDLE
             return
 
-        tree = plan_obj.get("tree")
-        if not tree or not isinstance(tree, dict):
+        # Check for error in the response
+        if plan_obj.get("error"):
             error = plan_obj.get("error", "unknown")
             detail = plan_obj.get("detail") or plan_obj.get("explanation", "")
             await self._reply(msg, f"Planning failed: {error}. {detail}\nWhat would you like to change?")
             conv.phase = ConversationPhase.IDLE
             return
 
-        canonical, plan_hash = canonicalize_plan_for_hash(plan_obj)
-        conv.plan_json = canonical
-        conv.plan_hash = plan_hash
+        # Handle multi-plan response (new format with "plans" list)
+        if "plans" in plan_obj:
+            plans_list = plan_obj.get("plans", [])
+            if not plans_list:
+                await self._reply(msg, "Planning returned no plans. Could you try rephrasing your request?")
+                conv.phase = ConversationPhase.IDLE
+                return
 
-        node_count = count_bt_nodes(tree)
-        preview = bt_preview(tree)
-        self.logger.info(demo("Plan stored: hash=%s nodes=%d preview=%s"), plan_hash, node_count, preview)
+            # Store the multi-plan response for async execution
+            canonical, plan_hash = canonicalize_plan_for_hash(plan_obj)
+            conv.plan_json = canonical
+            conv.plan_hash = plan_hash
+            conv.plan_count = len(plans_list)
+
+            total_nodes = sum(count_bt_nodes(p.get("tree", {})) for p in plans_list)
+            self.logger.info(
+                demo("Multi-plan stored: hash=%s plans=%d total_nodes=%d"),
+                plan_hash, len(plans_list), total_nodes
+            )
+
+        # Handle single-plan response (legacy format with "tree" at top level)
+        else:
+            tree = plan_obj.get("tree")
+            if not tree or not isinstance(tree, dict):
+                error = plan_obj.get("error", "unknown")
+                detail = plan_obj.get("detail") or plan_obj.get("explanation", "")
+                await self._reply(msg, f"Planning failed: {error}. {detail}\nWhat would you like to change?")
+                conv.phase = ConversationPhase.IDLE
+                return
+
+            canonical, plan_hash = canonicalize_plan_for_hash(plan_obj)
+            conv.plan_json = canonical
+            conv.plan_hash = plan_hash
+
+            node_count = count_bt_nodes(tree)
+            preview = bt_preview(tree)
+            self.logger.info(demo("Plan stored: hash=%s nodes=%d preview=%s"), plan_hash, node_count, preview)
 
         conv.phase = ConversationPhase.SUMMARIZING_PLAN
         summary = await self._summarize_plan(plan_body if isinstance(plan_body, str) else json.dumps(plan_obj))
@@ -548,88 +600,196 @@ class UserMessageBehaviour(CyclicBehaviour):
             state_intents = [a for a in atomic_intents if a.category == "ENV_STATE_REQUEST"]
             goal_intents = [a for a in atomic_intents if a.category == "GOAL_REQUEST"]
 
+            # Fetch hierarchical capabilities text for all intent parsing phases
+            capabilities_hierarchical = ""
+            if caps_intents or state_intents or goal_intents:
+                try:
+                    caps_summary = json.loads(capabilities_ctx) if capabilities_ctx else {}
+                except (json.JSONDecodeError, AttributeError):
+                    caps_summary = {}
+                capabilities_hierarchical = self._build_capabilities_hierarchical_text(caps_summary)
+
             # Phase 1: ENV_CAPABILITIES_REQUEST (if any)
             if caps_intents:
                 conv.phase = ConversationPhase.EXTRACTING_INTENTS
                 for intent in caps_intents:
-                    stub = self._parse_atomic_intent(intent.span, intent.category, capabilities_ctx)
+                    extraction = await self._parse_atomic_intent(intent.span, intent.category, capabilities_hierarchical)
                     await self._handle_query_capabilities(msg, thread, conv, capabilities_ctx)
 
             # Phase 2: ENV_STATE_REQUEST (if any)
             if state_intents:
                 conv.phase = ConversationPhase.EXTRACTING_INTENTS
                 for intent in state_intents:
-                    stub = self._parse_atomic_intent(intent.span, intent.category, capabilities_ctx)
-                    await self._handle_query_state(msg, thread, conv, stub)
+                    extraction = await self._parse_atomic_intent(intent.span, intent.category, capabilities_hierarchical)
+                    await self._handle_query_state(msg, thread, conv, extraction)
 
             # Phase 3: GOAL_REQUEST (if any)
             if goal_intents:
                 conv.phase = ConversationPhase.EXTRACTING_INTENTS
-                for intent in goal_intents:
-                    stub = self._parse_atomic_intent(intent.span, intent.category, capabilities_ctx)
-                    await self._handle_goal(msg, thread, conv, stub)
+                extractions = await asyncio.gather(
+                    *[self._parse_atomic_intent(intent.span, intent.category, capabilities_hierarchical) for intent in goal_intents],
+                    return_exceptions=True,
+                )
+                parsed_intents = []
+                for extraction in extractions:
+                    if isinstance(extraction, Exception):
+                        self.logger.error("Failed to parse atomic intent: %s", extraction)
+                        continue
+                    if isinstance(extraction, dict):
+                        parsed = goal_intent_from_dict(extraction)
+                        parsed_intents.append(parsed)
+
+                if parsed_intents:
+                    await self._handle_goal(msg, thread, conv, parsed_intents)
 
     # ------------------------------------------------------------------
     # DETERMINISTIC: plan execution
     # ------------------------------------------------------------------
 
     async def _execute_plan(self, thread: str, conv: ConversationState) -> ExecutionResult:
-        """Execute the stored plan via IRExecutor (deterministic)."""
+        """Execute the stored plan(s) via IRExecutor.
+
+        Handles both single-plan (legacy) and multi-plan (new per-intent) responses.
+        Multi-plan execution happens in parallel (asyncio.gather).
+        """
         plan_obj = coerce_plan_dict(conv.plan_json)
         if not isinstance(plan_obj, dict):
             return ExecutionResult(success=False, error="Invalid plan JSON")
 
-        tree_spec = plan_obj.get("tree", {})
-        raw_intents = plan_obj.get("intents", [])
+        # Handle multi-plan response (new format with "plans" list)
+        if "plans" in plan_obj:
+            plans_list = plan_obj.get("plans", [])
+            if not plans_list:
+                return ExecutionResult(success=False, error="No plans to execute")
 
-        # Reconstruct typed goal intents from the wire format
-        intents = []
-        for d in raw_intents:
-            if isinstance(d, dict) and d.get("category") in ("implicit", "explicit"):
-                intents.append(goal_intent_from_dict(d))
-            elif isinstance(d, dict):
-                # Fallback for non-goal intents (state/capabilities requests)
-                intents.append(Intent(intent_text=d.get("text_intent", str(d))))
-            else:
-                intents.append(Intent(intent_text=str(d)))
+            await self.agent.ensure_execution_engine_ready()
 
-        is_signifier_reuse = plan_obj.get("signifier_reuse", False)
-        intent_type = plan_obj.get("intent_type")
-        workspace_id = plan_obj.get("workspace_id")
+            # Execute all plans in parallel
+            executor = IRExecutor(max_ticks=self.agent.bt_max_ticks)
+            loop = asyncio.get_event_loop()
 
-        if not tree_spec or not isinstance(tree_spec, dict):
-            return ExecutionResult(success=False, error="Plan has no behavior tree to execute")
+            execution_tasks = []
+            for i, plan_entry in enumerate(plans_list):
+                tree_spec = plan_entry.get("tree", {})
+                intent_data = plan_entry.get("intent", {})
+                explanation = plan_entry.get("explanation", "")
 
-        await self.agent.ensure_execution_engine_ready()
+                if not tree_spec or not isinstance(tree_spec, dict):
+                    self.logger.warning(demo("Plan %d has no tree"), i)
+                    continue
 
-        node_count = count_bt_nodes(tree_spec)
-        self.logger.info(demo("Executing BT: thread=%s nodes=%d signifier_reuse=%s intent_type=%s"), thread, node_count, is_signifier_reuse, intent_type)
+                node_count = count_bt_nodes(tree_spec)
+                intent_text = (
+                    intent_data.get("text_intent")
+                    if isinstance(intent_data, dict)
+                    else str(intent_data)
+                )
+                self.logger.info(
+                    demo("Executing plan %d/%d: intent=%r nodes=%d"),
+                    i + 1, len(plans_list), intent_text, node_count
+                )
 
-        executor = IRExecutor(max_ticks=self.agent.bt_max_ticks)
-        loop = asyncio.get_event_loop()
-        try:
-            exec_result: ExecutionResult = await loop.run_in_executor(
-                None,
-                executor.execute_from_spec,
-                tree_spec,
+                # Schedule execution as async task
+                task = loop.run_in_executor(None, executor.execute_from_spec, tree_spec)
+                execution_tasks.append((i, intent_data, task))
+
+            # Await all executions in parallel
+            results = []
+            for i, intent_data, task in execution_tasks:
+                try:
+                    exec_result = await task
+                    results.append((i, intent_data, exec_result))
+                    self.logger.info(
+                        demo("Plan %d execution complete: success=%s ticks=%d status=%s"),
+                        i + 1, exec_result.success, exec_result.ticks, exec_result.final_status
+                    )
+                except Exception as exc:
+                    self.logger.warning(demo("Plan %d execution failed: %s"), i + 1, exc)
+                    results.append((i, intent_data, ExecutionResult(success=False, error=str(exc))))
+
+            self.agent.state_memory.clear()
+            self.logger.info(demo("State memory cache cleared after multi-plan execution"))
+
+            # Check overall success: all plans must succeed
+            all_success = all(r[2].success for r in results)
+
+            # Record signifiers for implicit goals from successful plans
+            workspace_id = plan_obj.get("workspace_id")
+            for i, intent_data, exec_result in results:
+                if exec_result.success:
+                    tree_spec = plans_list[i].get("tree", {})
+                    # Reconstruct intent from wire format
+                    if isinstance(intent_data, dict) and intent_data.get("category") in ("implicit", "explicit"):
+                        intent_obj = goal_intent_from_dict(intent_data)
+                    else:
+                        intent_obj = Intent(intent_text=intent_data.get("text_intent", str(intent_data)))
+
+                    # Only record for implicit intents
+                    if isinstance(intent_obj, ImplicitGoalIntent):
+                        await self._record_signifiers(
+                            tree_spec, [intent_obj], exec_result, thread,
+                            intent_type="IMPLICIT", workspace_id=workspace_id
+                        )
+
+            return ExecutionResult(
+                success=all_success,
+                final_status=f"Multi-plan execution: {sum(r[2].success for r in results)}/{len(results)} succeeded",
+                ticks=sum(r[2].ticks for r in results),
             )
-        except Exception as exc:
-            self.logger.warning(demo("BT execution failed: %s"), exc)
-            return ExecutionResult(success=False, error=str(exc))
 
-        self.logger.info(
-            demo("BT execution complete: success=%s ticks=%d status=%s"),
-            exec_result.success, exec_result.ticks, exec_result.final_status,
-        )
+        # Handle single-plan response (legacy format with "tree" at top level)
+        else:
+            tree_spec = plan_obj.get("tree", {})
+            raw_intents = plan_obj.get("intents", [])
 
-        self.agent.state_memory.clear()
-        self.logger.info(demo("State memory cache cleared after BT execution"))
+            # Reconstruct typed goal intents from the wire format
+            intents = []
+            for d in raw_intents:
+                if isinstance(d, dict) and d.get("category") in ("implicit", "explicit"):
+                    intents.append(goal_intent_from_dict(d))
+                elif isinstance(d, dict):
+                    # Fallback for non-goal intents (state/capabilities requests)
+                    intents.append(Intent(intent_text=d.get("text_intent", str(d))))
+                else:
+                    intents.append(Intent(intent_text=str(d)))
 
-        # Only record signifiers for implicit goal intents (explicit goals don't produce experiences)
-        if exec_result.success and not is_signifier_reuse and intent_type == "implicit":
-            await self._record_signifiers(tree_spec, intents, exec_result, thread, intent_type, workspace_id)
+            is_signifier_reuse = plan_obj.get("signifier_reuse", False)
+            intent_type = plan_obj.get("intent_type")
+            workspace_id = plan_obj.get("workspace_id")
 
-        return exec_result
+            if not tree_spec or not isinstance(tree_spec, dict):
+                return ExecutionResult(success=False, error="Plan has no behavior tree to execute")
+
+            await self.agent.ensure_execution_engine_ready()
+
+            node_count = count_bt_nodes(tree_spec)
+            self.logger.info(demo("Executing BT: thread=%s nodes=%d signifier_reuse=%s intent_type=%s"), thread, node_count, is_signifier_reuse, intent_type)
+
+            executor = IRExecutor(max_ticks=self.agent.bt_max_ticks)
+            loop = asyncio.get_event_loop()
+            try:
+                exec_result: ExecutionResult = await loop.run_in_executor(
+                    None,
+                    executor.execute_from_spec,
+                    tree_spec,
+                )
+            except Exception as exc:
+                self.logger.warning(demo("BT execution failed: %s"), exc)
+                return ExecutionResult(success=False, error=str(exc))
+
+            self.logger.info(
+                demo("BT execution complete: success=%s ticks=%d status=%s"),
+                exec_result.success, exec_result.ticks, exec_result.final_status,
+            )
+
+            self.agent.state_memory.clear()
+            self.logger.info(demo("State memory cache cleared after BT execution"))
+
+            # Only record signifiers for implicit goal intents (explicit goals don't produce experiences)
+            if exec_result.success and not is_signifier_reuse and str(intent_type).upper() == "IMPLICIT":
+                await self._record_signifiers(tree_spec, intents, exec_result, thread, "IMPLICIT", workspace_id)
+
+            return exec_result
 
     # ------------------------------------------------------------------
     # DETERMINISTIC: signifier recording

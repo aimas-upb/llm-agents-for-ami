@@ -11,7 +11,7 @@ from .plan import (
     count_bt_nodes,
     bt_preview,
 )
-from .llm_client import LLMClientConfig, build_llm_client, build_llm_call_kwargs
+from .llm_client import LLMClientConfig, build_llm_client, build_llm_call_kwargs, build_behaviour_llm_client
 
 __all__ = [
     "strip_code_fences",
@@ -23,4 +23,5 @@ __all__ = [
     "LLMClientConfig",
     "build_llm_client",
     "build_llm_call_kwargs",
+    "build_behaviour_llm_client",
 ]

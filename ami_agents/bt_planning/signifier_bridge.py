@@ -12,6 +12,7 @@ Functions:
 from typing import Any, Optional
 
 from ami_agents.agents.user_assistant.models import Intent
+from ..shared.models.intents import ExplicitGoalIntent, ImplicitGoalIntent
 from ..shared.utils.demo_log import demo
 from ..shared.utils.logger import LoggerFactory
 
@@ -435,8 +436,8 @@ def build_bt_from_signifiers(
     for intent in intents:
         query_str = intent.to_query_string()
 
-        # modify intents require read-compute-set — bail to LLM path
-        if intent.action == "modify":
+        # EXPLICIT with verb="modify" require read-compute-set — bail to LLM path
+        if isinstance(intent, ExplicitGoalIntent) and intent.action.verb == "modify":
             logger.info(demo("build_bt_from_signifiers: MODIFY action detected for intent=%r, bailing to LLM path"), query_str)
             return None
 
@@ -444,20 +445,14 @@ def build_bt_from_signifiers(
         if not isinstance(match_data, dict):
             return None  # Not all intents matched
 
-        finals = match_data.get("final_matches", [])
-        matches = match_data.get("matches", [])
-
-        if not finals and not matches:
+        # Use exact_matches (current signifier match format)
+        exact_matches = match_data.get("exact_matches", [])
+        if not exact_matches:
             return None  # This intent has no match
-
-        # Resolve ALL final_matches to their full match dicts
-        resolved = _resolve_final_matches(finals, matches)
-        if not resolved:
-            return None
 
         # Build action nodes for every resolved match
         intent_actions: list[dict] = []
-        for m in resolved:
+        for m in exact_matches:
             affordance_uri = m.get("affordance_uri", "")
             if not affordance_uri:
                 return None
@@ -468,24 +463,23 @@ def build_bt_from_signifiers(
                 "action_url": affordance_uri,
             }
 
-            # Intent-aware payload selection
-            if intent.action == "set" and intent.value is not None and intent.parameter:
+            # Intent-aware payload selection (only for ExplicitGoalIntent with value)
+            if isinstance(intent, ExplicitGoalIntent) and intent.action.parameter and intent.action.value is not None:
                 # Special case: 'on_off' is a semantic parameter, not an API parameter
                 # The action (turn_on vs turn_off) is already encoded in the affordance_uri
-                if intent.parameter == "on_off":
+                if intent.action.parameter == "on_off":
                     logger.info(demo("build_bt_from_signifiers: SET action with on_off parameter - skipping (encoded in affordance_uri)"))
                 else:
                     # Use the caller's actual target value, not the stale signifier hint
-                    action_node["parameters"] = {intent.parameter: intent.value}
-                    logger.info(demo("build_bt_from_signifiers: SET action - overriding payload_hint with intent value: %s=%s"), intent.parameter, intent.value)
-            elif intent.action == "check":
-                logger.info(demo("build_bt_from_signifiers: CHECK action - no parameters needed"))
+                    action_node["parameters"] = {intent.action.parameter: intent.action.value}
+                    logger.info(demo("build_bt_from_signifiers: SET action - overriding payload_hint with intent value: %s=%s"), intent.action.parameter, intent.action.value)
             else:
-                # Fallback: reuse signifier's payload_hint as-is
+                # ImplicitGoalIntent or ExplicitGoalIntent without explicit value:
+                # reuse signifier's payload_hint as-is
                 payload = m.get("payload_hint") or m.get("payload")
                 if payload and isinstance(payload, dict):
                     action_node["parameters"] = payload
-                    logger.info(demo("build_bt_from_signifiers: using payload_hint from signifier (fallback): %s"), payload)
+                    logger.info(demo("build_bt_from_signifiers: using payload_hint from signifier: %s"), payload)
 
             intent_actions.append(action_node)
 

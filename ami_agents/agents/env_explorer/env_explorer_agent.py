@@ -104,7 +104,8 @@ class EnvExplorerAgent(Agent, IAgent):
         self._experience_engine_context_builder = None
         self._experience_engine_shacl_validator = None
         self._experience_engine_default_matcher_version = self.config.get("experience_engine", {}).get("default_matcher_version", _EXPERIENCE_ENGINE_DEFAULTS["default_matcher_version"])
-        self._experience_engine_default_min_similarity = self.config.get("experience_engine", {}).get("default_min_similarity", _EXPERIENCE_ENGINE_DEFAULTS["default_min_similarity"])
+        min_similarity_raw = self.config.get("experience_engine", {}).get("default_min_similarity", _EXPERIENCE_ENGINE_DEFAULTS["default_min_similarity"])
+        self._experience_engine_default_min_similarity = float(min_similarity_raw)
         self._experience_engine_shacl_validation_enabled = self.config.get("experience_engine", {}).get("shacl_validation_enabled", "false").lower() == "true"
 
     async def setup(self):

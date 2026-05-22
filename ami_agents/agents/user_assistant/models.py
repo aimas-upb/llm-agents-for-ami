@@ -76,6 +76,7 @@ class ConversationState:
     plan_json: Optional[str] = None
     plan_hash: Optional[str] = None
     plan_summary: Optional[str] = None
+    plan_count: int = 1  # Number of independent plans (for multi-plan responses)
     is_query: bool = False
 
     def clear_plan(self) -> None:
@@ -83,5 +84,6 @@ class ConversationState:
         self.plan_json = None
         self.plan_hash = None
         self.plan_summary = None
+        self.plan_count = 1
         self.intents = []
         self.workspace_id = None

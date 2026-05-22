@@ -84,3 +84,45 @@ def envelope_signifier_reuse(
         "signifier_reuse": True,
         "signifier_ids": signifier_ids,
     }
+
+
+def envelope_llm_plans(
+    plans_by_intent: Dict[str, Dict[str, Any]],
+    intents: List[Union[ImplicitGoalIntent, ExplicitGoalIntent, Intent]],
+    workspace_id: Optional[str],
+) -> Dict[str, Any]:
+    """Reply for multiple LLM-generated plans (one per atomic intent).
+
+    Returns a list of independent plans, one per intent. UserAssistant
+    will execute these asynchronously (in parallel).
+    """
+    plans = []
+    has_impossible = False
+
+    for intent_obj in intents:
+        intent_str = intent_obj.to_query_string()
+        result = plans_by_intent.get(intent_str, {})
+
+        plan_entry: Dict[str, Any] = {
+            "tree": result.get("tree") or None,
+            "explanation": result.get("explanation", ""),
+            "intent": (
+                intent_obj.to_wire_dict()
+                if hasattr(intent_obj, 'to_wire_dict')
+                else intent_obj.to_dict()
+            ),
+        }
+        if result.get("impossible"):
+            plan_entry["impossible"] = True
+            has_impossible = True
+
+        plans.append(plan_entry)
+
+    out: Dict[str, Any] = {
+        "plan_type": PLAN_TYPE_BT,
+        "plans": plans,  # List of independent plans
+        "workspace_id": workspace_id,
+    }
+    if has_impossible:
+        out["impossible"] = True
+    return out

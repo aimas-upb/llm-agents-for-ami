@@ -19,6 +19,7 @@ from ...user_assistant.models import Intent
 from ..utils.plan_envelope import (
     envelope_error,
     envelope_llm_plan,
+    envelope_llm_plans,
     envelope_signifier_reuse,
 )
 from ..utils.signifier_fast_path import (
@@ -99,6 +100,13 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                     "BT recovered from signifiers (no EnvExplorer context queries, no LLM)"
                 )
             )
+            # Populate affected_env_vars back into intent objects for storage in signifiers
+            for intent_obj in self.intents:
+                if isinstance(intent_obj, ImplicitGoalIntent):
+                    intent_str = intent_obj.to_query_string()
+                    if intent_str in affected_env_vars_by_intent:
+                        intent_obj.affected_env_vars = affected_env_vars_by_intent[intent_str]
+
             self.reply_envelope = envelope_signifier_reuse(
                 tree=fast_tree,
                 signifier_ids=collect_signifier_ids(merged_matches, self.intents),
@@ -118,6 +126,13 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
         self.agent.add_behaviour(ctx)
         await ctx.join()
         if ctx.error:
+            # Populate affected_env_vars even on error for complete intent structure
+            for intent_obj in self.intents:
+                if isinstance(intent_obj, ImplicitGoalIntent):
+                    intent_str = intent_obj.to_query_string()
+                    if intent_str in affected_env_vars_by_intent:
+                        intent_obj.affected_env_vars = affected_env_vars_by_intent[intent_str]
+
             self.reply_envelope = envelope_error(
                 "context_gathering_failed",
                 ctx.error,
@@ -125,37 +140,51 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
             )
             return
 
-        # Convert affected_env_vars to only populated entries for BT planner
-        affected_env_vars_for_planner = {
-            intent_str: env_vars
-            for intent_str, env_vars in affected_env_vars_by_intent.items()
-            if env_vars is not None
-        } if affected_env_vars_by_intent else None
+        # Step 4 — Plan each atomic intent separately
+        plans_by_intent = {}
+        for intent_obj in self.intents:
+            intent_str = intent_obj.to_query_string()
 
-        plan_gen = BTPlanGenerationBehaviour(
-            intent_strings=intent_strings,
-            affordances=ctx.affordances,
-            state=(
-                ctx.state_payload.get("state")
-                if isinstance(ctx.state_payload, dict)
-                else ctx.state_payload
-            ),
-            signifier_hints=merged_matches,
-            affected_env_vars=affected_env_vars_for_planner,
-            logger=self.logger,
-        )
-        self.agent.add_behaviour(plan_gen)
-        await plan_gen.join()
-        if plan_gen.error:
-            self.reply_envelope = envelope_error(
-                "plan_generation_failed",
-                plan_gen.error,
-                self.intents,
+            # Convert affected_env_vars to only populated entries for BT planner
+            affected_env_vars_for_planner = {}
+            if intent_str in affected_env_vars_by_intent and affected_env_vars_by_intent[intent_str] is not None:
+                affected_env_vars_for_planner[intent_str] = affected_env_vars_by_intent[intent_str]
+
+            plan_gen = BTPlanGenerationBehaviour(
+                intent_strings=[intent_str],  # Plan single intent at a time
+                affordances=ctx.affordances,
+                state=(
+                    ctx.state_payload.get("state")
+                    if isinstance(ctx.state_payload, dict)
+                    else ctx.state_payload
+                ),
+                signifier_hints=merged_matches,
+                affected_env_vars=affected_env_vars_for_planner if affected_env_vars_for_planner else None,
+                logger=self.logger,
             )
-            return
+            self.agent.add_behaviour(plan_gen)
+            await plan_gen.join()
 
-        self.reply_envelope = envelope_llm_plan(
-            result=plan_gen.result,
+            if plan_gen.error:
+                self.reply_envelope = envelope_error(
+                    "plan_generation_failed",
+                    plan_gen.error,
+                    [intent_obj],
+                )
+                return
+
+            plans_by_intent[intent_str] = plan_gen.result
+
+        # Populate affected_env_vars back into intent objects for storage in signifiers
+        for intent_obj in self.intents:
+            if isinstance(intent_obj, ImplicitGoalIntent):
+                intent_str = intent_obj.to_query_string()
+                if intent_str in affected_env_vars_by_intent:
+                    intent_obj.affected_env_vars = affected_env_vars_by_intent[intent_str]
+
+        # Combine all plans into a single tree with parallel execution
+        self.reply_envelope = envelope_llm_plans(
+            plans_by_intent=plans_by_intent,
             intents=self.intents,
             workspace_id=self.workspace_id,
         )
@@ -165,7 +194,15 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
         intent_strings: List[str],
         affected_env_vars_by_intent: Optional[Dict[str, Optional[List[Dict[str, str]]]]] = None,
     ) -> Dict[str, Any]:
-        """Spawn local + community signifier behaviours in parallel and merge results."""
+        """Spawn local signifier behaviour and optionally community signifier behaviour.
+
+        Community signifier matching is only queried AFTER local matching if:
+        1. There is a community client available
+        2. At least one intent is an implicit goal with subtype == "implicit_intent"
+        3. Local matching found no (or weak) matches for those implicit intents
+
+        Explicit intents never trigger community queries (they are fully specified).
+        """
         # Only pass affected_env_vars if they are populated (for v3 matching)
         affected_env_vars_for_matching = {
             intent_str: env_vars
@@ -181,19 +218,37 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
         )
         self.agent.add_behaviour(local_b)
 
-        community_b: Optional[CommunitySignifierQueryBehaviour] = None
-        if getattr(self.agent, "community_client", None):
-            community_b = CommunitySignifierQueryBehaviour(
-                intent_strings=intent_strings, logger=self.logger
-            )
-            self.agent.add_behaviour(community_b)
-
+        # Wait for local matching to complete first
         await local_b.join()
-        if community_b is not None:
-            await community_b.join()
+        local_matches = local_b.matches
+
+        # Decide whether to query community based on:
+        # - Local matching results for implicit_intent subtypes
+        # - Availability of community client
+        community_b: Optional[CommunitySignifierQueryBehaviour] = None
+        implicit_intents_needing_community = []
+
+        if getattr(self.agent, "community_client", None) is not None:
+            # Check which implicit_intent subtypes had insufficient local matches
+            for intent in self.intents:
+                if isinstance(intent, ImplicitGoalIntent) and intent.subtype == "implicit_intent":
+                    intent_str = intent.to_query_string()
+                    match_data = local_matches.get(intent_str, {})
+                    exact_matches = match_data.get("exact_matches", [])
+                    # If no exact matches, consult community
+                    if not exact_matches:
+                        implicit_intents_needing_community.append(intent_str)
+
+            # Only spawn community behaviour if there are implicit intents without local matches
+            if implicit_intents_needing_community:
+                community_b = CommunitySignifierQueryBehaviour(
+                    intent_strings=implicit_intents_needing_community, logger=self.logger
+                )
+                self.agent.add_behaviour(community_b)
+                await community_b.join()
 
         return merge_signifier_matches(
-            local_b.matches,
+            local_matches,
             community_b.matches if community_b is not None else {},
             intent_strings,
         )
@@ -211,37 +266,34 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                 )
                 continue
 
-            matches = payload.get("matches") if isinstance(payload.get("matches"), list) else []
-            finals = (
-                payload.get("final_matches")
-                if isinstance(payload.get("final_matches"), list)
-                else []
-            )
+            exact = payload.get("exact_matches") if isinstance(payload.get("exact_matches"), list) else []
+            hints = payload.get("affordance_hints") if isinstance(payload.get("affordance_hints"), list) else []
             total = payload.get("total_signifiers")
             community_count = sum(
-                1 for m in matches if isinstance(m, dict) and m.get("source") == "community"
+                1 for m in exact + hints if isinstance(m, dict) and m.get("source") == "community"
             )
 
-            if finals:
+            if exact:
                 self.logger.info(
                     demo(
-                        "Signifier search: intent=%r matches=%d (community=%d) "
-                        "final=%d top=%s"
+                        "Signifier search: intent=%r exact=%d affordance_hints=%d "
+                        "(community=%d) top=%s"
                     ),
                     intent,
-                    len(matches),
+                    len(exact),
+                    len(hints),
                     community_count,
-                    len(finals),
-                    finals[0],
+                    exact[0].get("signifier_id", "?") if exact else "?",
                 )
             else:
                 self.logger.info(
                     demo(
-                        "Signifier search: intent=%r matches=%d (community=%d) "
-                        "final=0 stored_total=%s"
+                        "Signifier search: intent=%r exact=0 affordance_hints=%d "
+                        "(community=%d) stored_total=%s"
                     ),
                     intent,
-                    len(matches),
+                    len(hints),
                     community_count,
                     total if total is not None else "?",
                 )
+

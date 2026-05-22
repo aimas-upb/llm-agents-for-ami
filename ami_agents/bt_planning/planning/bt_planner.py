@@ -56,6 +56,7 @@ class AsyncBTPlanner:
         affordances: list[dict],
         state: Optional[dict] = None,
         signifier_hints: Optional[dict] = None,
+        affected_env_vars: Optional[dict] = None,
         client: Optional[AsyncOpenAI] = None,
         model: str = "gpt-4",
         temperature: Optional[float] = None,
@@ -70,6 +71,7 @@ class AsyncBTPlanner:
             affordances: List of available affordance dicts
             state: Optional current state dict
             signifier_hints: Optional signifier match data for context injection
+            affected_env_vars: Optional mapping of intent_str -> list of {variable, direction} for implicit intents
             client: AsyncOpenAI client
             model: Model name (e.g., "o3", "gpt-4o")
             temperature: Optional temperature override
@@ -238,8 +240,8 @@ class AsyncBTPlanner:
             },
         }
 
-        # Reasoning models (o-series) don't support temperature
-        is_reasoning = model.startswith("o")
+        # Reasoning models (o-series and gpt-5) don't support temperature
+        is_reasoning = model.startswith("o") or model.startswith("gpt-5")
         if not is_reasoning and temperature is not None:
             kwargs["temperature"] = temperature
 

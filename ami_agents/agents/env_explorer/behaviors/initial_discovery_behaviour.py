@@ -92,6 +92,14 @@ class InitialDiscoveryBehaviour(OneShotBehaviour):
                 len(self.agent.affordances or {}),
             )
 
+            # Log hierarchical capabilities text for inspection (only if verbose)
+            import os
+            if os.getenv("VERBOSE_LOGGING"):
+                from ..utils.data_formatting import format_capabilities_hierarchical_text
+
+                hierarchical_text = format_capabilities_hierarchical_text(self.agent)
+                self.agent.logger.info(demo("=== HIERARCHICAL CAPABILITIES TEXT ===\n%s"), hierarchical_text)
+
             await self.notify_discovery_complete()
 
         except Exception as e:

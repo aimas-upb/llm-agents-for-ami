@@ -39,7 +39,7 @@ class EnvContextQueryBehaviour(OneShotBehaviour):
             raw_aff, raw_state = await asyncio.gather(
                 self.agent._query_env_explorer(
                     message_type=MessageType.ENV_CAPABILITIES_REQUEST.value,
-                    body={"query": "all"},
+                    body={"query": "all", "detail_level": "summary"},
                     expect_type=MessageType.ENV_CAPABILITIES_RESPONSE.value,
                 ),
                 self.agent._query_env_explorer(
@@ -56,9 +56,8 @@ class EnvContextQueryBehaviour(OneShotBehaviour):
         aff_payload = parse_or_empty(raw_aff)
         state_payload = parse_or_empty(raw_state)
 
-        affordances = aff_payload.get("affordances") or aff_payload.get("capabilities") or []
-        if not isinstance(affordances, list):
-            affordances = []
+        # Extract affordances from hierarchical structure (workspaces → artifacts → affordances)
+        affordances = self._extract_affordances_from_hierarchy(aff_payload)
 
         if isinstance(state_payload, dict):
             artifacts = state_payload.get("artifacts")
@@ -115,3 +114,33 @@ class EnvContextQueryBehaviour(OneShotBehaviour):
             }
         except Exception:
             pass
+
+    def _extract_affordances_from_hierarchy(self, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract all affordances from hierarchical workspace → artifact → affordance structure."""
+        if not isinstance(payload, dict):
+            return []
+
+        affordances = []
+        workspaces = payload.get("workspaces", [])
+        if not isinstance(workspaces, list):
+            return []
+
+        def walk_workspaces(ws_list):
+            for ws in ws_list:
+                if not isinstance(ws, dict):
+                    continue
+                # Process artifacts in this workspace
+                artifacts = ws.get("artifacts", [])
+                if isinstance(artifacts, list):
+                    for artifact in artifacts:
+                        if isinstance(artifact, dict):
+                            aff_list = artifact.get("affordances", [])
+                            if isinstance(aff_list, list):
+                                affordances.extend(aff_list)
+                # Recursively process sub-workspaces
+                sub_ws = ws.get("sub_workspaces", [])
+                if isinstance(sub_ws, list):
+                    walk_workspaces(sub_ws)
+
+        walk_workspaces(workspaces)
+        return affordances

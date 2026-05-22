@@ -58,8 +58,8 @@ def build_llm_client(config: Dict[str, Any]) -> LLMClientConfig:
     except Exception:
         timeout = None
 
-    # Reasoning-model adjustments (o-series on OpenAI).
-    is_reasoning = model.startswith("o")
+    # Reasoning-model adjustments (o-series and gpt-5 on OpenAI).
+    is_reasoning = model.startswith("o") or model.startswith("gpt-5")
     if is_reasoning and "openai.com" in base_url.lower():
         temperature = 1.0
         reasoning_timeout = float(
@@ -113,3 +113,77 @@ def build_llm_call_kwargs(cfg: LLMClientConfig) -> Dict[str, Any]:
         if cfg.max_completion_tokens is not None:
             kwargs["max_completion_tokens"] = cfg.max_completion_tokens
     return kwargs
+
+
+def build_behaviour_llm_client(
+    config: Dict[str, Any],
+    behaviour_key: str,
+) -> LLMClientConfig:
+    """Build a per-behaviour LLM client with override-specific settings.
+
+    Args:
+        config: Agent config dict (from agents.yaml)
+        behaviour_key: Key in agent.llm.<behaviour_key> (e.g., "atomic_segmentation")
+
+    Returns:
+        LLMClientConfig with behaviour-specific settings.
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError(
+            "Missing OpenAI API key. Set OPENAI_API_KEY env var."
+        )
+
+    # Get behaviour-specific config, fallback to global defaults
+    agent_llm = config.get("llm", {}) or {}
+    behaviour_cfg = (agent_llm.get(behaviour_key) or {}) if agent_llm else {}
+
+    global_llm = config.get("llm", {}) or {}
+    llm_root = config.get("llm", {}) or {}
+
+    model = str(behaviour_cfg.get("model") or llm_root.get("default_model") or "gpt-4o-mini")
+    base_url = "https://api.openai.com/v1"
+
+    # Reasoning effort for o-series and gpt-5 models
+    reasoning_effort = behaviour_cfg.get("reasoning_effort") or os.getenv("OPENAI_REASONING_EFFORT")
+    is_reasoning = model.startswith("o") or model.startswith("gpt-5")
+    if is_reasoning and reasoning_effort is None:
+        reasoning_effort = "high"
+
+    # For reasoning models, read max_completion_tokens; for others, read max_tokens
+    max_tokens: Optional[int] = None
+    max_completion_tokens: Optional[int] = None
+    if is_reasoning:
+        max_completion_tokens = int(behaviour_cfg.get("max_completion_tokens") or llm_root.get("default_max_tokens", 8192))
+    else:
+        temperature = float(behaviour_cfg.get("temperature") if behaviour_cfg.get("temperature") is not None else llm_root.get("default_temperature", 0.0))
+        max_tokens = int(behaviour_cfg.get("max_tokens") or llm_root.get("default_max_tokens", 8192))
+
+    raw_timeout = (llm_root.get("retry", {}) or {}).get("timeout")
+    try:
+        timeout: Optional[float] = float(raw_timeout) if raw_timeout is not None else None
+    except Exception:
+        timeout = None
+
+    # Adjust timeout for reasoning models
+    if is_reasoning:
+        reasoning_timeout = float(
+            config.get("timeouts", {}).get("llm", {}).get("reasoning", 120.0)
+        )
+        if timeout is None or timeout < reasoning_timeout:
+            timeout = reasoning_timeout
+        temperature = 1.0  # Reasoning models require temperature = 1.0
+
+    client_kwargs: Dict[str, Any] = {"api_key": str(api_key), "base_url": base_url}
+    if timeout is not None:
+        client_kwargs["timeout"] = float(timeout)
+    client = AsyncOpenAI(**client_kwargs)
+
+    return LLMClientConfig(
+        client=client,
+        model=model,
+        base_url=base_url,
+        temperature=temperature,
+        reasoning_effort=str(reasoning_effort) if reasoning_effort else None,
+        max_completion_tokens=max_completion_tokens,
+    )

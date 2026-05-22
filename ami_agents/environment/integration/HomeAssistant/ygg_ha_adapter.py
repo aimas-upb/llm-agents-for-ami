@@ -779,50 +779,8 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                     description=service_description,
                 )
 
-        # Sensor-specific value action
-        if "sensor" in domains:
-            sensor_ent = _pick_entity(device_entities, "sensor")
-            st = state_map.get(sensor_ent, {}) if sensor_ent else {}
-            attrs = st.get("attributes", {}) if isinstance(st, dict) else {}
-            device_class = attrs.get("device_class")
-            unit = attrs.get("unit_of_measurement")
-            action_names = _sensor_action_names(device_class, unit)
-            if action_names:
-                action_name = action_names[0]
-
-                # Build output schema
-                output_schema = rdf._build_sensor_output_schema(device_class, unit)
-
-                rdf._add_action(
-                    art,
-                    action_name,
-                    EX.StatusCommand,
-                    "POST",
-                    URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/{urllib.parse.quote(action_name, safe='')}"),
-                    "application/json",
-                    output_schema=output_schema,
-                )
-
-        if "binary_sensor" in domains:
-            binary_ent = _pick_entity(device_entities, "binary_sensor")
-            st = state_map.get(binary_ent, {}) if binary_ent else {}
-            attrs = st.get("attributes", {}) if isinstance(st, dict) else {}
-            action_names = _binary_sensor_action_names(attrs.get("device_class"))
-            if action_names:
-                action_name = action_names[0]
-
-                # Build output schema
-                output_schema = rdf._build_binary_sensor_output_schema()
-
-                rdf._add_action(
-                    art,
-                    action_name,
-                    EX.StatusCommand,
-                    "POST",
-                    URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/{urllib.parse.quote(action_name, safe='')}"),
-                    "application/json",
-                    output_schema=output_schema,
-                )
+        # Sensors and binary sensors are read-only; their state and attributes
+        # are exposed as PropertyAffordance above. No ActionAffordances.
 
         if "climate" in domains:
             climate_ent = _pick_entity(device_entities, "climate")
@@ -1247,54 +1205,3 @@ async def update_artifact_representation(workspace_id: str, artifact_name: str, 
 async def delete_artifact_representation(workspace_id: str, artifact_name: str):
     return Response(content="Action succeeded:")
 
-# Dynamic sensor/binary sensor actions
-@app.api_route("/workspaces/{workspace_id}/artifacts/{artifact_name}/{action_name}", methods=["POST", "GET"])
-async def action_sensor_dynamic(workspace_id: str, artifact_name: str, action_name: str):
-    _, device_entities, _, _ = await _resolve_device_and_entities(workspace_id, artifact_name)
-    sensor_ent = _pick_entity(device_entities, "sensor")
-    binary_ent = _pick_entity(device_entities, "binary_sensor")
-    climate_ent = _pick_entity(device_entities, "climate")
-
-    states = await ha_rest.get_states()
-    state_map = {s.get("entity_id"): s for s in states}
-    sensor_state = state_map.get(sensor_ent) if sensor_ent else None
-    binary_state = state_map.get(binary_ent) if binary_ent else None
-    climate_state = state_map.get(climate_ent) if climate_ent else None
-
-    sensor_names = _sensor_action_names(
-        (sensor_state or {}).get("attributes", {}).get("device_class"),
-        (sensor_state or {}).get("attributes", {}).get("unit_of_measurement"),
-    ) if sensor_state else []
-    binary_names = _binary_sensor_action_names(
-        (binary_state or {}).get("attributes", {}).get("device_class")
-    ) if binary_state else []
-
-    if action_name in sensor_names:
-        return PlainTextResponse(str((sensor_state or {}).get("state", "")))
-    if action_name in binary_names:
-        return PlainTextResponse(str((binary_state or {}).get("state", "")))
-
-    if action_name == "getThermostatState":
-        if not climate_ent:
-            raise HTTPException(status_code=404, detail="No climate entity on artifact")
-        if not climate_state:
-            raise HTTPException(status_code=404, detail="Climate state not found")
-        return JSONResponse(_format_climate_state(climate_state))
-
-    # Provide meaningful errors for known patterns
-    if action_name.startswith("get") and "In" in action_name[3:]:
-        if not sensor_ent:
-            raise HTTPException(status_code=404, detail="No sensor entity on artifact")
-        if not sensor_state:
-            raise HTTPException(status_code=404, detail="Sensor state not found")
-        raise HTTPException(status_code=404, detail="Action not applicable to this sensor")
-
-    binary_like = action_name.startswith("get") and action_name.endswith("State")
-    if binary_like:
-        if not binary_ent:
-            raise HTTPException(status_code=404, detail="No binary sensor entity on artifact")
-        if not binary_state:
-            raise HTTPException(status_code=404, detail="Binary sensor state not found")
-        raise HTTPException(status_code=404, detail="Action not applicable to this binary sensor")
-
-    raise HTTPException(status_code=404, detail="Unknown action")
