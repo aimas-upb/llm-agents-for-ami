@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
+import asyncio
 import time
 
 
@@ -39,6 +40,9 @@ class GoalStatus:
 
     relevant_communities: List[str] = field(default_factory=list)
     community_responses: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    community_expected_responses: int = 0
+    continue_triggered: bool = False
+    community_event: asyncio.Event = field(default_factory=asyncio.Event, repr=False)
 
     error: Optional[str] = None
     error_detail: Optional[str] = None

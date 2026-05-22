@@ -99,6 +99,10 @@ class MessageType(Enum):
     PLAN_COMPLETED = "plan_completed"
     PLAN_FAILED = "plan_failed"
 
+    # Community query (XMPP)
+    COMMUNITY_REQUEST = "community_request"
+    COMMUNITY_RESPONSE = "community_response"
+
     # Affordance matching
     AFFORDANCE_MATCH_REQUEST = "affordance_match_request"
     AFFORDANCE_MATCH_RESPONSE = "affordance_match_response"

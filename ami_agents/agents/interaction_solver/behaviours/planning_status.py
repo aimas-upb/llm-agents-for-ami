@@ -88,6 +88,11 @@ class PlanningStatusBehaviour(CyclicBehaviour):
             response["has_local_plan"] = True
             response["local_plan_complete"] = goal_status.local_plan_complete
 
+        if goal_status.best_plan:
+            response["plan"] = goal_status.best_plan
+            if goal_status.best_plan_source:
+                response["plan_source"] = goal_status.best_plan_source
+
         if goal_status.relevant_communities:
             response["relevant_communities"] = goal_status.relevant_communities
 

@@ -30,7 +30,14 @@ from ...shared.protocols.agent_protocol import IAgent
 from ...shared.utils.demo_log import demo
 from ...shared.utils.logger import LoggerFactory
 from ...shared.utils.spade_rpc import RpcTimeoutError, rpc_call, send_via_router
-from .behaviours import EnvironmentReadyBehaviour, GoalRequestBehaviour, PlanningStatusBehaviour
+from .behaviours import (
+    EnvironmentReadyBehaviour,
+    GoalRequestBehaviour,
+    PlanningStatusBehaviour,
+    CommunityRequestBehaviour,
+    CommunityResponseBehaviour,
+)
+from .utils.community import build_communities
 from .utils.goal_status import GoalStatus
 from .utils import LLMClientConfig, build_llm_client
 from ..user_assistant.models import Intent
@@ -99,12 +106,26 @@ class InteractionSolverAgent(Agent, IAgent):
         )
         self.bt_planner = AsyncBTPlanner(max_attempts=max_attempts)
 
-        # ── Community signifier client (optional) ───────────────────
+        # ── Community XMPP query configuration ───────────────────────
         community_cfg = (self.config.get("planning", {}) or {}).get("community", {}) or {}
+        self.community_enabled = bool(community_cfg.get("enabled", False))
+        self.community_query_timeout = float(
+            community_cfg.get("query_timeout", 30.0)
+        )
+        self.community_min_response_ratio = float(
+            community_cfg.get("min_response_ratio", 0.5)
+        )
+        self.community_match_threshold = float(
+            community_cfg.get("match_threshold", 0.5)
+        )
+        # Build Community list from configuration
+        raw_communities = community_cfg.get("communities", [])
+        self.communities = build_communities(raw_communities)
+        
+        # Keep legacy HTTP client for backwards compatibility (if configured)
         community_url = community_cfg.get("api_url") or os.getenv("COMMUNITY_API_URL")
-        self.community_enabled = bool(community_cfg.get("enabled", bool(community_url)))
         self.community_client: Optional[CommunitySignifierClient] = None
-        if self.community_enabled and community_url:
+        if community_url:
             community_timeout = float(
                 community_cfg.get("timeout", _DEFAULT_COMMUNITY_TIMEOUT_S)
             )
@@ -211,6 +232,15 @@ class InteractionSolverAgent(Agent, IAgent):
         status_template = Template()
         status_template.set_metadata("type", MessageType.PLANNING_STATUS_REQUEST.value)
         self.add_behaviour(PlanningStatusBehaviour(self.logger), template=status_template)
+
+        # Community behaviours (for XMPP-based community queries)
+        community_request_template = Template()
+        community_request_template.set_metadata("type", MessageType.COMMUNITY_REQUEST.value)
+        self.add_behaviour(CommunityRequestBehaviour(self.logger), template=community_request_template)
+
+        community_response_template = Template()
+        community_response_template.set_metadata("type", MessageType.COMMUNITY_RESPONSE.value)
+        self.add_behaviour(CommunityResponseBehaviour(self.logger), template=community_response_template)
 
         temp_display = "default" if self.model.startswith("o") else self.temperature
         self.logger.info(

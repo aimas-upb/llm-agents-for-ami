@@ -40,8 +40,23 @@ interaction_solver:
 
     community:
       enabled: true
-      api_url: null  # Set via COMMUNITY_API_URL env var or override here
-      timeout: "${COMMUNITY_API_TIMEOUT:-10.0}"
+      api_url: null  # HTTP API (deprecated, use XMPP instead)
+      timeout: "${COMMUNITY_API_TIMEOUT:-10.0}"  # HTTP timeout (legacy)
+      # XMPP community query parameters
+      query_timeout: "${COMMUNITY_QUERY_TIMEOUT:-30.0}"  # seconds to wait for community responses
+      min_response_ratio: "${COMMUNITY_MIN_RESPONSE_RATIO:-0.5}"  # 0.0-1.0, e.g., 0.5 = at least 50% must respond
+      match_threshold: "${COMMUNITY_MATCH_THRESHOLD:-0.5}"  # similarity threshold for community matching
+      # Communities: list of multi-agent groups for collaborative planning
+      communities:
+        - community_id: "lighting"
+          keywords: ["light", "brightness", "lamp"]
+          member_ids:
+            - "interaction_solver-303@localhost"
+            - "interaction_solver-308@localhost"
+        - community_id: "climate"
+          keywords: ["temperature", "climate", "thermal", "heating", "cooling"]
+          member_ids:
+            - "interaction_solver-101@localhost"
 
     llm_planning:
       model: "gpt-4o-mini"

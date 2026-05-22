@@ -7,6 +7,7 @@ caller (GoalRequestBehaviour) sends the SPADE reply, so the workflow
 doesn't need access to the original message envelope itself.
 """
 
+import asyncio
 import json
 from typing import Any, Dict, List, Optional
 
@@ -27,7 +28,7 @@ from ..utils.signifier_fast_path import (
 )
 from ..utils.signifier_matching import merge_signifier_matches
 from .bt_plan_generation import BTPlanGenerationBehaviour
-from .community_signifier_query import CommunitySignifierQueryBehaviour
+from .community_query import CommunityQueryBehaviour
 from .env_context_query import EnvContextQueryBehaviour
 from .signifier_match_query import SignifierMatchQueryBehaviour
 
@@ -63,16 +64,70 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                 error_detail=None,
             )
 
-        # Step 1 — signifier matching (local + community in parallel).
-        merged_matches = await self._gather_signifier_matches(intent_strings)
+        # Step 1 — Query LOCAL signifiers only.
+        local_matches = await self._gather_local_signifier_matches(intent_strings)
+        self._log_signifier_search(local_matches)
+
+        # Step 2 — Try the signifier-only fast path with local matches.
+        fast_tree = try_build_signifier_only_tree(local_matches, self.intents)
+        if fast_tree is not None:
+            self.logger.info(
+                demo(
+                    "BT recovered from local signifiers (no community query, no LLM)"
+                )
+            )
+            self.reply_envelope = envelope_signifier_reuse(
+                tree=fast_tree,
+                signifier_ids=collect_signifier_ids(local_matches, self.intents),
+                intents=self.intents,
+                workspace_id=self.workspace_id,
+                intent_type=self.intent_type,
+                goal_id=self.goal_status.goal_id if self.goal_status else None,
+            )
+            if self.goal_status:
+                self.goal_status.update_status(
+                    phase=PlanningPhase.COMPLETED_SUCCESS,
+                    reused_plan=self.reply_envelope,
+                    reused_plan_source="signifier",
+                    best_plan=self.reply_envelope,
+                    best_plan_source="reused",
+                )
+            return
+
+        # Step 3 — No local plan; if community is enabled, spawn community query and WAIT
+        # for responses so this workflow continues generation and prepares the reply.
+        self.logger.info(demo("No local signifier match; checking community..."))
+        community_matches = {}
+        if getattr(self.agent, "community_enabled", False) and self.goal_status:
+            # mark phase and run CommunityQueryBehaviour to collect responses
+            self.goal_status.update_status(phase=PlanningPhase.QUERYING_COMMUNITY)
+            community_b = CommunityQueryBehaviour(
+                goal_status=self.goal_status,
+                intent_strings=intent_strings,
+                workspace_id=self.workspace_id,
+                intent_type=self.intent_type,
+                structured_intents=[i.to_dict() for i in self.intents],
+                logger=self.logger,
+            )
+            self.agent.add_behaviour(community_b)
+            await community_b.join()
+            community_matches = community_b.matches or {}
+            self.logger.info(
+                demo("Community query finished — received %d responses for goal_id=%s"),
+                len(self.goal_status.community_responses),
+                self.goal_status.goal_id,
+            )
+
+        # Merge local + community matches (community_matches may be empty)
+        merged_matches = merge_signifier_matches(local_matches, community_matches, intent_strings)
         self._log_signifier_search(merged_matches)
 
-        # Step 2 — try the signifier-only fast path.
+        # Step 4 — Try the signifier-only fast path with merged (local + community) matches.
         fast_tree = try_build_signifier_only_tree(merged_matches, self.intents)
         if fast_tree is not None:
             self.logger.info(
                 demo(
-                    "BT recovered from signifiers (no EnvExplorer context queries, no LLM)"
+                    "BT recovered from community signifiers (no EnvExplorer context queries, no LLM)"
                 )
             )
             self.reply_envelope = envelope_signifier_reuse(
@@ -89,11 +144,11 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                     reused_plan=self.reply_envelope,
                     reused_plan_source="signifier",
                     best_plan=self.reply_envelope,
-                    best_plan_source="reused",
+                    best_plan_source="community",
                 )
             return
 
-        # Step 3 — LLM path: gather context, then generate.
+        # Step 5 — LLM path: gather context, then generate.
         self.logger.info(
             demo("Gathering context from EnvExplorer (workspace_id=%r)"),
             self.workspace_id,
@@ -166,10 +221,10 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                 best_plan_source="local",
             )
 
-    async def _gather_signifier_matches(
+    async def _gather_local_signifier_matches(
         self, intent_strings: List[str]
     ) -> Dict[str, Any]:
-        """Spawn local + community signifier behaviours in parallel and merge results."""
+        """Query local signifiers via EnvExplorer only."""
         local_b = SignifierMatchQueryBehaviour(
             intents=self.intents,
             workspace_id=self.workspace_id,
@@ -177,23 +232,8 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
             logger=self.logger,
         )
         self.agent.add_behaviour(local_b)
-
-        community_b: Optional[CommunitySignifierQueryBehaviour] = None
-        if getattr(self.agent, "community_client", None):
-            community_b = CommunitySignifierQueryBehaviour(
-                intent_strings=intent_strings, logger=self.logger
-            )
-            self.agent.add_behaviour(community_b)
-
         await local_b.join()
-        if community_b is not None:
-            await community_b.join()
-
-        return merge_signifier_matches(
-            local_b.matches,
-            community_b.matches if community_b is not None else {},
-            intent_strings,
-        )
+        return local_b.matches
 
     def _log_signifier_search(self, results: Dict[str, Any]) -> None:
         """Demo-friendly per-intent summary of signifier search outcomes."""

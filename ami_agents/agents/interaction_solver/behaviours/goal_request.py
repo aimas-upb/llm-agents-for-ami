@@ -75,6 +75,16 @@ class GoalRequestBehaviour(CyclicBehaviour):
         if not goal_id:
             goal_id = str(uuid.uuid4())
 
+        # Prepare a pending reply message; if planning becomes async (community),
+        # the agent will send this reply later once the plan is ready.
+        reply_msg = msg.make_reply()
+        reply_msg.set_metadata("type", MessageType.PLAN_CREATED.value)
+        corr = msg.get_metadata(META_CORRELATION_ID)
+        if corr:
+            reply_msg.set_metadata(META_CORRELATION_ID, corr)
+        if msg.thread:
+            reply_msg.thread = msg.thread
+
         goal_status = GoalStatus(
             goal_id=goal_id,
             intents=intent_strings,
@@ -93,15 +103,16 @@ class GoalRequestBehaviour(CyclicBehaviour):
         self.agent.add_behaviour(workflow)
         await workflow.join()
 
-        envelope = workflow.reply_envelope or envelope_error(
-            "plan_generation_failed",
-            "Planning workflow returned no envelope.",
-            intent_objects,
-            intent_type,
-            goal_id=goal_id,
-        )
-        self._log_plan_summary(envelope)
-        await self._reply(msg, MessageType.PLAN_CREATED.value, envelope)
+        # If workflow provided a reply envelope synchronously, send it now.
+        if workflow.reply_envelope is not None:
+            envelope = workflow.reply_envelope
+            self._log_plan_summary(envelope)
+            await self._reply(msg, MessageType.PLAN_CREATED.value, envelope)
+        else:
+            # planning continues asynchronously while the workflow waits for
+            # community responses and/or finishes the LLM path.
+            self.logger.info(demo("Planning continuing asynchronously for goal_id=%s"), goal_id)
+            return
 
     # ── helpers ────────────────────────────────────────────────────────
 

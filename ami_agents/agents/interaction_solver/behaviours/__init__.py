@@ -7,7 +7,10 @@ lookup, BT plan generation).
 """
 
 from .bt_plan_generation import BTPlanGenerationBehaviour
-from .community_signifier_query import CommunitySignifierQueryBehaviour
+from .community_query import CommunityQueryBehaviour
+from .community_request import CommunityRequestBehaviour
+from .community_response import CommunityResponseBehaviour
+from .community_timeout import CommunityTimeoutBehaviour
 from .env_context_query import EnvContextQueryBehaviour
 from .environment_ready import EnvironmentReadyBehaviour
 from .goal_request import GoalRequestBehaviour
@@ -17,7 +20,10 @@ from .signifier_match_query import SignifierMatchQueryBehaviour
 
 __all__ = [
     "BTPlanGenerationBehaviour",
-    "CommunitySignifierQueryBehaviour",
+    "CommunityQueryBehaviour",
+    "CommunityRequestBehaviour",
+    "CommunityResponseBehaviour",
+    "CommunityTimeoutBehaviour",
     "EnvContextQueryBehaviour",
     "EnvironmentReadyBehaviour",
     "GoalRequestBehaviour",
