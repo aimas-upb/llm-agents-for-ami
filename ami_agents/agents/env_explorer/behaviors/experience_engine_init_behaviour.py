@@ -31,11 +31,9 @@ class InitializeExperienceEngineBehaviour(OneShotBehaviour):
         if ok:
             self.agent.logger.info(
                 demo(
-                    "Experience Engine startup complete "
-                    "(matcher_default=%s, storage_dir=%s)"
-                ),
-                self.agent._experience_engine_default_matcher_version,
-                self.agent._experience_engine_storage_dir,
+                    f"Experience Engine startup complete "
+                    f"(matcher_default={self.agent._experience_engine_default_matcher_version}, storage_dir={self.agent._experience_engine_storage_dir})"
+                )
             )
         else:
             self.agent.logger.error(
