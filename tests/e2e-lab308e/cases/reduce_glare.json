@@ -14,6 +14,13 @@
     }
   ],
   "query": "reduce glare",
+  "semantic_expectations": {
+    "target_properties": ["glare"],
+    "preferred_artifacts": ["blackout_blinds_308e_cover"],
+    "acceptable_artifacts": ["blackout_blinds_308e_cover", "blinds_308e_cover", "window_308e_cover", "ambient_lights_308e", "task_lights_308e", "desk_lamp_308e"],
+    "forbidden_artifacts": ["projector_308e", "display_wall_308e", "air_conditioner_308e", "heater_308e"],
+    "must_avoid_exact_numeric_thresholds": true
+  },
   "clarification_replies": [
     {
       "match_type": "regex",

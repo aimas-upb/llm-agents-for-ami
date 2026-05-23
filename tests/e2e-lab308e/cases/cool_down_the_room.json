@@ -21,6 +21,13 @@
     }
   ],
   "query": "cool down the room",
+  "semantic_expectations": {
+    "target_properties": ["thermal_comfort"],
+    "preferred_artifacts": ["air_conditioner_308e", "ceiling_fan_308e", "window_308e_cover"],
+    "acceptable_artifacts": ["air_conditioner_308e", "ceiling_fan_308e", "window_308e_cover", "heater_308e"],
+    "forbidden_artifacts": ["projector_308e", "display_wall_308e"],
+    "must_avoid_exact_numeric_thresholds": true
+  },
   "auto_confirm": true,
   "confirmation_text": "yes",
   "settle_seconds": 8,

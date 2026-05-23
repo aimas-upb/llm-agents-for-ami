@@ -21,26 +21,38 @@
     }
   ],
   "query": "make the screen easier to see",
+  "semantic_expectations": {
+    "target_properties": ["glare"],
+    "preferred_artifacts": ["blackout_blinds_308e_cover"],
+    "acceptable_artifacts": ["blackout_blinds_308e_cover", "blinds_308e_cover", "window_308e_cover", "ambient_lights_308e", "task_lights_308e", "desk_lamp_308e"],
+    "forbidden_artifacts": ["air_conditioner_308e", "heater_308e"],
+    "must_avoid_exact_numeric_thresholds": true
+  },
   "clarification_replies": [
     {
       "match_type": "regex",
-      "match": "(?i)(which|do you mean).*(display wall).*(projector)|(projector).*(display wall)",
+      "match": "(?i)(which screen|do you mean.*projector|do you mean.*display.*projector|wall display.*projector)",
       "reply": "the projector"
     },
     {
       "match_type": "regex",
-      "match": "(?i)increase the display brightness.*reduce ambient light|reduce ambient light.*increase the display brightness",
+      "match": "(?i)(what would you like me to do with the projector|control the projector|projector.*status|turn it on/off|change input|mute volume)",
+      "reply": "reduce glare"
+    },
+    {
+      "match_type": "regex",
+      "match": "(?i)(reduce the glare|how would you like me to reduce the glare|dim the lights|close the blinds|lower the blackout blinds)",
+      "reply": "lower the blackout blinds"
+    },
+    {
+      "match_type": "regex",
+      "match": "(?i)(which device should i adjust|which would you like me to adjust|the display|the projector|the room lights|the blinds)",
+      "reply": "the blackout blinds"
+    },
+    {
+      "match_type": "regex",
+      "match": "(?i)(increase display brightness|reduce ambient light|make the screen easier to see)",
       "reply": "reduce ambient light"
-    },
-    {
-      "match_type": "regex",
-      "match": "(?i)what would you like me to do with the projector",
-      "reply": "reduce glare"
-    },
-    {
-      "match_type": "regex",
-      "match": "(?i)do you want to control the projector.*or just check its status",
-      "reply": "reduce glare"
     }
   ],
   "auto_confirm": true,

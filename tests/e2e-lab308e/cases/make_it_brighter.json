@@ -35,6 +35,13 @@
     }
   ],
   "query": "make it brighter",
+  "semantic_expectations": {
+    "target_properties": ["luminosity"],
+    "preferred_artifacts": ["ambient_lights_308e", "task_lights_308e", "desk_lamp_308e", "blinds_308e_cover", "window_308e_cover"],
+    "acceptable_artifacts": ["ambient_lights_308e", "task_lights_308e", "desk_lamp_308e", "blinds_308e_cover", "blackout_blinds_308e_cover", "window_308e_cover"],
+    "forbidden_artifacts": ["air_conditioner_308e", "heater_308e", "projector_308e"],
+    "must_avoid_exact_numeric_thresholds": true
+  },
   "auto_confirm": true,
   "confirmation_text": "yes",
   "settle_seconds": 3,

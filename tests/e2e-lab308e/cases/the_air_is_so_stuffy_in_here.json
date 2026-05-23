@@ -62,6 +62,13 @@
     }
   ],
   "query": "the air is so stuffy in here",
+  "semantic_expectations": {
+    "target_properties": ["air_quality"],
+    "preferred_artifacts": ["window_308e_cover", "ceiling_fan_308e"],
+    "acceptable_artifacts": ["window_308e_cover", "ceiling_fan_308e", "air_conditioner_308e"],
+    "forbidden_artifacts": ["projector_308e", "display_wall_308e", "blackout_blinds_308e_cover"],
+    "must_avoid_exact_numeric_thresholds": true
+  },
   "clarification_replies": [
     {
       "match_type": "regex",
