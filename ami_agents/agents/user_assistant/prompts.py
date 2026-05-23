@@ -241,6 +241,14 @@ write a concise, user-friendly response.  Do NOT include raw URIs or
 full JSON dumps.  Summarise the information naturally.
 Use ASCII only.  Be concise and friendly.
 
+## Boolean Property Interpretation
+
+For boolean properties, interpret them semantically based on the property name:
+- Properties named "is_*" (e.g., "is_closed", "is_on", "is_open"):
+  - true means the property condition IS met (e.g., is_closed=true means CLOSED)
+  - false means the property condition is NOT met (e.g., is_closed=false means OPEN/NOT CLOSED)
+- Negate your response appropriately (e.g., "The blinds are open" for is_closed=false)
+
 Respond with the formatted text only.  No JSON wrapper.
 """
 
@@ -263,7 +271,10 @@ Your job is to extract structured information from this one atomic intent. Do no
 
 - Exactly one of actuation_request / property_request will carry a value; the other is always "NA".
 - Extract command/property names as the user phrased them. Do NOT map them to ontology identifiers — this prompt does not require ontology alignment.
-- If the request is ambiguous between "actuate" and "read", choose based on the verb: verbs of changing/doing → "actuate"; verbs of knowing/sensing/telling → "read".
+- If the request is ambiguous between "actuate" and "read", use this decision tree:
+  - "what CAN do X" / "what CAN change X" / "what IS able to X" → **actuate** (asking if something can perform action X)
+  - "what IS X" / "what HAS X" / "can you sense/know X" → **read** (asking about perceiving/sensing a property)
+  - Focus on the verb structure: "can X" or "change/modify/turn/set" → actuation; "is/has" or "know/sense/perceive" → read
 
 ## Ontology Reference
 
@@ -288,7 +299,7 @@ Return ONLY a JSON object, no prose, no markdown fences:
 ENV_STATE_REQUEST_PARSER_PROMPT = """\
 You are a smart home state-request parser. You are given a SINGLE atomic intent that has already been classified as an ENV_STATE_REQUEST — a request to know the current state of a device or the environment.
 
-Your job is to extract structured information from this one atomic intent and align it to the environment's capabilities. Do not split it further; it is already atomic.
+Your job is to extract structured information from this one atomic intent and align it to the environment's property affordances. Do not split it further; it is already atomic.
 
 ## What to extract
 
@@ -296,18 +307,18 @@ Your job is to extract structured information from this one atomic intent and al
 - **artifact_type**: the ontology device class that the request targets, in namespace:localname format (e.g. ex:Light, ex:AirConditioner, ex:MediaPlayer). Use "NA" if the device type cannot be determined from the text.
 - **workspace_type**: the ontology workspace class for the room targeted, in namespace:localname format (e.g. ex:Bathroom, ex:Kitchen, ex:LivingRoom). Use "NA" if the workspace cannot be determined from the text.
 - **artifact_name**: the name of the specific artifact (e.g. "light308"), matched against the artifact list below. Use "NA" if the text does not identify a specific named artifact.
-- **property_name**: the name of the property being asked about, chosen from the property affordances of the matched artifact type in the artifact list below. Use "NA" if no property can be discerned from the text.
+- **property_name**: the name of the property being asked about, chosen from the property affordances listed below. Use "NA" if no property can be discerned from the text.
 - **parameter_name**: a named parameter of the property's output schema, used ONLY when property_name is set AND that property's output schema is an object exposing several named parameters (e.g. a "state" property exposing "brightness", "color_rgb", "effects"). Set to "NA" when this does not apply or cannot be determined from the text.
 
 ## Alignment rules
 
-- For artifact_type and workspace_type, always use EXACT namespace:localname identifiers, case-sensitive, exactly as written in the ontology and the lists below. Never invent identifiers.
-- Choose artifact_type and workspace_type only from the types present in the lists below. property_name and parameter_name must come from the affordances listed for the matched artifact type.
+- For artifact_type and workspace_type, always use EXACT namespace:localname identifiers, case-sensitive, exactly as written in the ontology. Never invent identifiers.
+- artifact_name and property_name must come from the environment context below (artifact names and property names as listed).
 - If multiple artifacts could match, prefer the one consistent with any workspace or name mentioned in the text; if still ambiguous, leave artifact_name as "NA" but still fill artifact_type if the device class is clear.
 
 ## Environment context
 
-Workspaces and Artifacts available in this environment:
+Available workspaces, artifacts, and properties:
 
 {capabilities_hierarchical}
 
@@ -462,4 +473,67 @@ Workspaces and Artifacts available in this environment:
 ## Output
 
 Return ONLY the single JSON object for the determined category — no prose, no markdown fences, no commentary.
+"""
+
+
+ENV_CAPABILITIES_RESPONSE_PROMPT = """\
+You are a friendly assistant answering user questions about smart home capabilities.
+
+Given a structured capability request and the environment's current capabilities, generate a clear, user-friendly response.
+
+## Structured Capability Request
+
+The user's request has been parsed into:
+
+{{
+  "text_intent": string,
+  "capability_request": "actuate" | "read",
+  "actuation_request": string,    // only populated if capability_request == "actuate"
+  "property_request": string      // only populated if capability_request == "read"
+}}
+
+## Response Rules
+
+### For ACTUATE requests (capability_request == "actuate")
+
+- Examine the **ActionAffordances** in the environment capabilities.
+- **IMPORTANT**: Actions can have multiple capabilities through their parameters:
+  - A single action (e.g., "LightTurnOn") may accept different parameters (e.g., brightness, color_rgb, transition)
+  - Always check the **parameters** list to assess what modulations are possible, not just the action name
+  - Example: A light with "LightTurnOn" action accepting a "brightness" parameter CAN control brightness even if there's no separate "SetBrightness" action
+- Match based on:
+  - The affordance's **name** or **semantic_types** (look for domain types like ex:TurnOnCommand, ex:SetBrightnessCommand)
+  - The **parameter names** exposed by the action (e.g., brightness, color_rgb, mode, transition)
+- Count how many artifacts expose this affordance or capability through parameters.
+- If found: respond naturally with the count and names of artifacts (e.g., "Yes, you can control the brightness of the following lights: light308, light309, kitchen_light." or "The lights support brightness control via the brightness parameter in their turn-on commands.")
+- If not found: explain why the capability is missing, based on what IS available (e.g., "No, there are no artifacts that support dimming. The lights in this environment only support on/off control.")
+
+### For READ requests (capability_request == "read")
+
+- Examine the **PropertyAffordances** in the environment capabilities.
+- **IMPORTANT**: Properties can expose multiple data points through their output schema:
+  - A single property (e.g., "Status") may return multiple fields/parameters in its output (e.g., state, brightness, color, temperature)
+  - Always check the **parameters** list in the output schema to assess what information can be read, not just the property name
+  - Example: A sensor with "Status" property returning parameters like "temperature", "humidity", "pressure" can read all three
+- Match based on:
+  - The property's **name**
+  - The **parameter names** in the property's output schema (e.g., temperature, humidity, brightness, state, color)
+- Count how many artifacts expose this property or these data points.
+- If found: respond naturally with the count and names of artifacts (e.g., "Yes, you can read the temperature in: Lab 308, Lab 309, Bathroom." or "The sensors provide temperature readings through their Status property.")
+- If not found: explain why the capability is missing, based on what IS available (e.g., "No, there are no temperature sensors in this environment. Available sensors are: humidity, air_quality.")
+
+## Response Format
+
+- **Concise and natural**: Use simple language. Avoid raw URIs, JSON, or technical field names.
+- **No speculation**: Only report what exists in the provided capabilities. Do NOT make up devices or features.
+- **ASCII only**: No curly quotes, no em/en dashes, no special Unicode characters.
+- **Friendly tone**: End with a natural phrase if appropriate (e.g., "Would you like to control something?").
+
+## Environment Capabilities
+
+{capabilities_hierarchical}
+
+## Output
+
+Respond with ONLY the user-friendly text. No JSON wrapper, no markdown fences.
 """

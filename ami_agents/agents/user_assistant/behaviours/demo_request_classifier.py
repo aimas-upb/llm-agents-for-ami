@@ -75,8 +75,5 @@ class DemoRequestClassifierBehaviour(CyclicBehaviour):
 
         reason = "[" + ", ".join(reason_parts) + "]" if reason_parts else "[default]"
         self.logger.info(
-            demo("[HEURISTIC CLASSIFIER] Request classified as %s %s: %r"),
-            kind,
-            reason,
-            text,
+            demo(f"[HEURISTIC CLASSIFIER] Request classified as {kind} {reason}: {text!r}")
         )

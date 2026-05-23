@@ -28,7 +28,7 @@ class EnvironmentRequestHandler(CyclicBehaviour):
 
             # Check for capabilities request
             if msg_type == MessageType.ENV_CAPABILITIES_REQUEST.value:
-                self.agent.logger.info(demo("Received ENV_CAPABILITIES_REQUEST from %s"), str(msg.sender))
+                self.agent.logger.info(demo(f"Received ENV_CAPABILITIES_REQUEST from {msg.sender}"))
 
                 # Generate Response (machine-readable JSON payload + summary)
                 response_payload = format_capabilities_payload(self.agent)
@@ -50,7 +50,7 @@ class EnvironmentRequestHandler(CyclicBehaviour):
 
             # Check for state request (full snapshot or filtered)
             elif msg_type == MessageType.ENV_STATE_REQUEST.value:
-                self.agent.logger.info(demo("Received ENV_STATE_REQUEST from %s"), str(msg.sender))
+                self.agent.logger.info(demo(f"Received ENV_STATE_REQUEST from {msg.sender}"))
 
                 try:
                     payload = json.loads(msg.body or "{}")

@@ -182,20 +182,20 @@ If you touch any link in this chain, preserve the `intent_type` and
 **Always run Python via the `ami` conda env:**
 
 ```bash
-conda run -n ami python ...
-conda run -n ami pip install ...
-conda run -n ami pytest ...
+conda run -n ami-agents python ...
+conda run -n ami-agents pip install ...
+conda run -n ami-agents pytest ...
 ```
 
-If `conda` is not on PATH, the user's repo-local `ami` env exists at
-`~/miniconda3/envs/ami` — do not pip-install into the system Python.
+If `conda` is not on PATH, the user's repo-local `ami-agents` env exists at
+`~/miniconda3/envs/ami-agents` — do not pip-install into the system Python.
 
 ### 4.2 Tests
 
 ```bash
-conda run -n ami pytest tests/unit -q          # ~165 tests, ~1s
-conda run -n ami pytest tests/integration -q   # needs OPENAI_API_KEY
-conda run -n ami pytest tests/e2e -q           # needs full SPADE/HA stack
+conda run -n ami-agents pytest tests/unit -q          # ~165 tests, ~1s
+conda run -n ami-agents pytest tests/integration -q   # needs OPENAI_API_KEY
+conda run -n ami-agents pytest tests/e2e -q           # needs full SPADE/HA stack
 ```
 
 Target: **all unit tests must stay green** before opening a PR.
@@ -211,7 +211,7 @@ slixmpp). See `~/prosody-config/prosody.cfg.lua` for the dev config.
 
 Sequenced demo runs:
 ```bash
-conda run -n ami python tests/manual_test_full_flow_plan.py --sequence 3 --clear-signifiers
+conda run -n ami-agents python tests/manual_test_full_flow_plan.py --sequence 3 --clear-signifiers
 ```
 
 ### 4.4 Branching / commits
@@ -227,7 +227,7 @@ conda run -n ami python tests/manual_test_full_flow_plan.py --sequence 3 --clear
 
 ## 5. Things to never do
 
-1. **Never bypass the conda env.** `python` / `pip` outside `conda run -n ami`
+1. **Never bypass the conda env.** `python` / `pip` outside `conda run -n ami-agents`
    will install into the wrong place.
 2. **Never add SPADE behaviour logic as helper methods on the Agent class.**
    See §3.1 — hoist into `behaviours/`.

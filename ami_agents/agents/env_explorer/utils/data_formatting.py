@@ -5,8 +5,34 @@ Data formatting utilities for EnvExplorer agent.
 import json
 from typing import Any, Dict, List, Optional
 
-from rdflib import Graph, Namespace, RDF
+from rdflib import Graph, Namespace, RDF, URIRef
 from ....shared.models.environment import AffordanceType
+
+
+def _define_standard_namespaces(graph: Graph) -> dict:
+    """Bind all standard RDF namespaces to a graph and return them as a dict."""
+    ex = Namespace("http://example.org/")
+    hctl = Namespace("https://www.w3.org/2019/wot/hypermedia#")
+    hmas = Namespace("https://purl.org/hmas/")
+    http = Namespace("http://www.w3.org/2011/http#")
+    jacamo = Namespace("https://purl.org/hmas/jacamo/")
+    td = Namespace("https://www.w3.org/2019/wot/td#")
+    websub = Namespace("https://purl.org/hmas/websub/")
+    wotsec = Namespace("https://www.w3.org/2019/wot/security#")
+
+    graph.bind("ex", ex)
+    graph.bind("hctl", hctl)
+    graph.bind("hmas", hmas)
+    graph.bind("http", http)
+    graph.bind("jacamo", jacamo)
+    graph.bind("td", td)
+    graph.bind("websub", websub)
+    graph.bind("wotsec", wotsec)
+
+    return {
+        "ex": ex, "hctl": hctl, "hmas": hmas, "http": http,
+        "jacamo": jacamo, "td": td, "websub": websub, "wotsec": wotsec
+    }
 
 
 
@@ -243,7 +269,7 @@ def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:
         if not rdf_str:
             return []
         try:
-            from rdflib import Graph, RDF, RDFS, Namespace
+            from rdflib import Graph, RDF, RDFS
 
             # Ensure namespace declarations are present in the RDF before parsing
             rdf_with_prefixes = _ensure_rdf_prefixes(rdf_str)
@@ -251,19 +277,23 @@ def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:
             g = Graph()
             g.parse(data=rdf_with_prefixes, format="turtle")
 
-            # Namespaces already bound above
+            # Bind all standard namespaces
+            ns = _define_standard_namespaces(g)
+            hmas = ns["hmas"]
+            ex = ns["ex"]
 
             semantic_types_set = set()  # Use set to avoid duplicates
 
             # Find the primary artifact subject (has hmas:Artifact type)
-            # and get ALL its semantic types (ex: namespace), not affordance types
+            # and get ALL its semantic types (hmas:Artifact + ex: types)
             for subj in g.subjects(RDF.type, hmas.Artifact):
-                # Look for semantic types on this artifact subject (direct types, not nested)
+                # Always include the base hmas:Artifact type
+                semantic_types_set.add("hmas:Artifact")
+
+                # Also collect any ex: semantic types on this artifact subject
                 for type_obj in g.objects(subj, RDF.type):
-                    type_str = str(type_obj)
-                    # Only collect homeont/example.org types, not hmas or td types
-                    if "example.org/" in type_str or "example.org#" in type_str:
-                        semantic_types_set.add(_format_type_with_prefix(type_str))
+                    if type_obj in ex:  # Check if type is in the ex: namespace
+                        semantic_types_set.add(f"ex:{str(type_obj).split('/')[-1]}")
                 # Return all collected types for this artifact
                 if semantic_types_set:
                     return sorted(list(semantic_types_set))
@@ -271,28 +301,19 @@ def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:
             # If no Artifact found, try Workspace
             for subj in g.subjects(RDF.type, hmas.Workspace):
                 for type_obj in g.objects(subj, RDF.type):
-                    type_str = str(type_obj)
-                    if "example.org/" in type_str or "example.org#" in type_str:
-                        semantic_types_set.add(_format_type_with_prefix(type_str))
+                    if type_obj in ex:  # Check if type is in the ex: namespace
+                        semantic_types_set.add(f"ex:{str(type_obj).split('/')[-1]}")
                 # Return all collected types for this workspace
                 if semantic_types_set:
                     return sorted(list(semantic_types_set))
 
-            # Fallback: if no hmas types found, collect all example.org types from the first main subject
+            # Fallback: if no hmas types found, collect all example.org types from any subject
             # (handles affordance RDF which may not have hmas wrapper)
-            # Only iterate through the first non-blank subject to avoid duplication across graph copies
-            first_main_subject = None
+            from rdflib.term import BNode
             for subj in g.subjects():
-                # Skip blank nodes, prefer the first named subject
-                if not isinstance(subj, type(None)) and str(subj).startswith("http"):
-                    first_main_subject = subj
-                    break
-
-            if first_main_subject:
-                for type_obj in g.objects(first_main_subject, RDF.type):
-                    type_str = str(type_obj)
-                    if "example.org/" in type_str or "example.org#" in type_str:
-                        semantic_types_set.add(_format_type_with_prefix(type_str))
+                for type_obj in g.objects(subj, RDF.type):
+                    if type_obj in ex:  # Check if type is in the ex: namespace
+                        semantic_types_set.add(f"ex:{str(type_obj).split('/')[-1]}")
 
             if semantic_types_set:
                 return sorted(list(semantic_types_set))
@@ -305,7 +326,7 @@ def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:
         if not rdf_str:
             return ""
         try:
-            from rdflib import Graph, RDF, RDFS, Namespace
+            from rdflib import Graph, RDF, RDFS
 
             # Ensure namespace declarations are present in the RDF before parsing
             rdf_with_prefixes = _ensure_rdf_prefixes(rdf_str)
@@ -313,7 +334,9 @@ def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:
             g = Graph()
             g.parse(data=rdf_with_prefixes, format="turtle")
 
-            hmas = Namespace("https://purl.org/hmas/")
+            # Bind all standard namespaces
+            ns = _define_standard_namespaces(g)
+            hmas = ns["hmas"]
 
             # Try to find description on artifact subject
             for subj in g.subjects(RDF.type, hmas.Artifact):
@@ -341,26 +364,35 @@ def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:
         ws_description = ""
         if ws.rdf:
             try:
-                from rdflib import Graph, RDF, RDFS, Namespace
+                from rdflib import Graph, RDF, RDFS
                 g = Graph()
                 g.parse(data=ws.rdf, format="turtle")
-                hmas = Namespace("https://purl.org/hmas/")
+                ns = _define_standard_namespaces(g)
+                hmas = ns["hmas"]
+                ex = ns["ex"]
 
-                # Find workspace subject and ALL its ex: types, plus description
+                # Find workspace subject and ALL its types (hmas:Workspace + ex: types), plus description
                 for subj in g.subjects(RDF.type, hmas.Workspace):
+                    # Always include the base hmas:Workspace type
+                    ws_semantic_types.append("hmas:Workspace")
+
+                    # Also collect any ex: semantic types
                     for type_obj in g.objects(subj, RDF.type):
-                        type_str = str(type_obj)
-                        if "example.org/" in type_str or "example.org#" in type_str:
-                            if "#" in type_str:
-                                ws_semantic_types.append(f"ex:{type_str.split('#')[-1]}")
-                            else:
-                                ws_semantic_types.append(f"ex:{type_str.split('/')[-1]}")
+                        if type_obj in ex:  # Check if type is in the ex: namespace
+                            ws_semantic_types.append(f"ex:{str(type_obj).split('/')[-1]}")
                     # Extract description
                     comment = g.value(subj, RDFS.comment)
                     if comment:
                         ws_description = str(comment)
             except Exception:
                 pass
+
+        # Remove duplicate types while preserving order.
+        seen_ws_types = set()
+        ws_semantic_types = [
+            t for t in ws_semantic_types
+            if not (t in seen_ws_types or seen_ws_types.add(t))
+        ]
 
         artifacts_list = []
         for artifact_id in (ws.artifacts or []):
@@ -394,17 +426,42 @@ def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:
                     if isinstance(props, dict):
                         output_properties = list(props.keys())
 
-                # Get semantic types for affordance from RDF
+                # Get semantic types for affordance (always include base td: type)
                 aff_semantic_types = []
+
+                # Determine the base td: type based on affordance type
+                if aff.affordance_type == AffordanceType.ACTION:
+                    aff_semantic_types.append("td:ActionAffordance")
+                elif aff.affordance_type == AffordanceType.PROPERTY:
+                    aff_semantic_types.append("td:PropertyAffordance")
+
+                # Also collect any ex: semantic types from RDF
                 if aff.rdf:
-                    aff_semantic_types = extract_semantic_types_from_rdf(aff.rdf)
-                # Fallback to semantic_types if RDF extraction found nothing
-                if not aff_semantic_types and aff.semantic_types:
-                    # Normalize any full URIs to ex: prefix format
-                    aff_semantic_types = [
-                        _format_type_with_prefix(st) if ("example.org/" in st or "example.org#" in st) else st
-                        for st in aff.semantic_types
-                    ]
+                    extracted_types = extract_semantic_types_from_rdf(aff.rdf)
+                    aff_semantic_types.extend(extracted_types)
+
+                # Always check semantic_types as fallback (affordance RDF may not include ex: types)
+                if aff.semantic_types:
+                    ex = Namespace("http://example.org/")
+                    for st in aff.semantic_types:
+                        # Check if it's an ex: namespace URI
+                        try:
+                            type_uri = URIRef(st) if not isinstance(st, URIRef) else st
+                            if type_uri in ex:
+                                formatted = f"ex:{str(type_uri).split('/')[-1]}"
+                                # Only add if not already present (avoid duplicates)
+                                if formatted not in aff_semantic_types:
+                                    aff_semantic_types.append(formatted)
+                            else:
+                                if st not in aff_semantic_types:
+                                    aff_semantic_types.append(st)
+                        except:
+                            if st not in aff_semantic_types:
+                                aff_semantic_types.append(st)
+
+                # Remove duplicates while preserving order
+                seen = set()
+                aff_semantic_types = [x for x in aff_semantic_types if not (x in seen or seen.add(x))]
 
                 # Get description from RDF
                 aff_description = ""
@@ -512,6 +569,11 @@ def format_capabilities_hierarchical_text(agent_instance) -> str:
 
     lines = []
 
+    def dedupe_preserve_order(values: List[str]) -> List[str]:
+        """Remove duplicates while keeping first-seen order."""
+        seen = set()
+        return [v for v in values if not (v in seen or seen.add(v))]
+
     def format_workspace_node(ws_node: Dict[str, Any], indent: str = "") -> None:
         """Recursively format a workspace node from hierarchical JSON."""
         # Format workspace header with explicit name: and semantic_types:
@@ -519,7 +581,7 @@ def format_capabilities_hierarchical_text(agent_instance) -> str:
         lines.append(f"{indent}  name: {ws_node.get('name', '?')}")
         # Always include hmas:Workspace, plus any ex: types if they exist
         semantic_types = ws_node.get("semantic_types", [])
-        all_types = ["hmas:Workspace"] + semantic_types if semantic_types else ["hmas:Workspace"]
+        all_types = dedupe_preserve_order(["hmas:Workspace", *semantic_types])
         lines.append(f"{indent}  semantic_types: {', '.join(all_types)}")
         description = ws_node.get("description", "")
         if description:
@@ -531,7 +593,7 @@ def format_capabilities_hierarchical_text(agent_instance) -> str:
             lines.append(f"{indent}    name: {artifact_node.get('name', '?')}")
             # Always include hmas:Artifact, plus any ex: types if they exist
             artifact_types = artifact_node.get("semantic_types", [])
-            artifact_all_types = ["hmas:Artifact"] + artifact_types if artifact_types else ["hmas:Artifact"]
+            artifact_all_types = dedupe_preserve_order(["hmas:Artifact", *artifact_types])
             lines.append(f"{indent}    semantic_types: {', '.join(artifact_all_types)}")
             artifact_desc = artifact_node.get("description", "")
             if artifact_desc:
@@ -587,6 +649,7 @@ def format_capabilities_detailed_rdf(agent_instance) -> str:
 
     # Canonical prefix block
     prefix_block = """\
+@prefix ex: <http://example.org/> .
 @prefix hmas: <https://purl.org/hmas/> .
 @prefix td: <https://www.w3.org/2019/wot/td#> .
 @prefix hctl: <https://www.w3.org/2019/wot/hypermedia#> .
@@ -595,11 +658,30 @@ def format_capabilities_detailed_rdf(agent_instance) -> str:
 @prefix homeont: <https://example.org/homeont#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix jacamo: <https://purl.org/hmas/jacamo/> .
+@prefix wotsec: <https://www.w3.org/2019/wot/security#> .
+@prefix websub: <https://purl.org/hmas/websub/> .
 
 """
 
     # Create a merged graph
     merged_graph = Graph()
+
+    # Bind canonical namespaces to the merged graph BEFORE adding triples
+    # This ensures rdflib uses these prefixes during serialization instead of generating ns1, ns2, etc.
+    from rdflib import Namespace
+    merged_graph.bind("hmas", Namespace("https://purl.org/hmas/"))
+    merged_graph.bind("td", Namespace("https://www.w3.org/2019/wot/td#"))
+    merged_graph.bind("hctl", Namespace("https://www.w3.org/2019/wot/hypermedia#"))
+    merged_graph.bind("jsonschema", Namespace("https://www.w3.org/2019/wot/json-schema#"))
+    merged_graph.bind("http", Namespace("http://www.w3.org/2011/http#"))
+    merged_graph.bind("homeont", Namespace("https://example.org/homeont#"))
+    merged_graph.bind("rdfs", Namespace("http://www.w3.org/2000/01/rdf-schema#"))
+    merged_graph.bind("rdf", Namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
+    merged_graph.bind("ex", Namespace("http://example.org/"))
+    merged_graph.bind("jacamo", Namespace("https://purl.org/hmas/jacamo/"))
+    merged_graph.bind("wotsec", Namespace("https://www.w3.org/2019/wot/security#"))
+    merged_graph.bind("websub", Namespace("https://purl.org/hmas/websub/"))
 
     # Add all workspace RDF
     for ws in (agent_instance.environment_map or {}).values():

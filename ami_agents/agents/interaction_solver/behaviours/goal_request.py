@@ -40,10 +40,7 @@ class GoalRequestBehaviour(CyclicBehaviour):
 
         intent_strings = [i.to_query_string() for i in intent_objects]
         self.logger.info(
-            demo("Received GOAL_REQUEST: intents=%s workspace_id=%r from=%s"),
-            intent_strings,
-            workspace_id,
-            str(msg.sender),
+            demo(f"Received GOAL_REQUEST: intents={intent_strings} workspace_id={workspace_id!r} from={msg.sender}")
         )
 
         ready = await self.agent.await_environment_ready(
@@ -130,12 +127,17 @@ class GoalRequestBehaviour(CyclicBehaviour):
         if not isinstance(envelope, dict):
             self.logger.info(demo("Plan created (non-dict body)."))
             return
+
+        # Handle both single-tree format (top-level "tree") and multi-plan format (plans list)
         tree = envelope.get("tree")
         has_tree = tree is not None and isinstance(tree, dict) and bool(tree)
+
+        # Check for multi-plan format
+        plans = envelope.get("plans")
+        if isinstance(plans, list) and not has_tree:
+            # Multi-plan format - check if any plan has a tree
+            has_tree = any(p.get("tree") for p in plans if isinstance(p, dict))
+
         self.logger.info(
-            demo("Plan created: has_tree=%s signifier_reuse=%s impossible=%s error=%s"),
-            has_tree,
-            envelope.get("signifier_reuse", False),
-            envelope.get("impossible", False),
-            envelope.get("error"),
+            demo(f"Plan created: has_tree={has_tree} signifier_reuse={envelope.get('signifier_reuse', False)} impossible={envelope.get('impossible', False)} error={envelope.get('error')}")
         )

@@ -203,12 +203,7 @@ class SignifierMatchBehaviour(CyclicBehaviour):
                 min_similarity = self.agent._experience_engine_default_min_similarity
 
             self.agent.logger.info(
-                demo("[INTENT_TYPE] Signifier match: intent=%r matcher=%s min_similarity=%s k=%s intent_type=%r"),
-                intent,
-                version_to_use,
-                min_similarity,
-                k,
-                intent_type,
+                demo(f"[INTENT_TYPE] Signifier match: intent={intent!r} matcher={version_to_use} min_similarity={min_similarity} k={k} intent_type={intent_type!r}")
             )
             self.agent.logger.debug(f"Using matcher version: {version_to_use}")
 
@@ -260,9 +255,7 @@ class SignifierMatchBehaviour(CyclicBehaviour):
 
                 except Exception as e:
                     self.agent.logger.error(
-                        demo("!!! MATCHER FAILED: %s - %s"),
-                        type(e).__name__,
-                        str(e),
+                        demo(f"!!! MATCHER FAILED: {type(e).__name__} - {e}"),
                         exc_info=True,
                     )
                     return {"ok": False, "error": "matcher_failed", "detail": str(e), "exact_matches": [], "affordance_hints": [], "total_signifiers": len(signifier_dicts)}

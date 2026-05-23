@@ -211,12 +211,9 @@ class UserAssistantAgent(Agent, IAgent):
         temp_display = "default" if self.llm_model.startswith("o") else self.llm_temperature
         self.logger.info(
             demo(
-                "UserAssistant booting (model=%s, base_url=%s, temperature=%s, reasoning_effort=%s)"
-            ),
-            self.llm_model,
-            self.llm_base_url,
-            temp_display,
-            self.llm_reasoning_effort or "default",
+                f"UserAssistant booting (model={self.llm_model}, base_url={self.llm_base_url}, "
+                f"temperature={temp_display}, reasoning_effort={self.llm_reasoning_effort or 'default'})"
+            )
         )
 
         # Register behaviours with template routing

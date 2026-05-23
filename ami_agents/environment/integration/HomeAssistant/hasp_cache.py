@@ -66,7 +66,12 @@ def _entity_display_name(entity: Optional[Dict[str, Any]], devices_by_id: Dict[s
     for key in ("name", "original_name"):
         val = entity.get(key)
         if isinstance(val, str) and val.strip():
-            return val.strip()
+            name = val.strip()
+            # Clean up duplicates like "lights_308.lights_308" -> "lights_308"
+            parts = name.split(".")
+            if len(parts) == 2 and parts[0] == parts[1]:
+                return parts[0]
+            return name
     object_id = ""
     ent_id = entity.get("entity_id", "")
     if isinstance(ent_id, str) and "." in ent_id:
@@ -74,6 +79,9 @@ def _entity_display_name(entity: Optional[Dict[str, Any]], devices_by_id: Dict[s
     device = devices_by_id.get(entity.get("device_id"))
     device_name = (device or {}).get("name") if isinstance(device, dict) else None
     if device_name and object_id:
+        # Don't duplicate if device_name already equals object_id
+        if device_name == object_id:
+            return device_name
         return f"{device_name}.{object_id}"
     if device_name:
         return device_name

@@ -67,9 +67,7 @@ class EnvContextQueryBehaviour(OneShotBehaviour):
             artifacts_count = 0
 
         self.logger.info(
-            demo("Context snapshot: affordances=%s artifacts_in_state=%s"),
-            len(affordances),
-            artifacts_count,
+            demo(f"Context snapshot: affordances={len(affordances)} artifacts_in_state={artifacts_count}")
         )
 
         if self.workspace_id:

@@ -35,15 +35,25 @@ def build_llm_client(config: Dict[str, Any]) -> LLMClientConfig:
     provider_cfg = (llm_root.get("providers", {}) or {}).get(provider_name, {}) or {}
     planning_llm = (config.get("planning", {}) or {}).get("llm_planning", {}) or {}
 
-    model = str(planning_llm.get("model") or provider_cfg.get("model") or "gpt-4")
-    temperature = float(planning_llm.get("temperature", provider_cfg.get("temperature", 0.7)))
+    # Debug: log what we're resolving
+    import logging
+    from ami_agents.shared.utils.demo_log import demo
+    logger = logging.getLogger(__name__)
+    logger.info(demo(f"[LLM_CLIENT] planning_llm={planning_llm}"))
+    logger.info(demo(f"[LLM_CLIENT] planning_llm.get('model')={planning_llm.get('model')}"))
+    logger.info(demo(f"[LLM_CLIENT] provider_cfg={provider_cfg}"))
+    logger.info(demo(f"[LLM_CLIENT] llm_root.get('default_model')={llm_root.get('default_model')}"))
+
+    model = str(planning_llm.get("model") or provider_cfg.get("model") or llm_root.get("default_model") or "gpt-4o-mini")
+    logger.info(demo(f"[LLM_CLIENT] Final model resolved to: {model}"))
+    temperature = float(planning_llm.get("temperature", provider_cfg.get("temperature", llm_root.get("default_temperature", 0.0))))
 
     max_tokens_cfg = planning_llm.get("max_tokens", provider_cfg.get("max_tokens"))
     max_completion_tokens_cfg = planning_llm.get(
         "max_completion_tokens", provider_cfg.get("max_completion_tokens")
     )
 
-    is_reasoning = model.startswith("o")
+    is_reasoning = model.startswith("o") or model.startswith("gpt-5")
     max_tokens: Optional[int] = None
     max_completion_tokens: Optional[int] = None
     if is_reasoning:

@@ -11,7 +11,6 @@ signifier recording) is deterministic.
 
 import asyncio
 import json
-import logging
 from typing import Any, Dict, Optional
 
 from spade.behaviour import CyclicBehaviour
@@ -35,6 +34,7 @@ from ..models import (
 from ..prompts import (
     ATOMIC_SEGMENTATION_SYSTEM_PROMPT,
     ENV_CAPABILITIES_REQUEST_PARSER_PROMPT,
+    ENV_CAPABILITIES_RESPONSE_PROMPT,
     ENV_STATE_REQUEST_PARSER_PROMPT,
     GOAL_REQUEST_PARSER_PROMPT,
     PLAN_SUMMARY_SYSTEM_PROMPT,
@@ -52,12 +52,180 @@ from ..utils import (
     bt_preview,
     loose_json_loads,
 )
+from ..utils.llm_client import build_behaviour_llm_client, build_llm_call_kwargs
 from ....shared.utils.logger import LoggerFactory
+
+logger = LoggerFactory.get_logger("UserAssistant")
 
 
 # ============================================================================
 # Context builder helpers for per-span LLM prompt template variables
 # ============================================================================
+
+
+def _filter_capabilities_json(caps_dict: dict) -> dict:
+    """Filter capabilities JSON to reduce size for ENV_CAPABILITIES_RESPONSE_PROMPT.
+
+    Rules:
+    1. Omit 'description' if empty
+    2. Omit 'form' from action/property affordances
+    3. Exclude action affordances without ex: semantic types
+    4. Omit output_schema from property affordances
+    5. Omit input_schema from action affordances
+    6. Omit parameters if empty
+
+    Args:
+        caps_dict: Hierarchical capabilities dict from EnvExplorer
+
+    Returns:
+        Filtered dict with reduced size
+    """
+    filtered = {}
+
+    # Copy top-level fields
+    for key in ("discovery_complete",):
+        if key in caps_dict:
+            filtered[key] = caps_dict[key]
+
+    # Filter workspaces
+    filtered["workspaces"] = []
+    for ws in (caps_dict.get("workspaces") or []):
+        filtered_ws = {
+            k: v for k, v in ws.items()
+            if k not in ("form",) and not (k == "description" and not v)
+        }
+
+        # Filter artifacts
+        filtered_ws["artifacts"] = []
+        for artifact in (ws.get("artifacts") or []):
+            filtered_artifact = {
+                k: v for k, v in artifact.items()
+                if k not in ("form",) and not (k == "description" and not v)
+            }
+
+            # Filter affordances
+            filtered_artifact["affordances"] = []
+            for aff in (artifact.get("affordances") or []):
+                aff_type = aff.get("type", "")
+
+                # Rule 3: For action affordances, keep ONLY those with ex: namespace semantic types
+                if aff_type == "action_affordance":
+                    semantic_types = aff.get("semantic_types", [])
+                    # Keep only ex: types (user-facing Home Assistant actions)
+                    ex_types = [st for st in semantic_types if st.startswith("ex:")]
+                    logger.debug(
+                        f"Action affordance {aff.get('name')}: semantic_types={semantic_types}, ex_types={ex_types}"
+                    )
+                    if not ex_types:
+                        logger.debug(
+                            f"Filtering out action affordance {aff.get('name')} (no ex: semantic types)"
+                        )
+                        continue
+
+                # Build filtered affordance
+                filtered_aff = {}
+
+                # Copy all fields except form, schemas, parameters, and empty descriptions
+                for key, val in aff.items():
+                    if key == "form":
+                        continue  # Rule 2
+                    elif key == "output_schema" and aff_type == "property_affordance":
+                        continue  # Rule 4
+                    elif key == "input_schema" and aff_type == "action_affordance":
+                        continue  # Rule 5
+                    elif key == "parameters":
+                        # Rule 6: Omit if empty
+                        if val and len(val) > 0:
+                            filtered_aff[key] = val
+                    elif key == "description" and not val:
+                        # Rule 1: Omit if empty
+                        continue
+                    else:
+                        filtered_aff[key] = val
+
+                filtered_artifact["affordances"].append(filtered_aff)
+
+            filtered_ws["artifacts"].append(filtered_artifact)
+
+        filtered["workspaces"].append(filtered_ws)
+
+    return filtered
+
+
+def _filter_capabilities_json_for_state(caps_dict: dict) -> dict:
+    """Filter capabilities JSON for ENV_STATE_REQUEST parsing.
+
+    Rules:
+    1. Include ONLY property affordances (exclude all actions)
+    2. Omit 'form', 'output_schema'
+    3. Include 'description' only if non-empty
+    4. Omit 'parameters' if empty
+
+    Purpose: Minimal property list for state-query parser to align property names to artifact/property URIs.
+
+    Args:
+        caps_dict: Hierarchical capabilities dict from EnvExplorer
+
+    Returns:
+        Filtered dict containing only properties (no actions, no schemas/forms)
+    """
+    filtered = {}
+
+    # Copy top-level fields
+    for key in ("discovery_complete",):
+        if key in caps_dict:
+            filtered[key] = caps_dict[key]
+
+    # Filter workspaces
+    filtered["workspaces"] = []
+    for ws in (caps_dict.get("workspaces") or []):
+        filtered_ws = {
+            k: v for k, v in ws.items()
+            if k != "form" and not (k == "description" and not v)
+        }
+
+        # Filter artifacts
+        filtered_ws["artifacts"] = []
+        for artifact in (ws.get("artifacts") or []):
+            filtered_artifact = {
+                k: v for k, v in artifact.items()
+                if k != "form" and not (k == "description" and not v)
+            }
+
+            # Filter affordances: ONLY property affordances (no actions)
+            filtered_artifact["affordances"] = []
+            for aff in (artifact.get("affordances") or []):
+                aff_type = aff.get("type", "")
+
+                # Skip action affordances entirely
+                if aff_type != "property_affordance":
+                    continue
+
+                # Build filtered property affordance
+                filtered_aff = {}
+
+                # Copy fields except: form, output_schema, and empty description
+                for key, val in aff.items():
+                    if key == "form":
+                        continue  # Omit form
+                    elif key == "output_schema":
+                        continue  # Omit output schema
+                    elif key == "description" and not val:
+                        continue  # Omit empty description
+                    elif key == "parameters":
+                        # Only include if non-empty
+                        if val and len(val) > 0:
+                            filtered_aff[key] = val
+                    else:
+                        filtered_aff[key] = val
+
+                filtered_artifact["affordances"].append(filtered_aff)
+
+            filtered_ws["artifacts"].append(filtered_artifact)
+
+        filtered["workspaces"].append(filtered_ws)
+
+    return filtered
 
 
 
@@ -92,7 +260,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         if not msg:
             return
 
-        self.logger.debug(demo("[UserMessageBehaviour.run] Received message: %s"), msg.body[:100] if msg.body else "(empty)")
+        self.logger.debug(demo(f"[UserMessageBehaviour.run] Received message: {msg.body[:100] if msg.body else '(empty)'}"))
 
         thread = str(getattr(msg, "thread", None) or "__default__")
         text = (msg.body or "").strip()
@@ -128,36 +296,43 @@ class UserMessageBehaviour(CyclicBehaviour):
         intent_summary = {}
         for ai in atomic_intents:
             intent_summary[ai.category] = intent_summary.get(ai.category, 0) + 1
-        self.logger.info(demo("[SEGMENTATION] %d atomic intent(s): %s"), len(atomic_intents), intent_summary)
+        self.logger.info(demo(f"[SEGMENTATION] {len(atomic_intents)} atomic intent(s): {intent_summary}"))
         for ai in atomic_intents:
-            self.logger.info(demo("[SEGMENTATION] - %s: span=%r reason=%s"), ai.category, ai.span, ai.reason)
+            self.logger.info(demo(f"[SEGMENTATION] - {ai.category}: span={ai.span!r} reason={ai.reason}"))
 
         # Group intents by category
         caps_intents = [a for a in atomic_intents if a.category == "ENV_CAPABILITIES_REQUEST"]
         state_intents = [a for a in atomic_intents if a.category == "ENV_STATE_REQUEST"]
         goal_intents = [a for a in atomic_intents if a.category == "GOAL_REQUEST"]
 
-        # Fetch hierarchical capabilities text for all intent parsing phases
-        # Build this from the summary capabilities JSON to get workspace/artifact/affordance hierarchy
+        # Fetch hierarchical capabilities text and JSON for intent parsing phases
         capabilities_hierarchical = ""
+        capabilities_hierarchical_state = ""
         if caps_intents or state_intents or goal_intents:
+            # Build hierarchical text for ENV_CAPABILITIES_REQUEST and GOAL_REQUEST
             capabilities_hierarchical = self._build_capabilities_hierarchical_text(caps_summary)
+
+            # Build filtered JSON for ENV_STATE_REQUEST (properties only)
+            if state_intents:
+                filtered_state_caps = _filter_capabilities_json_for_state(caps_summary)
+                capabilities_hierarchical_state = json.dumps(filtered_state_caps, indent=2)
+
             import os
             if os.getenv("VERBOSE_LOGGING"):
-                self.logger.info(demo("=== HIERARCHICAL CAPABILITIES CONTEXT ===\n%s"), capabilities_hierarchical)
+                self.logger.info(demo(f"=== HIERARCHICAL CAPABILITIES CONTEXT ===\n{capabilities_hierarchical}"))
 
         # Phase 1: ENV_CAPABILITIES_REQUEST (if any)
         if caps_intents:
             conv.phase = ConversationPhase.EXTRACTING_INTENTS
             for intent in caps_intents:
                 extraction = await self._parse_atomic_intent(intent.span, intent.category, capabilities_hierarchical)
-                await self._handle_query_capabilities(msg, thread, conv, capabilities_ctx)
+                await self._handle_query_capabilities(msg, thread, conv, capabilities_ctx, extraction)
 
         # Phase 2: ENV_STATE_REQUEST (if any)
         if state_intents:
             conv.phase = ConversationPhase.EXTRACTING_INTENTS
             for intent in state_intents:
-                extraction = await self._parse_atomic_intent(intent.span, intent.category, capabilities_hierarchical)
+                extraction = await self._parse_atomic_intent(intent.span, intent.category, capabilities_hierarchical_state)
                 await self._handle_query_state(msg, thread, conv, extraction)
 
         # Phase 3: GOAL_REQUEST (if any) — batch all goal intents into a single request
@@ -191,7 +366,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         self, user_text: str, capabilities_ctx: str = ""
     ) -> list[AtomicIntent]:
         """Call LLM to segment user message into atomic intents with categories."""
-        self.logger.info(demo("[LLM CALL] Calling ATOMIC_SEGMENTATION_SYSTEM_PROMPT for: %r"), user_text[:100])
+        self.logger.info(demo(f"[LLM CALL] Calling ATOMIC_SEGMENTATION_SYSTEM_PROMPT for: {user_text[:100]!r}"))
         prompt = ATOMIC_SEGMENTATION_SYSTEM_PROMPT.format(capabilities=capabilities_ctx)
         messages = [
             {"role": "system", "content": prompt},
@@ -320,7 +495,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         Returns:
             Dict with parsed structured intent fields (LLM output), or fallback dict on error
         """
-        self.logger.info(demo("[LLM CALL] Parsing %s: %r"), category, span[:80])
+        self.logger.info(demo(f"[LLM CALL] Parsing {category}: {span[:80]!r}"))
 
         # Choose prompt and template variables by category
         ontology = self.agent.ontology_ttl
@@ -412,6 +587,28 @@ class UserMessageBehaviour(CyclicBehaviour):
             self.logger.error("LLM query formatting failed: %s", exc)
             return raw_data
 
+    async def _format_capabilities_response(self, capabilities_ctx: str, extraction: dict) -> str:
+        """Call LLM to format capabilities response based on structured extraction."""
+        prompt = ENV_CAPABILITIES_RESPONSE_PROMPT.format(capabilities_hierarchical=capabilities_ctx)
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": json.dumps(extraction)},
+        ]
+        try:
+            # Build LLM client with capabilities_analysis config
+            llm_cfg = build_behaviour_llm_client(self.agent.config, "capabilities_analysis")
+            kwargs = build_llm_call_kwargs(llm_cfg)
+
+            response = await llm_cfg.client.chat.completions.create(
+                model=llm_cfg.model,
+                messages=messages,
+                **kwargs,
+            )
+            return (response.choices[0].message.content or "").strip() or "Unable to process capabilities query."
+        except Exception as exc:
+            self.logger.error("LLM capabilities formatting failed: %s", exc)
+            return "Unable to process capabilities query."
+
     # ------------------------------------------------------------------
     # DETERMINISTIC: handle goal → request plan → summarize
     # ------------------------------------------------------------------
@@ -436,9 +633,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         for i, intent in enumerate(parsed_intents):
             import json
             self.logger.info(
-                demo("Parsed goal intent #%d: %s"),
-                i + 1,
-                json.dumps(intent.to_wire_dict(), indent=2),
+                demo(f"Parsed goal intent #{i + 1}: {json.dumps(intent.to_wire_dict(), indent=2)}")
             )
 
         solver_jid = self.agent.target_jids.get("solver")
@@ -463,9 +658,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         ]
 
         self.logger.info(
-            demo("UA -> InteractionSolver GOAL_REQUEST: %d intents, categories: %s"),
-            len(parsed_intents),
-            intent_categories,
+            demo(f"UA -> InteractionSolver GOAL_REQUEST: {len(parsed_intents)} intents, categories: {intent_categories}")
         )
         try:
             result = await rpc_call(
@@ -523,8 +716,7 @@ class UserMessageBehaviour(CyclicBehaviour):
 
             total_nodes = sum(count_bt_nodes(p.get("tree", {})) for p in plans_list)
             self.logger.info(
-                demo("Multi-plan stored: hash=%s plans=%d total_nodes=%d"),
-                plan_hash, len(plans_list), total_nodes
+                demo(f"Multi-plan stored: hash={plan_hash} plans={len(plans_list)} total_nodes={total_nodes}")
             )
 
         # Handle single-plan response (legacy format with "tree" at top level)
@@ -543,7 +735,7 @@ class UserMessageBehaviour(CyclicBehaviour):
 
             node_count = count_bt_nodes(tree)
             preview = bt_preview(tree)
-            self.logger.info(demo("Plan stored: hash=%s nodes=%d preview=%s"), plan_hash, node_count, preview)
+            self.logger.info(demo(f"Plan stored: hash={plan_hash} nodes={node_count} preview={preview}"))
 
         conv.phase = ConversationPhase.SUMMARIZING_PLAN
         summary = await self._summarize_plan(plan_body if isinstance(plan_body, str) else json.dumps(plan_obj))
@@ -563,7 +755,7 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         if low in CONFIRM_TOKENS:
             conv.phase = ConversationPhase.EXECUTING
-            self.logger.info(demo("User confirmed plan: thread=%s"), thread)
+            self.logger.info(demo(f"User confirmed plan: thread={thread}"))
             exec_result = await self._execute_plan(thread, conv)
 
             if exec_result.success:
@@ -576,13 +768,13 @@ class UserMessageBehaviour(CyclicBehaviour):
             conv.phase = ConversationPhase.IDLE
 
         elif low in REJECT_TOKENS:
-            self.logger.info(demo("User rejected plan: thread=%s"), thread)
+            self.logger.info(demo(f"User rejected plan: thread={thread}"))
             conv.clear_plan()
             conv.phase = ConversationPhase.IDLE
             await self._reply(msg, "Okay, I've discarded that plan. What would you like to change?")
 
         else:
-            self.logger.info(demo("New request while awaiting confirmation, discarding plan: thread=%s"), thread)
+            self.logger.info(demo(f"New request while awaiting confirmation, discarding plan: thread={thread}"))
             conv.clear_plan()
             conv.phase = ConversationPhase.IDLE
 
@@ -614,7 +806,7 @@ class UserMessageBehaviour(CyclicBehaviour):
                 conv.phase = ConversationPhase.EXTRACTING_INTENTS
                 for intent in caps_intents:
                     extraction = await self._parse_atomic_intent(intent.span, intent.category, capabilities_hierarchical)
-                    await self._handle_query_capabilities(msg, thread, conv, capabilities_ctx)
+                    await self._handle_query_capabilities(msg, thread, conv, capabilities_ctx, extraction)
 
             # Phase 2: ENV_STATE_REQUEST (if any)
             if state_intents:
@@ -675,7 +867,7 @@ class UserMessageBehaviour(CyclicBehaviour):
                 explanation = plan_entry.get("explanation", "")
 
                 if not tree_spec or not isinstance(tree_spec, dict):
-                    self.logger.warning(demo("Plan %d has no tree"), i)
+                    self.logger.warning(demo(f"Plan {i} has no tree"))
                     continue
 
                 node_count = count_bt_nodes(tree_spec)
@@ -685,8 +877,7 @@ class UserMessageBehaviour(CyclicBehaviour):
                     else str(intent_data)
                 )
                 self.logger.info(
-                    demo("Executing plan %d/%d: intent=%r nodes=%d"),
-                    i + 1, len(plans_list), intent_text, node_count
+                    demo(f"Executing plan {i + 1}/{len(plans_list)}: intent={intent_text!r} nodes={node_count}")
                 )
 
                 # Schedule execution as async task
@@ -700,20 +891,19 @@ class UserMessageBehaviour(CyclicBehaviour):
                     exec_result = await task
                     results.append((i, intent_data, exec_result))
                     self.logger.info(
-                        demo("Plan %d execution complete: success=%s ticks=%d status=%s"),
-                        i + 1, exec_result.success, exec_result.ticks, exec_result.final_status
+                        demo(f"Plan {i + 1} execution complete: success={exec_result.success} ticks={exec_result.ticks} status={exec_result.final_status}")
                     )
                 except Exception as exc:
-                    self.logger.warning(demo("Plan %d execution failed: %s"), i + 1, exc)
+                    self.logger.warning(demo(f"Plan {i + 1} execution failed: {exc}"))
                     results.append((i, intent_data, ExecutionResult(success=False, error=str(exc))))
 
             self.agent.state_memory.clear()
-            self.logger.info(demo("State memory cache cleared after multi-plan execution"))
+            self.logger.info(demo(f"State memory cache cleared after multi-plan execution"))
 
             # Check overall success: all plans must succeed
             all_success = all(r[2].success for r in results)
 
-            # Record signifiers for implicit goals from successful plans
+            # Record signifiers for successful plans
             workspace_id = plan_obj.get("workspace_id")
             for i, intent_data, exec_result in results:
                 if exec_result.success:
@@ -724,11 +914,17 @@ class UserMessageBehaviour(CyclicBehaviour):
                     else:
                         intent_obj = Intent(intent_text=intent_data.get("text_intent", str(intent_data)))
 
-                    # Only record for implicit intents
+                    # Record signifiers for both implicit and explicit intents
                     if isinstance(intent_obj, ImplicitGoalIntent):
                         await self._record_signifiers(
                             tree_spec, [intent_obj], exec_result, thread,
                             intent_type="IMPLICIT", workspace_id=workspace_id
+                        )
+                    elif isinstance(intent_obj, ExplicitGoalIntent):
+                        # EXPLICIT intents produce signifiers but without context
+                        await self._record_signifiers(
+                            tree_spec, [intent_obj], exec_result, thread,
+                            intent_type="EXPLICIT", workspace_id=workspace_id
                         )
 
             return ExecutionResult(
@@ -763,7 +959,7 @@ class UserMessageBehaviour(CyclicBehaviour):
             await self.agent.ensure_execution_engine_ready()
 
             node_count = count_bt_nodes(tree_spec)
-            self.logger.info(demo("Executing BT: thread=%s nodes=%d signifier_reuse=%s intent_type=%s"), thread, node_count, is_signifier_reuse, intent_type)
+            self.logger.info(demo(f"Executing BT: thread={thread} nodes={node_count} signifier_reuse={is_signifier_reuse} intent_type={intent_type}"))
 
             executor = IRExecutor(max_ticks=self.agent.bt_max_ticks)
             loop = asyncio.get_event_loop()
@@ -774,20 +970,23 @@ class UserMessageBehaviour(CyclicBehaviour):
                     tree_spec,
                 )
             except Exception as exc:
-                self.logger.warning(demo("BT execution failed: %s"), exc)
+                self.logger.warning(demo(f"BT execution failed: {exc}"))
                 return ExecutionResult(success=False, error=str(exc))
 
             self.logger.info(
-                demo("BT execution complete: success=%s ticks=%d status=%s"),
-                exec_result.success, exec_result.ticks, exec_result.final_status,
+                demo(f"BT execution complete: success={exec_result.success} ticks={exec_result.ticks} status={exec_result.final_status}")
             )
 
             self.agent.state_memory.clear()
-            self.logger.info(demo("State memory cache cleared after BT execution"))
+            self.logger.info(demo(f"State memory cache cleared after BT execution"))
 
-            # Only record signifiers for implicit goal intents (explicit goals don't produce experiences)
-            if exec_result.success and not is_signifier_reuse and str(intent_type).upper() == "IMPLICIT":
-                await self._record_signifiers(tree_spec, intents, exec_result, thread, "IMPLICIT", workspace_id)
+            # Record signifiers for implicit and explicit goal intents (but not for signifier reuse)
+            if exec_result.success and not is_signifier_reuse:
+                intent_type_upper = str(intent_type).upper() if intent_type else ""
+                if intent_type_upper in ("IMPLICIT", "EXPLICIT"):
+                    await self._record_signifiers(
+                        tree_spec, intents, exec_result, thread, intent_type_upper, workspace_id
+                    )
 
             return exec_result
 
@@ -806,7 +1005,8 @@ class UserMessageBehaviour(CyclicBehaviour):
     ) -> None:
         """Extract and record signifiers from an executed BT.
 
-        Only called for implicit goals (where the system inferred the device from context).
+        For IMPLICIT intents: includes state context for SHACL validation.
+        For EXPLICIT intents: excludes state context (user specified exact target).
         """
         intent_strings = [i.to_query_string() for i in intents]
         structured_intents = [
@@ -818,42 +1018,48 @@ class UserMessageBehaviour(CyclicBehaviour):
 
         state_snapshot: Optional[dict] = None
         explorer_jid = self.agent.target_jids.get("explorer")
-        if explorer_jid and workspace_id:
-            try:
-                self.logger.info(demo("Querying environment state for signifier context (workspace_id=%r)"), workspace_id)
 
-                state_response = await rpc_call(
-                    self.agent,
-                    to_jid=str(explorer_jid),
-                    request_type=MessageType.ENV_STATE_REQUEST.value,
-                    body={},
-                    expect_type=MessageType.ENV_STATE_RESPONSE.value,
-                    timeout=self.agent.signifier_match_timeout,
-                )
+        # Only fetch state context for IMPLICIT intents
+        if intent_type and "IMPLICIT" in str(intent_type).upper():
+            if explorer_jid and workspace_id:
+                try:
+                    self.logger.info(demo(f"Querying environment state for signifier context (workspace_id={workspace_id!r})"))
 
-                if state_response and state_response.body:
-                    raw_state = json.loads(state_response.body) if isinstance(state_response.body, str) else state_response.body
+                    state_response = await rpc_call(
+                        self.agent,
+                        to_jid=str(explorer_jid),
+                        request_type=MessageType.ENV_STATE_REQUEST.value,
+                        body={},
+                        expect_type=MessageType.ENV_STATE_RESPONSE.value,
+                        timeout=self.agent.signifier_match_timeout,
+                    )
 
-                    if isinstance(raw_state, dict):
-                        if "artifacts" in raw_state and isinstance(raw_state["artifacts"], dict):
-                            artifacts_dict = raw_state["artifacts"]
-                        else:
-                            artifacts_dict = raw_state
+                    if state_response and state_response.body:
+                        raw_state = json.loads(state_response.body) if isinstance(state_response.body, str) else state_response.body
 
-                        filtered_artifacts = {}
-                        for artifact_id, artifact_info in artifacts_dict.items():
-                            if isinstance(artifact_info, dict):
-                                artifact_ws = artifact_info.get("workspace_id")
-                                if artifact_ws and (str(artifact_ws) == str(workspace_id) or workspace_id in str(artifact_ws)):
-                                    filtered_artifacts[artifact_id] = artifact_info
+                        if isinstance(raw_state, dict):
+                            if "artifacts" in raw_state and isinstance(raw_state["artifacts"], dict):
+                                artifacts_dict = raw_state["artifacts"]
+                            else:
+                                artifacts_dict = raw_state
 
-                        state_snapshot = {"artifacts": filtered_artifacts}
-                        self.logger.info(
-                            demo("State snapshot retrieved: %d artifacts for workspace_id=%r"),
-                            len(filtered_artifacts), workspace_id
-                        )
-            except Exception as e:
-                self.logger.warning(demo("Failed to query state snapshot: %s (continuing without state)"), e)
+                            filtered_artifacts = {}
+                            for artifact_id, artifact_info in artifacts_dict.items():
+                                if isinstance(artifact_info, dict):
+                                    artifact_ws = artifact_info.get("workspace_id")
+                                    if artifact_ws and (str(artifact_ws) == str(workspace_id) or workspace_id in str(artifact_ws)):
+                                        filtered_artifacts[artifact_id] = artifact_info
+
+                            state_snapshot = {"artifacts": filtered_artifacts}
+                            self.logger.info(
+                                demo(f"State snapshot retrieved: {len(filtered_artifacts)} artifacts for workspace_id={workspace_id!r}")
+                            )
+                except Exception as e:
+                    self.logger.warning(demo(f"Failed to query state snapshot: {e} (continuing without state)"))
+        else:
+            # EXPLICIT intents don't include state context
+            if intent_type and "EXPLICIT" in str(intent_type).upper():
+                self.logger.info(demo(f"Skipping state context for EXPLICIT intent (user specified exact target)"))
 
         signifiers = extract_signifiers_from_bt(
             tree_spec=tree_spec,
@@ -865,10 +1071,10 @@ class UserMessageBehaviour(CyclicBehaviour):
             structured_intents=structured_intents,
         )
         if not signifiers:
-            self.logger.info(demo("No signifiers extracted from BT"))
+            self.logger.info(demo(f"No signifiers extracted from BT"))
             return
 
-        self.logger.info(demo("Recording %d signifiers from BT execution (intent_type=%s)"), len(signifiers), intent_type)
+        self.logger.info(demo(f"Recording {len(signifiers)} signifiers from BT execution (intent_type={intent_type})"))
 
         # 1. Record locally via EnvExplorer
         if explorer_jid:
@@ -894,9 +1100,9 @@ class UserMessageBehaviour(CyclicBehaviour):
                         created_count = rec_payload.get("created_count")
                 except Exception:
                     pass
-                self.logger.info(demo("Local signifier recording: created_count=%s"), created_count or "?")
+                self.logger.info(demo(f"Local signifier recording: created_count={created_count or '?'}"))
             except Exception as exc:
-                self.logger.info(demo("Failed to record signifiers locally: %s"), exc)
+                self.logger.info(demo(f"Failed to record signifiers locally: {exc}"))
 
         # 2. Publish to community
         community_client = self.agent.community_client
@@ -909,16 +1115,16 @@ class UserMessageBehaviour(CyclicBehaviour):
                         published += 1
                 except Exception:
                     pass
-            self.logger.info(demo("Community signifier publishing: %d/%d published"), published, len(signifiers))
+            self.logger.info(demo(f"Community signifier publishing: {published}/{len(signifiers)} published"))
 
     # ------------------------------------------------------------------
     # DETERMINISTIC: query handlers
     # ------------------------------------------------------------------
 
     async def _handle_query_capabilities(
-        self, msg, thread: str, conv: ConversationState, capabilities_ctx: str
+        self, msg, thread: str, conv: ConversationState, capabilities_ctx: str, extraction: dict
     ) -> None:
-        """Handle a capabilities query (deterministic fetch + LLM formatting)."""
+        """Handle a capabilities query (structured + LLM formatting)."""
         if not capabilities_ctx:
             capabilities_ctx = await self._fetch_capabilities()
 
@@ -927,42 +1133,44 @@ class UserMessageBehaviour(CyclicBehaviour):
             conv.phase = ConversationPhase.IDLE
             return
 
-        formatted = await self._format_query_response(capabilities_ctx, conv.user_message)
+        # Parse and filter capabilities JSON to reduce size
+        try:
+            caps_dict = json.loads(capabilities_ctx) if isinstance(capabilities_ctx, str) else capabilities_ctx
+            ## log caps_dict with indentation for debugging
+            # self.logger.info(demo(f"Raw capabilities JSON: {json.dumps(caps_dict, indent=2)}"))
+            
+            filtered_caps = _filter_capabilities_json(caps_dict)
+            filtered_json = json.dumps(filtered_caps, indent=2)
+
+            # self.logger.info(demo(f"Filtered capabilities JSON: {filtered_json}"))
+        except Exception as e:
+            self.logger.warning(f"Failed to filter capabilities JSON: {e}, using unfiltered")
+            filtered_json = capabilities_ctx
+
+        formatted = await self._format_capabilities_response(filtered_json, extraction)
         await self._reply(msg, formatted)
         conv.phase = ConversationPhase.IDLE
 
     async def _handle_query_state(
         self, msg, thread: str, conv: ConversationState, extraction: dict
     ) -> None:
-        """Handle a state query (deterministic fetch with cache + LLM formatting)."""
-        artifact_id = extraction.get("artifact_id")
-        property_uri = extraction.get("property_uri")
+        """Handle a state query (deterministic fetch with cache + LLM formatting).
 
-        state_memory = self.agent.state_memory
-        if property_uri and state_memory.has(property_uri):
-            cached = state_memory.get(property_uri)
-            self.logger.info(demo("State cache HIT: property_uri=%r value=%r"), property_uri, cached)
-            raw_data = json.dumps({"property_uri": property_uri, "value": cached, "source": "cache"})
-            formatted = await self._format_query_response(raw_data, conv.user_message)
-            await self._reply(msg, formatted)
-            conv.phase = ConversationPhase.IDLE
-            return
-
+        The extraction dict contains LLM-parsed fields: artifact_type, workspace_type,
+        artifact_name, property_name, parameter_name. We send these to EnvExplorer,
+        which resolves names to artifact_id and property_uri, fetches state, and returns data.
+        """
         explorer_jid = self.agent.target_jids.get("explorer")
         if not explorer_jid:
             await self._reply(msg, "Error: EnvExplorer is not configured.")
             conv.phase = ConversationPhase.IDLE
             return
 
-        payload: Dict[str, Any] = {}
-        if artifact_id:
-            payload["artifact_id"] = artifact_id
-        if property_uri:
-            payload["property_uri"] = property_uri
+        # Send entire extraction to EnvExplorer for name→ID resolution
+        payload = extraction
 
         self.logger.info(
-            demo("UA -> EnvExplorer ENV_STATE_REQUEST: artifact_id=%r property_uri=%r"),
-            artifact_id, property_uri,
+            demo(f"UA -> EnvExplorer ENV_STATE_REQUEST: extraction={json.dumps(extraction)}")
         )
         try:
             result = await rpc_call(
@@ -973,18 +1181,11 @@ class UserMessageBehaviour(CyclicBehaviour):
                 expect_type=MessageType.ENV_STATE_RESPONSE.value,
                 timeout=self.agent.rpc_call_timeout,
             )
-            try:
-                state_data = json.loads(result.body) if isinstance(result.body, str) else result.body
-                if isinstance(state_data, dict):
-                    if property_uri and "value" in state_data:
-                        state_memory.store(property_uri, state_data["value"])
-                    elif "artifacts" in state_data and isinstance(state_data["artifacts"], dict):
-                        state_memory.store_bulk(state_data["artifacts"])
-                    else:
-                        state_memory.store_bulk(state_data)
-            except Exception:
-                pass  # best-effort caching
 
+            # Log the raw state response before formatting
+            self.logger.info(demo(f"ENV_STATE_RESPONSE received: {result.body}"))
+
+            # Format the raw state response for user-friendly output
             formatted = await self._format_query_response(result.body, conv.user_message)
             await self._reply(msg, formatted)
         except RpcTimeoutError:

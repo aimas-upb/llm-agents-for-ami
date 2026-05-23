@@ -116,11 +116,15 @@ class HomeAssistantRDF:
     def __init__(self, base: Optional[str] = None) -> None:
         self.base = (base or BASE_FALLBACK).rstrip("/") + "/"
         self.g = Graph(base=self.base)
+        # Bind standard namespaces
         for p, ns in {
             "websub": WEBSUB, "hctl": HCTL, "js": JS, "hmas": HMAS,
             "ex": EX, "wotsec": WOTSEC, "htv": HTV, "jacamo": JACAMO, "td": TD
         }.items():
             self.g.bind(p, ns)
+        # Bind the base URI as the default namespace (:)
+        # This ensures rdflib includes @prefix : <base> in Turtle output
+        self.g.bind("", Namespace(self.base))
 
     def _add_action(self, subj: URIRef, name: str, type_uri: URIRef,
                     method: str, target: URIRef, ctype: str,

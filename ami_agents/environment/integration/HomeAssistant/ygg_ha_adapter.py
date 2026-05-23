@@ -217,7 +217,12 @@ def _entity_display_name(entity: Optional[Dict[str, Any]], devices_by_id: Dict[s
     for key in ("name", "original_name"):
         val = entity.get(key)
         if isinstance(val, str) and val.strip():
-            return val.strip()
+            name = val.strip()
+            # Clean up duplicates like "lights_308.lights_308" -> "lights_308"
+            parts = name.split(".")
+            if len(parts) == 2 and parts[0] == parts[1]:
+                return parts[0]
+            return name
     object_id = ""
     ent_id = entity.get("entity_id", "")
     if isinstance(ent_id, str) and "." in ent_id:
@@ -225,6 +230,9 @@ def _entity_display_name(entity: Optional[Dict[str, Any]], devices_by_id: Dict[s
     device = devices_by_id.get(entity.get("device_id"))
     device_name = (device or {}).get("name") if isinstance(device, dict) else None
     if device_name and object_id:
+        # Don't duplicate if device_name already equals object_id
+        if device_name == object_id:
+            return device_name
         return f"{device_name}.{object_id}"
     if device_name:
         return device_name
@@ -416,7 +424,8 @@ async def get_platform(request: Request):
         else:
             filtered_areas = areas
 
-        rdf = HomeAssistantRDF(str(request.base_url))
+        # Use the BASE_WS_URI for the platform root
+        rdf = HomeAssistantRDF(BASE_WS_URI)
         rdf.platform_to_rdf(filtered_areas)
         return Response(rdf.serialize(), media_type="text/turtle")
     except Exception as exc:
@@ -427,7 +436,8 @@ async def get_platform(request: Request):
 async def list_workspaces(request: Request):
     try:
         areas = await ha_client.get_areas()
-        rdf = HomeAssistantRDF(str(request.base_url))
+        # Use the platform root as base (workspace_to_rdf expects this)
+        rdf = HomeAssistantRDF(BASE_WS_URI)
         for a in areas:
             rdf.workspace_to_rdf(a, [])
         return Response(rdf.serialize(), media_type="text/turtle")
@@ -643,18 +653,19 @@ async def workspace(workspace_id: str, request: Request):
         if area is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
         devices, _ = await _get_workspace_devices_and_entities(workspace_id)
-        rdf = HomeAssistantRDF(str(request.base_url))
+        # Use the platform root as base (workspace_to_rdf expects this)
+        rdf = HomeAssistantRDF(BASE_WS_URI)
         rdf.workspace_to_rdf(area, devices)
         ws_type = _semantic_workspace_type()
         if ws_type:
-            ws_uri = URIRef(f"{rdf.base}workspaces/{workspace_id}#workspace")
+            ws_uri = URIRef(f"{BASE_WS_URI.rstrip('/')}/workspaces/{workspace_id}#workspace")
             rdf.g.add((ws_uri, RDF.type, ws_type))
         for d in devices:
             device_name = d.get("name", d.get("id"))
             art_type = _semantic_artifact_type(device_name)
             if art_type:
                 safe_name = urllib.parse.quote(device_name, safe="")
-                art_uri = URIRef(f"{rdf.base}workspaces/{workspace_id}/artifacts/{safe_name}#artifact")
+                art_uri = URIRef(f"{BASE_WS_URI.rstrip('/')}/workspaces/{workspace_id}/artifacts/{safe_name}#artifact")
                 rdf.g.add((art_uri, RDF.type, art_type))
         return Response(rdf.serialize(), media_type="text/turtle")
     except HTTPException:
@@ -671,10 +682,11 @@ async def list_artifacts(workspace_id: str, request: Request):
         if area is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
         devices, entities = await _get_workspace_devices_and_entities(workspace_id)
-        rdf = HomeAssistantRDF(str(request.base_url))
+        # Use the platform root as base (for consistent namespace handling)
+        rdf = HomeAssistantRDF(BASE_WS_URI)
         aid = area["area_id"]
-        ws = URIRef(f"{rdf.base}workspaces/{aid}#workspace")
-        art_dir = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/")
+        ws = URIRef(f"{BASE_WS_URI.rstrip('/')}/workspaces/{aid}#workspace")
+        art_dir = URIRef(f"{BASE_WS_URI.rstrip('/')}/workspaces/{aid}/artifacts/")
         for ent in entities:
             label = ent.get("_artifact_label") or _entity_display_name(ent, {d["id"]: d for d in devices})
             safe_name = ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
@@ -701,12 +713,15 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
         state_map = {s["entity_id"]: s for s in states}
 
         #print(states)
-        
-        rdf = HomeAssistantRDF(str(request.base_url))
-        aid = workspace_id
-        ws = URIRef(f"{rdf.base}workspaces/{aid}#workspace")
-        art_dir = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/")
+
+        # Construct the base URI for this artifact's RDF (artifact directory)
         safe_name = urllib.parse.quote(artifact_label, safe="")
+        artifact_base = f"{BASE_WS_URI.rstrip('/')}/workspaces/{workspace_id}/artifacts/{safe_name}/"
+
+        rdf = HomeAssistantRDF(artifact_base)
+        aid = workspace_id
+        ws = URIRef(f"{BASE_WS_URI.rstrip('/')}/workspaces/{aid}#workspace")
+        art_dir = URIRef(f"{BASE_WS_URI.rstrip('/')}/workspaces/{aid}/artifacts/")
         art = URIRef(f"{art_dir}{safe_name}#artifact")
 
         # Build RDF
@@ -773,7 +788,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                     action_name,
                     _semantic_action_type(artifact_label, svc_name),
                     "POST",
-                    URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/ha/{urllib.parse.quote(domain, safe='')}/{urllib.parse.quote(svc_name, safe='')}"),
+                    URIRef(f"{rdf.base}ha/{urllib.parse.quote(domain, safe='')}/{urllib.parse.quote(svc_name, safe='')}"),
                     "application/json",
                     input_schema=input_schema,
                     description=service_description,
@@ -793,7 +808,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                     "getThermostatState",
                     EX.StatusCommand,
                     "POST",
-                    URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/getThermostatState"),
+                    URIRef(f"{rdf.base}getThermostatState"),
                     "application/json",
                     output_schema=output_schema,
                 )
@@ -833,7 +848,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                         # If parsing fails, keep as string
                         pass
 
-                property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/state")
+                property_uri = URIRef(f"{rdf.base}properties/state")
                 # Pass domain to schema builder for context-aware schema generation
                 schema = rdf._build_property_schema("state", schema_value, entity_attrs, entity_domain=entity_domain)
                 rdf._add_property(
@@ -857,7 +872,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                         continue
 
                     # Build property URI
-                    property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/{urllib.parse.quote(attr_name, safe='')}")
+                    property_uri = URIRef(f"{rdf.base}properties/{urllib.parse.quote(attr_name, safe='')}")
 
                     # Build schema for this property
                     schema = rdf._build_property_schema(attr_name, attr_value, entity_attrs)
@@ -881,7 +896,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                         metadata_attrs[ts_field] = entity_state[ts_field]
 
                 if metadata_attrs:
-                    metadata_property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/metadata")
+                    metadata_property_uri = URIRef(f"{rdf.base}properties/metadata")
                     metadata_schema = rdf._build_metadata_schema(metadata_attrs)
                     rdf._add_property(
                         art,
@@ -894,13 +909,13 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
 
         # Generic Jacamo/WebSub affordances
         rdf._add_action(art, "getArtifactRepresentation", JACAMO.PerceiveArtifact, "GET",
-                        URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}"), "application/json")
+                        URIRef(f"{rdf.base}"), "application/json")
         rdf._add_action(art, "updateArtifactRepresentation", JACAMO.UpdateArtifact, "PUT",
-                        URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}"), "application/json")
+                        URIRef(f"{rdf.base}"), "application/json")
         rdf._add_action(art, "deleteArtifactRepresentation", JACAMO.DeleteArtifact, "DELETE",
-                        URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}"), "application/json")
+                        URIRef(f"{rdf.base}"), "application/json")
         rdf._add_action(art, "focusArtifact", JACAMO.Focus, "POST",
-                        URIRef(f"{rdf.base}workspaces/{aid}/focus"), "application/json")
+                        URIRef(f"{rdf.base}focus"), "application/json")
         rdf._add_action(art, "subscribeToArtifact", WEBSUB.subscribeToArtifact, "POST",
                         URIRef(f"{rdf.base}hub/"), "application/json", "websub")
         rdf._add_action(art, "unsubscribeFromArtifact", WEBSUB.unsubscribeFromArtifact, "POST",
@@ -912,7 +927,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
         if True:
             rdf.g.add((art, HMAS.isContainedIn, ws))
             rdf.g.add((ws, RDF.type, HMAS.Workspace))
-            profile = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}")
+            profile = URIRef(f"{rdf.base}")
             rdf.g.add((profile, RDF.type, HMAS.ResourceProfile))
             rdf.g.add((profile, HMAS.isProfileOf, art))
             return Response(rdf.serialize(), media_type="text/turtle")

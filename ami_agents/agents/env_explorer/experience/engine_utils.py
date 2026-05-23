@@ -71,9 +71,7 @@ async def ensure_experience_engine_ready(agent_instance) -> bool:
 
             agent_instance._experience_engine_ready = True
             agent_instance.logger.info(
-                demo("Experience engine ready (storage_dir=%s, matcher_default=%s)"),
-                agent_instance._experience_engine_storage_dir,
-                agent_instance._experience_engine_default_matcher_version,
+                demo(f"Experience engine ready (storage_dir={agent_instance._experience_engine_storage_dir}, matcher_default={agent_instance._experience_engine_default_matcher_version})")
             )
             return True
 

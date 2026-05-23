@@ -48,9 +48,7 @@ class SignifierRecordBehaviour(CyclicBehaviour):
             )
         except Exception as e:
             self.agent.logger.error(
-                demo("!!! EXCEPTION in signifier recording: %s - %s"),
-                type(e).__name__,
-                str(e),
+                demo(f"!!! EXCEPTION in signifier recording: {type(e).__name__} - {e}"),
                 exc_info=True,
             )
             response_payload = {"ok": False, "error": "exception", "detail": str(e)}
@@ -86,10 +84,7 @@ class SignifierRecordBehaviour(CyclicBehaviour):
         now properly encapsulated in a behavior.
         """
         self.agent.logger.info(
-            demo(">>> SignifierRecordBehaviour processing: plan_type=%s, execution_report_type=%s, signifiers_provided=%s"),
-            type(plan).__name__,
-            type(execution_report).__name__,
-            signifiers is not None
+            demo(f">>> SignifierRecordBehaviour processing: plan_type={type(plan).__name__}, execution_report_type={type(execution_report).__name__}, signifiers_provided={signifiers is not None}")
         )
 
         # Ensure Experience engine engine is ready
@@ -98,12 +93,12 @@ class SignifierRecordBehaviour(CyclicBehaviour):
             if not self.agent._experience_engine_registry:
                 return {"ok": False, "error": "experience_engine_not_ready"}
         except Exception as e:
-            self.agent.logger.error(demo("!!! Experience engine engine setup failed: %s"), str(e), exc_info=True)
+            self.agent.logger.error(demo(f"!!! Experience engine engine setup failed: {e}"), exc_info=True)
             return {"ok": False, "error": "experience_engine_setup_failed", "detail": str(e)}
 
         # NEW PATH: If signifiers are already provided (from BT extraction), skip plan parsing
         if signifiers and isinstance(signifiers, list) and len(signifiers) > 0:
-            self.agent.logger.info(demo(">>> Using pre-extracted signifiers (count=%d), skipping plan parsing"), len(signifiers))
+            self.agent.logger.info(demo(f">>> Using pre-extracted signifiers (count={len(signifiers)}), skipping plan parsing"))
             return await self._process_pre_extracted_signifiers(signifiers, sender, thread)
 
         # OLD PATH: Extract signifiers from plan steps
@@ -125,7 +120,7 @@ class SignifierRecordBehaviour(CyclicBehaviour):
                 SignifierStatus,
             )
         except ImportError as e:
-            self.agent.logger.error(demo("!!! EXCEPTION in signifier recording: ImportError - %s"), str(e), exc_info=True)
+            self.agent.logger.error(demo(f"!!! EXCEPTION in signifier recording: ImportError - {e}"), exc_info=True)
             return {"ok": False, "error": "import_failed", "detail": str(e)}
 
         created: List[str] = []
@@ -158,8 +153,7 @@ class SignifierRecordBehaviour(CyclicBehaviour):
                 if structured_intent_orig and isinstance(structured_intent_orig, dict):
                     intent_structured["structured_intent"] = structured_intent_orig
                     self.agent.logger.info(
-                        demo("[STRUCTURED_INTENT] Preserving original structured_intent: %s"),
-                        structured_intent_orig
+                        demo(f"[STRUCTURED_INTENT] Preserving original structured_intent: {structured_intent_orig}")
                     )
 
                 # Build context metadata
@@ -180,18 +174,14 @@ class SignifierRecordBehaviour(CyclicBehaviour):
                 # Extract intent_type (EXPLICIT or IMPLICIT classification)
                 intent_type = sig_dict.get("intent_type")
                 self.agent.logger.info(
-                    demo("[INTENT_TYPE] Extracted from signifier dict: intent_type=%r for signifier %s"),
-                    intent_type,
-                    signifier_id,
+                    demo(f"[INTENT_TYPE] Extracted from signifier dict: intent_type={intent_type!r} for signifier {signifier_id}")
                 )
                 # Validate and normalize to uppercase
                 if intent_type:
                     intent_type_upper = str(intent_type).upper()
                     if intent_type_upper not in ("EXPLICIT", "IMPLICIT"):
                         self.agent.logger.warning(
-                            demo("[INTENT_TYPE] Invalid intent_type %r for signifier %s, setting to None"),
-                            intent_type,
-                            signifier_id,
+                            demo(f"[INTENT_TYPE] Invalid intent_type {intent_type!r} for signifier {signifier_id}, setting to None")
                         )
                         intent_type = None
                     else:
@@ -201,14 +191,11 @@ class SignifierRecordBehaviour(CyclicBehaviour):
                 shacl_shapes = generate_shacl_shapes_from_conditions(structured_conditions)
                 if shacl_shapes:
                     self.agent.logger.info(
-                        demo("Generated SHACL shapes for signifier %s (%d conditions)"),
-                        signifier_id,
-                        len(structured_conditions),
+                        demo(f"Generated SHACL shapes for signifier {signifier_id} ({len(structured_conditions)} conditions)")
                     )
                 else:
                     self.agent.logger.debug(
-                        demo("No SHACL shapes generated for signifier %s (no valid conditions)"),
-                        signifier_id,
+                        demo(f"No SHACL shapes generated for signifier {signifier_id} (no valid conditions)")
                     )
 
                 # Generate natural language description from structured conditions
@@ -229,24 +216,19 @@ class SignifierRecordBehaviour(CyclicBehaviour):
                     ),
                     affordance_uri=affordance_uri,
                     intent_type=intent_type,  # Pass intent_type for memory engine filtering
+                    affected_env_vars=sig_dict.get("affected_env_vars"),  # For v3 env-var matching
                     provenance=Provenance(created_by=str(sender or self.agent.jid), source="bt_execution"),
                 )
 
                 self.agent._experience_engine_registry.create(signifier)
                 created.append(signifier_id)
                 self.agent.logger.info(
-                    demo("[INTENT_TYPE] Stored signifier %s: intent=%r -> affordance=%s, intent_type=%r"),
-                    signifier_id,
-                    intent_text,
-                    affordance_uri,
-                    intent_type,
+                    demo(f"[INTENT_TYPE] Stored signifier {signifier_id}: intent={intent_text!r} -> affordance={affordance_uri}, intent_type={intent_type!r}")
                 )
 
             except Exception as e:
                 self.agent.logger.error(
-                    demo("Failed to create signifier from pre-extracted: %s - %s"),
-                    type(e).__name__,
-                    str(e),
+                    demo(f"Failed to create signifier from pre-extracted: {type(e).__name__} - {e}"),
                     exc_info=True,
                 )
                 skipped.append({
@@ -262,9 +244,7 @@ class SignifierRecordBehaviour(CyclicBehaviour):
             "skipped": skipped,
         }
         self.agent.logger.info(
-            demo("Signifier recording result: created=%d, skipped=%d"),
-            len(created),
-            len(skipped),
+            demo(f"Signifier recording result: created={len(created)}, skipped={len(skipped)}")
         )
         return result
 
@@ -285,15 +265,13 @@ class SignifierRecordBehaviour(CyclicBehaviour):
                 plan_obj = None
 
         if not isinstance(plan_obj, dict):
-            self.agent.logger.warning(demo(">>> EARLY RETURN: invalid_plan (plan_obj type=%s)"), type(plan_obj).__name__)
+            self.agent.logger.warning(demo(f">>> EARLY RETURN: invalid_plan (plan_obj type={type(plan_obj).__name__})"))
             return {"ok": False, "error": "invalid_plan", "hint": "no plan or signifiers provided"}
 
         steps = plan_obj.get("steps")
         if not isinstance(steps, list) or not steps:
             self.agent.logger.warning(
-                demo(">>> EARLY RETURN: missing_steps (steps type=%s, empty=%s)"),
-                type(steps).__name__,
-                not steps if isinstance(steps, list) else "N/A"
+                demo(f">>> EARLY RETURN: missing_steps (steps type={type(steps).__name__}, empty={not steps if isinstance(steps, list) else 'N/A'})")
             )
             return {"ok": False, "error": "missing_steps", "hint": "plan must have 'steps' array or provide 'signifiers' directly"}
 
@@ -318,7 +296,7 @@ class SignifierRecordBehaviour(CyclicBehaviour):
                 SignifierStatus,
             )
         except ImportError as e:
-            self.agent.logger.error(demo("!!! OLD PATH import failed: ImportError - %s"), str(e), exc_info=True)
+            self.agent.logger.error(demo(f"!!! OLD PATH import failed: ImportError - {e}"), exc_info=True)
             return {"ok": False, "error": "import_failed", "detail": str(e)}
 
         created: List[str] = []
@@ -387,17 +365,11 @@ class SignifierRecordBehaviour(CyclicBehaviour):
                 self.agent._experience_engine_registry.create(signifier)
                 created.append(signifier_id)
                 self.agent.logger.info(
-                    demo("Stored signifier (no SHACL context) %s: intent=%r -> affordance=%s"),
-                    signifier_id,
-                    intent,
-                    affordance_uri,
+                    demo(f"Stored signifier (no SHACL context) {signifier_id}: intent={intent!r} -> affordance={affordance_uri}")
                 )
             except Exception as e:
                 self.agent.logger.error(
-                    demo("Failed to create signifier %s: %s - %s"),
-                    signifier_id,
-                    type(e).__name__,
-                    str(e),
+                    demo(f"Failed to create signifier {signifier_id}: {type(e).__name__} - {e}"),
                     exc_info=True,
                 )
                 skipped.append({"step_id": step_id, "error": "create_failed", "detail": str(e)})
@@ -409,9 +381,7 @@ class SignifierRecordBehaviour(CyclicBehaviour):
             "skipped": skipped,
         }
         self.agent.logger.info(
-            demo("Signifier recording result: created=%d, skipped=%d"),
-            len(created),
-            len(skipped),
+            demo(f"Signifier recording result: created={len(created)}, skipped={len(skipped)}")
         )
         return result
 

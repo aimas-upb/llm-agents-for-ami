@@ -1,4 +1,5 @@
 import json
+import os
 from spade.behaviour import CyclicBehaviour
 
 from ....shared.models.messages import MessageType, META_CORRELATION_ID
@@ -27,7 +28,7 @@ class EnvironmentCapabilitiesBehaviour(CyclicBehaviour):
         if msg_type != MessageType.ENV_CAPABILITIES_REQUEST.value:
             return
 
-        self.agent.logger.info(demo("Received ENV_CAPABILITIES_REQUEST from %s"), str(msg.sender))
+        self.agent.logger.info(demo(f"Received ENV_CAPABILITIES_REQUEST from {msg.sender}"))
 
         # Parse request body to extract detail_level
         detail_level = "summary"  # default
@@ -40,6 +41,8 @@ class EnvironmentCapabilitiesBehaviour(CyclicBehaviour):
 
         # Generate capabilities response payload
         response_payload = self._generate_capabilities_payload(detail_level)
+        ## Log the response payload for debugging (can be removed in production)
+        # self.agent.logger.info(demo(f"Generated capabilities payload: {response_payload}"))
 
         # Send response
         reply = msg.make_reply()
@@ -60,7 +63,8 @@ class EnvironmentCapabilitiesBehaviour(CyclicBehaviour):
 
         await self.send(reply)
 
-        self.agent.logger.debug(f"Sent capabilities response with {len(response_payload.get('workspaces', {}))} workspaces")
+        workspace_count = len(response_payload.get('workspaces', {})) if isinstance(response_payload, dict) else 0
+        self.agent.logger.info(demo(f"Sent capabilities response with {workspace_count} workspaces"))
 
     def _generate_capabilities_payload(self, detail_level: str = "summary"):
         """
@@ -80,7 +84,11 @@ class EnvironmentCapabilitiesBehaviour(CyclicBehaviour):
             if detail_level == "detailed":
                 return format_capabilities_detailed_rdf(self.agent)
             elif detail_level == "summary":
-                return format_capabilities_summary_hierarchical(self.agent)
+                capabilities_payload = format_capabilities_summary_hierarchical(self.agent)
+                ## pretty-print the payload if verbose mode is enabled for easier debugging (can be removed in production)
+                if os.getenv("VERBOSE_LOGGING", "false").lower() == "true":
+                    print(json.dumps(capabilities_payload, indent=2))
+                return capabilities_payload
             else:
                 # Unknown detail_level - use default legacy payload
                 return format_capabilities_payload(self.agent)

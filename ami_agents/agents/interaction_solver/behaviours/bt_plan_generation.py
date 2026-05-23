@@ -46,7 +46,7 @@ class BTPlanGenerationBehaviour(OneShotBehaviour):
                 affected_env_vars=self.affected_env_vars,
                 client=agent.llm_client,
                 model=agent.model,
-                temperature=agent.temperature if not agent.model.startswith("o") else None,
+                temperature=agent.temperature if not (agent.model.startswith("o") or agent.model.startswith("gpt-5")) else None,
                 reasoning_effort=agent.reasoning_effort,
                 max_completion_tokens=agent.max_completion_tokens,
             )

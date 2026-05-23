@@ -89,7 +89,7 @@ class SignifierListBehaviour(CyclicBehaviour):
 
                 signifiers_out.append(signifier_data)
 
-            self.agent.logger.info(demo("Listed %d signifiers from registry"), len(signifiers_out))
+            self.agent.logger.info(demo(f"Listed {len(signifiers_out)} signifiers from registry"))
 
             return {
                 "total": len(signifiers_out),

@@ -115,7 +115,11 @@ def _walk_tree(
 
         # Add original structured_intent if available for this intent
         if intent in intent_to_structured:
-            sig_dict["structured_intent"] = intent_to_structured[intent]
+            structured = intent_to_structured[intent]
+            sig_dict["structured_intent"] = structured
+            # For IMPLICIT intents, extract and add affected_env_vars for v3 matching
+            if "affected_env_vars" in structured:
+                sig_dict["affected_env_vars"] = structured["affected_env_vars"]
 
         signifiers.append(sig_dict)
 
@@ -161,19 +165,14 @@ def _match_node_to_intent(
                 # Try exact match
                 if artifact_part in artifact_to_intent:
                     logger.info(
-                        demo("[INTENT_MATCH] Exact artifact match: artifact=%s -> intent=%r"),
-                        artifact_part,
-                        artifact_to_intent[artifact_part]
+                        demo(f"[INTENT_MATCH] Exact artifact match: artifact={artifact_part} -> intent={artifact_to_intent[artifact_part]!r}")
                     )
                     return artifact_to_intent[artifact_part]
                 # Try partial match (e.g., "lights_308" in URL fragment with anchor)
                 for artifact_id, intent_str in artifact_to_intent.items():
                     if artifact_id in artifact_part:
                         logger.info(
-                            demo("[INTENT_MATCH] Partial artifact match: artifact=%s (from %s) -> intent=%r"),
-                            artifact_id,
-                            artifact_part,
-                            intent_str
+                            demo(f"[INTENT_MATCH] Partial artifact match: artifact={artifact_id} (from {artifact_part}) -> intent={intent_str!r}")
                         )
                         return intent_str
 
@@ -215,20 +214,14 @@ def _match_node_to_intent(
 
     if best_intent:
         logger.info(
-            demo("[INTENT_MATCH] Keyword-based match: node=%s action=%s -> intent=%r"),
-            node_name,
-            action_name,
-            best_intent
+            demo(f"[INTENT_MATCH] Keyword-based match: node={node_name} action={action_name} -> intent={best_intent!r}")
         )
         return best_intent
 
     # STRATEGY 3: Fallback to first intent
     fallback = intents[0] if intents else "unknown"
     logger.warning(
-        demo("[INTENT_MATCH] No match found, falling back to first intent: %r (node=%s, action_url=%s)"),
-        fallback,
-        node_name,
-        action_url
+        demo(f"[INTENT_MATCH] No match found, falling back to first intent: {fallback!r} (node={node_name}, action_url={action_url})")
     )
     return fallback
 
@@ -268,10 +261,7 @@ def _extract_conditions_from_state(
     logger.debug("_extract_conditions_from_state CALLED: state_snapshot type=%s, workspace_id=%r",
                  type(state_snapshot).__name__ if state_snapshot else 'None', workspace_id)
     logger.info(
-        demo("_extract_conditions_from_state: state_snapshot type=%s, has_data=%s, workspace_id=%r"),
-        type(state_snapshot).__name__ if state_snapshot else "None",
-        bool(state_snapshot),
-        workspace_id,
+        demo(f"_extract_conditions_from_state: state_snapshot type={type(state_snapshot).__name__ if state_snapshot else 'None'}, has_data={bool(state_snapshot)}, workspace_id={workspace_id!r}")
     )
 
     if not state_snapshot or not isinstance(state_snapshot, dict):
@@ -284,10 +274,7 @@ def _extract_conditions_from_state(
                  len(artifacts) if isinstance(artifacts, dict) else 0,
                  list(artifacts.keys())[:3] if isinstance(artifacts, dict) else [])
     logger.info(
-        demo("_extract_conditions_from_state: artifacts type=%s, count=%d, keys=%s"),
-        type(artifacts).__name__,
-        len(artifacts) if isinstance(artifacts, dict) else 0,
-        list(artifacts.keys())[:3] if isinstance(artifacts, dict) else [],
+        demo(f"_extract_conditions_from_state: artifacts type={type(artifacts).__name__}, count={len(artifacts) if isinstance(artifacts, dict) else 0}, keys={list(artifacts.keys())[:3] if isinstance(artifacts, dict) else []}")
     )
 
     if not isinstance(artifacts, dict):
@@ -368,8 +355,7 @@ def _extract_conditions_from_state(
         ]
         if relevant_conditions:
             logger.info(
-                demo("_extract_conditions_from_state: returning %d relevant conditions (filtered from %d)"),
-                len(relevant_conditions), len(conditions)
+                demo(f"_extract_conditions_from_state: returning {len(relevant_conditions)} relevant conditions (filtered from {len(conditions)})")
             )
             return relevant_conditions
 
@@ -377,7 +363,7 @@ def _extract_conditions_from_state(
     result = conditions[:10]
     logger.debug("_extract_conditions_from_state: returning %d conditions (total found: %d)",
                  len(result), len(conditions))
-    logger.info(demo("_extract_conditions_from_state: returning %d conditions (total found: %d)"), len(result), len(conditions))
+    logger.info(demo(f"_extract_conditions_from_state: returning {len(result)} conditions (total found: {len(conditions)})"))
     return result
 
 
@@ -438,7 +424,7 @@ def build_bt_from_signifiers(
 
         # EXPLICIT with verb="modify" require read-compute-set — bail to LLM path
         if isinstance(intent, ExplicitGoalIntent) and intent.action.verb == "modify":
-            logger.info(demo("build_bt_from_signifiers: MODIFY action detected for intent=%r, bailing to LLM path"), query_str)
+            logger.info(demo(f"build_bt_from_signifiers: MODIFY action detected for intent={query_str!r}, bailing to LLM path"))
             return None
 
         match_data = signifier_matches.get(query_str)
@@ -472,14 +458,14 @@ def build_bt_from_signifiers(
                 else:
                     # Use the caller's actual target value, not the stale signifier hint
                     action_node["parameters"] = {intent.action.parameter: intent.action.value}
-                    logger.info(demo("build_bt_from_signifiers: SET action - overriding payload_hint with intent value: %s=%s"), intent.action.parameter, intent.action.value)
+                    logger.info(demo(f"build_bt_from_signifiers: SET action - overriding payload_hint with intent value: {intent.action.parameter}={intent.action.value}"))
             else:
                 # ImplicitGoalIntent or ExplicitGoalIntent without explicit value:
                 # reuse signifier's payload_hint as-is
                 payload = m.get("payload_hint") or m.get("payload")
                 if payload and isinstance(payload, dict):
                     action_node["parameters"] = payload
-                    logger.info(demo("build_bt_from_signifiers: using payload_hint from signifier: %s"), payload)
+                    logger.info(demo(f"build_bt_from_signifiers: using payload_hint from signifier: {payload}"))
 
             intent_actions.append(action_node)
 
