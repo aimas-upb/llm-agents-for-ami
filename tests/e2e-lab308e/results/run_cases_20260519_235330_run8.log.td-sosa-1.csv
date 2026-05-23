@@ -1,0 +1,698 @@
+2026-05-19 23:53:31,132 - Lab308eE2ERunner - INFO - [1;36m[DEMO][0m Starting lab308e E2E harness (Yggdrasil=http://localhost:8080)
+2026-05-19 23:53:31,211 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m InteractionSolver booting (model=gpt-5-mini, base_url=https://api.openai.com/v1, temperature=1.0, reasoning_effort=default)
+2026-05-19 23:53:31,211 - InteractionSolver[interaction_solver@localhost] - INFO - InteractionSolverAgent initialized (pure SPADE + direct LLM planning).
+2026-05-19 23:53:31,211 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Starting EnvExplorer agent
+2026-05-19 23:53:31,233 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Setting up EnvExplorerAgent...
+2026-05-19 23:53:31,241 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Starting EnvExplorer discovery...
+2026-05-19 23:53:31,241 - ami_agents.environment.integration.integration_engine - INFO - Dereferencing Yggdrasil URL: http://localhost:8080
+2026-05-19 23:53:31,245 - ami_agents.environment.integration.integration_engine - INFO - Yggdrasil dereference response: status=200 content_type='text/turtle; charset=utf-8' body_preview='@base <http://localhost:8080/> .\n@prefix hmas: <https://purl.org/hmas/> .\n@prefix td: <https://www.w3.org/2019/wot/td#> .\n@prefix wotsec: <https://www.w3.org/2019/wot/security#> .\n\n<http://localhost:8080> a hmas:ResourceProfile ;\n    hmas:isProfileOf <#platform> .\n\n<#platform> a hmas:HypermediaMASPlatform,\n        td:Thing ;\n    hmas:hosts <workspaces/lab308e#workspace> ;\n    td:hasSecurityConfiguration [ a wotsec:NoSecurityScheme ] ;\n    td:title "Home Assistant Platform" .\n\n'
+2026-05-19 23:53:31,259 - ami_agents.environment.integration.integration_engine - INFO - Parsed Yggdrasil graph: triples=8 subjects=3
+2026-05-19 23:53:31,259 - ami_agents.environment.integration.integration_engine - INFO - URL is a ResourceProfile, searching for isProfileOf property: http://localhost:8080
+2026-05-19 23:53:31,259 - ami_agents.environment.integration.integration_engine - INFO - Found HypermediaMASPlatform via ResourceProfile: http://localhost:8080/#platform
+2026-05-19 23:53:31,260 - ami_agents.environment.integration.integration_engine - INFO - Notification listener started at http://10.205.0.120:8086/webhook
+2026-05-19 23:53:31,260 - ami_agents.environment.integration.integration_engine - INFO - Found 1 root workspace(s) hosted by platform
+2026-05-19 23:53:31,269 - ami_agents.environment.integration.integration_engine - INFO - Processed workspace 'lab308e' with 0 sub-workspace(s)
+2026-05-19 23:53:31,269 - ami_agents.environment.integration.integration_engine - INFO - Total workspaces found: 1
+2026-05-19 23:53:31,279 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'air_conditioner_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,287 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'ambient_lights_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,293 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'blackout_blinds_308e cover' in workspace 'lab308e'
+2026-05-19 23:53:31,299 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'blinds_308e cover' in workspace 'lab308e'
+2026-05-19 23:53:31,305 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'ceiling_fan_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,310 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'clock_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,314 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'co2_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,321 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'desk_lamp_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,325 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'desk_light_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,339 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'display_wall_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,343 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'external_light_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,347 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'glare_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,355 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'heater_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,359 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'humidity_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,364 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'internal_light_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,368 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'person_counter_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,372 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'presence_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,385 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'projector_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,393 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'task_lights_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,398 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'temperature_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:31,405 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'window_308e cover' in workspace 'lab308e'
+2026-05-19 23:53:31,405 - ami_agents.environment.integration.integration_engine - INFO - Total artifacts found: 21
+* Owlready2 * WARNING: ObjectProperty http://www.w3.org/2004/02/skos/core#relatedMatch belongs to more than one entity types: [owl.ObjectProperty, owl.SymmetricProperty, core.mappingRelation, core.related]; I'm trying to fix it...
+* Owlready2 * WARNING: ObjectProperty http://www.w3.org/2011/http#statusCodeNumber belongs to more than one entity types: [owl.ObjectProperty, terms.identifier]; I'm trying to fix it...
+2026-05-19 23:53:32,249 - ami_agents.environment.integration.integration_engine - INFO - Total affordances found: 208
+2026-05-19 23:53:32,249 - ami_agents.environment.integration.integration_engine - INFO - Mapping artifact states...
+2026-05-19 23:53:32,249 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 10 property endpoints for air_conditioner_308e...
+2026-05-19 23:53:32,256 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 9 property endpoints for ambient_lights_308e...
+2026-05-19 23:53:32,261 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 5 property endpoints for blackout_blinds_308e cover...
+2026-05-19 23:53:32,265 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m UserAssistant booting (model=gpt-5-mini, base_url=https://api.openai.com/v1, temperature=1.0, reasoning_effort=default)
+2026-05-19 23:53:32,265 - UserAssistant[user_assistant@localhost] - INFO - UserAssistantAgent initialized (composable behaviours).
+2026-05-19 23:53:32,266 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 5 property endpoints for blinds_308e cover...
+2026-05-19 23:53:32,269 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for ceiling_fan_308e...
+2026-05-19 23:53:32,273 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for clock_308e...
+2026-05-19 23:53:32,276 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for co2_sensing_308e...
+2026-05-19 23:53:32,280 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 6 property endpoints for desk_lamp_308e...
+2026-05-19 23:53:32,284 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for desk_light_sensing_308e...
+2026-05-19 23:53:32,287 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 8 property endpoints for display_wall_308e...
+2026-05-19 23:53:32,292 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for external_light_sensing_308e...
+2026-05-19 23:53:32,296 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for glare_sensing_308e...
+2026-05-19 23:53:32,299 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 10 property endpoints for heater_308e...
+2026-05-19 23:53:32,304 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for humidity_sensing_308e...
+2026-05-19 23:53:32,307 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for internal_light_sensing_308e...
+2026-05-19 23:53:32,311 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for person_counter_308e...
+2026-05-19 23:53:32,314 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for presence_sensing_308e...
+2026-05-19 23:53:32,318 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 8 property endpoints for projector_308e...
+2026-05-19 23:53:32,322 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 9 property endpoints for task_lights_308e...
+2026-05-19 23:53:32,328 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for temperature_sensing_308e...
+2026-05-19 23:53:32,331 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 5 property endpoints for window_308e cover...
+2026-05-19 23:53:32,339 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m TD-SOSA support detected: enabled
+2026-05-19 23:53:32,339 - EnvExplorerAgent[env_explorer@localhost] - INFO - Subscribing to artifact events...
+2026-05-19 23:53:32,339 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for air_conditioner_308e...
+2026-05-19 23:53:32,347 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on air_conditioner_308e
+2026-05-19 23:53:32,347 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for ambient_lights_308e...
+2026-05-19 23:53:32,353 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on ambient_lights_308e
+2026-05-19 23:53:32,353 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for blackout_blinds_308e cover...
+2026-05-19 23:53:32,359 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on blackout_blinds_308e cover
+2026-05-19 23:53:32,360 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for blinds_308e cover...
+2026-05-19 23:53:32,365 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on blinds_308e cover
+2026-05-19 23:53:32,366 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for ceiling_fan_308e...
+2026-05-19 23:53:32,372 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on ceiling_fan_308e
+2026-05-19 23:53:32,372 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for clock_308e...
+2026-05-19 23:53:32,379 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on clock_308e
+2026-05-19 23:53:32,379 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for co2_sensing_308e...
+2026-05-19 23:53:32,385 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on co2_sensing_308e
+2026-05-19 23:53:32,385 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for desk_lamp_308e...
+2026-05-19 23:53:32,391 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on desk_lamp_308e
+2026-05-19 23:53:32,391 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for desk_light_sensing_308e...
+2026-05-19 23:53:32,398 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on desk_light_sensing_308e
+2026-05-19 23:53:32,398 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for display_wall_308e...
+2026-05-19 23:53:32,404 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on display_wall_308e
+2026-05-19 23:53:32,404 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for external_light_sensing_308e...
+2026-05-19 23:53:32,410 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on external_light_sensing_308e
+2026-05-19 23:53:32,410 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for glare_sensing_308e...
+2026-05-19 23:53:32,415 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on glare_sensing_308e
+2026-05-19 23:53:32,415 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for heater_308e...
+2026-05-19 23:53:32,421 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on heater_308e
+2026-05-19 23:53:32,421 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for humidity_sensing_308e...
+2026-05-19 23:53:32,427 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on humidity_sensing_308e
+2026-05-19 23:53:32,428 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for internal_light_sensing_308e...
+2026-05-19 23:53:32,435 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on internal_light_sensing_308e
+2026-05-19 23:53:32,435 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for person_counter_308e...
+2026-05-19 23:53:32,441 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on person_counter_308e
+2026-05-19 23:53:32,441 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for presence_sensing_308e...
+2026-05-19 23:53:32,447 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on presence_sensing_308e
+2026-05-19 23:53:32,447 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for projector_308e...
+2026-05-19 23:53:32,453 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on projector_308e
+2026-05-19 23:53:32,453 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for task_lights_308e...
+2026-05-19 23:53:32,459 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on task_lights_308e
+2026-05-19 23:53:32,459 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for temperature_sensing_308e...
+2026-05-19 23:53:32,465 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on temperature_sensing_308e
+2026-05-19 23:53:32,465 - ami_agents.environment.integration.integration_engine - INFO - Using CArtAgO Focus for window_308e cover...
+2026-05-19 23:53:32,471 - ami_agents.environment.integration.integration_engine - INFO - Successfully focused on window_308e cover
+2026-05-19 23:53:32,471 - EnvExplorerAgent[env_explorer@localhost] - INFO - Discovery Complete. Found 21 artifacts.
+2026-05-19 23:53:32,471 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Discovery summary: workspaces=1 artifacts=21 affordances=208
+2026-05-19 23:53:32,471 - spade.Agent - WARNING - No behaviour matched for message: <message to="user_assistant@localhost" from="env_explorer@localhost" thread="None" metadata={'type': 'env_discovery_complete', 'correlation_id': 'e1eb95f6-17a9-4995-991a-3d6ef3b4bce2'}>
+{"discovery_complete": true, "artifacts_count": 21, "affordances_count": 208, "yggdrasil_url": "http://localhost:8080", "semantic_capabilities": {"td_sosa_supported": true}}
+</message>
+2026-05-19 23:53:32,471 - EnvExplorerAgent[env_explorer@localhost] - INFO - Discovery complete notification sent to 2/2 agents.
+2026-05-19 23:53:32,471 - InteractionSolver[interaction_solver@localhost] - INFO - Environment ready (notified by env_explorer@localhost).
+2026-05-19 23:53:32,767 - Lab308eE2ERunner - INFO - [1;36m[DEMO][0m Pre-warming UserAssistant execution engine...
+2026-05-19 23:53:32,767 - ami_agents.environment.integration.integration_engine - INFO - Dereferencing Yggdrasil URL: http://localhost:8080
+2026-05-19 23:53:32,777 - ami_agents.environment.integration.integration_engine - INFO - Yggdrasil dereference response: status=200 content_type='text/turtle; charset=utf-8' body_preview='@base <http://localhost:8080/> .\n@prefix hmas: <https://purl.org/hmas/> .\n@prefix td: <https://www.w3.org/2019/wot/td#> .\n@prefix wotsec: <https://www.w3.org/2019/wot/security#> .\n\n<http://localhost:8080> a hmas:ResourceProfile ;\n    hmas:isProfileOf <#platform> .\n\n<#platform> a hmas:HypermediaMASPlatform,\n        td:Thing ;\n    hmas:hosts <workspaces/lab308e#workspace> ;\n    td:hasSecurityConfiguration [ a wotsec:NoSecurityScheme ] ;\n    td:title "Home Assistant Platform" .\n\n'
+2026-05-19 23:53:32,780 - ami_agents.environment.integration.integration_engine - INFO - Parsed Yggdrasil graph: triples=8 subjects=3
+2026-05-19 23:53:32,780 - ami_agents.environment.integration.integration_engine - INFO - URL is a ResourceProfile, searching for isProfileOf property: http://localhost:8080
+2026-05-19 23:53:32,780 - ami_agents.environment.integration.integration_engine - INFO - Found HypermediaMASPlatform via ResourceProfile: http://localhost:8080/#platform
+2026-05-19 23:53:32,780 - ami_agents.environment.integration.integration_engine - INFO - Found 1 root workspace(s) hosted by platform
+2026-05-19 23:53:32,792 - ami_agents.environment.integration.integration_engine - INFO - Processed workspace 'lab308e' with 0 sub-workspace(s)
+2026-05-19 23:53:32,792 - ami_agents.environment.integration.integration_engine - INFO - Total workspaces found: 1
+2026-05-19 23:53:32,808 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'air_conditioner_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,819 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'ambient_lights_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,826 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'blackout_blinds_308e cover' in workspace 'lab308e'
+2026-05-19 23:53:32,833 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'blinds_308e cover' in workspace 'lab308e'
+2026-05-19 23:53:32,839 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'ceiling_fan_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,844 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'clock_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,848 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'co2_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,856 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'desk_lamp_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,860 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'desk_light_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,873 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'display_wall_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,878 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'external_light_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,882 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'glare_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,890 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'heater_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,895 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'humidity_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,899 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'internal_light_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,903 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'person_counter_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,906 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'presence_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,920 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'projector_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,928 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'task_lights_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,932 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'temperature_sensing_308e' in workspace 'lab308e'
+2026-05-19 23:53:32,938 - ami_agents.environment.integration.integration_engine - INFO - Processed artifact 'window_308e cover' in workspace 'lab308e'
+2026-05-19 23:53:32,938 - ami_agents.environment.integration.integration_engine - INFO - Total artifacts found: 21
+2026-05-19 23:53:33,136 - ami_agents.environment.integration.integration_engine - INFO - Total affordances found: 208
+2026-05-19 23:53:33,136 - ami_agents.environment.integration.integration_engine - INFO - Mapping artifact states...
+2026-05-19 23:53:33,136 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 10 property endpoints for air_conditioner_308e...
+2026-05-19 23:53:33,141 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 9 property endpoints for ambient_lights_308e...
+2026-05-19 23:53:33,146 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 5 property endpoints for blackout_blinds_308e cover...
+2026-05-19 23:53:33,150 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 5 property endpoints for blinds_308e cover...
+2026-05-19 23:53:33,153 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for ceiling_fan_308e...
+2026-05-19 23:53:33,157 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for clock_308e...
+2026-05-19 23:53:33,160 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for co2_sensing_308e...
+2026-05-19 23:53:33,163 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 6 property endpoints for desk_lamp_308e...
+2026-05-19 23:53:33,167 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for desk_light_sensing_308e...
+2026-05-19 23:53:33,171 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 8 property endpoints for display_wall_308e...
+2026-05-19 23:53:33,175 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for external_light_sensing_308e...
+2026-05-19 23:53:33,179 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for glare_sensing_308e...
+2026-05-19 23:53:33,182 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 10 property endpoints for heater_308e...
+2026-05-19 23:53:33,187 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for humidity_sensing_308e...
+2026-05-19 23:53:33,190 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for internal_light_sensing_308e...
+2026-05-19 23:53:33,194 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for person_counter_308e...
+2026-05-19 23:53:33,197 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for presence_sensing_308e...
+2026-05-19 23:53:33,201 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 8 property endpoints for projector_308e...
+2026-05-19 23:53:33,205 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 9 property endpoints for task_lights_308e...
+2026-05-19 23:53:33,210 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 4 property endpoints for temperature_sensing_308e...
+2026-05-19 23:53:33,213 - ami_agents.environment.integration.integration_engine - INFO - Active Discovery: Polling 5 property endpoints for window_308e cover...
+2026-05-19 23:53:33,240 - Lab308eE2ERunner - INFO - Running case: cool_down_the_room_reduces_heat_or_ventilates
+2026-05-19 23:53:33,241 - Lab308eE2ERunner - INFO - Cleared signifier storage before case cool_down_the_room_reduces_heat_or_ventilates at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage
+2026-05-19 23:53:36,239 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Received user message: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 phase=extracting_intents text='cool down the room'
+2026-05-19 23:53:36,240 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Request classified as IMPLICIT: 'cool down the room'
+2026-05-19 23:53:36,240 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_CAPABILITIES_REQUEST from user_assistant@localhost
+2026-05-19 23:53:36,244 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Capabilities fetched: body_len=169360
+2026-05-19 23:54:02,675 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Raw intent extraction output: {"classification":"goal","intent_type":"implicit","intents":[{"action":"set","artifact":"air_conditioner","parameter":"hvac_mode","value":"cool","intent_text":"cool down the room"}],"workspace_id":"lab308e"}
+2026-05-19 23:54:02,676 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Intent extraction result: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 classification=goal workspace_id='lab308e' intent_type='implicit' artifact_id=None property_uri=None intents_count=1 question=None
+2026-05-19 23:54:02,676 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Routing message as GOAL: thread=92dbde42-e75d-44b5-aabf-725d1bf81430
+2026-05-19 23:54:02,676 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Derived intents: ['cool down the room']  workspace=lab308e  intent_type=IMPLICIT
+2026-05-19 23:54:02,676 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m UA -> InteractionSolver GOAL_REQUEST: intents=['cool down the room'] intent_type=IMPLICIT
+2026-05-19 23:54:02,677 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Received GOAL_REQUEST: intents=['cool down the room'] workspace_id='lab308e' from=user_assistant@localhost
+2026-05-19 23:54:02,677 - InteractionSolver - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent='cool down the room', workspace_id='lab308e', intent_type='IMPLICIT', has_structured_intent=True
+2026-05-19 23:54:02,829 - src.storage.memory_store - INFO - Initialized MemoryStore at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage
+2026-05-19 23:54:02,829 - src.validation.authoring_validator - INFO - Authoring Validator initialized (strict=False)
+2026-05-19 23:54:02,829 - src.storage.registry - INFO - Initialized SignifierRegistry (authoring_validation=False)
+2026-05-19 23:54:02,829 - src.matching.base - INFO - Initialized Intent Matcher StringContainsMatcher (v0)
+2026-05-19 23:54:02,829 - src.matching.registry - INFO - Registered matcher StringContainsMatcher as v0
+2026-05-19 23:54:02,829 - src.matching.base - INFO - Initialized Intent Matcher EmbeddingMatcher (v1)
+2026-05-19 23:54:02,829 - src.matching.registry - INFO - Registered matcher EmbeddingMatcher as v1
+2026-05-19 23:54:02,829 - src.matching.registry - INFO - Registered EmbeddingMatcher (v1)
+2026-05-19 23:54:02,829 - src.matching.base - INFO - Initialized Intent Matcher StructuredIntentMatcher (v2)
+2026-05-19 23:54:02,829 - src.matching.registry - INFO - Registered matcher StructuredIntentMatcher as v2
+2026-05-19 23:54:02,829 - src.matching.registry - INFO - Registered StructuredIntentMatcher (v2)
+2026-05-19 23:54:02,829 - src.matching.registry - INFO - Initialized Intent Matcher Registry (default=v2)
+2026-05-19 23:54:02,829 - src.validation.context_builder - INFO - Context Graph Builder initialized
+2026-05-19 23:54:02,829 - src.validation.shacl_validator - INFO - SHACL Validator initialized
+2026-05-19 23:54:02,829 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Experience engine ready (storage_dir=/Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage, matcher_default=v2)
+2026-05-19 23:54:02,829 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier match: 0 stored signifiers (storage empty).
+2026-05-19 23:54:02,829 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Signifier search: intent='cool down the room' matches=0 (community=0) final=0 stored_total=?
+2026-05-19 23:54:02,829 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Gathering context from EnvExplorer (workspace_id='lab308e')
+2026-05-19 23:54:02,829 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_CAPABILITIES_REQUEST from interaction_solver@localhost
+2026-05-19 23:54:02,830 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_STATE_REQUEST from interaction_solver@localhost
+2026-05-19 23:54:02,831 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Context snapshot: affordances=89 artifacts_in_state=21
+2026-05-19 23:54:02,831 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Workspace scoping applied: affordances=89 artifacts_in_state=21 workspace_id='lab308e'
+2026-05-19 23:54:02,831 - InteractionSolver - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent='cool down the room', workspace_id='lab308e', intent_type='IMPLICIT', has_structured_intent=False
+2026-05-19 23:54:02,831 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier match: 0 stored signifiers (storage empty).
+2026-05-19 23:54:02,832 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Signifier search: intent='cool down the room' matches=0 (community=0) final=0 stored_total=?
+2026-05-19 23:54:02,832 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Querying semantic HASP effects: workspace_id='lab308e' observable_properties=['thermal_comfort']
+2026-05-19 23:54:02,832 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_SEMANTIC_QUERY_REQUEST from interaction_solver@localhost
+2026-05-19 23:54:02,832 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query request parsed: workspace_id='lab308e' observable_properties=['thermal_comfort']
+2026-05-19 23:54:02,832 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query -> HASP: workspace_id='lab308e' observable_property='thermal_comfort'
+2026-05-19 23:54:02,847 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query <- HASP: observable_property='thermal_comfort' actions=2
+2026-05-19 23:54:02,847 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query response prepared: workspace_id='lab308e' result_sets=1
+2026-05-19 23:54:02,847 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Semantic HASP effects received: workspace_id='lab308e' result_sets=1
+2026-05-19 23:54:35,126 - ami_agents.bt_planning.planning.bt_planner - INFO - Generated JSON IR with 11 nodes
+2026-05-19 23:54:35,126 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Plan created: has_tree=True signifier_reuse=False impossible=False error=None
+2026-05-19 23:54:35,126 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Plan stored: hash=3afa1ab0d427a2917221f3c78eeb2954e514986f9645b8dbab141efecf308d05 nodes=11 preview=Sequence_1(sequence) [Selector_2(selector) [CheckHvac_ModeIscool:cond(hvac_mode==cool), SetHvacMode:action(set_hvac_mode) params={'hvac_mode': 'cool'}], SetTemperature:action(set_temperature) params={'temperature': 20.0, 'hvac_mode': 'cool'}, Selector_3(selector) [CheckStateIson:cond(state==on), TurnOn:action(turn_on)], Parallel_4(parallel) [CheckStateIs24.0:cond(state==24.0), CheckStateIs20.0:cond(state==20.0)]]
+2026-05-19 23:54:46,987 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Confirmation path entered: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 text='yes' has_pending_plan=True
+2026-05-19 23:54:46,987 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m User confirmed plan: thread=92dbde42-e75d-44b5-aabf-725d1bf81430
+2026-05-19 23:54:46,987 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Executing BT: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 nodes=11 signifier_reuse=False intent_type=IMPLICIT
+2026-05-19 23:54:46,987 - ami_agents.bt_planning.execution.ir_executor - INFO - Compiling JSON IR to py_trees
+2026-05-19 23:54:46,988 - ami_agents.bt_planning.execution.ir_executor - INFO - Compiled tree: Sequence_1
+2026-05-19 23:54:46,988 - ami_agents.bt_planning.execution.ir_executor - INFO - Executing behavior tree
+2026-05-19 23:54:47,031 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [SetTemperature] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e/ha/climate/set_temperature
+2026-05-19 23:54:47,795 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [SetTemperature] Action succeeded (status: 200, time: 0.764s)
+2026-05-19 23:54:48,036 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOn] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/ceiling_fan_308e/ha/switch/turn_on
+2026-05-19 23:54:49,008 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOn] Action succeeded (status: 200, time: 0.972s)
+2026-05-19 23:54:49,250 - ami_agents.bt_planning.execution.ir_executor - INFO - Execution complete: SUCCESS after 1 ticks
+2026-05-19 23:54:49,250 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m BT execution complete: success=True ticks=1 status=SUCCESS
+2026-05-19 23:54:49,251 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m State memory cache cleared after BT execution
+2026-05-19 23:54:49,251 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Querying environment state for signifier context (workspace_id='lab308e')
+2026-05-19 23:54:49,251 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_STATE_REQUEST from user_assistant@localhost
+2026-05-19 23:54:49,251 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m State snapshot retrieved: 21 artifacts for workspace_id='lab308e'
+2026-05-19 23:54:49,251 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m [INTENT_MATCH] Partial artifact match: artifact=air_conditioner (from air_conditioner_308e) -> intent='cool down the room'
+2026-05-19 23:54:49,251 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:54:49,251 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:54:49,251 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 20 relevant conditions (filtered from 238)
+2026-05-19 23:54:49,251 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m [INTENT_MATCH] Partial artifact match: artifact=air_conditioner (from air_conditioner_308e) -> intent='cool down the room'
+2026-05-19 23:54:49,251 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:54:49,252 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:54:49,252 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 20 relevant conditions (filtered from 238)
+2026-05-19 23:54:49,252 - ami_agents.bt_planning.signifier_bridge - WARNING - [1;36m[DEMO][0m [INTENT_MATCH] No match found, falling back to first intent: 'cool down the room' (node=TurnOn, action_url=http://localhost:8080/workspaces/lab308e/artifacts/ceiling_fan_308e/ha/switch/turn_on)
+2026-05-19 23:54:49,252 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:54:49,252 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:54:49,252 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 8 relevant conditions (filtered from 238)
+2026-05-19 23:54:49,252 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Recording 3 signifiers from BT execution (intent_type=IMPLICIT)
+2026-05-19 23:54:49,252 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m >>> SignifierRecordBehaviour processing: plan_type=NoneType, execution_report_type=dict, signifiers_provided=True
+2026-05-19 23:54:49,252 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m >>> Using pre-extracted signifiers (count=3), skipping plan parsing
+2026-05-19 23:54:49,252 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'set', 'artifact': 'air_conditioner', 'parameter': 'hvac_mode', 'value': 'cool', 'intent_text': 'cool down the room'}
+2026-05-19 23:54:49,252 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-6f8bf46786304eaca5286f0fa7b6a505
+2026-05-19 23:54:49,252 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-6f8bf46786304eaca5286f0fa7b6a505 (20 conditions)
+2026-05-19 23:54:49,254 - src.storage.memory_store - INFO - Stored JSON document for sig-6f8bf46786304eaca5286f0fa7b6a505 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-6f8bf46786304eaca5286f0fa7b6a505.json
+2026-05-19 23:54:49,259 - src.storage.memory_store - INFO - Stored RDF graph for sig-6f8bf46786304eaca5286f0fa7b6a505 v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-6f8bf46786304eaca5286f0fa7b6a505_v1.ttl
+2026-05-19 23:54:49,259 - src.storage.registry - INFO - Created signifier: sig-6f8bf46786304eaca5286f0fa7b6a505
+2026-05-19 23:54:49,259 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-6f8bf46786304eaca5286f0fa7b6a505: intent='cool down the room' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e/ha/climate/set_hvac_mode, intent_type='IMPLICIT'
+2026-05-19 23:54:49,259 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'set', 'artifact': 'air_conditioner', 'parameter': 'hvac_mode', 'value': 'cool', 'intent_text': 'cool down the room'}
+2026-05-19 23:54:49,259 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-c27f96a8ab5e46c98e506660ca80333f
+2026-05-19 23:54:49,259 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-c27f96a8ab5e46c98e506660ca80333f (20 conditions)
+2026-05-19 23:54:49,259 - src.storage.memory_store - INFO - Stored JSON document for sig-c27f96a8ab5e46c98e506660ca80333f at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-c27f96a8ab5e46c98e506660ca80333f.json
+2026-05-19 23:54:49,266 - src.storage.memory_store - INFO - Stored RDF graph for sig-c27f96a8ab5e46c98e506660ca80333f v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-c27f96a8ab5e46c98e506660ca80333f_v1.ttl
+2026-05-19 23:54:49,266 - src.storage.registry - INFO - Created signifier: sig-c27f96a8ab5e46c98e506660ca80333f
+2026-05-19 23:54:49,266 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-c27f96a8ab5e46c98e506660ca80333f: intent='cool down the room' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e/ha/climate/set_temperature, intent_type='IMPLICIT'
+2026-05-19 23:54:49,266 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'set', 'artifact': 'air_conditioner', 'parameter': 'hvac_mode', 'value': 'cool', 'intent_text': 'cool down the room'}
+2026-05-19 23:54:49,266 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-e70f9b1521664c299850850fec1ea41a
+2026-05-19 23:54:49,266 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-e70f9b1521664c299850850fec1ea41a (8 conditions)
+2026-05-19 23:54:49,267 - src.storage.memory_store - INFO - Stored JSON document for sig-e70f9b1521664c299850850fec1ea41a at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-e70f9b1521664c299850850fec1ea41a.json
+2026-05-19 23:54:49,269 - src.storage.memory_store - INFO - Stored RDF graph for sig-e70f9b1521664c299850850fec1ea41a v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-e70f9b1521664c299850850fec1ea41a_v1.ttl
+2026-05-19 23:54:49,269 - src.storage.registry - INFO - Created signifier: sig-e70f9b1521664c299850850fec1ea41a
+2026-05-19 23:54:49,270 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-e70f9b1521664c299850850fec1ea41a: intent='cool down the room' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/ceiling_fan_308e/ha/switch/turn_on, intent_type='IMPLICIT'
+2026-05-19 23:54:49,270 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier recording result: created=3, skipped=0
+2026-05-19 23:54:49,270 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Local signifier recording: created_count=3
+2026-05-19 23:54:57,288 - Lab308eE2ERunner - INFO - Running case: make_it_brighter_increases_workspace_light
+2026-05-19 23:54:57,291 - Lab308eE2ERunner - INFO - Cleared signifier storage before case make_it_brighter_increases_workspace_light at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage
+2026-05-19 23:55:02,217 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Received user message: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 phase=extracting_intents text='make it brighter'
+2026-05-19 23:55:02,217 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Request classified as IMPLICIT: 'make it brighter'
+2026-05-19 23:55:02,217 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_CAPABILITIES_REQUEST from user_assistant@localhost
+2026-05-19 23:55:02,218 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Capabilities fetched: body_len=169360
+2026-05-19 23:55:10,133 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Raw intent extraction output: {"classification":"goal","intent_type":"implicit","intents":[{"action":"modify","artifact":"light","parameter":"brightness","value":null,"intent_text":"make it brighter"}],"workspace_id":"lab308e"}
+2026-05-19 23:55:10,134 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Intent extraction result: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 classification=goal workspace_id='lab308e' intent_type='implicit' artifact_id=None property_uri=None intents_count=1 question=None
+2026-05-19 23:55:10,134 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Routing message as GOAL: thread=92dbde42-e75d-44b5-aabf-725d1bf81430
+2026-05-19 23:55:10,134 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Derived intents: ['make it brighter']  workspace=lab308e  intent_type=IMPLICIT
+2026-05-19 23:55:10,134 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m UA -> InteractionSolver GOAL_REQUEST: intents=['make it brighter'] intent_type=IMPLICIT
+2026-05-19 23:55:10,134 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Received GOAL_REQUEST: intents=['make it brighter'] workspace_id='lab308e' from=user_assistant@localhost
+2026-05-19 23:55:10,134 - InteractionSolver - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent='make it brighter', workspace_id='lab308e', intent_type='IMPLICIT', has_structured_intent=True
+2026-05-19 23:55:10,134 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier match: 0 stored signifiers (storage empty).
+2026-05-19 23:55:10,134 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Signifier search: intent='make it brighter' matches=0 (community=0) final=0 stored_total=?
+2026-05-19 23:55:10,134 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m build_bt_from_signifiers: MODIFY action detected for intent='make it brighter', bailing to LLM path
+2026-05-19 23:55:10,134 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Gathering context from EnvExplorer (workspace_id='lab308e')
+2026-05-19 23:55:10,134 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_CAPABILITIES_REQUEST from interaction_solver@localhost
+2026-05-19 23:55:10,135 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_STATE_REQUEST from interaction_solver@localhost
+2026-05-19 23:55:10,136 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Context snapshot: affordances=89 artifacts_in_state=21
+2026-05-19 23:55:10,136 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Workspace scoping applied: affordances=89 artifacts_in_state=21 workspace_id='lab308e'
+2026-05-19 23:55:10,136 - InteractionSolver - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent='make it brighter', workspace_id='lab308e', intent_type='IMPLICIT', has_structured_intent=False
+2026-05-19 23:55:10,136 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier match: 0 stored signifiers (storage empty).
+2026-05-19 23:55:10,137 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Signifier search: intent='make it brighter' matches=0 (community=0) final=0 stored_total=?
+2026-05-19 23:55:10,137 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Querying semantic HASP effects: workspace_id='lab308e' observable_properties=['luminosity']
+2026-05-19 23:55:10,137 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_SEMANTIC_QUERY_REQUEST from interaction_solver@localhost
+2026-05-19 23:55:10,137 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query request parsed: workspace_id='lab308e' observable_properties=['luminosity']
+2026-05-19 23:55:10,137 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query -> HASP: workspace_id='lab308e' observable_property='luminosity'
+2026-05-19 23:55:10,356 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query <- HASP: observable_property='luminosity' actions=9
+2026-05-19 23:55:10,356 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query response prepared: workspace_id='lab308e' result_sets=1
+2026-05-19 23:55:10,356 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Semantic HASP effects received: workspace_id='lab308e' result_sets=1
+2026-05-19 23:55:45,194 - ami_agents.bt_planning.planning.bt_planner - INFO - Generated JSON IR with 23 nodes
+2026-05-19 23:55:45,194 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Plan created: has_tree=True signifier_reuse=False impossible=False error=None
+2026-05-19 23:55:45,195 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Plan stored: hash=87978ced5022f66fb6dcda19db60b668b8834892548edb665b23f93fb413c980 nodes=23 preview=Selector_1(selector) [CheckStateIs200.0:cond(state==200.0), Sequence_2(sequence) [Parallel_3(parallel), CheckStateIs200.0:cond(state==200.0)]]
+2026-05-19 23:55:50,909 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Confirmation path entered: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 text='yes' has_pending_plan=True
+2026-05-19 23:55:50,910 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m User confirmed plan: thread=92dbde42-e75d-44b5-aabf-725d1bf81430
+2026-05-19 23:55:50,910 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Executing BT: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 nodes=23 signifier_reuse=False intent_type=IMPLICIT
+2026-05-19 23:55:50,910 - ami_agents.bt_planning.execution.ir_executor - INFO - Compiling JSON IR to py_trees
+2026-05-19 23:55:50,912 - ami_agents.bt_planning.execution.ir_executor - INFO - Compiled tree: Selector_1
+2026-05-19 23:55:50,912 - ami_agents.bt_planning.execution.ir_executor - INFO - Executing behavior tree
+2026-05-19 23:55:50,990 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOn] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e/ha/light/turn_on
+2026-05-19 23:55:51,713 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOn] Action succeeded (status: 200, time: 0.722s)
+2026-05-19 23:55:51,948 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOn] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/task_lights_308e/ha/light/turn_on
+2026-05-19 23:55:52,662 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOn] Action succeeded (status: 200, time: 0.714s)
+2026-05-19 23:55:52,900 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOn] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/desk_lamp_308e/ha/light/turn_on
+2026-05-19 23:55:53,868 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOn] Action succeeded (status: 200, time: 0.967s)
+2026-05-19 23:55:54,115 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [OpenCover] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/blinds_308e_cover/ha/cover/open_cover
+2026-05-19 23:55:55,093 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [OpenCover] Action succeeded (status: 200, time: 0.977s)
+2026-05-19 23:55:55,318 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [OpenCover] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/ha/cover/open_cover
+2026-05-19 23:55:56,283 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [OpenCover] Action succeeded (status: 200, time: 0.965s)
+2026-05-19 23:55:56,533 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [OpenCover] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/window_308e_cover/ha/cover/open_cover
+2026-05-19 23:55:57,505 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [OpenCover] Action succeeded (status: 200, time: 0.972s)
+2026-05-19 23:55:57,748 - ami_agents.bt_planning.execution.ir_executor - INFO - Execution complete: SUCCESS after 1 ticks
+2026-05-19 23:55:57,748 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m BT execution complete: success=True ticks=1 status=SUCCESS
+2026-05-19 23:55:57,748 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m State memory cache cleared after BT execution
+2026-05-19 23:55:57,748 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Querying environment state for signifier context (workspace_id='lab308e')
+2026-05-19 23:55:57,748 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_STATE_REQUEST from user_assistant@localhost
+2026-05-19 23:55:57,749 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m State snapshot retrieved: 21 artifacts for workspace_id='lab308e'
+2026-05-19 23:55:57,749 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m [INTENT_MATCH] Partial artifact match: artifact=light (from ambient_lights_308e) -> intent='make it brighter'
+2026-05-19 23:55:57,749 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:55:57,749 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:55:57,749 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 18 relevant conditions (filtered from 238)
+2026-05-19 23:55:57,749 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m [INTENT_MATCH] Partial artifact match: artifact=light (from task_lights_308e) -> intent='make it brighter'
+2026-05-19 23:55:57,749 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:55:57,749 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:55:57,749 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 18 relevant conditions (filtered from 238)
+2026-05-19 23:55:57,749 - ami_agents.bt_planning.signifier_bridge - WARNING - [1;36m[DEMO][0m [INTENT_MATCH] No match found, falling back to first intent: 'make it brighter' (node=TurnOn, action_url=http://localhost:8080/workspaces/lab308e/artifacts/desk_lamp_308e/ha/light/turn_on)
+2026-05-19 23:55:57,749 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:55:57,749 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:55:57,749 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 12 relevant conditions (filtered from 238)
+2026-05-19 23:55:57,749 - ami_agents.bt_planning.signifier_bridge - WARNING - [1;36m[DEMO][0m [INTENT_MATCH] No match found, falling back to first intent: 'make it brighter' (node=OpenCover, action_url=http://localhost:8080/workspaces/lab308e/artifacts/blinds_308e_cover/ha/cover/open_cover)
+2026-05-19 23:55:57,749 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:55:57,749 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:55:57,750 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 20 relevant conditions (filtered from 238)
+2026-05-19 23:55:57,750 - ami_agents.bt_planning.signifier_bridge - WARNING - [1;36m[DEMO][0m [INTENT_MATCH] No match found, falling back to first intent: 'make it brighter' (node=OpenCover, action_url=http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/ha/cover/open_cover)
+2026-05-19 23:55:57,750 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:55:57,750 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:55:57,750 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 10 relevant conditions (filtered from 238)
+2026-05-19 23:55:57,750 - ami_agents.bt_planning.signifier_bridge - WARNING - [1;36m[DEMO][0m [INTENT_MATCH] No match found, falling back to first intent: 'make it brighter' (node=OpenCover, action_url=http://localhost:8080/workspaces/lab308e/artifacts/window_308e_cover/ha/cover/open_cover)
+2026-05-19 23:55:57,750 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:55:57,750 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:55:57,750 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 10 relevant conditions (filtered from 238)
+2026-05-19 23:55:57,750 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Recording 6 signifiers from BT execution (intent_type=IMPLICIT)
+2026-05-19 23:55:57,750 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m >>> SignifierRecordBehaviour processing: plan_type=NoneType, execution_report_type=dict, signifiers_provided=True
+2026-05-19 23:55:57,750 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m >>> Using pre-extracted signifiers (count=6), skipping plan parsing
+2026-05-19 23:55:57,750 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'modify', 'artifact': 'light', 'parameter': 'brightness', 'intent_text': 'make it brighter'}
+2026-05-19 23:55:57,750 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-d255a38a513a4409a15563be69168699
+2026-05-19 23:55:57,750 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-d255a38a513a4409a15563be69168699 (18 conditions)
+2026-05-19 23:55:57,751 - src.storage.memory_store - INFO - Stored JSON document for sig-d255a38a513a4409a15563be69168699 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-d255a38a513a4409a15563be69168699.json
+2026-05-19 23:55:57,756 - src.storage.memory_store - INFO - Stored RDF graph for sig-d255a38a513a4409a15563be69168699 v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-d255a38a513a4409a15563be69168699_v1.ttl
+2026-05-19 23:55:57,756 - src.storage.registry - INFO - Created signifier: sig-d255a38a513a4409a15563be69168699
+2026-05-19 23:55:57,756 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-d255a38a513a4409a15563be69168699: intent='make it brighter' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e/ha/light/turn_on, intent_type='IMPLICIT'
+2026-05-19 23:55:57,756 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'modify', 'artifact': 'light', 'parameter': 'brightness', 'intent_text': 'make it brighter'}
+2026-05-19 23:55:57,756 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-6ca576998613409abf9a7283271bdad6
+2026-05-19 23:55:57,756 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-6ca576998613409abf9a7283271bdad6 (18 conditions)
+2026-05-19 23:55:57,756 - src.storage.memory_store - INFO - Stored JSON document for sig-6ca576998613409abf9a7283271bdad6 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-6ca576998613409abf9a7283271bdad6.json
+2026-05-19 23:55:57,761 - src.storage.memory_store - INFO - Stored RDF graph for sig-6ca576998613409abf9a7283271bdad6 v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-6ca576998613409abf9a7283271bdad6_v1.ttl
+2026-05-19 23:55:57,761 - src.storage.registry - INFO - Created signifier: sig-6ca576998613409abf9a7283271bdad6
+2026-05-19 23:55:57,761 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-6ca576998613409abf9a7283271bdad6: intent='make it brighter' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/task_lights_308e/ha/light/turn_on, intent_type='IMPLICIT'
+2026-05-19 23:55:57,761 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'modify', 'artifact': 'light', 'parameter': 'brightness', 'intent_text': 'make it brighter'}
+2026-05-19 23:55:57,761 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-63d11f7093f34633b5c75a52f6210756
+2026-05-19 23:55:57,761 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-63d11f7093f34633b5c75a52f6210756 (12 conditions)
+2026-05-19 23:55:57,761 - src.storage.memory_store - INFO - Stored JSON document for sig-63d11f7093f34633b5c75a52f6210756 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-63d11f7093f34633b5c75a52f6210756.json
+2026-05-19 23:55:57,769 - src.storage.memory_store - INFO - Stored RDF graph for sig-63d11f7093f34633b5c75a52f6210756 v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-63d11f7093f34633b5c75a52f6210756_v1.ttl
+2026-05-19 23:55:57,769 - src.storage.registry - INFO - Created signifier: sig-63d11f7093f34633b5c75a52f6210756
+2026-05-19 23:55:57,769 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-63d11f7093f34633b5c75a52f6210756: intent='make it brighter' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/desk_lamp_308e/ha/light/turn_on, intent_type='IMPLICIT'
+2026-05-19 23:55:57,769 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'modify', 'artifact': 'light', 'parameter': 'brightness', 'intent_text': 'make it brighter'}
+2026-05-19 23:55:57,769 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-4a7b7f07c68f4b4b8e52c152f1f0bd06
+2026-05-19 23:55:57,769 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-4a7b7f07c68f4b4b8e52c152f1f0bd06 (20 conditions)
+2026-05-19 23:55:57,769 - src.storage.memory_store - INFO - Stored JSON document for sig-4a7b7f07c68f4b4b8e52c152f1f0bd06 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-4a7b7f07c68f4b4b8e52c152f1f0bd06.json
+2026-05-19 23:55:57,774 - src.storage.memory_store - INFO - Stored RDF graph for sig-4a7b7f07c68f4b4b8e52c152f1f0bd06 v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-4a7b7f07c68f4b4b8e52c152f1f0bd06_v1.ttl
+2026-05-19 23:55:57,775 - src.storage.registry - INFO - Created signifier: sig-4a7b7f07c68f4b4b8e52c152f1f0bd06
+2026-05-19 23:55:57,775 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-4a7b7f07c68f4b4b8e52c152f1f0bd06: intent='make it brighter' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/blinds_308e_cover/ha/cover/open_cover, intent_type='IMPLICIT'
+2026-05-19 23:55:57,775 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'modify', 'artifact': 'light', 'parameter': 'brightness', 'intent_text': 'make it brighter'}
+2026-05-19 23:55:57,775 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-b60ae897d28b43108242666291f3086d
+2026-05-19 23:55:57,775 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-b60ae897d28b43108242666291f3086d (10 conditions)
+2026-05-19 23:55:57,775 - src.storage.memory_store - INFO - Stored JSON document for sig-b60ae897d28b43108242666291f3086d at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-b60ae897d28b43108242666291f3086d.json
+2026-05-19 23:55:57,778 - src.storage.memory_store - INFO - Stored RDF graph for sig-b60ae897d28b43108242666291f3086d v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-b60ae897d28b43108242666291f3086d_v1.ttl
+2026-05-19 23:55:57,778 - src.storage.registry - INFO - Created signifier: sig-b60ae897d28b43108242666291f3086d
+2026-05-19 23:55:57,778 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-b60ae897d28b43108242666291f3086d: intent='make it brighter' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/ha/cover/open_cover, intent_type='IMPLICIT'
+2026-05-19 23:55:57,778 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'modify', 'artifact': 'light', 'parameter': 'brightness', 'intent_text': 'make it brighter'}
+2026-05-19 23:55:57,778 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-d9504927c1804477865d0eaff15ec946
+2026-05-19 23:55:57,778 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-d9504927c1804477865d0eaff15ec946 (10 conditions)
+2026-05-19 23:55:57,778 - src.storage.memory_store - INFO - Stored JSON document for sig-d9504927c1804477865d0eaff15ec946 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-d9504927c1804477865d0eaff15ec946.json
+2026-05-19 23:55:57,782 - src.storage.memory_store - INFO - Stored RDF graph for sig-d9504927c1804477865d0eaff15ec946 v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-d9504927c1804477865d0eaff15ec946_v1.ttl
+2026-05-19 23:55:57,782 - src.storage.registry - INFO - Created signifier: sig-d9504927c1804477865d0eaff15ec946
+2026-05-19 23:55:57,782 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-d9504927c1804477865d0eaff15ec946: intent='make it brighter' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/window_308e_cover/ha/cover/open_cover, intent_type='IMPLICIT'
+2026-05-19 23:55:57,782 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier recording result: created=6, skipped=0
+2026-05-19 23:55:57,782 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Local signifier recording: created_count=6
+2026-05-19 23:56:01,124 - Lab308eE2ERunner - INFO - Running case: make_screen_easier_to_see_reduces_screen_glare
+2026-05-19 23:56:01,125 - Lab308eE2ERunner - INFO - Cleared signifier storage before case make_screen_easier_to_see_reduces_screen_glare at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage
+2026-05-19 23:56:05,059 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Received user message: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 phase=extracting_intents text='make the screen easier to see'
+2026-05-19 23:56:05,059 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Request classified as IMPLICIT: 'make the screen easier to see'
+2026-05-19 23:56:05,059 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_CAPABILITIES_REQUEST from user_assistant@localhost
+2026-05-19 23:56:05,060 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Capabilities fetched: body_len=169360
+2026-05-19 23:56:09,335 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Raw intent extraction output: {"classification":"unclear","question":"Which screen do you mean — the display wall (display_wall_308e) or the projector (projector_308e)?"}
+2026-05-19 23:56:09,335 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Intent extraction result: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 classification=unclear workspace_id=None intent_type=None artifact_id=None property_uri=None intents_count=0 question='Which screen do you mean — the display wall (display_wall_308e) or the projector (projector_308e)?'
+2026-05-19 23:56:09,335 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Routing message as UNCLEAR: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 question='Which screen do you mean — the display wall (display_wall_308e) or the projector (projector_308e)?'
+2026-05-19 23:56:09,335 - Lab308eE2ERunner - INFO - Matched clarification for case make_screen_easier_to_see_reduces_screen_glare; replying with scripted answer: the projector
+2026-05-19 23:56:09,336 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Received user message: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 phase=extracting_intents text='the projector'
+2026-05-19 23:56:09,336 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Request classified as IMPLICIT: 'the projector'
+2026-05-19 23:56:09,336 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_CAPABILITIES_REQUEST from user_assistant@localhost
+2026-05-19 23:56:09,337 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Capabilities fetched: body_len=169360
+2026-05-19 23:56:14,975 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Raw intent extraction output: {"classification":"unclear","question":"What would you like me to do with the projector?"}
+2026-05-19 23:56:14,975 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Intent extraction result: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 classification=unclear workspace_id=None intent_type=None artifact_id=None property_uri=None intents_count=0 question='What would you like me to do with the projector?'
+2026-05-19 23:56:14,975 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Routing message as UNCLEAR: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 question='What would you like me to do with the projector?'
+2026-05-19 23:56:14,975 - Lab308eE2ERunner - INFO - Matched clarification for case make_screen_easier_to_see_reduces_screen_glare; replying with scripted answer: reduce glare
+2026-05-19 23:56:14,975 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Received user message: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 phase=extracting_intents text='reduce glare'
+2026-05-19 23:56:14,975 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Request classified as IMPLICIT: 'reduce glare'
+2026-05-19 23:56:14,976 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_CAPABILITIES_REQUEST from user_assistant@localhost
+2026-05-19 23:56:14,977 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Capabilities fetched: body_len=169360
+2026-05-19 23:56:32,084 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Raw intent extraction output: {"classification":"goal","intent_type":"implicit","intents":[{"action":"modify","artifact":"blinds","parameter":"position","value":null,"intent_text":"reduce glare"}],"workspace_id":"lab308e"}
+2026-05-19 23:56:32,084 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Intent extraction result: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 classification=goal workspace_id='lab308e' intent_type='implicit' artifact_id=None property_uri=None intents_count=1 question=None
+2026-05-19 23:56:32,084 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Routing message as GOAL: thread=92dbde42-e75d-44b5-aabf-725d1bf81430
+2026-05-19 23:56:32,084 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Derived intents: ['reduce glare']  workspace=lab308e  intent_type=IMPLICIT
+2026-05-19 23:56:32,084 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m UA -> InteractionSolver GOAL_REQUEST: intents=['reduce glare'] intent_type=IMPLICIT
+2026-05-19 23:56:32,085 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Received GOAL_REQUEST: intents=['reduce glare'] workspace_id='lab308e' from=user_assistant@localhost
+2026-05-19 23:56:32,085 - InteractionSolver - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent='reduce glare', workspace_id='lab308e', intent_type='IMPLICIT', has_structured_intent=True
+2026-05-19 23:56:32,085 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier match: 0 stored signifiers (storage empty).
+2026-05-19 23:56:32,085 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Signifier search: intent='reduce glare' matches=0 (community=0) final=0 stored_total=?
+2026-05-19 23:56:32,085 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m build_bt_from_signifiers: MODIFY action detected for intent='reduce glare', bailing to LLM path
+2026-05-19 23:56:32,086 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Gathering context from EnvExplorer (workspace_id='lab308e')
+2026-05-19 23:56:32,086 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_CAPABILITIES_REQUEST from interaction_solver@localhost
+2026-05-19 23:56:32,087 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_STATE_REQUEST from interaction_solver@localhost
+2026-05-19 23:56:32,088 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Context snapshot: affordances=89 artifacts_in_state=21
+2026-05-19 23:56:32,088 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Workspace scoping applied: affordances=89 artifacts_in_state=21 workspace_id='lab308e'
+2026-05-19 23:56:32,088 - InteractionSolver - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent='reduce glare', workspace_id='lab308e', intent_type='IMPLICIT', has_structured_intent=False
+2026-05-19 23:56:32,088 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier match: 0 stored signifiers (storage empty).
+2026-05-19 23:56:32,088 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Signifier search: intent='reduce glare' matches=0 (community=0) final=0 stored_total=?
+2026-05-19 23:56:32,088 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Querying semantic HASP effects: workspace_id='lab308e' observable_properties=['glare']
+2026-05-19 23:56:32,088 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_SEMANTIC_QUERY_REQUEST from interaction_solver@localhost
+2026-05-19 23:56:32,088 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query request parsed: workspace_id='lab308e' observable_properties=['glare']
+2026-05-19 23:56:32,088 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query -> HASP: workspace_id='lab308e' observable_property='glare'
+2026-05-19 23:56:32,149 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query <- HASP: observable_property='glare' actions=2
+2026-05-19 23:56:32,149 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query response prepared: workspace_id='lab308e' result_sets=1
+2026-05-19 23:56:32,150 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Semantic HASP effects received: workspace_id='lab308e' result_sets=1
+2026-05-19 23:56:58,254 - ami_agents.bt_planning.planning.bt_planner - INFO - Generated JSON IR with 23 nodes
+2026-05-19 23:56:58,255 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Plan created: has_tree=True signifier_reuse=False impossible=False error=None
+2026-05-19 23:56:58,255 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Plan stored: hash=805b10ad32f812c146e8df3b4f38bca4bcf5f2d1fedbf92c27026e1e8980c01d nodes=23 preview=Selector_1(selector) [CheckStateIs50.0:cond(state==50.0), Sequence_2(sequence) [Parallel_3(parallel), CheckStateIs50.0:cond(state==50.0)]]
+2026-05-19 23:57:05,037 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Confirmation path entered: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 text='yes' has_pending_plan=True
+2026-05-19 23:57:05,037 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m User confirmed plan: thread=92dbde42-e75d-44b5-aabf-725d1bf81430
+2026-05-19 23:57:05,037 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Executing BT: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 nodes=23 signifier_reuse=False intent_type=IMPLICIT
+2026-05-19 23:57:05,037 - ami_agents.bt_planning.execution.ir_executor - INFO - Compiling JSON IR to py_trees
+2026-05-19 23:57:05,038 - ami_agents.bt_planning.execution.ir_executor - INFO - Compiled tree: Selector_1
+2026-05-19 23:57:05,038 - ami_agents.bt_planning.execution.ir_executor - INFO - Executing behavior tree
+2026-05-19 23:57:05,555 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [CloseCover] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/ha/cover/close_cover
+2026-05-19 23:57:06,772 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [CloseCover] Action succeeded (status: 200, time: 1.216s)
+2026-05-19 23:57:07,018 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [CloseCover] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/blinds_308e_cover/ha/cover/close_cover
+2026-05-19 23:57:07,982 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [CloseCover] Action succeeded (status: 200, time: 0.964s)
+2026-05-19 23:57:08,215 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [CloseCover] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/window_308e_cover/ha/cover/close_cover
+2026-05-19 23:57:09,187 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [CloseCover] Action succeeded (status: 200, time: 0.971s)
+2026-05-19 23:57:09,439 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOff] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/desk_lamp_308e/ha/light/turn_off
+2026-05-19 23:57:10,408 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOff] Action succeeded (status: 200, time: 0.969s)
+2026-05-19 23:57:10,664 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOff] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/task_lights_308e/ha/light/turn_off
+2026-05-19 23:57:11,628 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOff] Action succeeded (status: 200, time: 0.964s)
+2026-05-19 23:57:11,875 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOff] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e/ha/light/turn_off
+2026-05-19 23:57:12,824 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOff] Action succeeded (status: 200, time: 0.948s)
+2026-05-19 23:57:13,071 - ami_agents.bt_planning.execution.ir_executor - INFO - Execution complete: FAILURE after 1 ticks
+2026-05-19 23:57:13,071 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m BT execution complete: success=False ticks=1 status=FAILURE
+2026-05-19 23:57:13,071 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m State memory cache cleared after BT execution
+2026-05-19 23:57:21,398 - Lab308eE2ERunner - ERROR - Assertion failed: {"type": "final_reply_contains", "passed": false, "expected": "success", "actual": "Execution failed: FAILURE"}
+2026-05-19 23:57:21,400 - Lab308eE2ERunner - INFO - Running case: reduce_glare_closes_blackout_blinds
+2026-05-19 23:57:21,401 - Lab308eE2ERunner - INFO - Cleared signifier storage before case reduce_glare_closes_blackout_blinds at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage
+2026-05-19 23:57:24,608 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Received user message: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 phase=extracting_intents text='reduce glare'
+2026-05-19 23:57:24,608 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Request classified as IMPLICIT: 'reduce glare'
+2026-05-19 23:57:24,608 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_CAPABILITIES_REQUEST from user_assistant@localhost
+2026-05-19 23:57:24,610 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Capabilities fetched: body_len=169360
+2026-05-19 23:57:36,704 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Raw intent extraction output: {"classification":"goal","intent_type":"implicit","intents":[{"action":"modify","artifact":"light","parameter":"brightness","value":null,"intent_text":"dim the lights to reduce glare"},{"action":"set","artifact":"blinds","parameter":"open_close","value":false,"intent_text":"close the blinds to reduce glare"}],"workspace_id":"lab308e"}
+2026-05-19 23:57:36,704 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Intent extraction result: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 classification=goal workspace_id='lab308e' intent_type='implicit' artifact_id=None property_uri=None intents_count=2 question=None
+2026-05-19 23:57:36,704 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Routing message as GOAL: thread=92dbde42-e75d-44b5-aabf-725d1bf81430
+2026-05-19 23:57:36,704 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Derived intents: ['dim the lights to reduce glare', 'close the blinds to reduce glare']  workspace=lab308e  intent_type=IMPLICIT
+2026-05-19 23:57:36,704 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m UA -> InteractionSolver GOAL_REQUEST: intents=['dim the lights to reduce glare', 'close the blinds to reduce glare'] intent_type=IMPLICIT
+2026-05-19 23:57:36,704 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Received GOAL_REQUEST: intents=['dim the lights to reduce glare', 'close the blinds to reduce glare'] workspace_id='lab308e' from=user_assistant@localhost
+2026-05-19 23:57:36,705 - InteractionSolver - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent='dim the lights to reduce glare', workspace_id='lab308e', intent_type='IMPLICIT', has_structured_intent=True
+2026-05-19 23:57:36,705 - InteractionSolver - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent='close the blinds to reduce glare', workspace_id='lab308e', intent_type='IMPLICIT', has_structured_intent=True
+2026-05-19 23:57:36,705 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier match: 0 stored signifiers (storage empty).
+2026-05-19 23:57:36,705 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier match: 0 stored signifiers (storage empty).
+2026-05-19 23:57:36,705 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Signifier search: intent='dim the lights to reduce glare' matches=0 (community=0) final=0 stored_total=?
+2026-05-19 23:57:36,705 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Signifier search: intent='close the blinds to reduce glare' matches=0 (community=0) final=0 stored_total=?
+2026-05-19 23:57:36,705 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m build_bt_from_signifiers: MODIFY action detected for intent='dim the lights to reduce glare', bailing to LLM path
+2026-05-19 23:57:36,705 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Gathering context from EnvExplorer (workspace_id='lab308e')
+2026-05-19 23:57:36,705 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_CAPABILITIES_REQUEST from interaction_solver@localhost
+2026-05-19 23:57:36,706 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_STATE_REQUEST from interaction_solver@localhost
+2026-05-19 23:57:36,707 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Context snapshot: affordances=89 artifacts_in_state=21
+2026-05-19 23:57:36,707 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Workspace scoping applied: affordances=89 artifacts_in_state=21 workspace_id='lab308e'
+2026-05-19 23:57:36,707 - InteractionSolver - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent='dim the lights to reduce glare', workspace_id='lab308e', intent_type='IMPLICIT', has_structured_intent=False
+2026-05-19 23:57:36,707 - InteractionSolver - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent='close the blinds to reduce glare', workspace_id='lab308e', intent_type='IMPLICIT', has_structured_intent=False
+2026-05-19 23:57:36,707 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier match: 0 stored signifiers (storage empty).
+2026-05-19 23:57:36,708 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier match: 0 stored signifiers (storage empty).
+2026-05-19 23:57:36,708 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Signifier search: intent='dim the lights to reduce glare' matches=0 (community=0) final=0 stored_total=?
+2026-05-19 23:57:36,708 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Signifier search: intent='close the blinds to reduce glare' matches=0 (community=0) final=0 stored_total=?
+2026-05-19 23:57:36,708 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Querying semantic HASP effects: workspace_id='lab308e' observable_properties=['glare', 'luminosity']
+2026-05-19 23:57:36,708 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_SEMANTIC_QUERY_REQUEST from interaction_solver@localhost
+2026-05-19 23:57:36,708 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query request parsed: workspace_id='lab308e' observable_properties=['glare', 'luminosity']
+2026-05-19 23:57:36,708 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query -> HASP: workspace_id='lab308e' observable_property='glare'
+2026-05-19 23:57:36,958 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query <- HASP: observable_property='glare' actions=2
+2026-05-19 23:57:36,958 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query -> HASP: workspace_id='lab308e' observable_property='luminosity'
+2026-05-19 23:57:37,197 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query <- HASP: observable_property='luminosity' actions=9
+2026-05-19 23:57:37,197 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Semantic query response prepared: workspace_id='lab308e' result_sets=2
+2026-05-19 23:57:37,197 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Semantic HASP effects received: workspace_id='lab308e' result_sets=2
+2026-05-19 23:58:24,299 - ami_agents.bt_planning.planning.bt_planner - INFO - Generated JSON IR with 23 nodes
+2026-05-19 23:58:24,301 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Plan created: has_tree=True signifier_reuse=False impossible=False error=None
+2026-05-19 23:58:24,303 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Plan stored: hash=9ee8a8dc6b266769606604a0617e7f3e99befeea96013b77ebdd32ac7de0db7f nodes=23 preview=Sequence_1(sequence) [Parallel_2(parallel) [Parallel_3(parallel), Parallel_7(parallel)], CheckStateIs50.0:cond(state==50.0)]
+2026-05-19 23:58:31,777 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Confirmation path entered: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 text='yes' has_pending_plan=True
+2026-05-19 23:58:31,778 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m User confirmed plan: thread=92dbde42-e75d-44b5-aabf-725d1bf81430
+2026-05-19 23:58:31,778 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Executing BT: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 nodes=23 signifier_reuse=False intent_type=IMPLICIT
+2026-05-19 23:58:31,778 - ami_agents.bt_planning.execution.ir_executor - INFO - Compiling JSON IR to py_trees
+2026-05-19 23:58:31,779 - ami_agents.bt_planning.execution.ir_executor - INFO - Compiled tree: Sequence_1
+2026-05-19 23:58:31,779 - ami_agents.bt_planning.execution.ir_executor - INFO - Executing behavior tree
+2026-05-19 23:58:31,852 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOn] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/desk_lamp_308e/ha/light/turn_on
+2026-05-19 23:58:32,580 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [TurnOn] Action succeeded (status: 200, time: 0.727s)
+2026-05-19 23:58:33,052 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [CloseCover] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/ha/cover/close_cover
+2026-05-19 23:58:33,784 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [CloseCover] Action succeeded (status: 200, time: 0.732s)
+2026-05-19 23:58:34,729 - ami_agents.bt_planning.execution.ir_executor - INFO - Execution complete: SUCCESS after 1 ticks
+2026-05-19 23:58:34,729 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m BT execution complete: success=True ticks=1 status=SUCCESS
+2026-05-19 23:58:34,730 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m State memory cache cleared after BT execution
+2026-05-19 23:58:34,730 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Querying environment state for signifier context (workspace_id='lab308e')
+2026-05-19 23:58:34,730 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_STATE_REQUEST from user_assistant@localhost
+2026-05-19 23:58:34,730 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m State snapshot retrieved: 21 artifacts for workspace_id='lab308e'
+2026-05-19 23:58:34,730 - ami_agents.bt_planning.signifier_bridge - WARNING - [1;36m[DEMO][0m [INTENT_MATCH] No match found, falling back to first intent: 'dim the lights to reduce glare' (node=TurnOn, action_url=http://localhost:8080/workspaces/lab308e/artifacts/desk_lamp_308e/ha/light/turn_on)
+2026-05-19 23:58:34,730 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:58:34,730 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 12 relevant conditions (filtered from 238)
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m [INTENT_MATCH] Partial artifact match: artifact=light (from task_lights_308e) -> intent='dim the lights to reduce glare'
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 18 relevant conditions (filtered from 238)
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m [INTENT_MATCH] Partial artifact match: artifact=light (from ambient_lights_308e) -> intent='dim the lights to reduce glare'
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 18 relevant conditions (filtered from 238)
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m [INTENT_MATCH] Partial artifact match: artifact=blinds (from blackout_blinds_308e_cover) -> intent='close the blinds to reduce glare'
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 10 relevant conditions (filtered from 238)
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m [INTENT_MATCH] Partial artifact match: artifact=blinds (from blinds_308e_cover) -> intent='close the blinds to reduce glare'
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 20 relevant conditions (filtered from 238)
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m [INTENT_MATCH] Keyword-based match: node=CloseCover action=close cover -> intent='close the blinds to reduce glare'
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:58:34,731 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 10 relevant conditions (filtered from 238)
+2026-05-19 23:58:34,731 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Recording 6 signifiers from BT execution (intent_type=IMPLICIT)
+2026-05-19 23:58:34,732 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m >>> SignifierRecordBehaviour processing: plan_type=NoneType, execution_report_type=dict, signifiers_provided=True
+2026-05-19 23:58:34,732 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m >>> Using pre-extracted signifiers (count=6), skipping plan parsing
+2026-05-19 23:58:34,732 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'modify', 'artifact': 'light', 'parameter': 'brightness', 'intent_text': 'dim the lights to reduce glare'}
+2026-05-19 23:58:34,732 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-ef45c12e5447443b8a410eebfd0b61e5
+2026-05-19 23:58:34,732 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-ef45c12e5447443b8a410eebfd0b61e5 (12 conditions)
+2026-05-19 23:58:34,733 - src.storage.memory_store - INFO - Stored JSON document for sig-ef45c12e5447443b8a410eebfd0b61e5 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-ef45c12e5447443b8a410eebfd0b61e5.json
+2026-05-19 23:58:34,737 - src.storage.memory_store - INFO - Stored RDF graph for sig-ef45c12e5447443b8a410eebfd0b61e5 v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-ef45c12e5447443b8a410eebfd0b61e5_v1.ttl
+2026-05-19 23:58:34,737 - src.storage.registry - INFO - Created signifier: sig-ef45c12e5447443b8a410eebfd0b61e5
+2026-05-19 23:58:34,737 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-ef45c12e5447443b8a410eebfd0b61e5: intent='dim the lights to reduce glare' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/desk_lamp_308e/ha/light/turn_on, intent_type='IMPLICIT'
+2026-05-19 23:58:34,737 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'modify', 'artifact': 'light', 'parameter': 'brightness', 'intent_text': 'dim the lights to reduce glare'}
+2026-05-19 23:58:34,737 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-5bdea8c3588d46a4a9eaecbe6f375111
+2026-05-19 23:58:34,738 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-5bdea8c3588d46a4a9eaecbe6f375111 (18 conditions)
+2026-05-19 23:58:34,738 - src.storage.memory_store - INFO - Stored JSON document for sig-5bdea8c3588d46a4a9eaecbe6f375111 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-5bdea8c3588d46a4a9eaecbe6f375111.json
+2026-05-19 23:58:34,742 - src.storage.memory_store - INFO - Stored RDF graph for sig-5bdea8c3588d46a4a9eaecbe6f375111 v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-5bdea8c3588d46a4a9eaecbe6f375111_v1.ttl
+2026-05-19 23:58:34,742 - src.storage.registry - INFO - Created signifier: sig-5bdea8c3588d46a4a9eaecbe6f375111
+2026-05-19 23:58:34,742 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-5bdea8c3588d46a4a9eaecbe6f375111: intent='dim the lights to reduce glare' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/task_lights_308e/ha/light/turn_off, intent_type='IMPLICIT'
+2026-05-19 23:58:34,742 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'modify', 'artifact': 'light', 'parameter': 'brightness', 'intent_text': 'dim the lights to reduce glare'}
+2026-05-19 23:58:34,742 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-433fa1d2b4ce4469944e2f3d909f0693
+2026-05-19 23:58:34,742 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-433fa1d2b4ce4469944e2f3d909f0693 (18 conditions)
+2026-05-19 23:58:34,743 - src.storage.memory_store - INFO - Stored JSON document for sig-433fa1d2b4ce4469944e2f3d909f0693 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-433fa1d2b4ce4469944e2f3d909f0693.json
+2026-05-19 23:58:34,747 - src.storage.memory_store - INFO - Stored RDF graph for sig-433fa1d2b4ce4469944e2f3d909f0693 v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-433fa1d2b4ce4469944e2f3d909f0693_v1.ttl
+2026-05-19 23:58:34,747 - src.storage.registry - INFO - Created signifier: sig-433fa1d2b4ce4469944e2f3d909f0693
+2026-05-19 23:58:34,747 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-433fa1d2b4ce4469944e2f3d909f0693: intent='dim the lights to reduce glare' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e/ha/light/turn_off, intent_type='IMPLICIT'
+2026-05-19 23:58:34,747 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'set', 'artifact': 'blinds', 'parameter': 'open_close', 'value': False, 'intent_text': 'close the blinds to reduce glare'}
+2026-05-19 23:58:34,747 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-ba1a496408ee407cb8b879441e54d764
+2026-05-19 23:58:34,747 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-ba1a496408ee407cb8b879441e54d764 (10 conditions)
+2026-05-19 23:58:34,747 - src.storage.memory_store - INFO - Stored JSON document for sig-ba1a496408ee407cb8b879441e54d764 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-ba1a496408ee407cb8b879441e54d764.json
+2026-05-19 23:58:34,750 - src.storage.memory_store - INFO - Stored RDF graph for sig-ba1a496408ee407cb8b879441e54d764 v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-ba1a496408ee407cb8b879441e54d764_v1.ttl
+2026-05-19 23:58:34,750 - src.storage.registry - INFO - Created signifier: sig-ba1a496408ee407cb8b879441e54d764
+2026-05-19 23:58:34,750 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-ba1a496408ee407cb8b879441e54d764: intent='close the blinds to reduce glare' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/ha/cover/close_cover, intent_type='IMPLICIT'
+2026-05-19 23:58:34,751 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'set', 'artifact': 'blinds', 'parameter': 'open_close', 'value': False, 'intent_text': 'close the blinds to reduce glare'}
+2026-05-19 23:58:34,751 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-a064e2c1f8314fd5bb7fffd914fb7f09
+2026-05-19 23:58:34,751 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-a064e2c1f8314fd5bb7fffd914fb7f09 (20 conditions)
+2026-05-19 23:58:34,751 - src.storage.memory_store - INFO - Stored JSON document for sig-a064e2c1f8314fd5bb7fffd914fb7f09 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-a064e2c1f8314fd5bb7fffd914fb7f09.json
+2026-05-19 23:58:34,757 - src.storage.memory_store - INFO - Stored RDF graph for sig-a064e2c1f8314fd5bb7fffd914fb7f09 v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-a064e2c1f8314fd5bb7fffd914fb7f09_v1.ttl
+2026-05-19 23:58:34,757 - src.storage.registry - INFO - Created signifier: sig-a064e2c1f8314fd5bb7fffd914fb7f09
+2026-05-19 23:58:34,757 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-a064e2c1f8314fd5bb7fffd914fb7f09: intent='close the blinds to reduce glare' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/blinds_308e_cover/ha/cover/close_cover, intent_type='IMPLICIT'
+2026-05-19 23:58:34,757 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'set', 'artifact': 'blinds', 'parameter': 'open_close', 'value': False, 'intent_text': 'close the blinds to reduce glare'}
+2026-05-19 23:58:34,757 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-14505ecfadde44f6b76c93941a25ef58
+2026-05-19 23:58:34,757 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-14505ecfadde44f6b76c93941a25ef58 (10 conditions)
+2026-05-19 23:58:34,757 - src.storage.memory_store - INFO - Stored JSON document for sig-14505ecfadde44f6b76c93941a25ef58 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-14505ecfadde44f6b76c93941a25ef58.json
+2026-05-19 23:58:34,760 - src.storage.memory_store - INFO - Stored RDF graph for sig-14505ecfadde44f6b76c93941a25ef58 v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-14505ecfadde44f6b76c93941a25ef58_v1.ttl
+2026-05-19 23:58:34,760 - src.storage.registry - INFO - Created signifier: sig-14505ecfadde44f6b76c93941a25ef58
+2026-05-19 23:58:34,761 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-14505ecfadde44f6b76c93941a25ef58: intent='close the blinds to reduce glare' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/window_308e_cover/ha/cover/close_cover, intent_type='IMPLICIT'
+2026-05-19 23:58:34,761 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier recording result: created=6, skipped=0
+2026-05-19 23:58:34,761 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Local signifier recording: created_count=6
+2026-05-19 23:58:42,828 - Lab308eE2ERunner - INFO - Running case: the_air_is_so_stuffy_in_here_opens_window_and_reduces_co2
+2026-05-19 23:58:42,829 - Lab308eE2ERunner - INFO - Cleared signifier storage before case the_air_is_so_stuffy_in_here_opens_window_and_reduces_co2 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage
+2026-05-19 23:58:46,043 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Received user message: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 phase=extracting_intents text='the air is so stuffy in here'
+2026-05-19 23:58:46,043 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Request classified as IMPLICIT: 'the air is so stuffy in here'
+2026-05-19 23:58:46,043 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_CAPABILITIES_REQUEST from user_assistant@localhost
+2026-05-19 23:58:46,044 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Capabilities fetched: body_len=169360
+2026-05-19 23:59:00,815 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Raw intent extraction output: {"classification":"unclear","question":"Would you like me to turn on the air conditioner to improve the air?"}
+2026-05-19 23:59:00,817 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Intent extraction result: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 classification=unclear workspace_id=None intent_type=None artifact_id=None property_uri=None intents_count=0 question='Would you like me to turn on the air conditioner to improve the air?'
+2026-05-19 23:59:00,817 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Routing message as UNCLEAR: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 question='Would you like me to turn on the air conditioner to improve the air?'
+2026-05-19 23:59:00,821 - Lab308eE2ERunner - INFO - Matched clarification for case the_air_is_so_stuffy_in_here_opens_window_and_reduces_co2; replying with scripted answer: improve ventilation by opening the window
+2026-05-19 23:59:00,822 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Received user message: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 phase=extracting_intents text='improve ventilation by opening the window'
+2026-05-19 23:59:00,823 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Request classified as IMPLICIT: 'improve ventilation by opening the window'
+2026-05-19 23:59:00,823 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_CAPABILITIES_REQUEST from user_assistant@localhost
+2026-05-19 23:59:00,825 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Capabilities fetched: body_len=169360
+2026-05-19 23:59:16,833 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Raw intent extraction output: {"classification":"goal","intent_type":"implicit","intents":[{"action":"set","artifact":"window","parameter":"open_close","value":true,"intent_text":"open the window"}],"workspace_id":"lab308e"}
+2026-05-19 23:59:16,834 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Intent extraction result: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 classification=goal workspace_id='lab308e' intent_type='implicit' artifact_id=None property_uri=None intents_count=1 question=None
+2026-05-19 23:59:16,834 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Routing message as GOAL: thread=92dbde42-e75d-44b5-aabf-725d1bf81430
+2026-05-19 23:59:16,834 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Derived intents: ['open the window']  workspace=lab308e  intent_type=IMPLICIT
+2026-05-19 23:59:16,834 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m UA -> InteractionSolver GOAL_REQUEST: intents=['open the window'] intent_type=IMPLICIT
+2026-05-19 23:59:16,834 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Received GOAL_REQUEST: intents=['open the window'] workspace_id='lab308e' from=user_assistant@localhost
+2026-05-19 23:59:16,835 - InteractionSolver - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent='open the window', workspace_id='lab308e', intent_type='IMPLICIT', has_structured_intent=True
+2026-05-19 23:59:16,836 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier match: 0 stored signifiers (storage empty).
+2026-05-19 23:59:16,836 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Signifier search: intent='open the window' matches=0 (community=0) final=0 stored_total=?
+2026-05-19 23:59:16,836 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Gathering context from EnvExplorer (workspace_id='lab308e')
+2026-05-19 23:59:16,837 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_CAPABILITIES_REQUEST from interaction_solver@localhost
+2026-05-19 23:59:16,841 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_STATE_REQUEST from interaction_solver@localhost
+2026-05-19 23:59:16,842 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Context snapshot: affordances=89 artifacts_in_state=21
+2026-05-19 23:59:16,842 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Workspace scoping applied: affordances=89 artifacts_in_state=21 workspace_id='lab308e'
+2026-05-19 23:59:16,843 - InteractionSolver - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent='open the window', workspace_id='lab308e', intent_type='IMPLICIT', has_structured_intent=False
+2026-05-19 23:59:16,843 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier match: 0 stored signifiers (storage empty).
+2026-05-19 23:59:16,843 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Signifier search: intent='open the window' matches=0 (community=0) final=0 stored_total=?
+2026-05-19 23:59:16,843 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Skipping semantic HASP query: no observable properties inferred from intents=['open the window']
+2026-05-19 23:59:32,883 - ami_agents.bt_planning.planning.bt_planner - INFO - Generated JSON IR with 3 nodes
+2026-05-19 23:59:32,883 - InteractionSolver[interaction_solver@localhost] - INFO - [1;36m[DEMO][0m Plan created: has_tree=True signifier_reuse=False impossible=False error=None
+2026-05-19 23:59:32,884 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Plan stored: hash=08df7d50c58dba66cf7ee6ab9432d11a337e30884726d191e726e2fcd57e6468 nodes=3 preview=Selector_1(selector) [CheckStateIsopen:cond(state==open), OpenCover:action(open_cover)]
+2026-05-19 23:59:42,866 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Confirmation path entered: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 text='yes' has_pending_plan=True
+2026-05-19 23:59:42,866 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m User confirmed plan: thread=92dbde42-e75d-44b5-aabf-725d1bf81430
+2026-05-19 23:59:42,866 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Executing BT: thread=92dbde42-e75d-44b5-aabf-725d1bf81430 nodes=3 signifier_reuse=False intent_type=IMPLICIT
+2026-05-19 23:59:42,866 - ami_agents.bt_planning.execution.ir_executor - INFO - Compiling JSON IR to py_trees
+2026-05-19 23:59:42,867 - ami_agents.bt_planning.execution.ir_executor - INFO - Compiled tree: Selector_1
+2026-05-19 23:59:42,867 - ami_agents.bt_planning.execution.ir_executor - INFO - Executing behavior tree
+2026-05-19 23:59:42,886 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [OpenCover] Invoking action: http://localhost:8080/workspaces/lab308e/artifacts/window_308e_cover/ha/cover/open_cover
+2026-05-19 23:59:43,631 - ami_agents.bt_planning.nodes.affordance_nodes - INFO - [OpenCover] Action succeeded (status: 200, time: 0.745s)
+2026-05-19 23:59:43,631 - ami_agents.bt_planning.execution.ir_executor - INFO - Execution complete: SUCCESS after 1 ticks
+2026-05-19 23:59:43,631 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m BT execution complete: success=True ticks=1 status=SUCCESS
+2026-05-19 23:59:43,631 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m State memory cache cleared after BT execution
+2026-05-19 23:59:43,632 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Querying environment state for signifier context (workspace_id='lab308e')
+2026-05-19 23:59:43,632 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Received ENV_STATE_REQUEST from user_assistant@localhost
+2026-05-19 23:59:43,632 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m State snapshot retrieved: 21 artifacts for workspace_id='lab308e'
+2026-05-19 23:59:43,632 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m [INTENT_MATCH] Partial artifact match: artifact=window (from window_308e_cover) -> intent='open the window'
+2026-05-19 23:59:43,632 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: state_snapshot type=dict, has_data=True, workspace_id='lab308e'
+2026-05-19 23:59:43,632 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: artifacts type=dict, count=21, keys=['http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact', 'http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact']
+2026-05-19 23:59:43,633 - ami_agents.bt_planning.signifier_bridge - INFO - [1;36m[DEMO][0m _extract_conditions_from_state: returning 10 relevant conditions (filtered from 238)
+2026-05-19 23:59:43,633 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Recording 1 signifiers from BT execution (intent_type=IMPLICIT)
+2026-05-19 23:59:43,633 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m >>> SignifierRecordBehaviour processing: plan_type=NoneType, execution_report_type=dict, signifiers_provided=True
+2026-05-19 23:59:43,633 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m >>> Using pre-extracted signifiers (count=1), skipping plan parsing
+2026-05-19 23:59:43,633 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [STRUCTURED_INTENT] Preserving original structured_intent: {'action': 'set', 'artifact': 'window', 'parameter': 'open_close', 'value': True, 'intent_text': 'open the window'}
+2026-05-19 23:59:43,633 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Extracted from signifier dict: intent_type='IMPLICIT' for signifier sig-685d131b567d46ec9c82292bcb8d939e
+2026-05-19 23:59:43,633 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Generated SHACL shapes for signifier sig-685d131b567d46ec9c82292bcb8d939e (10 conditions)
+2026-05-19 23:59:43,634 - src.storage.memory_store - INFO - Stored JSON document for sig-685d131b567d46ec9c82292bcb8d939e at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/json/sig-685d131b567d46ec9c82292bcb8d939e.json
+2026-05-19 23:59:43,638 - src.storage.memory_store - INFO - Stored RDF graph for sig-685d131b567d46ec9c82292bcb8d939e v1 at /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/ami_agents/shared/memory/storage/rdf/sig-685d131b567d46ec9c82292bcb8d939e_v1.ttl
+2026-05-19 23:59:43,638 - src.storage.registry - INFO - Created signifier: sig-685d131b567d46ec9c82292bcb8d939e
+2026-05-19 23:59:43,638 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m [INTENT_TYPE] Stored signifier sig-685d131b567d46ec9c82292bcb8d939e: intent='open the window' -> affordance=http://localhost:8080/workspaces/lab308e/artifacts/window_308e_cover/ha/cover/open_cover, intent_type='IMPLICIT'
+2026-05-19 23:59:43,638 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Signifier recording result: created=1, skipped=0
+2026-05-19 23:59:43,638 - UserAssistant[user_assistant@localhost] - INFO - [1;36m[DEMO][0m Local signifier recording: created_count=1
+2026-05-20 00:00:08,415 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Stopping EnvExplorer agent
+2026-05-20 00:00:08,432 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/air_conditioner_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,443 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/ambient_lights_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,451 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/blackout_blinds_308e_cover#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,459 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/blinds_308e_cover#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,472 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/ceiling_fan_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,482 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/clock_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,491 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/co2_sensing_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,498 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/desk_lamp_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,504 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/desk_light_sensing_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,511 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/display_wall_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,519 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/external_light_sensing_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,526 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/glare_sensing_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,532 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/heater_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,540 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/humidity_sensing_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,546 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/internal_light_sensing_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,552 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/person_counter_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,561 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/presence_sensing_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,569 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/projector_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,578 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/task_lights_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,584 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/temperature_sensing_308e#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:08,592 - ami_agents.environment.integration.integration_engine - INFO - Unsubscribed from http://localhost:8080/workspaces/lab308e/artifacts/window_308e_cover#artifact via http://10.205.0.120:8086/webhook
+2026-05-20 00:00:09,597 - EnvExplorerAgent[env_explorer@localhost] - INFO - [1;36m[DEMO][0m Stopping EnvExplorer agent
+
+=== lab308e E2E Summary ===
+PASS cool_down_the_room.json
+PASS make_it_brighter.json
+FAIL make_screen_easier_to_see.json
+PASS reduce_glare.json
+PASS the_air_is_so_stuffy_in_here.json
+Passed 4/5 cases
+Appended results to /Users/cristi/aiml/gits/master-thesis/code_cleanup/llm-agents-for-ami/tests/e2e-lab308e/results.csv
