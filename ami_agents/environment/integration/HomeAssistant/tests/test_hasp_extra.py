@@ -110,12 +110,11 @@ def test_dynamic_sensor_action_invalid_and_mismatch(monkeypatch):
     appmod.ha_client = WS()
     appmod.ha_rest = REST()
     client = TestClient(appmod.app)
-    # invalid format
-    r = client.post("/workspaces/lab/artifacts/temp/notAnAction")
-    assert r.status_code == 404
-    # mismatch: wrong unit
+    # synthetic sensor status actions are no longer exposed
     r2 = client.post("/workspaces/lab/artifacts/temp/getTemperatureInDegf")
     assert r2.status_code == 404
+    r3 = client.post("/workspaces/lab/artifacts/temp/getTemperatureInDegc")
+    assert r3.status_code == 404
 
 
 def test_save_graph_snapshot(tmp_path, monkeypatch):

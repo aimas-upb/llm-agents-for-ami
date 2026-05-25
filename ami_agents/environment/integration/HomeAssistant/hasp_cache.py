@@ -217,14 +217,14 @@ class HASPGraphCache:
 
     async def query_actions_affecting_observable_property(
         self, workspace_id: str, observable_property: str
-    ) -> List[Dict[str, str]]:
+    ) -> Dict[str, Any]:
         property_uri = (
             observable_property
             if observable_property.startswith(("http://", "https://"))
             else f"{self.base_uri}workspaces/{workspace_id}/environment/{urllib.parse.quote(observable_property, safe='')}"
         )
         artifact_prefix = f"{self.base_uri}workspaces/{workspace_id}/artifacts/"
-        query = f"""
+        action_query = f"""
         PREFIX td: <{TD}>
         PREFIX hctl: <{HCTL}>
         PREFIX sosa: <{SOSA}>
@@ -247,8 +247,20 @@ class HASPGraphCache:
         }}
         ORDER BY ?artifact ?actionName
         """
+        property_meta_query = f"""
+        PREFIX tdsosa: <{TDSOSA}>
+
+        SELECT ?targetMin ?targetMax ?targetUnit
+        WHERE {{
+          OPTIONAL {{ <{property_uri}> tdsosa:targetMinValue ?targetMin . }}
+          OPTIONAL {{ <{property_uri}> tdsosa:targetMaxValue ?targetMax . }}
+          OPTIONAL {{ <{property_uri}> tdsosa:targetUnit ?targetUnit . }}
+        }}
+        LIMIT 1
+        """
         async with self._lock:
-            rows = list(self.full_graph.query(query))
+            rows = list(self.full_graph.query(action_query))
+            meta_rows = list(self.full_graph.query(property_meta_query))
 
         results: List[Dict[str, str]] = []
         for row in rows:
@@ -268,7 +280,31 @@ class HASPGraphCache:
                     "direction": direction or "",
                 }
             )
-        return results
+        target_min: Optional[float] = None
+        target_max: Optional[float] = None
+        target_unit = ""
+        if meta_rows:
+            meta_row = meta_rows[0]
+            if meta_row.targetMin is not None:
+                try:
+                    target_min = float(meta_row.targetMin)
+                except (TypeError, ValueError):
+                    target_min = None
+            if meta_row.targetMax is not None:
+                try:
+                    target_max = float(meta_row.targetMax)
+                except (TypeError, ValueError):
+                    target_max = None
+            if meta_row.targetUnit is not None:
+                target_unit = str(meta_row.targetUnit)
+
+        return {
+            "property_uri": property_uri,
+            "target_min": target_min,
+            "target_max": target_max,
+            "target_unit": target_unit,
+            "actions": results,
+        }
 
     async def get_workspaces_ttl(self) -> str:
         async with self._lock:

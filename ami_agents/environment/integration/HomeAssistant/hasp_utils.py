@@ -850,6 +850,9 @@ def get_supported_service_fields(domain: str, entity_attributes: Dict[str, Any],
         preset_modes = entity_attributes.get("preset_modes", [])
         fan_modes = entity_attributes.get("fan_modes", [])
         swing_modes = entity_attributes.get("swing_modes", [])
+        supports_humidity = (
+            "min_humidity" in entity_attributes or "max_humidity" in entity_attributes
+        )
 
         for field_name, field_def in service_fields.items():
             # Temperature fields - check if entity supports temperature setting
@@ -880,6 +883,12 @@ def get_supported_service_fields(domain: str, entity_attributes: Dict[str, Any],
             if field_name == "swing_mode":
                 if swing_modes:
                     supported[field_name] = _narrow_select_field(field_def, swing_modes)
+                continue
+
+            # Humidity target
+            if field_name == "humidity":
+                if supports_humidity:
+                    supported[field_name] = field_def
                 continue
 
             # Include by default
@@ -954,6 +963,20 @@ def validate_service_payload_for_entity(
             if swing_mode not in allowed:
                 return f"Unsupported swing_mode {swing_mode!r}; supported values: {sorted(allowed)}"
 
+    if service_name == "set_humidity" and "humidity" in payload:
+        min_humidity = entity_attributes.get("min_humidity")
+        max_humidity = entity_attributes.get("max_humidity")
+        if min_humidity is None and max_humidity is None:
+            return "Humidity control is not supported by this entity"
+        try:
+            humidity = float(payload.get("humidity"))
+        except (TypeError, ValueError):
+            return f"Unsupported humidity {payload.get('humidity')!r}; expected numeric value"
+        if min_humidity is not None and humidity < float(min_humidity):
+            return f"Unsupported humidity {humidity!r}; minimum supported value: {float(min_humidity)}"
+        if max_humidity is not None and humidity > float(max_humidity):
+            return f"Unsupported humidity {humidity!r}; maximum supported value: {float(max_humidity)}"
+
     return None
 
 
@@ -970,6 +993,8 @@ def is_service_supported_for_entity(
         # service forwards with backend 500s.
         if service_name in {"turn_on", "turn_off"}:
             return False
+        if service_name == "set_humidity":
+            return "min_humidity" in entity_attributes or "max_humidity" in entity_attributes
         return True
 
     if domain != "cover":

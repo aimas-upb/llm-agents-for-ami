@@ -88,6 +88,45 @@ def _load_tdsosa_overrides() -> Dict[str, str]:
 
 TD_SOSA_ENV_VAR_OVERRIDES = _load_tdsosa_overrides()
 
+
+def _load_tdsosa_property_ranges() -> Dict[str, Dict[str, Any]]:
+    raw = os.getenv("TD_SOSA_PROPERTY_RANGES", "").strip()
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except Exception as exc:
+        print("Invalid TD_SOSA_PROPERTY_RANGES JSON:", exc)
+        return {}
+    if not isinstance(data, dict):
+        print("TD_SOSA_PROPERTY_RANGES must be a JSON object")
+        return {}
+
+    out: Dict[str, Dict[str, Any]] = {}
+    for k, v in data.items():
+        if not isinstance(k, str) or not isinstance(v, dict):
+            continue
+        normalized_key = " ".join(k.strip().lower().split())
+        if not normalized_key:
+            continue
+        target_min = v.get("min")
+        target_max = v.get("max")
+        unit = v.get("unit")
+
+        entry: Dict[str, Any] = {}
+        if isinstance(target_min, (int, float)) and not isinstance(target_min, bool):
+            entry["min"] = target_min
+        if isinstance(target_max, (int, float)) and not isinstance(target_max, bool):
+            entry["max"] = target_max
+        if isinstance(unit, str) and unit.strip():
+            entry["unit"] = unit.strip()
+        if entry:
+            out[normalized_key] = entry
+    return out
+
+
+TD_SOSA_PROPERTY_RANGES = _load_tdsosa_property_ranges()
+
 app = FastAPI(title="HASP")
 app.add_middleware(
     CORSMiddleware,
@@ -409,6 +448,31 @@ def _env_var_uri(base: str, workspace_id: str, env_var: str) -> URIRef:
     return URIRef(f"{base}workspaces/{workspace_id}/environment/{urllib.parse.quote(env_var, safe='')}")
 
 
+def _resolve_property_range(
+    env_var_key: Optional[str],
+    env_var_uri: Optional[URIRef] = None,
+) -> Optional[Dict[str, Any]]:
+    if not TD_SOSA_PROPERTY_RANGES:
+        return None
+
+    candidates: List[str] = []
+    if env_var_key:
+        candidates.append(_normalize_override_key(env_var_key))
+    if env_var_uri is not None:
+        uri_str = str(env_var_uri).strip()
+        if uri_str:
+            candidates.append(uri_str)
+            last_token = uri_str.rstrip("/").rsplit("/", 1)[-1]
+            if last_token:
+                candidates.append(_normalize_override_key(urllib.parse.unquote(last_token)))
+
+    for candidate in candidates:
+        match = TD_SOSA_PROPERTY_RANGES.get(candidate)
+        if match:
+            return dict(match)
+    return None
+
+
 def _ambient_var_from_signals(domain: str, device_class: Optional[str], signal_name: Optional[str]) -> Optional[str]:
     text = f"{domain} {(device_class or '')} {(signal_name or '')}".lower()
     if any(tok in text for tok in ("illumin", "lumin", "bright", "light")):
@@ -467,6 +531,7 @@ def _add_tdsosa_property_links(
     property_affordance: BNode,
     feature_of_interest: URIRef,
     env_var_uri: URIRef,
+    env_var_key: Optional[str],
     observable: bool,
     actuatable: bool,
 ) -> None:
@@ -479,6 +544,14 @@ def _add_tdsosa_property_links(
     rdf.g.add((property_affordance, TDSOSA.affordsProperty, env_var_uri))
     rdf.g.add((feature_of_interest, SSN.hasProperty, env_var_uri))
     rdf.g.add((env_var_uri, SSN.isPropertyOf, feature_of_interest))
+    range_hint = _resolve_property_range(env_var_key, env_var_uri)
+    if range_hint:
+        if "min" in range_hint:
+            rdf.g.add((env_var_uri, TDSOSA.targetMinValue, Literal(range_hint["min"])))
+        if "max" in range_hint:
+            rdf.g.add((env_var_uri, TDSOSA.targetMaxValue, Literal(range_hint["max"])))
+        if "unit" in range_hint:
+            rdf.g.add((env_var_uri, TDSOSA.targetUnit, Literal(str(range_hint["unit"]))))
 
 
 def _add_tdsosa_action_effect(
@@ -486,6 +559,7 @@ def _add_tdsosa_action_effect(
     action_affordance: BNode,
     feature_of_interest: URIRef,
     env_var_uri: URIRef,
+    env_var_key: Optional[str],
     actuation_uri: URIRef,
     direction: str,
 ) -> None:
@@ -503,6 +577,14 @@ def _add_tdsosa_action_effect(
     rdf.g.add((env_var_uri, SSN.isPropertyOf, feature_of_interest))
     rdf.g.add((env_var_uri, RDF.type, SOSA.ObservableProperty))
     rdf.g.add((env_var_uri, RDF.type, SOSA.ActuatableProperty))
+    range_hint = _resolve_property_range(env_var_key, env_var_uri)
+    if range_hint:
+        if "min" in range_hint:
+            rdf.g.add((env_var_uri, TDSOSA.targetMinValue, Literal(range_hint["min"])))
+        if "max" in range_hint:
+            rdf.g.add((env_var_uri, TDSOSA.targetMaxValue, Literal(range_hint["max"])))
+        if "unit" in range_hint:
+            rdf.g.add((env_var_uri, TDSOSA.targetUnit, Literal(str(range_hint["unit"]))))
 
 
 async def _resolve_device_and_entities(workspace_id: str, artifact_name: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]], Optional[Dict[str, Any]], str]:
@@ -941,6 +1023,7 @@ def _build_cached_artifact_ttl(
             supported_fields = get_supported_service_fields(domain, domain_entity_attrs, all_service_fields)
             if domain == "climate":
                 required_fields = {
+                    "set_humidity": "humidity",
                     "set_fan_mode": "fan_mode",
                     "set_hvac_mode": "hvac_mode",
                     "set_preset_mode": "preset_mode",
@@ -983,42 +1066,10 @@ def _build_cached_artifact_ttl(
                     action_affordance=action_affordance,
                     feature_of_interest=artifact_foi,
                     env_var_uri=env_var_uri,
+                    env_var_key=env_var_key,
                     actuation_uri=actuation_uri,
                     direction=direction,
                 )
-
-    if "sensor" in domains:
-        sensor_ent = _pick_entity(device_entities, "sensor")
-        st = state_map.get(sensor_ent, {}) if sensor_ent else {}
-        attrs = st.get("attributes", {}) if isinstance(st, dict) else {}
-        action_names = _sensor_action_names(attrs.get("device_class"), attrs.get("unit_of_measurement"))
-        if action_names:
-            action_name = action_names[0]
-            rdf._add_action(
-                art,
-                action_name,
-                EX.StatusCommand,
-                "POST",
-                URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/{urllib.parse.quote(action_name, safe='')}"),
-                "application/json",
-                output_schema=rdf._build_sensor_output_schema(attrs.get("device_class"), attrs.get("unit_of_measurement")),
-            )
-
-    if "binary_sensor" in domains:
-        binary_ent = _pick_entity(device_entities, "binary_sensor")
-        st = state_map.get(binary_ent, {}) if binary_ent else {}
-        attrs = st.get("attributes", {}) if isinstance(st, dict) else {}
-        action_names = _binary_sensor_action_names(attrs.get("device_class"))
-        if action_names:
-            rdf._add_action(
-                art,
-                action_names[0],
-                EX.StatusCommand,
-                "POST",
-                URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/{urllib.parse.quote(action_names[0], safe='')}"),
-                "application/json",
-                output_schema=rdf._build_binary_sensor_output_schema(),
-            )
 
     if "climate" in domains:
         climate_ent = _pick_entity(device_entities, "climate")
@@ -1065,7 +1116,8 @@ def _build_cached_artifact_ttl(
                 env_var_uri = _env_var_uri(rdf.base, aid, state_env_key)
                 _add_tdsosa_property_links(
                     rdf=rdf, property_affordance=state_prop, feature_of_interest=artifact_foi,
-                    env_var_uri=env_var_uri, observable=_domain_is_observer(entity_domain),
+                    env_var_uri=env_var_uri, env_var_key=state_env_key,
+                    observable=_domain_is_observer(entity_domain),
                     actuatable=_domain_is_actuator(entity_domain),
                 )
 
@@ -1090,7 +1142,8 @@ def _build_cached_artifact_ttl(
                     env_var_uri = _env_var_uri(rdf.base, aid, env_var_key)
                     _add_tdsosa_property_links(
                         rdf=rdf, property_affordance=op_prop, feature_of_interest=artifact_foi,
-                        env_var_uri=env_var_uri, observable=_domain_is_observer(domain),
+                        env_var_uri=env_var_uri, env_var_key=env_var_key,
+                        observable=_domain_is_observer(domain),
                         actuatable=_domain_is_actuator(domain),
                     )
 
@@ -1129,7 +1182,8 @@ def _build_cached_artifact_ttl(
 async def _startup_cache():
     print(
         f"AREAS={sorted(AREAS) if AREAS else 'ALL'}, BASE_WS_URI={BASE_WS_URI}, "
-        f"TD_SOSA_ENV_VAR_OVERRIDES={len(TD_SOSA_ENV_VAR_OVERRIDES)}"
+        f"TD_SOSA_ENV_VAR_OVERRIDES={len(TD_SOSA_ENV_VAR_OVERRIDES)}, "
+        f"TD_SOSA_PROPERTY_RANGES={len(TD_SOSA_PROPERTY_RANGES)}"
     )
     app.state.graph_cache = HASPGraphCache(
         ws_client=ha_client,
@@ -1208,7 +1262,10 @@ async def query_actions_affecting_observable_property(request: Request):
     return {
         "workspace_id": workspace_id,
         "property_uri": resolved_property_uri,
-        "actions": matches,
+        "target_min": matches.get("target_min"),
+        "target_max": matches.get("target_max"),
+        "target_unit": matches.get("target_unit", ""),
+        "actions": matches.get("actions", []),
     }
 
 @app.get("/workspaces/{workspace_id}", response_class=Response,
@@ -1425,7 +1482,7 @@ async def update_artifact_representation(workspace_id: str, artifact_name: str, 
 async def delete_artifact_representation(workspace_id: str, artifact_name: str):
     return Response(content="Action succeeded:")
 
-# Dynamic sensor/binary sensor actions
+# Dynamic climate status action
 @app.post("/workspaces/{workspace_id}/artifacts/{artifact_name}/{action_name}")
 async def action_sensor_dynamic(workspace_id: str, artifact_name: str, action_name: str):
     cache = await _ensure_graph_cache()
@@ -1433,25 +1490,8 @@ async def action_sensor_dynamic(workspace_id: str, artifact_name: str, action_na
         device_entities, state_map = await cache.get_artifact_snapshot(workspace_id, artifact_name)
     except KeyError:
         raise HTTPException(status_code=404, detail="Artifact not found")
-    sensor_ent = _pick_entity(device_entities, "sensor")
-    binary_ent = _pick_entity(device_entities, "binary_sensor")
     climate_ent = _pick_entity(device_entities, "climate")
-    sensor_state = state_map.get(sensor_ent) if sensor_ent else None
-    binary_state = state_map.get(binary_ent) if binary_ent else None
     climate_state = state_map.get(climate_ent) if climate_ent else None
-
-    sensor_names = _sensor_action_names(
-        (sensor_state or {}).get("attributes", {}).get("device_class"),
-        (sensor_state or {}).get("attributes", {}).get("unit_of_measurement"),
-    ) if sensor_state else []
-    binary_names = _binary_sensor_action_names(
-        (binary_state or {}).get("attributes", {}).get("device_class")
-    ) if binary_state else []
-
-    if action_name in sensor_names:
-        return PlainTextResponse(str((sensor_state or {}).get("state", "")))
-    if action_name in binary_names:
-        return PlainTextResponse(str((binary_state or {}).get("state", "")))
 
     if action_name == "getThermostatState":
         if not climate_ent:
@@ -1459,21 +1499,5 @@ async def action_sensor_dynamic(workspace_id: str, artifact_name: str, action_na
         if not climate_state:
             raise HTTPException(status_code=404, detail="Climate state not found")
         return JSONResponse(_format_climate_state(climate_state))
-
-    # Provide meaningful errors for known patterns
-    if action_name.startswith("get") and "In" in action_name[3:]:
-        if not sensor_ent:
-            raise HTTPException(status_code=404, detail="No sensor entity on artifact")
-        if not sensor_state:
-            raise HTTPException(status_code=404, detail="Sensor state not found")
-        raise HTTPException(status_code=404, detail="Action not applicable to this sensor")
-
-    binary_like = action_name.startswith("get") and action_name.endswith("State")
-    if binary_like:
-        if not binary_ent:
-            raise HTTPException(status_code=404, detail="No binary sensor entity on artifact")
-        if not binary_state:
-            raise HTTPException(status_code=404, detail="Binary sensor state not found")
-        raise HTTPException(status_code=404, detail="Action not applicable to this binary sensor")
 
     raise HTTPException(status_code=404, detail="Unknown action")

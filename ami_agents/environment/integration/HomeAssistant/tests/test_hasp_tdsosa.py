@@ -2,7 +2,7 @@ import urllib.parse
 
 import pytest
 from fastapi.testclient import TestClient
-from rdflib import Graph, Namespace, RDF, URIRef
+from rdflib import Graph, Literal, Namespace, RDF, URIRef
 
 import hasp as appmod
 
@@ -79,6 +79,7 @@ def setup_tdsosa_test_env(monkeypatch):
     monkeypatch.setattr(appmod, "AREAS", set())
     monkeypatch.setattr(appmod, "BASE_WS_URI", "http://localhost:8080")
     monkeypatch.setattr(appmod, "TD_SOSA_ENV_VAR_OVERRIDES", {})
+    monkeypatch.setattr(appmod, "TD_SOSA_PROPERTY_RANGES", {})
     monkeypatch.setattr(appmod, "ha_client", FakeHAWS())
     monkeypatch.setattr(appmod, "ha_rest", FakeHAREST())
     appmod.subscriptions.clear()
@@ -164,12 +165,12 @@ def test_tdsosa_action_effect_uses_override_env_var(monkeypatch):
     assert (None, SOSA.actsOnProperty, env_uri) in g
 
 
-def test_temperature_sensor_exposes_temperature_action():
+def test_temperature_sensor_does_not_expose_synthetic_status_action():
     client = TestClient(appmod.app)
     artifact = "temp_sensor"
     r = client.get(f"/workspaces/lab308/artifacts/{artifact}")
     assert r.status_code == 200
-    assert "getTemperatureInDegc" in r.text
+    assert "getTemperatureInDegc" not in r.text
 
 
 def test_temperature_sensor_state_property_returns_number():
@@ -198,6 +199,24 @@ def test_temperature_sensor_state_override_applies_to_tdsosa(monkeypatch):
     assert (env_uri, RDF.type, SOSA.ObservableProperty) in g
 
 
+def test_tdsosa_property_range_is_attached_to_environment_property(monkeypatch):
+    monkeypatch.setattr(
+        appmod,
+        "TD_SOSA_PROPERTY_RANGES",
+        {"luminosity": {"min": 200, "unit": "lx"}},
+    )
+
+    client = TestClient(appmod.app)
+    artifact = "main_light"
+    r = client.get(f"/workspaces/lab308/artifacts/{artifact}")
+    assert r.status_code == 200
+    g = _ttl_graph(r.text)
+
+    env_uri = URIRef("http://testserver/workspaces/lab308/environment/luminosity")
+    assert (env_uri, TDSOSA.targetMinValue, Literal(200)) in g
+    assert (env_uri, TDSOSA.targetUnit, Literal("lx")) in g
+
+
 def test_query_actions_affecting_observable_property():
     client = TestClient(appmod.app)
     r = client.post(
@@ -220,3 +239,23 @@ def test_query_actions_affecting_observable_property():
     assert "http://localhost:8080/workspaces/lab308/artifacts/main_light/ha/light/turn_off" in action_targets
     assert "http://localhost:8080/workspaces/lab308/artifacts/blinds/ha/cover/open_cover" in action_targets
     assert "http://localhost:8080/workspaces/lab308/artifacts/blinds/ha/cover/close_cover" in action_targets
+
+
+def test_query_actions_affecting_observable_property_includes_target_range(monkeypatch):
+    monkeypatch.setattr(
+        appmod,
+        "TD_SOSA_PROPERTY_RANGES",
+        {"luminosity": {"min": 200, "unit": "lx"}},
+    )
+
+    client = TestClient(appmod.app)
+    r = client.post(
+        "/_graph/query/actions-affecting-observable-property",
+        json={"workspace_id": "lab308", "observable_property": "luminosity"},
+    )
+    assert r.status_code == 200
+    payload = r.json()
+
+    assert payload["target_min"] == 200.0
+    assert payload["target_max"] is None
+    assert payload["target_unit"] == "lx"

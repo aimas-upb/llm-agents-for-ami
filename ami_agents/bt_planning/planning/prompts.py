@@ -43,6 +43,10 @@ You generate executable behavior tree specifications in JSON format using the ge
 - For numeric or continuous sensor properties such as glare, illuminance, temperature, humidity, CO2, volume, or percentages, do not use exact equality checks unless the user explicitly requested an exact target value.
 - For those continuous properties, prefer range comparisons with an operator such as `<=`, `>=`, `<`, or `>`.
 - Use exact equality checks mainly for discrete states such as `on`, `off`, `open`, `closed`, `heat`, or `cool`.
+- If observable property hints provide a recommended target minimum and/or maximum, use those values for success conditions instead of inventing stricter numeric thresholds, unless the user explicitly requested a different target.
+- If an observable property hint provides only `target_max`, generate a condition with operator `<=` and `expected_value = target_max`.
+- If an observable property hint provides only `target_min`, generate a condition with operator `>=` and `expected_value = target_min`.
+- If an observable property hint provides both `target_min` and `target_max`, treat that as an acceptable band and use `>= target_min`, `<= target_max`, or both as separate conditions. Do not turn range hints into exact equality checks.
 
 {signifier_hints}
 
@@ -206,6 +210,31 @@ def format_observable_property_hints(observable_property_matches: dict | None) -
         prop_uri = result.get("property_uri") or result.get("observable_property") or "unknown"
         actions = result.get("actions")
         lines.append(f"Semantic property id (not a readable endpoint): {prop_uri}")
+        target_min = result.get("target_min")
+        target_max = result.get("target_max")
+        target_unit = str(result.get("target_unit") or "").strip()
+        if target_min is not None or target_max is not None:
+            if target_min is not None and target_max is not None:
+                target_text = f"{target_min}..{target_max}"
+            elif target_min is not None:
+                target_text = f">= {target_min}"
+            else:
+                target_text = f"<= {target_max}"
+            if target_unit:
+                target_text = f"{target_text} {target_unit}"
+            lines.append(f"  Recommended target band: {target_text}")
+            if target_min is None and target_max is not None:
+                lines.append(
+                    f"  Success-condition rule: use operator `<=` with expected_value `{target_max}`"
+                )
+            elif target_max is None and target_min is not None:
+                lines.append(
+                    f"  Success-condition rule: use operator `>=` with expected_value `{target_min}`"
+                )
+            else:
+                lines.append(
+                    f"  Success-condition rule: keep the final state within `{target_min}`..`{target_max}`"
+                )
         readable_property_urls = result.get("readable_property_urls")
         if isinstance(readable_property_urls, list) and readable_property_urls:
             lines.append("  Readable sensor property URLs for conditions:")

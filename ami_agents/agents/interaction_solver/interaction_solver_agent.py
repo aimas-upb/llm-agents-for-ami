@@ -349,7 +349,22 @@ class InteractionSolverAgent(Agent, IAgent):
             ).lower()
             if "glare" in text:
                 add("glare")
-            if any(tok in text for tok in ("co2", "air quality", "air_quality", "ventilat", "stale air")):
+            if any(
+                tok in text
+                for tok in (
+                    "co2",
+                    "air quality",
+                    "air_quality",
+                    "ventilat",
+                    "stale air",
+                    "stuffy",
+                    "stuffy air",
+                    "stuffy room",
+                    "bad air",
+                    "heavy air",
+                    "fresh air",
+                )
+            ):
                 add("air_quality")
             if any(tok in text for tok in ("illumin", "lumin", "bright", "light", "dark")):
                 add("luminosity")

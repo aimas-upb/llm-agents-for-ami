@@ -1,0 +1,28 @@
+{
+  "luminosity": {
+    "min": 200,
+    "unit": "lx"
+  },
+  "desk_luminosity": {
+    "min": 300,
+    "unit": "lx"
+  },
+  "glare": {
+    "max": 50,
+    "unit": "percent"
+  },
+  "air_quality": {
+    "max": 1500,
+    "unit": "ppm"
+  },
+  "thermal_comfort": {
+    "min": 20,
+    "max": 24,
+    "unit": "degC"
+  },
+  "humidity": {
+    "min": 30,
+    "max": 60,
+    "unit": "percent"
+  }
+}
