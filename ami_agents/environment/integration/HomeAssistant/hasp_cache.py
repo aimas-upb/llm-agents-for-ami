@@ -17,6 +17,7 @@ TD = Namespace("https://www.w3.org/2019/wot/td#")
 HCTL = Namespace("https://www.w3.org/2019/wot/hypermedia#")
 SOSA = Namespace("http://www.w3.org/ns/sosa/")
 TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
+TIME = Namespace("http://www.w3.org/2006/time#")
 
 
 ArtifactBuilder = Callable[[str, str, str, List[Dict[str, Any]], Dict[str, Dict[str, Any]], Dict[str, Any]], str]
@@ -230,7 +231,7 @@ class HASPGraphCache:
         PREFIX sosa: <{SOSA}>
         PREFIX tdsosa: <{TDSOSA}>
 
-        SELECT DISTINCT ?artifact ?artifactTitle ?actionName ?actionTarget ?actuation ?dirType
+        SELECT DISTINCT ?artifact ?artifactTitle ?actionName ?actionTarget ?actuation ?dirType ?settlingNumeric ?settlingUnit
         WHERE {{
           ?artifact td:hasActionAffordance ?action .
           ?action td:name ?actionName ;
@@ -242,6 +243,11 @@ class HASPGraphCache:
           OPTIONAL {{
             ?actuation a ?dirType .
             FILTER(?dirType IN (tdsosa:IncreasingActuation, tdsosa:DecreasingActuation))
+          }}
+          OPTIONAL {{
+            ?actuation tdsosa:settlingTime ?settlingTime .
+            OPTIONAL {{ ?settlingTime <{TIME.numericDuration}> ?settlingNumeric . }}
+            OPTIONAL {{ ?settlingTime <{TIME.unitType}> ?settlingUnit . }}
           }}
           FILTER(STRSTARTS(STR(?artifact), "{artifact_prefix}"))
         }}
@@ -262,24 +268,30 @@ class HASPGraphCache:
             rows = list(self.full_graph.query(action_query))
             meta_rows = list(self.full_graph.query(property_meta_query))
 
-        results: List[Dict[str, str]] = []
+        results: List[Dict[str, Any]] = []
         for row in rows:
             direction = None
             if row.dirType == TDSOSA.IncreasingActuation:
                 direction = "increase"
             elif row.dirType == TDSOSA.DecreasingActuation:
                 direction = "decrease"
-            results.append(
-                {
-                    "artifact_uri": str(row.artifact),
-                    "artifact_title": str(row.artifactTitle) if row.artifactTitle is not None else "",
-                    "action_name": str(row.actionName),
-                    "action_target": str(row.actionTarget),
-                    "actuation_uri": str(row.actuation),
-                    "property_uri": property_uri,
-                    "direction": direction or "",
-                }
-            )
+            item: Dict[str, Any] = {
+                "artifact_uri": str(row.artifact),
+                "artifact_title": str(row.artifactTitle) if row.artifactTitle is not None else "",
+                "action_name": str(row.actionName),
+                "action_target": str(row.actionTarget),
+                "actuation_uri": str(row.actuation),
+                "property_uri": property_uri,
+                "direction": direction or "",
+            }
+            if row.settlingNumeric is not None:
+                try:
+                    item["settling_time_seconds"] = float(row.settlingNumeric)
+                except (TypeError, ValueError):
+                    pass
+            if row.settlingUnit is not None:
+                item["settling_time_unit"] = str(row.settlingUnit)
+            results.append(item)
         target_min: Optional[float] = None
         target_max: Optional[float] = None
         target_unit = ""

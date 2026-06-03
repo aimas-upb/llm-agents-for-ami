@@ -1,0 +1,20 @@
+{
+  "entity:cover.blinds_308e_cover:action:cover.open_cover": 30,
+  "entity:cover.blinds_308e_cover:action:cover.close_cover": 30,
+  "entity:cover.blackout_blinds_308e_cover:action:cover.open_cover": 20,
+  "entity:cover.blackout_blinds_308e_cover:action:cover.close_cover": 20,
+  "entity:cover.window_308e_cover:action:cover.open_cover": 15,
+  "entity:cover.window_308e_cover:action:cover.close_cover": 15,
+
+  "entity:climate.air_conditioner_308e:action:climate.set_temperature": 300,
+  "entity:climate.air_conditioner_308e:action:climate.set_hvac_mode": 300,
+  "entity:climate.heater_308e:action:climate.set_temperature": 300,
+  "entity:climate.heater_308e:action:climate.set_hvac_mode": 300,
+  "entity:switch.ceiling_fan_308e:action:switch.turn_on": 120,
+  "entity:switch.ceiling_fan_308e:action:switch.turn_off": 120,
+
+  "entity:media_player.projector_308e:action:media_player.turn_on": 5,
+  "entity:media_player.projector_308e:action:media_player.turn_off": 5,
+  "entity:media_player.display_wall_308e:action:media_player.turn_on": 5,
+  "entity:media_player.display_wall_308e:action:media_player.turn_off": 5
+}

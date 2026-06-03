@@ -8,4 +8,5 @@ export HA_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI2MTcxYmQ1NGRiND
 export HA_URL="ws://localhost:8123/api/websocket"
 export TD_SOSA_ENV_VAR_OVERRIDES="$(cat tdsosa-env-overrides.lab308e.json)"
 export TD_SOSA_PROPERTY_RANGES="$(cat tdsosa-property-ranges.lab308e.json)"
+export TD_SOSA_SETTLING_TIMES="$(cat tdsosa-settling-times.lab308e.json)"
 #export TD_SOSA_ENV_VAR_OVERRIDES="$(cat tdsosa-env-overrides.sample.json)"

@@ -10,6 +10,7 @@ import hasp as appmod
 SOSA = Namespace("http://www.w3.org/ns/sosa/")
 SSN = Namespace("http://www.w3.org/ns/ssn/")
 TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
+TIME = Namespace("http://www.w3.org/2006/time#")
 
 
 class FakeHAWS:
@@ -80,6 +81,7 @@ def setup_tdsosa_test_env(monkeypatch):
     monkeypatch.setattr(appmod, "BASE_WS_URI", "http://localhost:8080")
     monkeypatch.setattr(appmod, "TD_SOSA_ENV_VAR_OVERRIDES", {})
     monkeypatch.setattr(appmod, "TD_SOSA_PROPERTY_RANGES", {})
+    monkeypatch.setattr(appmod, "TD_SOSA_SETTLING_TIMES", {})
     monkeypatch.setattr(appmod, "ha_client", FakeHAWS())
     monkeypatch.setattr(appmod, "ha_rest", FakeHAREST())
     appmod.subscriptions.clear()
@@ -217,6 +219,32 @@ def test_tdsosa_property_range_is_attached_to_environment_property(monkeypatch):
     assert (env_uri, TDSOSA.targetUnit, Literal("lx")) in g
 
 
+def test_tdsosa_settling_time_is_attached_to_action_effect(monkeypatch):
+    monkeypatch.setattr(
+        appmod,
+        "TD_SOSA_SETTLING_TIMES",
+        {"entity:cover.blinds:action:cover.close_cover": 30},
+    )
+
+    client = TestClient(appmod.app)
+    artifact = "blinds"
+    r = client.get(f"/workspaces/lab308/artifacts/{artifact}")
+    assert r.status_code == 200
+    g = _ttl_graph(r.text)
+
+    actuation_uri = URIRef(
+        f"http://testserver/workspaces/lab308/artifacts/{artifact}/actuations/cover_close_cover_decrease"
+    )
+    durations = list(g.objects(actuation_uri, TDSOSA.settlingTime))
+
+    assert len(durations) == 1
+    assert (durations[0], RDF.type, TIME.Duration) in g
+    numeric_values = list(g.objects(durations[0], TIME.numericDuration))
+    assert len(numeric_values) == 1
+    assert float(numeric_values[0]) == 30.0
+    assert (durations[0], TIME.unitType, TIME.unitSecond) in g
+
+
 def test_query_actions_affecting_observable_property():
     client = TestClient(appmod.app)
     r = client.post(
@@ -259,3 +287,27 @@ def test_query_actions_affecting_observable_property_includes_target_range(monke
     assert payload["target_min"] == 200.0
     assert payload["target_max"] is None
     assert payload["target_unit"] == "lx"
+
+
+def test_query_actions_affecting_observable_property_includes_settling_time(monkeypatch):
+    monkeypatch.setattr(
+        appmod,
+        "TD_SOSA_SETTLING_TIMES",
+        {"entity:cover.blinds:action:cover.close_cover": 30},
+    )
+
+    client = TestClient(appmod.app)
+    r = client.post(
+        "/_graph/query/actions-affecting-observable-property",
+        json={"workspace_id": "lab308", "observable_property": "luminosity"},
+    )
+    assert r.status_code == 200
+    payload = r.json()
+
+    close_blinds = [
+        item
+        for item in payload["actions"]
+        if item["action_target"].endswith("/artifacts/blinds/ha/cover/close_cover")
+    ]
+    assert len(close_blinds) == 1
+    assert close_blinds[0]["settling_time_seconds"] == 30.0

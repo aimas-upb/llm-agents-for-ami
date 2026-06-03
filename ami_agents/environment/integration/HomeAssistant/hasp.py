@@ -16,6 +16,7 @@ from fastapi.responses import Response, JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
+from rdflib.namespace import XSD
 
 from http import HTTPStatus
 from hasp_utils import (HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST,
@@ -39,6 +40,7 @@ SSN    = Namespace("http://www.w3.org/ns/ssn/")
 QUDT   = Namespace("http://qudt.org/schema/qudt/")
 UNIT   = Namespace("http://qudt.org/vocab/unit/")
 TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
+TIME   = Namespace("http://www.w3.org/2006/time#")
 
 WEBHOOK_VERIFY_TIMEOUT = 5.0
 
@@ -126,6 +128,41 @@ def _load_tdsosa_property_ranges() -> Dict[str, Dict[str, Any]]:
 
 
 TD_SOSA_PROPERTY_RANGES = _load_tdsosa_property_ranges()
+
+
+def _load_tdsosa_settling_times() -> Dict[str, float]:
+    raw = os.getenv("TD_SOSA_SETTLING_TIMES", "").strip()
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except Exception as exc:
+        print("Invalid TD_SOSA_SETTLING_TIMES JSON:", exc)
+        return {}
+    if not isinstance(data, dict):
+        print("TD_SOSA_SETTLING_TIMES must be a JSON object")
+        return {}
+
+    out: Dict[str, float] = {}
+    for k, v in data.items():
+        if not isinstance(k, str):
+            continue
+        seconds: Optional[float] = None
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            seconds = float(v)
+        elif isinstance(v, dict):
+            raw_seconds = v.get("seconds", v.get("value"))
+            if isinstance(raw_seconds, (int, float)) and not isinstance(raw_seconds, bool):
+                seconds = float(raw_seconds)
+        if seconds is None or seconds < 0:
+            continue
+        key = " ".join(k.strip().lower().split())
+        if key:
+            out[key] = seconds
+    return out
+
+
+TD_SOSA_SETTLING_TIMES = _load_tdsosa_settling_times()
 
 app = FastAPI(title="HASP")
 app.add_middleware(
@@ -473,6 +510,55 @@ def _resolve_property_range(
     return None
 
 
+def _resolve_settling_time(
+    *,
+    entity: Optional[Dict[str, Any]] = None,
+    device: Optional[Dict[str, Any]] = None,
+    artifact_label: Optional[str] = None,
+    domain: Optional[str] = None,
+    service_name: Optional[str] = None,
+    env_var_key: Optional[str] = None,
+) -> Optional[float]:
+    if not TD_SOSA_SETTLING_TIMES:
+        return None
+    ent_id = _to_override_token((entity or {}).get("entity_id"))
+    dev_id = _to_override_token((device or {}).get("id"))
+    dev_name = _to_override_token((device or {}).get("name"))
+    art = _to_override_token(artifact_label)
+    dom = _to_override_token(domain)
+    svc = _to_override_token(service_name)
+    env_key = _to_override_token(env_var_key)
+    keys: List[str] = []
+    if svc and dom:
+        dsvc = f"{dom}.{svc}"
+        if ent_id:
+            keys.append(f"entity:{ent_id}:action:{dsvc}")
+        if dev_id:
+            keys.append(f"device_id:{dev_id}:action:{dsvc}")
+        if dev_name:
+            keys.append(f"device:{dev_name}:action:{dsvc}")
+        if art:
+            keys.append(f"artifact:{art}:action:{dsvc}")
+        keys.append(f"action:{dsvc}")
+    if env_key:
+        keys.append(f"environment:{env_key}")
+    if ent_id:
+        keys.append(f"entity:{ent_id}")
+    if dev_id:
+        keys.append(f"device_id:{dev_id}")
+    if dev_name:
+        keys.append(f"device:{dev_name}")
+    if art:
+        keys.append(f"artifact:{art}")
+    if dom:
+        keys.append(f"domain:{dom}")
+    for key in keys:
+        match = TD_SOSA_SETTLING_TIMES.get(_normalize_override_key(key))
+        if match is not None:
+            return float(match)
+    return None
+
+
 def _ambient_var_from_signals(domain: str, device_class: Optional[str], signal_name: Optional[str]) -> Optional[str]:
     text = f"{domain} {(device_class or '')} {(signal_name or '')}".lower()
     if any(tok in text for tok in ("illumin", "lumin", "bright", "light")):
@@ -562,6 +648,7 @@ def _add_tdsosa_action_effect(
     env_var_key: Optional[str],
     actuation_uri: URIRef,
     direction: str,
+    settling_time_seconds: Optional[float] = None,
 ) -> None:
     rdf.g.add((action_affordance, TDSOSA.hasEffectActuation, actuation_uri))
     rdf.g.add((actuation_uri, RDF.type, SOSA.Actuation))
@@ -573,6 +660,12 @@ def _add_tdsosa_action_effect(
     rdf.g.add((amount, RDF.type, QUDT.QuantityValue))
     rdf.g.add((amount, QUDT.numericValue, Literal(1)))
     rdf.g.add((amount, QUDT.unit, UNIT.UNITLESS))
+    if settling_time_seconds is not None:
+        duration = BNode()
+        rdf.g.add((actuation_uri, TDSOSA.settlingTime, duration))
+        rdf.g.add((duration, RDF.type, TIME.Duration))
+        rdf.g.add((duration, TIME.numericDuration, Literal(float(settling_time_seconds), datatype=XSD.decimal)))
+        rdf.g.add((duration, TIME.unitType, TIME.unitSecond))
     rdf.g.add((feature_of_interest, SSN.hasProperty, env_var_uri))
     rdf.g.add((env_var_uri, SSN.isPropertyOf, feature_of_interest))
     rdf.g.add((env_var_uri, RDF.type, SOSA.ObservableProperty))
@@ -1061,6 +1154,14 @@ def _build_cached_artifact_ttl(
                     f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/actuations/"
                     f"{urllib.parse.quote(domain, safe='')}_{urllib.parse.quote(svc_name, safe='')}_{direction}"
                 )
+                settling_time_seconds = _resolve_settling_time(
+                    entity=domain_entity_meta,
+                    device=device,
+                    artifact_label=artifact_label,
+                    domain=domain,
+                    service_name=svc_name,
+                    env_var_key=env_var_key,
+                )
                 _add_tdsosa_action_effect(
                     rdf=rdf,
                     action_affordance=action_affordance,
@@ -1069,6 +1170,7 @@ def _build_cached_artifact_ttl(
                     env_var_key=env_var_key,
                     actuation_uri=actuation_uri,
                     direction=direction,
+                    settling_time_seconds=settling_time_seconds,
                 )
 
     if "climate" in domains:
@@ -1183,7 +1285,8 @@ async def _startup_cache():
     print(
         f"AREAS={sorted(AREAS) if AREAS else 'ALL'}, BASE_WS_URI={BASE_WS_URI}, "
         f"TD_SOSA_ENV_VAR_OVERRIDES={len(TD_SOSA_ENV_VAR_OVERRIDES)}, "
-        f"TD_SOSA_PROPERTY_RANGES={len(TD_SOSA_PROPERTY_RANGES)}"
+        f"TD_SOSA_PROPERTY_RANGES={len(TD_SOSA_PROPERTY_RANGES)}, "
+        f"TD_SOSA_SETTLING_TIMES={len(TD_SOSA_SETTLING_TIMES)}"
     )
     app.state.graph_cache = HASPGraphCache(
         ws_client=ha_client,
