@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional
 from enum import Enum
 from dataclasses import dataclass
 import logging
+import time
 
 from .http_client import HTTPClient, HTTPClientConfig, HTTPError
 from .blackboard_keys import BlackboardKeys
@@ -859,4 +860,83 @@ class ComparisonPropertyConditionNode(PropertyConditionNode):
             
         except HTTPError as e:
             logger.error(f"[{self.name}] HTTP error: {e.message}")
+            return Status.FAILURE
+
+
+class WaitPropertyConditionNode(ComparisonPropertyConditionNode):
+    """
+    Polling condition node for delayed environment effects.
+
+    The node reads a property on each tick and returns RUNNING until the
+    comparison succeeds or the timeout expires.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        property_url: str,
+        expected_value: Any = None,
+        operator: ComparisonOperator = ComparisonOperator.EQUAL,
+        expected_value_key: Optional[str] = None,
+        value_path: Optional[List[str]] = None,
+        negate: bool = False,
+        timeout_seconds: float = 30.0,
+        poll_interval_seconds: float = 1.0,
+    ):
+        super().__init__(
+            name=name,
+            property_url=property_url,
+            expected_value=expected_value,
+            operator=operator,
+            expected_value_key=expected_value_key,
+            value_path=value_path,
+            negate=negate,
+        )
+        self.timeout_seconds = max(0.0, float(timeout_seconds))
+        self.poll_interval_seconds = max(0.0, float(poll_interval_seconds))
+        self._started_at: Optional[float] = None
+
+    def initialise(self) -> None:
+        super().initialise()
+        self._started_at = time.monotonic()
+
+    def update(self) -> Status:
+        logger.debug(
+            f"[{self.name}] Waiting for property with operator {self.operator.value}: "
+            f"{self.property_url}"
+        )
+
+        try:
+            response = self._http_client.get(self.property_url)
+
+            if not response.is_success:
+                logger.warning(
+                    f"[{self.name}] Failed to read property while waiting: HTTP {response.status_code}"
+                )
+                return Status.FAILURE
+
+            self._actual_value = self._navigate_value(response.body)
+            expected = self._get_expected_value()
+            self._comparison_result = self._compare(self._actual_value, expected)
+            final_result = not self._comparison_result if self.negate else self._comparison_result
+
+            if final_result:
+                logger.debug(
+                    f"[{self.name}] Wait condition satisfied: {self._actual_value} "
+                    f"{self.operator.value} {expected}"
+                )
+                return Status.SUCCESS
+
+            elapsed = time.monotonic() - (self._started_at or time.monotonic())
+            if elapsed >= self.timeout_seconds:
+                logger.warning(
+                    f"[{self.name}] Wait condition timed out after {elapsed:.2f}s: "
+                    f"{self._actual_value} {self.operator.value} {expected}"
+                )
+                return Status.FAILURE
+
+            return Status.RUNNING
+
+        except HTTPError as e:
+            logger.error(f"[{self.name}] HTTP error while waiting: {e.message}")
             return Status.FAILURE

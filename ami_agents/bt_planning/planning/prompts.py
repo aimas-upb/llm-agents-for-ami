@@ -14,6 +14,7 @@ You generate executable behavior tree specifications in JSON format using the ge
 3. **parallel**: Runs all children concurrently. Policy: "success_on_all" or "success_on_one".
 4. **action**: Leaf node that invokes an HTTP POST action affordance. Requires "action_url" and optional "parameters".
 5. **condition**: Leaf node that checks a property value via HTTP GET. Requires "property_url" and "expected_value". Optional "operator" (==, !=, >, <, >=, <=).
+6. **wait_condition**: Leaf node that repeatedly checks a property value via HTTP GET until it matches or times out. Requires "property_url", "expected_value"; optional "operator", "timeout_seconds", "poll_interval_seconds".
 
 ## Common Patterns
 
@@ -47,6 +48,9 @@ You generate executable behavior tree specifications in JSON format using the ge
 - If an observable property hint provides only `target_max`, generate a condition with operator `<=` and `expected_value = target_max`.
 - If an observable property hint provides only `target_min`, generate a condition with operator `>=` and `expected_value = target_min`.
 - If an observable property hint provides both `target_min` and `target_max`, treat that as an acceptable band and use `>= target_min`, `<= target_max`, or both as separate conditions. Do not turn range hints into exact equality checks.
+- If an observable property hint lists a settling time for an action and provides a readable sensor property URL, use a `wait_condition` after that action to verify the target band after the delayed effect.
+- Set `wait_condition.timeout_seconds` to at least the listed settling time, preferably settling time plus a small margin. Use `poll_interval_seconds` around 1-5 seconds.
+- Do not put immediate post-action `condition` nodes after actions whose relevant effect has a settling time; use `wait_condition` for the post-action verification instead.
 
 {signifier_hints}
 
@@ -251,8 +255,12 @@ def format_observable_property_hints(observable_property_matches: dict | None) -
             direction = action.get("direction") or "affects"
             action_name = action.get("action_name") or "unknown_action"
             action_target = action.get("action_target") or ""
+            settling_time = action.get("settling_time_seconds")
+            settling_text = ""
+            if settling_time is not None:
+                settling_text = f"; settling_time={settling_time}s"
             lines.append(
-                f"  - {title}: {action_name} -> {direction} ({action_target})"
+                f"  - {title}: {action_name} -> {direction} ({action_target}{settling_text})"
             )
         lines.append("")
 

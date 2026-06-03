@@ -6,6 +6,7 @@ for the AAMAS 2026 demo multi-agent system.
 """
 
 import logging
+import time
 from typing import Optional
 
 import py_trees
@@ -15,6 +16,7 @@ from ..nodes.affordance_nodes import (
     ActionAffordanceNode,
     PropertyConditionNode,
     ComparisonPropertyConditionNode,
+    WaitPropertyConditionNode,
     ComparisonOperator,
 )
 from .base import ExecutionResult
@@ -144,6 +146,17 @@ class IRExecutor:
                     value_path=spec.get("value_path"),
                 )
 
+        elif node_type == "wait_condition":
+            return WaitPropertyConditionNode(
+                name=name,
+                property_url=spec["property_url"],
+                expected_value=spec["expected_value"],
+                operator=OPERATOR_MAP.get(spec.get("operator", "=="), ComparisonOperator.EQUAL),
+                value_path=spec.get("value_path"),
+                timeout_seconds=spec.get("timeout_seconds", 30.0),
+                poll_interval_seconds=spec.get("poll_interval_seconds", 1.0),
+            )
+
         else:
             raise ValueError(f"Unknown node type: {node_type}")
 
@@ -182,6 +195,10 @@ class IRExecutor:
                 result.final_status = "FAILURE"
                 result.success = False
                 break
+            elif tree.status == Status.RUNNING:
+                poll_interval = self._min_poll_interval(tree)
+                if poll_interval > 0:
+                    time.sleep(poll_interval)
         else:
             result.final_status = "RUNNING (max ticks reached)"
 
@@ -217,7 +234,7 @@ class IRExecutor:
         # AsyncBTPlanner normalizer fills in sensible defaults.  We only warn
         # (do NOT add to errors) so that trees without names still pass.
         node_type = spec.get("type")
-        valid_types = {"sequence", "selector", "parallel", "action", "condition"}
+        valid_types = {"sequence", "selector", "parallel", "action", "condition", "wait_condition"}
         if node_type not in valid_types:
             errors.append(f"{path}: missing or invalid 'type'")
 
@@ -237,11 +254,29 @@ class IRExecutor:
             if not action_url or not isinstance(action_url, str):
                 errors.append(f"{path}: action nodes require 'action_url'")
         # Condition nodes
-        elif node_type == "condition":
+        elif node_type in {"condition", "wait_condition"}:
             property_url = spec.get("property_url")
             if not property_url or not isinstance(property_url, str):
-                errors.append(f"{path}: condition nodes require 'property_url'")
+                errors.append(f"{path}: {node_type} nodes require 'property_url'")
             if "expected_value" not in spec:
-                errors.append(f"{path}: condition nodes require 'expected_value'")
+                errors.append(f"{path}: {node_type} nodes require 'expected_value'")
+            if node_type == "wait_condition":
+                timeout_seconds = spec.get("timeout_seconds")
+                if timeout_seconds is not None and not isinstance(timeout_seconds, (int, float)):
+                    errors.append(f"{path}: wait_condition timeout_seconds must be numeric")
+                poll_interval = spec.get("poll_interval_seconds")
+                if poll_interval is not None and (
+                    not isinstance(poll_interval, (int, float)) or poll_interval < 0
+                ):
+                    errors.append(f"{path}: wait_condition poll_interval_seconds must be >= 0")
 
         return errors
+
+    def _min_poll_interval(self, tree: py_trees.behaviour.Behaviour) -> float:
+        intervals = []
+        for node in tree.iterate():
+            if isinstance(node, WaitPropertyConditionNode) and node.status == Status.RUNNING:
+                interval = getattr(node, "poll_interval_seconds", None)
+                if interval is not None:
+                    intervals.append(float(interval))
+        return min(intervals) if intervals else 0.0

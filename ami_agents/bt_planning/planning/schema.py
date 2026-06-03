@@ -12,7 +12,7 @@ TREE_PARAMETER_SCHEMA = {
         "name": {"type": "string"},
         "type": {
             "type": "string",
-            "enum": ["sequence", "selector", "parallel", "action", "condition"],
+            "enum": ["sequence", "selector", "parallel", "action", "condition", "wait_condition"],
         },
         "children": {
             "type": "array",
@@ -49,6 +49,16 @@ TREE_PARAMETER_SCHEMA = {
             "type": "string",
             "description": "Optional JSON path for nested condition values.",
         },
+        "timeout_seconds": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Maximum seconds to poll before a wait_condition fails.",
+        },
+        "poll_interval_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Seconds between property polls for wait_condition nodes.",
+        },
     },
     "required": ["name", "type"],
     "oneOf": [
@@ -75,6 +85,11 @@ TREE_PARAMETER_SCHEMA = {
         {
             "title": "Condition",
             "properties": {"type": {"const": "condition"}},
+            "required": ["property_url", "expected_value"],
+        },
+        {
+            "title": "WaitCondition",
+            "properties": {"type": {"const": "wait_condition"}},
             "required": ["property_url", "expected_value"],
         },
     ],

@@ -299,11 +299,12 @@ class AsyncBTPlanner:
                 url = spec.get("action_url", "")
                 action_name = url.rstrip("/").rsplit("/", 1)[-1] if url else "action"
                 spec["name"] = action_name.replace("_", " ").title().replace(" ", "")
-            elif node_type == "condition":
+            elif node_type in {"condition", "wait_condition"}:
                 prop = spec.get("property_url", "")
                 prop_name = prop.rstrip("/").rsplit("/", 1)[-1] if prop else "check"
                 expected = spec.get("expected_value", "")
-                spec["name"] = f"Check{prop_name.title()}Is{expected}".replace(" ", "")
+                prefix = "WaitFor" if node_type == "wait_condition" else "Check"
+                spec["name"] = f"{prefix}{prop_name.title()}Is{expected}".replace(" ", "")
             else:
                 _counter[0] += 1
                 spec["name"] = f"{node_type.title()}_{_counter[0]}"
@@ -343,7 +344,7 @@ class AsyncBTPlanner:
             errors.append(f"{path}: missing 'name'")
 
         node_type = spec.get("type")
-        valid_types = {"sequence", "selector", "parallel", "action", "condition"}
+        valid_types = {"sequence", "selector", "parallel", "action", "condition", "wait_condition"}
         if node_type not in valid_types:
             errors.append(f"{path}: missing or invalid 'type'")
 
@@ -360,11 +361,20 @@ class AsyncBTPlanner:
             action_url = spec.get("action_url")
             if not action_url or not isinstance(action_url, str):
                 errors.append(f"{path}: action nodes require 'action_url'")
-        elif node_type == "condition":
+        elif node_type in {"condition", "wait_condition"}:
             property_url = spec.get("property_url")
             if not property_url or not isinstance(property_url, str):
-                errors.append(f"{path}: condition nodes require 'property_url'")
+                errors.append(f"{path}: {node_type} nodes require 'property_url'")
             if "expected_value" not in spec:
-                errors.append(f"{path}: condition nodes require 'expected_value'")
+                errors.append(f"{path}: {node_type} nodes require 'expected_value'")
+            if node_type == "wait_condition":
+                timeout_seconds = spec.get("timeout_seconds")
+                if timeout_seconds is not None and not isinstance(timeout_seconds, (int, float)):
+                    errors.append(f"{path}: wait_condition timeout_seconds must be numeric")
+                poll_interval = spec.get("poll_interval_seconds")
+                if poll_interval is not None and (
+                    not isinstance(poll_interval, (int, float)) or poll_interval < 0
+                ):
+                    errors.append(f"{path}: wait_condition poll_interval_seconds must be >= 0")
 
         return errors

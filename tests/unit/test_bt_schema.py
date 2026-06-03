@@ -41,6 +41,19 @@ class TestSchemaValidation:
         errors = executor.validate_tree(sample_condition_spec)
         assert errors == []
 
+    def test_valid_wait_condition(self, executor):
+        spec = {
+            "name": "WaitForGlare",
+            "type": "wait_condition",
+            "property_url": "http://localhost:8080/props/glare",
+            "expected_value": 50,
+            "operator": "<=",
+            "timeout_seconds": 20,
+            "poll_interval_seconds": 1,
+        }
+        errors = executor.validate_tree(spec)
+        assert errors == []
+
     def test_valid_nested_tree(self, executor, sample_nested_spec):
         errors = executor.validate_tree(sample_nested_spec)
         assert errors == []
@@ -74,6 +87,15 @@ class TestSchemaValidation:
         spec = {
             "name": "NoExpected",
             "type": "condition",
+            "property_url": "http://localhost:8080/props/state",
+        }
+        errors = executor.validate_tree(spec)
+        assert any("expected_value" in e for e in errors)
+
+    def test_invalid_wait_condition_missing_expected_value(self, executor):
+        spec = {
+            "name": "NoExpected",
+            "type": "wait_condition",
             "property_url": "http://localhost:8080/props/state",
         }
         errors = executor.validate_tree(spec)

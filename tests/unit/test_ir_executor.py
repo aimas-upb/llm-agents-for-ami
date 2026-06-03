@@ -14,6 +14,7 @@ from ami_agents.bt_planning.nodes.affordance_nodes import (
     ActionAffordanceNode,
     PropertyConditionNode,
     ComparisonPropertyConditionNode,
+    WaitPropertyConditionNode,
 )
 
 
@@ -65,6 +66,21 @@ class TestCompilation:
         }
         tree = executor._compile(spec)
         assert isinstance(tree, ComparisonPropertyConditionNode)
+
+    def test_compile_wait_condition_node(self, executor):
+        spec = {
+            "name": "WaitForGlare",
+            "type": "wait_condition",
+            "property_url": "http://localhost:8080/props/glare",
+            "expected_value": 50,
+            "operator": "<=",
+            "timeout_seconds": 20,
+            "poll_interval_seconds": 0,
+        }
+        tree = executor._compile(spec)
+        assert isinstance(tree, WaitPropertyConditionNode)
+        assert tree.timeout_seconds == 20.0
+        assert tree.poll_interval_seconds == 0.0
 
     def test_compile_nested_tree(self, executor, sample_nested_spec):
         tree = executor._compile(sample_nested_spec)
@@ -134,3 +150,30 @@ class TestExecution:
         assert d["tree_name"] == "TestTree"
         assert d["ticks"] == 3
         assert len(d["tick_history"]) == 3
+
+    @patch("ami_agents.bt_planning.nodes.affordance_nodes.HTTPClient")
+    def test_execute_wait_condition_polls_until_success(self, mock_client_cls):
+        from ami_agents.bt_planning.nodes.http_client import HTTPResponse
+
+        mock_client = MagicMock()
+        mock_client.get.side_effect = [
+            HTTPResponse(200, 75, {}, "http://localhost/props/glare", 0.0),
+            HTTPResponse(200, 45, {}, "http://localhost/props/glare", 0.0),
+        ]
+        mock_client_cls.return_value = mock_client
+
+        spec = {
+            "name": "WaitForGlare",
+            "type": "wait_condition",
+            "property_url": "http://localhost/props/glare",
+            "expected_value": 50,
+            "operator": "<=",
+            "timeout_seconds": 5,
+            "poll_interval_seconds": 0,
+        }
+        result = IRExecutor(max_ticks=3).execute_from_spec(spec)
+
+        assert result.success is True
+        assert result.ticks == 2
+        assert result.tick_history == ["RUNNING", "SUCCESS"]
+        assert mock_client.get.call_count == 2

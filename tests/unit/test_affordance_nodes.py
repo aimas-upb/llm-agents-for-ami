@@ -11,6 +11,7 @@ from ami_agents.bt_planning.nodes.affordance_nodes import (
     ActionAffordanceNode,
     PropertyConditionNode,
     ComparisonPropertyConditionNode,
+    WaitPropertyConditionNode,
     ComparisonOperator,
     ActionResult,
     PropertyValue,
@@ -216,3 +217,43 @@ class TestComparisonPropertyConditionNode:
         node.initialise()
 
         assert node.update() == Status.SUCCESS
+
+
+class TestWaitPropertyConditionNode:
+    """Tests for WaitPropertyConditionNode."""
+
+    @patch.object(WaitPropertyConditionNode, "setup")
+    def test_wait_condition_runs_until_match(self, mock_setup):
+        node = WaitPropertyConditionNode(
+            name="WaitForTemp",
+            property_url="http://localhost:8080/props/temp",
+            expected_value=24,
+            operator=ComparisonOperator.LESS_THAN_OR_EQUAL,
+            timeout_seconds=10,
+            poll_interval_seconds=0,
+        )
+        node._http_client = MagicMock()
+        node._http_client.get.side_effect = [
+            _make_http_response(200, 26),
+            _make_http_response(200, 24),
+        ]
+        node.initialise()
+
+        assert node.update() == Status.RUNNING
+        assert node.update() == Status.SUCCESS
+
+    @patch.object(WaitPropertyConditionNode, "setup")
+    def test_wait_condition_times_out(self, mock_setup):
+        node = WaitPropertyConditionNode(
+            name="WaitForTemp",
+            property_url="http://localhost:8080/props/temp",
+            expected_value=24,
+            operator=ComparisonOperator.LESS_THAN_OR_EQUAL,
+            timeout_seconds=0,
+            poll_interval_seconds=0,
+        )
+        node._http_client = MagicMock()
+        node._http_client.get.return_value = _make_http_response(200, 26)
+        node.initialise()
+
+        assert node.update() == Status.FAILURE
