@@ -26,12 +26,16 @@ You need the same runtime pieces as `tests/manual_interactive_cli.py`:
 Useful env vars:
 
 - `YGGDRASIL_URL`
+- `HA_TOKEN`
+  - used for direct Home Assistant `/api/states/...` setup steps; if unset, the runner loads the lab308e default from `ami_agents/environment/integration/HomeAssistant/prepare-adapter-env.sh`
 - `SPADE_SERVER`
 - `SPADE_PASSWORD`
 - `OPENAI_MODEL`
   - default if unset: `gpt-5-mini`
 - `OPENAI_BASE_URL`
 - `OPENAI_REASONING_EFFORT`
+- `BT_MAX_TICKS_USER_ASSISTANT`
+  - default in this runner: `240`, so `wait_condition` nodes can poll across settling-time windows
 
 ## Run
 
@@ -40,6 +44,9 @@ From the repo root:
 ```bash
 PYTHONPATH=ami_agents/shared/memory ~/aiml/env-spade-3/bin/python tests/e2e-lab308e/run_cases.py
 ```
+
+The default runner response timeout is 900 seconds because some plans verify
+settling-time effects with `wait_condition` polling.
 
 Run one case:
 
@@ -65,7 +72,7 @@ PYTHONPATH=ami_agents/shared/memory ~/aiml/env-spade-3/bin/python \
   --clear-signifiers
 ```
 
-Clear signifiers before every case:
+Clear signifiers and per-case in-memory assistant state before every case:
 
 ```bash
 PYTHONPATH=ami_agents/shared/memory ~/aiml/env-spade-3/bin/python \
@@ -202,4 +209,5 @@ Each file contains the LLM calls in order, including:
 - The runner starts `EnvExplorer`, `InteractionSolver`, and `UserAssistant` once for the whole batch.
 - Cases should therefore be written to establish their own initial state explicitly.
 - If you want a clean signifier store before the batch, use `--clear-signifiers`.
-- If you want isolated signifier memory for every JSON case, use `--clear-signifiers-per-case`.
+- If you want isolated signifier memory and no carried-over pending plans/conversation thread
+  state for every JSON case, use `--clear-signifiers-per-case`.

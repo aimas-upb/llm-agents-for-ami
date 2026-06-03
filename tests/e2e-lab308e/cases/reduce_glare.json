@@ -24,13 +24,23 @@
   "clarification_replies": [
     {
       "match_type": "regex",
-      "match": "(?i)reduce( the)? glare.*(closing the blinds|dimming the lights|lowering the blackout blinds)",
-      "reply": "lower the blackout blinds"
+      "match": "(?i)(would you like me|do you want me).*?(close|lower).*?blinds.*?dim.*?lights.*?glare",
+      "reply": "close the blackout blinds"
     },
     {
       "match_type": "regex",
-      "match": "(?i)which device should i adjust to reduce glare.*(window blinds|blackout blinds|ambient/task lights|projector)",
+      "match": "(?i)which device should i adjust.*reduce glare.*(blinds|lights|display|projector|ambient/task lights|window blinds|blackout blinds)",
       "reply": "the blackout blinds"
+    },
+    {
+      "match_type": "regex",
+      "match": "(?i)what would you like me to do with the blackout blinds.*(open|close|set (a )?position|check (their )?status)",
+      "reply": "close the blackout blinds"
+    },
+    {
+      "match_type": "regex",
+      "match": "(?i)reduce( the)? glare.*((closing|close|lowering|lower).*blinds|dimming.*lights)",
+      "reply": "close the blackout blinds"
     }
   ],
   "auto_confirm": true,

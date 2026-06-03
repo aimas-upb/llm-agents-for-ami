@@ -31,23 +31,33 @@
   "clarification_replies": [
     {
       "match_type": "regex",
-      "match": "(?i)(which screen|do you mean.*projector|do you mean.*display.*projector|wall display.*projector)",
+      "match": "(?i)(which screen|do you mean.*projector|do you mean.*display(_| )wall.*projector|display(_| )wall.*projector|wall display.*projector)",
       "reply": "the projector"
     },
     {
       "match_type": "regex",
-      "match": "(?i)(what would you like me to do with the projector|control the projector|projector.*status|turn it on/off|change input|mute volume)",
+      "match": "(?i)(what would you like (me )?to do with the projector|control the projector|projector.*(turn|volume|play|status)|turn it on/off|change input|mute volume)",
       "reply": "reduce glare"
     },
     {
       "match_type": "regex",
-      "match": "(?i)(reduce the glare|how would you like me to reduce the glare|dim the lights|close the blinds|lower the blackout blinds)",
-      "reply": "lower the blackout blinds"
+      "match": "(?i)(reduce the glare|how would you like me to reduce the glare|dim the lights|close the blinds|lower the blinds|lower the blackout blinds)",
+      "reply": "close the blackout blinds"
     },
     {
       "match_type": "regex",
-      "match": "(?i)(which device should i adjust|which would you like me to adjust|the display|the projector|the room lights|the blinds)",
+      "match": "(?i)do you want me to adjust the screen/display brightness or change room lighting/blinds to reduce glare",
+      "reply": "change room lighting/blinds to reduce glare by closing the blackout blinds"
+    },
+    {
+      "match_type": "regex",
+      "match": "(?i)(which device should i adjust|which would you like me to adjust|the display|the room lights|the blinds|display/projector)",
       "reply": "the blackout blinds"
+    },
+    {
+      "match_type": "regex",
+      "match": "(?i)(what would you like me to do with the blackout blinds|open, close, set position|open, close, set a position|check (their )?status)",
+      "reply": "close the blackout blinds"
     },
     {
       "match_type": "regex",

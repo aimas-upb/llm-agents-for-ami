@@ -47,6 +47,31 @@ env_path = PROJECT_ROOT / ".env"
 if env_path.exists():
     load_dotenv(env_path)
 
+
+def _load_adapter_env_defaults() -> None:
+    """Load simple HomeAssistant env defaults used by lab308e setup steps."""
+    adapter_env = (
+        PROJECT_ROOT
+        / "ami_agents"
+        / "environment"
+        / "integration"
+        / "HomeAssistant"
+        / "prepare-adapter-env.sh"
+    )
+    if not adapter_env.exists():
+        return
+    pattern = re.compile(r"""^\s*export\s+([A-Z0-9_]+)=["']([^"'$`]*)["']\s*$""")
+    for line in adapter_env.read_text(encoding="utf-8").splitlines():
+        match = pattern.match(line)
+        if not match:
+            continue
+        key, value = match.groups()
+        if key in {"HA_TOKEN", "HA_URL", "HA_BASE_URL"} and not os.getenv(key):
+            os.environ[key] = value
+
+
+_load_adapter_env_defaults()
+
 from ami_agents.agents.env_explorer.env_explorer_agent import EnvExplorerAgent
 from ami_agents.agents.interaction_solver.interaction_solver_agent import InteractionSolverAgent
 from ami_agents.agents.user_assistant.user_assistant_agent import UserAssistantAgent
@@ -268,8 +293,12 @@ class HeadlessUserAgent(Agent):
     async def setup(self):
         template = Template()
         template.set_metadata("message_type", "llm")
-        template.thread = self.thread_id
         self.add_behaviour(self.ReceiveLLMReply(), template=template)
+
+    def reset_thread(self) -> str:
+        self.thread_id = str(uuid.uuid4())
+        self.drain_replies()
+        return self.thread_id
 
     async def ask(self, text: str) -> None:
         behaviour = self.SendMessage(text)
@@ -290,6 +319,8 @@ class HeadlessUserAgent(Agent):
         async def run(self):
             msg = await self.receive(timeout=1)
             if not msg:
+                return
+            if str(getattr(msg, "thread", "") or "") != self.agent.thread_id:
                 return
             await self.agent.reply_queue.put(msg.body or "")
 
@@ -410,6 +441,29 @@ class Lab308eHarness:
         if plan_hash:
             details["plan_hash"] = plan_hash
 
+    def _clear_in_memory_case_state(self) -> str:
+        if not self.assistant or not self.user:
+            return ""
+
+        old_thread = self.user.thread_id
+        new_thread = self.user.reset_thread()
+
+        conversations = getattr(self.assistant, "_conversations", None)
+        if isinstance(conversations, dict):
+            conversations.clear()
+
+        state_memory = getattr(self.assistant, "state_memory", None)
+        clear_state_memory = getattr(state_memory, "clear", None)
+        if callable(clear_state_memory):
+            clear_state_memory()
+
+        self.logger.info(
+            "Cleared UserAssistant in-memory case state: old_thread=%s new_thread=%s",
+            old_thread,
+            new_thread,
+        )
+        return new_thread
+
     @staticmethod
     def _is_terminal_reply(text: str) -> bool:
         lowered = (text or "").strip().lower()
@@ -490,6 +544,9 @@ class Lab308eHarness:
             config["llm"]["providers"]["openai"]["reasoning_effort"] = reasoning_effort
         config.setdefault("planning", {})
         config["planning"]["timeout"] = float(os.getenv("AMI_PLANNING_TIMEOUT", "180"))
+        bt_max_ticks = int(os.getenv("BT_MAX_TICKS_USER_ASSISTANT", "240"))
+        config.setdefault("bt_execution", {}).setdefault("max_ticks", {})
+        config["bt_execution"]["max_ticks"]["user_assistant"] = bt_max_ticks
         return config
 
     async def start(self) -> None:
@@ -559,7 +616,13 @@ class Lab308eHarness:
         self.logger.info("Running case: %s", name)
         if self.args.clear_signifiers_per_case:
             storage_dir = _clear_signifier_storage()
-            self.logger.info("Cleared signifier storage before case %s at %s", name, storage_dir)
+            new_thread = self._clear_in_memory_case_state()
+            self.logger.info(
+                "Cleared signifier storage and in-memory conversation state before case %s at %s%s",
+                name,
+                storage_dir,
+                f" (thread={new_thread})" if new_thread else "",
+            )
         started_at = datetime.now().astimezone()
         started_perf = time.perf_counter()
         LLMCallCounter.reset()
@@ -567,6 +630,7 @@ class Lab308eHarness:
 
         try:
             await self._run_steps(case.get("initial_state") or [], phase="initial_state")
+            await asyncio.sleep(30)
 
             query = str(case["query"])
             await self.user.ask(query)
@@ -670,6 +734,12 @@ class Lab308eHarness:
                 )
                 json_body = self._expand_env_placeholders(step.get("json"))
                 headers = self._expand_env_placeholders(step.get("headers")) or None
+                if isinstance(headers, dict):
+                    auth_header = str(headers.get("Authorization") or "")
+                    if re.fullmatch(r"Bearer\s*", auth_header):
+                        raise RuntimeError(
+                            f"{phase}[{idx}] uses Authorization: Bearer ${{HA_TOKEN}}, but HA_TOKEN is not set"
+                        )
                 expected_status = int(step.get("expect_status", 200))
                 async with session.request(method, url, json=json_body, headers=headers) as resp:
                     text = await resp.text()
@@ -795,7 +865,7 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     parser.add_argument("--case-dir", default=str(Path(__file__).resolve().parent / "cases"))
     parser.add_argument("--case", help="Run one specific JSON file.")
     parser.add_argument("--case-name", help="Run one specific test by JSON 'name' field.")
-    parser.add_argument("--response-timeout", type=float, default=180.0)
+    parser.add_argument("--response-timeout", type=float, default=900.0)
     parser.add_argument("--settle-seconds", type=float, default=2.0)
     parser.add_argument("--clear-signifiers", action="store_true")
     parser.add_argument("--clear-signifiers-per-case", action="store_true")
