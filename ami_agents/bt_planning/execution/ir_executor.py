@@ -6,33 +6,14 @@ for the AAMAS 2026 demo multi-agent system.
 """
 
 import logging
-from typing import Optional
 
 import py_trees
 from py_trees.common import Status
 
-from ..nodes.affordance_nodes import (
-    ActionAffordanceNode,
-    PropertyConditionNode,
-    ComparisonPropertyConditionNode,
-    ComparisonOperator,
-)
+from ..nodes.registry import compile_node, validate_node
 from .base import ExecutionResult
 
 logger = logging.getLogger(__name__)
-
-
-OPERATOR_MAP = {
-    "==": ComparisonOperator.EQUAL,
-    "!=": ComparisonOperator.NOT_EQUAL,
-    ">": ComparisonOperator.GREATER_THAN,
-    ">=": ComparisonOperator.GREATER_THAN_OR_EQUAL,
-    "<": ComparisonOperator.LESS_THAN,
-    "<=": ComparisonOperator.LESS_THAN_OR_EQUAL,
-    "in": ComparisonOperator.IN,
-    "not_in": ComparisonOperator.NOT_IN,
-    "contains": ComparisonOperator.CONTAINS,
-}
 
 
 class IRExecutor:
@@ -93,59 +74,17 @@ class IRExecutor:
         """
         Compile a JSON specification to py_trees.
 
+        Dispatches each node through the node registry (``nodes/registry.py``),
+        so custom node types (e.g. ``compute``) compile the same way the five
+        built-ins do.
+
         Args:
             spec: JSON tree specification
 
         Returns:
             py_trees behavior
         """
-        node_type = spec.get("type")
-        name = spec.get("name", "unnamed")
-
-        if node_type == "sequence":
-            children = [self._compile(child) for child in spec.get("children", [])]
-            return py_trees.composites.Sequence(name=name, memory=True, children=children)
-
-        elif node_type == "selector":
-            children = [self._compile(child) for child in spec.get("children", [])]
-            return py_trees.composites.Selector(name=name, memory=False, children=children)
-
-        elif node_type == "parallel":
-            children = [self._compile(child) for child in spec.get("children", [])]
-            policy_name = spec.get("policy", "success_on_all")
-            if policy_name == "success_on_one":
-                policy = py_trees.common.ParallelPolicy.SuccessOnOne()
-            else:
-                policy = py_trees.common.ParallelPolicy.SuccessOnAll()
-            return py_trees.composites.Parallel(name=name, policy=policy, children=children)
-
-        elif node_type == "action":
-            return ActionAffordanceNode(
-                name=name,
-                action_url=spec["action_url"],
-                parameters=spec.get("parameters", {}),
-            )
-
-        elif node_type == "condition":
-            operator = spec.get("operator")
-            if operator and operator != "==":
-                return ComparisonPropertyConditionNode(
-                    name=name,
-                    property_url=spec["property_url"],
-                    expected_value=spec["expected_value"],
-                    operator=OPERATOR_MAP.get(operator, ComparisonOperator.EQUAL),
-                    value_path=spec.get("value_path"),
-                )
-            else:
-                return PropertyConditionNode(
-                    name=name,
-                    property_url=spec["property_url"],
-                    expected_value=spec["expected_value"],
-                    value_path=spec.get("value_path"),
-                )
-
-        else:
-            raise ValueError(f"Unknown node type: {node_type}")
+        return compile_node(spec, self._compile)
 
     def _execute_tree(self, tree: py_trees.behaviour.Behaviour) -> ExecutionResult:
         """
@@ -202,46 +141,11 @@ class IRExecutor:
         return self._validate_tree(spec)
 
     def _validate_tree(self, spec: dict, path: str = "tree") -> list[str]:
-        """Validate that the tree spec is non-empty and structurally sound."""
-        errors: list[str] = []
+        """
+        Validate that the tree spec is non-empty and structurally sound.
 
-        if not spec:
-            errors.append(f"{path}: tree is empty")
-            return errors
-
-        if not isinstance(spec, dict):
-            errors.append(f"{path}: expected object, got {type(spec).__name__}")
-            return errors
-
-        # 'name' is optional -- the compiler defaults to "unnamed" and the
-        # AsyncBTPlanner normalizer fills in sensible defaults.  We only warn
-        # (do NOT add to errors) so that trees without names still pass.
-        node_type = spec.get("type")
-        valid_types = {"sequence", "selector", "parallel", "action", "condition"}
-        if node_type not in valid_types:
-            errors.append(f"{path}: missing or invalid 'type'")
-
-        # Composite nodes
-        if node_type in {"sequence", "selector", "parallel"}:
-            children = spec.get("children")
-            if not isinstance(children, list) or not children:
-                errors.append(f"{path}: composite nodes require non-empty 'children'")
-            else:
-                for idx, child in enumerate(children):
-                    errors.extend(
-                        self._validate_tree(child, path=f"{path}.children[{idx}]")
-                    )
-        # Action nodes
-        elif node_type == "action":
-            action_url = spec.get("action_url")
-            if not action_url or not isinstance(action_url, str):
-                errors.append(f"{path}: action nodes require 'action_url'")
-        # Condition nodes
-        elif node_type == "condition":
-            property_url = spec.get("property_url")
-            if not property_url or not isinstance(property_url, str):
-                errors.append(f"{path}: condition nodes require 'property_url'")
-            if "expected_value" not in spec:
-                errors.append(f"{path}: condition nodes require 'expected_value'")
-
-        return errors
+        Delegates per-node validation to the node registry so built-in and
+        custom node types share one source of truth. ``name`` stays optional —
+        the compiler defaults it to "unnamed".
+        """
+        return validate_node(spec, path)
