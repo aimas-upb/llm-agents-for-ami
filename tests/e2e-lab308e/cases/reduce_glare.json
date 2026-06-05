@@ -39,6 +39,11 @@
     },
     {
       "match_type": "regex",
+      "match": "(?i)what would you like me to do with the blackout blinds\\??",
+      "reply": "close the blackout blinds"
+    },
+    {
+      "match_type": "regex",
       "match": "(?i)reduce( the)? glare.*((closing|close|lowering|lower).*blinds|dimming.*lights)",
       "reply": "close the blackout blinds"
     }

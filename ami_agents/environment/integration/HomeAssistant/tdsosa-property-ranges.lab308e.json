@@ -16,7 +16,6 @@
     "unit": "ppm"
   },
   "thermal_comfort": {
-    "min": 20,
     "max": 24,
     "unit": "degC"
   },

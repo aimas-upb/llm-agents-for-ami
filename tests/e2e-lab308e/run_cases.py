@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 import aiohttp
 import spade
@@ -60,13 +61,34 @@ def _load_adapter_env_defaults() -> None:
     )
     if not adapter_env.exists():
         return
-    pattern = re.compile(r"""^\s*export\s+([A-Z0-9_]+)=["']([^"'$`]*)["']\s*$""")
+    simple_pattern = re.compile(r"""^\s*export\s+([A-Z0-9_]+)=["']([^"'$`]*)["']\s*$""")
+    cat_pattern = re.compile(r"""^\s*export\s+([A-Z0-9_]+)=["']?\$\(cat\s+([^)"']+)\)["']?\s*$""")
     for line in adapter_env.read_text(encoding="utf-8").splitlines():
-        match = pattern.match(line)
-        if not match:
+        simple_match = simple_pattern.match(line)
+        if simple_match:
+            key, value = simple_match.groups()
+        else:
+            cat_match = cat_pattern.match(line)
+            if not cat_match:
+                continue
+            key, rel_path = cat_match.groups()
+            source_path = (adapter_env.parent / rel_path.strip()).resolve()
+            if not source_path.exists():
+                continue
+            value = source_path.read_text(encoding="utf-8").strip()
+        if key in os.environ:
             continue
-        key, value = match.groups()
-        if key in {"HA_TOKEN", "HA_URL", "HA_BASE_URL"} and not os.getenv(key):
+        if key in {
+            "AREAS",
+            "BASE_WS_URI",
+            "HASP_URL",
+            "HA_TOKEN",
+            "HA_URL",
+            "HA_BASE_URL",
+            "TD_SOSA_ENV_VAR_OVERRIDES",
+            "TD_SOSA_PROPERTY_RANGES",
+            "TD_SOSA_SETTLING_TIMES",
+        }:
             os.environ[key] = value
 
 
@@ -210,6 +232,108 @@ def _require_env(var: str) -> str:
     return val
 
 
+LAB308E_HARD_RESET_STATES: Dict[str, Dict[str, Any]] = {
+    "light.ambient_lights_308e": {
+        "state": "off",
+        "attributes": {"friendly_name": "ambient_lights_308e", "brightness": 96},
+    },
+    "light.task_lights_308e": {
+        "state": "off",
+        "attributes": {"friendly_name": "task_lights_308e", "brightness": 128},
+    },
+    "light.desk_lamp_308e": {
+        "state": "off",
+        "attributes": {"friendly_name": "desk_lamp_308e", "brightness": 140},
+    },
+    "cover.blinds_308e_cover": {
+        "state": "closed",
+        "attributes": {"friendly_name": "blinds_308e cover", "current_position": 0, "supported_features": 15},
+    },
+    "cover.blackout_blinds_308e_cover": {
+        "state": "open",
+        "attributes": {"friendly_name": "blackout_blinds_308e cover", "current_position": 100, "supported_features": 15},
+    },
+    "cover.window_308e_cover": {
+        "state": "closed",
+        "attributes": {"friendly_name": "window_308e cover", "current_position": 0, "supported_features": 15},
+    },
+    "media_player.projector_308e": {
+        "state": "off",
+        "attributes": {"friendly_name": "projector_308e", "volume_level": 0.15},
+    },
+    "media_player.display_wall_308e": {
+        "state": "on",
+        "attributes": {"friendly_name": "display_wall_308e", "volume_level": 0.0},
+    },
+    "switch.ceiling_fan_308e": {
+        "state": "off",
+        "attributes": {"friendly_name": "ceiling_fan_308e"},
+    },
+    "climate.air_conditioner_308e": {
+        "state": "cool",
+        "attributes": {
+            "friendly_name": "air_conditioner_308e",
+            "hvac_mode": "cool",
+            "temperature": 24,
+            "current_temperature": 26,
+            "min_temp": 18,
+            "max_temp": 30,
+            "target_temp_step": 0.5,
+        },
+    },
+    "climate.heater_308e": {
+        "state": "off",
+        "attributes": {
+            "friendly_name": "heater_308e",
+            "hvac_mode": "off",
+            "temperature": 20,
+            "current_temperature": 26,
+            "min_temp": 16,
+            "max_temp": 28,
+            "target_temp_step": 0.5,
+        },
+    },
+    "sensor.person_counter_308e": {
+        "state": 3,
+        "attributes": {"friendly_name": "person_counter_308e", "unit_of_measurement": "persons"},
+    },
+    "binary_sensor.presence_sensing_308e": {
+        "state": "on",
+        "attributes": {"friendly_name": "presence_sensing_308e", "device_class": "occupancy"},
+    },
+    # Derived sensors are written after relevant actuators/occupancy so the
+    # simulator picks up these exact seed values on its next tick.
+    "sensor.internal_light_sensing_308e": {
+        "state": 180,
+        "attributes": {"friendly_name": "internal_light_sensing_308e", "unit_of_measurement": "lx"},
+    },
+    "sensor.desk_light_sensing_308e": {
+        "state": 120,
+        "attributes": {"friendly_name": "desk_light_sensing_308e", "unit_of_measurement": "lx"},
+    },
+    "sensor.glare_sensing_308e": {
+        "state": 75,
+        "attributes": {"friendly_name": "glare_sensing_308e", "unit_of_measurement": "%"},
+    },
+    "sensor.external_light_sensing_308e": {
+        "state": 5200,
+        "attributes": {"friendly_name": "external_light_sensing_308e", "unit_of_measurement": "lx"},
+    },
+    "sensor.temperature_sensing_308e": {
+        "state": 26,
+        "attributes": {"friendly_name": "temperature_sensing_308e", "unit_of_measurement": "C"},
+    },
+    "sensor.humidity_sensing_308e": {
+        "state": 62,
+        "attributes": {"friendly_name": "humidity_sensing_308e", "unit_of_measurement": "%"},
+    },
+    "sensor.co2_sensing_308e": {
+        "state": 980,
+        "attributes": {"friendly_name": "co2_sensing_308e", "unit_of_measurement": "ppm"},
+    },
+}
+
+
 def _clear_signifier_storage() -> Path:
     storage_dir = PROJECT_ROOT / "ami_agents" / "shared" / "memory" / "storage"
     storage_dir.mkdir(parents=True, exist_ok=True)
@@ -345,6 +469,76 @@ class CaseResult:
     details: Dict[str, Any]
 
 
+class ManagedService:
+    def __init__(
+        self,
+        *,
+        name: str,
+        argv: List[str],
+        cwd: Path,
+        logger: logging.Logger,
+        env: Optional[Dict[str, str]] = None,
+    ):
+        self.name = name
+        self.argv = argv
+        self.cwd = cwd
+        self.logger = logger
+        self.env = env
+        self.process: Optional[asyncio.subprocess.Process] = None
+        self._log_task: Optional[asyncio.Task[None]] = None
+
+    def is_running(self) -> bool:
+        return self.process is not None and self.process.returncode is None
+
+    async def start(self) -> None:
+        if self.is_running():
+            return
+        self.logger.info("Starting managed %s: %s", self.name, " ".join(self.argv))
+        self.process = await asyncio.create_subprocess_exec(
+            *self.argv,
+            cwd=str(self.cwd),
+            env=self.env,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        self._log_task = asyncio.create_task(self._drain_stdout())
+
+    async def stop(self) -> None:
+        process = self.process
+        if process is None:
+            return
+        if process.returncode is None:
+            self.logger.info("Stopping managed %s", self.name)
+            process.terminate()
+            try:
+                await asyncio.wait_for(process.wait(), timeout=8.0)
+            except asyncio.TimeoutError:
+                self.logger.warning("Managed %s did not terminate; killing it", self.name)
+                process.kill()
+                await process.wait()
+        if self._log_task is not None:
+            try:
+                await asyncio.wait_for(self._log_task, timeout=2.0)
+            except asyncio.TimeoutError:
+                self._log_task.cancel()
+            self._log_task = None
+        self.process = None
+
+    async def restart(self) -> None:
+        await self.stop()
+        await self.start()
+
+    async def _drain_stdout(self) -> None:
+        process = self.process
+        if process is None or process.stdout is None:
+            return
+        while True:
+            line = await process.stdout.readline()
+            if not line:
+                break
+            self.logger.info("[%s] %s", self.name, line.decode(errors="replace").rstrip())
+
+
 class Lab308eHarness:
     def __init__(self, args: argparse.Namespace, logger: logging.Logger):
         self.args = args
@@ -352,6 +546,13 @@ class Lab308eHarness:
         self.xmpp_server = os.getenv("SPADE_SERVER", "localhost")
         self.password = os.getenv("SPADE_PASSWORD", "password")
         self.yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8080/").strip().rstrip("/")
+        self.ha_base_url = (
+            os.getenv("HA_BASE_URL")
+            or os.getenv("HA_URL", "ws://localhost:8123/api/websocket")
+            .replace("ws://", "http://")
+            .replace("wss://", "https://")
+            .split("/api/websocket")[0]
+        ).strip().rstrip("/")
         self.response_timeout = float(args.response_timeout)
         self.model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini")
 
@@ -365,6 +566,8 @@ class Lab308eHarness:
         self.assistant: Optional[UserAssistantAgent] = None
         self.solver: Optional[InteractionSolverAgent] = None
         self.user: Optional[HeadlessUserAgent] = None
+        self.hasp_service: Optional[ManagedService] = None
+        self.simulator_service: Optional[ManagedService] = None
 
     @staticmethod
     def _clarification_followup(first_reply: str, confirmation_text: str) -> Optional[str]:
@@ -464,6 +667,18 @@ class Lab308eHarness:
         )
         return new_thread
 
+    async def _hard_reset_lab308e(self) -> None:
+        token = _require_env("HA_TOKEN")
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        async with aiohttp.ClientSession(headers=headers) as session:
+            for entity_id, payload in LAB308E_HARD_RESET_STATES.items():
+                async with session.post(f"{self.ha_base_url}/api/states/{entity_id}", json=payload) as resp:
+                    text = await resp.text()
+                    if resp.status >= 400:
+                        raise AssertionError(
+                            f"Hard reset failed for {entity_id}: HTTP {resp.status}: {text}"
+                        )
+
     @staticmethod
     def _is_terminal_reply(text: str) -> bool:
         lowered = (text or "").strip().lower()
@@ -549,6 +764,79 @@ class Lab308eHarness:
         config["bt_execution"]["max_ticks"]["user_assistant"] = bt_max_ticks
         return config
 
+    def _hasp_port(self) -> int:
+        parsed = urlparse(self.yggdrasil_url)
+        if parsed.port is not None:
+            return parsed.port
+        return 443 if parsed.scheme == "https" else 80
+
+    def _build_managed_services(self) -> None:
+        ha_dir = PROJECT_ROOT / "ami_agents" / "environment" / "integration" / "HomeAssistant"
+        env = os.environ.copy()
+        python_path_parts = [str(PROJECT_ROOT), str(ha_dir)]
+        existing_python_path = env.get("PYTHONPATH", "").strip()
+        if existing_python_path:
+            python_path_parts.append(existing_python_path)
+        env["PYTHONPATH"] = os.pathsep.join(python_path_parts)
+
+        if self.args.manage_hasp:
+            env["PORT"] = str(self._hasp_port())
+            env.setdefault("BASE_WS_URI", self.yggdrasil_url + "/")
+            self.hasp_service = ManagedService(
+                name="hasp",
+                argv=[
+                    sys.executable,
+                    "-m",
+                    "uvicorn",
+                    "hasp:app",
+                    "--host",
+                    self.args.hasp_host,
+                    "--port",
+                    str(self._hasp_port()),
+                ],
+                cwd=ha_dir,
+                logger=self.logger,
+                env=env,
+            )
+
+        if self.args.manage_simulator:
+            self.simulator_service = ManagedService(
+                name="simulate_lab308e",
+                argv=[sys.executable, str(ha_dir / "simulate_lab308e.py")],
+                cwd=ha_dir,
+                logger=self.logger,
+                env=env,
+            )
+
+    async def _wait_for_yggdrasil(self, timeout_s: float = 20.0) -> None:
+        deadline = asyncio.get_running_loop().time() + timeout_s
+        last_error = ""
+        while asyncio.get_running_loop().time() < deadline:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(self.yggdrasil_url) as resp:
+                        if resp.status < 400:
+                            return
+                        last_error = f"HTTP {resp.status}"
+            except Exception as exc:
+                last_error = str(exc)
+            await asyncio.sleep(0.5)
+        raise RuntimeError(f"Yggdrasil is not reachable at {self.yggdrasil_url}: {last_error}")
+
+    async def _stop_simulator_for_setup(self) -> None:
+        if self.simulator_service is not None:
+            await self.simulator_service.stop()
+
+    async def _start_simulator_for_execution(self) -> None:
+        if self.simulator_service is not None:
+            await self.simulator_service.start()
+
+    async def _restart_hasp_for_case(self) -> None:
+        if self.hasp_service is None:
+            return
+        await self.hasp_service.restart()
+        await self._wait_for_yggdrasil(timeout_s=float(self.args.service_start_timeout))
+
     async def start(self) -> None:
         _require_env("OPENAI_API_KEY")
 
@@ -559,12 +847,12 @@ class Lab308eHarness:
         PromptDumpState.configure(enabled=bool(self.args.dump_prompts), output_dir=self.prompt_dump_dir)
 
         config = self._load_config()
+        self._build_managed_services()
 
         self.logger.info(demo("Starting lab308e E2E harness (Yggdrasil=%s)"), self.yggdrasil_url)
-        async with aiohttp.ClientSession() as session:
-            async with session.get(self.yggdrasil_url) as resp:
-                if resp.status >= 400:
-                    raise RuntimeError(f"Yggdrasil returned HTTP {resp.status} at {self.yggdrasil_url}")
+        if self.hasp_service is not None:
+            await self.hasp_service.start()
+        await self._wait_for_yggdrasil(timeout_s=float(self.args.service_start_timeout))
 
         self.explorer = EnvExplorerAgent(self.explorer_jid, self.password, config, hmas_client=DummyHMASClient())
         self.assistant = UserAssistantAgent(
@@ -599,6 +887,8 @@ class Lab308eHarness:
         await self.user.start(auto_register=True)
 
     async def stop(self) -> None:
+        if self.simulator_service is not None:
+            await self.simulator_service.stop()
         for agent in [self.user, self.assistant, self.solver, self.explorer]:
             if not agent:
                 continue
@@ -606,6 +896,8 @@ class Lab308eHarness:
                 await agent.stop()
             except Exception:
                 pass
+        if self.hasp_service is not None:
+            await self.hasp_service.stop()
         await asyncio.sleep(1)
 
     async def run_case(self, case_path: Path) -> CaseResult:
@@ -629,8 +921,26 @@ class Lab308eHarness:
         PromptDumpState.start_case(name)
 
         try:
+            await self._stop_simulator_for_setup()
+            if not self.args.no_hard_reset and case.get("hard_reset", True):
+                await self._restart_hasp_for_case()
+            if not self.args.no_hard_reset and case.get("hard_reset", True):
+                await self._hard_reset_lab308e()
             await self._run_steps(case.get("initial_state") or [], phase="initial_state")
-            await asyncio.sleep(30)
+            pre_query_assertions = case.get("pre_query_assertions") or []
+            if pre_query_assertions:
+                details["pre_query_assertions"] = []
+                for assertion in pre_query_assertions:
+                    result = await self._evaluate_assertion(assertion, details)
+                    details["pre_query_assertions"].append(result)
+                    if not result["passed"]:
+                        details["failure_stage"] = "initial_state"
+                        details["failed_assertion"] = result
+                        details["started_at"] = started_at.isoformat()
+                        details["duration_seconds"] = round(time.perf_counter() - started_perf, 3)
+                        details.update(LLMCallCounter.snapshot())
+                        self._attach_prompt_dump(details)
+                        return CaseResult(case_path, False, details)
 
             query = str(case["query"])
             await self.user.ask(query)
@@ -678,6 +988,7 @@ class Lab308eHarness:
                     await self.user.ask(followup_text)
                 else:
                     self.user.drain_replies()
+                    await self._start_simulator_for_execution()
                     await self.user.ask(confirm_text)
                 final_reply = await self._wait_for_terminal_reply(details, case_response_timeout)
 
@@ -871,6 +1182,11 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     parser.add_argument("--clear-signifiers-per-case", action="store_true")
     parser.add_argument("--skip-prewarm", action="store_true")
     parser.add_argument("--dump-prompts", action="store_true")
+    parser.add_argument("--no-hard-reset", action="store_true")
+    parser.add_argument("--manage-hasp", action="store_true")
+    parser.add_argument("--manage-simulator", action="store_true")
+    parser.add_argument("--hasp-host", default="0.0.0.0")
+    parser.add_argument("--service-start-timeout", type=float, default=30.0)
     parser.add_argument("--log-level", default="INFO")
     parser.add_argument("--write-results", action="store_true")
     return parser.parse_args(argv)

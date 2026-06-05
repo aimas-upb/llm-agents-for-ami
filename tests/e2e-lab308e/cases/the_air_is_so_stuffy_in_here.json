@@ -61,6 +61,50 @@
       "seconds": 2
     }
   ],
+  "pre_query_assertions": [
+    {
+      "type": "property_equals",
+      "path": "/workspaces/lab308e/artifacts/window_308e_cover/properties/state",
+      "equals": "closed",
+      "timeout_seconds": 20,
+      "poll_interval_seconds": 1
+    },
+    {
+      "type": "property_equals",
+      "path": "/workspaces/lab308e/artifacts/ceiling_fan_308e/properties/state",
+      "equals": "off",
+      "timeout_seconds": 20,
+      "poll_interval_seconds": 1
+    },
+    {
+      "type": "property_gte",
+      "path": "/workspaces/lab308e/artifacts/co2_sensing_308e/properties/state",
+      "gte": 1550,
+      "timeout_seconds": 20,
+      "poll_interval_seconds": 1
+    },
+    {
+      "type": "property_lte",
+      "path": "/workspaces/lab308e/artifacts/co2_sensing_308e/properties/state",
+      "lte": 1650,
+      "timeout_seconds": 20,
+      "poll_interval_seconds": 1
+    },
+    {
+      "type": "property_equals",
+      "path": "/workspaces/lab308e/artifacts/person_counter_308e/properties/state",
+      "equals": 1,
+      "timeout_seconds": 20,
+      "poll_interval_seconds": 1
+    },
+    {
+      "type": "property_equals",
+      "path": "/workspaces/lab308e/artifacts/presence_sensing_308e/properties/state",
+      "equals": "on",
+      "timeout_seconds": 20,
+      "poll_interval_seconds": 1
+    }
+  ],
   "query": "the air is so stuffy in here",
   "semantic_expectations": {
     "target_properties": ["air_quality"],

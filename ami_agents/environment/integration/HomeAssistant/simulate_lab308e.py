@@ -257,7 +257,11 @@ class Lab308eSimulator:
         if heater_mode in {"heat", "heating"}:
             temp += 0.22 * time_factor
         if ac_mode in {"cool", "cooling"}:
-            temp -= 0.28 * time_factor
+            ac_target = _as_float(world["air_conditioner"].get("attributes", {}).get("temperature"), 24.0)
+            if temp > ac_target:
+                temp -= 0.85 * time_factor
+            else:
+                temp -= 0.18 * time_factor
         if fan_on:
             temp -= 0.08 * time_factor
         temp += occupancy_heat * time_factor
