@@ -1336,6 +1336,14 @@ async def save_graph_snapshot(request: Request):
     return {"path": output_path, "filename": filename, "format": rdf_format}
 
 
+@app.post("/_graph/refresh-states")
+async def refresh_graph_states():
+    """Force HASP's Home Assistant state cache to refresh from REST."""
+    cache = await _ensure_graph_cache()
+    await cache.refresh_states()
+    return {"status": "ok"}
+
+
 @app.post("/_graph/query/actions-affecting-observable-property")
 async def query_actions_affecting_observable_property(request: Request):
     payload = await request.json()
