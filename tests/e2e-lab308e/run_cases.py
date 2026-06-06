@@ -334,6 +334,68 @@ LAB308E_HARD_RESET_STATES: Dict[str, Dict[str, Any]] = {
 }
 
 
+LAB308E_SIMULATOR_DERIVED_ENTITIES = {
+    "sensor.clock_308e",
+    "sensor.external_light_sensing_308e",
+    "sensor.internal_light_sensing_308e",
+    "sensor.desk_light_sensing_308e",
+    "sensor.glare_sensing_308e",
+    "sensor.temperature_sensing_308e",
+    "sensor.humidity_sensing_308e",
+    "sensor.co2_sensing_308e",
+}
+
+
+LAB308E_HARD_RESET_SERVICES: Dict[str, List[Dict[str, Any]]] = {
+    "light.ambient_lights_308e": [
+        {"domain": "light", "service": "turn_off", "data": {"entity_id": "light.ambient_lights_308e"}},
+    ],
+    "light.task_lights_308e": [
+        {"domain": "light", "service": "turn_off", "data": {"entity_id": "light.task_lights_308e"}},
+    ],
+    "light.desk_lamp_308e": [
+        {"domain": "light", "service": "turn_off", "data": {"entity_id": "light.desk_lamp_308e"}},
+    ],
+    "cover.blinds_308e_cover": [
+        {"domain": "cover", "service": "close_cover", "data": {"entity_id": "cover.blinds_308e_cover"}},
+    ],
+    "cover.blackout_blinds_308e_cover": [
+        {"domain": "cover", "service": "open_cover", "data": {"entity_id": "cover.blackout_blinds_308e_cover"}},
+    ],
+    "cover.window_308e_cover": [
+        {"domain": "cover", "service": "close_cover", "data": {"entity_id": "cover.window_308e_cover"}},
+    ],
+    "media_player.projector_308e": [
+        {"domain": "media_player", "service": "turn_off", "data": {"entity_id": "media_player.projector_308e"}},
+    ],
+    "media_player.display_wall_308e": [
+        {"domain": "media_player", "service": "turn_on", "data": {"entity_id": "media_player.display_wall_308e"}},
+    ],
+    "switch.ceiling_fan_308e": [
+        {"domain": "switch", "service": "turn_off", "data": {"entity_id": "switch.ceiling_fan_308e"}},
+    ],
+    "climate.air_conditioner_308e": [
+        {
+            "domain": "climate",
+            "service": "set_hvac_mode",
+            "data": {"entity_id": "climate.air_conditioner_308e", "hvac_mode": "cool"},
+        },
+        {
+            "domain": "climate",
+            "service": "set_temperature",
+            "data": {"entity_id": "climate.air_conditioner_308e", "temperature": 24},
+        },
+    ],
+    "climate.heater_308e": [
+        {
+            "domain": "climate",
+            "service": "set_hvac_mode",
+            "data": {"entity_id": "climate.heater_308e", "hvac_mode": "off"},
+        },
+    ],
+}
+
+
 def _clear_signifier_storage() -> Path:
     storage_dir = PROJECT_ROOT / "ami_agents" / "shared" / "memory" / "storage"
     storage_dir.mkdir(parents=True, exist_ok=True)
@@ -670,14 +732,190 @@ class Lab308eHarness:
     async def _hard_reset_lab308e(self) -> None:
         token = _require_env("HA_TOKEN")
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        ha_state_writes: List[Dict[str, Any]] = []
+
+        def record_verifiable_write(entity_id: str, payload: Dict[str, Any]) -> None:
+            if "state" not in payload:
+                return
+            if entity_id in LAB308E_SIMULATOR_DERIVED_ENTITIES:
+                self.logger.info(
+                    "Seeded simulator-derived hard reset state without exact verification: %s=%r",
+                    entity_id,
+                    payload["state"],
+                )
+                return
+            ha_state_writes.append({"entity_id": entity_id, "state": payload["state"]})
+
         async with aiohttp.ClientSession(headers=headers) as session:
+            for entity_id, calls in LAB308E_HARD_RESET_SERVICES.items():
+                for call in calls:
+                    domain = str(call["domain"])
+                    service = str(call["service"])
+                    data = dict(call.get("data") or {})
+                    async with session.post(
+                        f"{self.ha_base_url}/api/services/{domain}/{service}",
+                        json=data,
+                    ) as resp:
+                        text = await resp.text()
+                        if resp.status >= 400:
+                            raise AssertionError(
+                                f"Hard reset service failed for {entity_id}: "
+                                f"{domain}/{service} HTTP {resp.status}: {text}"
+                            )
+                payload = LAB308E_HARD_RESET_STATES.get(entity_id, {})
+                record_verifiable_write(entity_id, payload)
+
             for entity_id, payload in LAB308E_HARD_RESET_STATES.items():
+                if entity_id in LAB308E_HARD_RESET_SERVICES:
+                    continue
                 async with session.post(f"{self.ha_base_url}/api/states/{entity_id}", json=payload) as resp:
                     text = await resp.text()
                     if resp.status >= 400:
                         raise AssertionError(
                             f"Hard reset failed for {entity_id}: HTTP {resp.status}: {text}"
                         )
+                record_verifiable_write(entity_id, payload)
+        await self._verify_setup_state_writes(ha_state_writes, reason="hard reset")
+
+    async def _refresh_hasp_state_cache(self, *, reason: str, log: bool = True) -> None:
+        url = f"{self.yggdrasil_url}/_graph/refresh-states"
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json={}) as resp:
+                text = await resp.text()
+                if resp.status >= 400:
+                    raise AssertionError(
+                        f"HASP state cache refresh failed after {reason}: HTTP {resp.status}: {text}"
+                    )
+        if log:
+            self.logger.info("Refreshed HASP state cache after %s", reason)
+
+    @staticmethod
+    def _values_match(actual: Any, expected: Any) -> bool:
+        if actual == expected:
+            return True
+        try:
+            return float(actual) == float(expected)
+        except (TypeError, ValueError):
+            return str(actual).strip() == str(expected).strip()
+
+    def _entity_id_from_ha_state_url(self, url: str) -> Optional[str]:
+        parsed = urlparse(url)
+        prefix = "/api/states/"
+        if not parsed.path.startswith(prefix):
+            return None
+        entity_id = parsed.path[len(prefix):].strip("/")
+        return entity_id or None
+
+    def _hasp_state_url_for_entity(self, entity_id: str) -> Optional[str]:
+        if "." not in entity_id:
+            return None
+        artifact_name = entity_id.split(".", 1)[1]
+        return f"{self.yggdrasil_url}/workspaces/lab308e/artifacts/{artifact_name}/properties/state"
+
+    async def _wait_for_ha_state(
+        self,
+        entity_id: str,
+        expected_state: Any,
+        *,
+        reason: str,
+        timeout_s: float = 45.0,
+        interval_s: float = 0.5,
+    ) -> Any:
+        token = _require_env("HA_TOKEN")
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        url = f"{self.ha_base_url}/api/states/{entity_id}"
+        deadline = asyncio.get_running_loop().time() + timeout_s
+        last_state: Any = None
+        async with aiohttp.ClientSession(headers=headers) as session:
+            while True:
+                async with session.get(url) as resp:
+                    text = await resp.text()
+                    if resp.status >= 400:
+                        raise AssertionError(
+                            f"HA state verification failed after {reason} for {entity_id}: "
+                            f"HTTP {resp.status}: {text}"
+                        )
+                    body = json.loads(text)
+                    last_state = body.get("state")
+                if self._values_match(last_state, expected_state):
+                    self.logger.info(
+                        "Verified HA state after %s: %s=%r",
+                        reason,
+                        entity_id,
+                        last_state,
+                    )
+                    return last_state
+                if asyncio.get_running_loop().time() >= deadline:
+                    raise AssertionError(
+                        f"Timed out verifying HA state after {reason}: {entity_id} "
+                        f"expected {expected_state!r}, actual {last_state!r}"
+                    )
+                await asyncio.sleep(interval_s)
+
+    async def _wait_for_hasp_entity_state(
+        self,
+        entity_id: str,
+        expected_state: Any,
+        *,
+        reason: str,
+        timeout_s: float = 45.0,
+        interval_s: float = 0.5,
+    ) -> Any:
+        url = self._hasp_state_url_for_entity(entity_id)
+        if not url:
+            return None
+        deadline = asyncio.get_running_loop().time() + timeout_s
+        last_state: Any = None
+        async with aiohttp.ClientSession() as session:
+            while True:
+                async with session.get(url) as resp:
+                    text = await resp.text()
+                    if resp.status >= 400:
+                        raise AssertionError(
+                            f"HASP state verification failed after {reason} for {entity_id}: "
+                            f"GET {url} HTTP {resp.status}: {text}"
+                        )
+                    try:
+                        last_state = json.loads(text)
+                    except json.JSONDecodeError:
+                        last_state = text
+                if self._values_match(last_state, expected_state):
+                    self.logger.info(
+                        "Verified HASP state after %s: %s=%r",
+                        reason,
+                        entity_id,
+                        last_state,
+                    )
+                    return last_state
+                if asyncio.get_running_loop().time() >= deadline:
+                    raise AssertionError(
+                        f"Timed out verifying HASP state after {reason}: {entity_id} "
+                        f"expected {expected_state!r}, actual {last_state!r}, url={url}"
+                    )
+                await asyncio.sleep(interval_s)
+                await self._refresh_hasp_state_cache(reason=f"{reason} verification", log=False)
+
+    async def _verify_setup_state_writes(
+        self,
+        writes: List[Dict[str, Any]],
+        *,
+        reason: str,
+    ) -> None:
+        if not writes:
+            return
+        for write in writes:
+            await self._wait_for_ha_state(
+                str(write["entity_id"]),
+                write["state"],
+                reason=reason,
+            )
+        await self._refresh_hasp_state_cache(reason=reason)
+        for write in writes:
+            await self._wait_for_hasp_entity_state(
+                str(write["entity_id"]),
+                write["state"],
+                reason=reason,
+            )
 
     @staticmethod
     def _is_terminal_reply(text: str) -> bool:
@@ -927,6 +1165,10 @@ class Lab308eHarness:
             if not self.args.no_hard_reset and case.get("hard_reset", True):
                 await self._hard_reset_lab308e()
             await self._run_steps(case.get("initial_state") or [], phase="initial_state")
+            await self._start_simulator_for_execution()
+            pre_query_settle_seconds = float(case.get("pre_query_settle_seconds", 2))
+            if pre_query_settle_seconds > 0:
+                await asyncio.sleep(pre_query_settle_seconds)
             pre_query_assertions = case.get("pre_query_assertions") or []
             if pre_query_assertions:
                 details["pre_query_assertions"] = []
@@ -1029,6 +1271,7 @@ class Lab308eHarness:
     async def _run_steps(self, steps: List[Dict[str, Any]], *, phase: str) -> None:
         if not steps:
             return
+        ha_state_writes: List[Dict[str, Any]] = []
         async with aiohttp.ClientSession() as session:
             for idx, step in enumerate(steps, start=1):
                 step_type = step.get("type", "request")
@@ -1058,6 +1301,18 @@ class Lab308eHarness:
                         raise AssertionError(
                             f"{phase}[{idx}] {method} {url} expected HTTP {expected_status}, got {resp.status}: {text}"
                         )
+                if method == "POST" and url.startswith(f"{self.ha_base_url}/api/states/"):
+                    entity_id = self._entity_id_from_ha_state_url(url)
+                    if entity_id and isinstance(json_body, dict) and "state" in json_body:
+                        ha_state_writes.append(
+                            {
+                                "entity_id": entity_id,
+                                "state": json_body["state"],
+                                "step": idx,
+                            }
+                        )
+
+        await self._verify_setup_state_writes(ha_state_writes, reason=phase)
 
     async def _evaluate_assertion(self, assertion: Dict[str, Any], details: Dict[str, Any]) -> Dict[str, Any]:
         assertion_type = assertion["type"]
