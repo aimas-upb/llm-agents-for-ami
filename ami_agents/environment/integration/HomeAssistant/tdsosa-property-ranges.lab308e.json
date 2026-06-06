@@ -12,7 +12,7 @@
     "unit": "percent"
   },
   "air_quality": {
-    "max": 1500,
+    "max": 2100,
     "unit": "ppm"
   },
   "thermal_comfort": {
