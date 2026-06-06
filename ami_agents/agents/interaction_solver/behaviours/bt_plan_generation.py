@@ -5,11 +5,14 @@ Per Alex's chat: "generating a plan is a behavior". Wraps the
 doesn't reach into the LLM client directly.
 """
 
+import json
+import os
 from typing import Any, Dict, List, Optional
 
 from spade.behaviour import OneShotBehaviour
 
 from ....shared.utils.logger import LoggerFactory
+from ....shared.utils.demo_log import demo
 
 
 class BTPlanGenerationBehaviour(OneShotBehaviour):
@@ -50,6 +53,15 @@ class BTPlanGenerationBehaviour(OneShotBehaviour):
                 reasoning_effort=agent.reasoning_effort,
                 max_completion_tokens=agent.max_completion_tokens,
             )
+            # Pretty-print the returned BT representation
+            if isinstance(self.result, dict) and self.result:
+                pretty_bt = json.dumps(self.result, indent=2)
+                no_color = bool(os.getenv("AMI_NO_COLOR")) or bool(os.getenv("NO_COLOR"))
+                if no_color:
+                    label = "[BT]"
+                else:
+                    label = "\x1b[1;32m[BT]\x1b[0m"
+                self.logger.info(demo(f"{label} returned from LLM:\n{pretty_bt}"))
         except Exception as e:
             self.error = str(e)
             self.logger.warning(f"BT generation failed: {e}")

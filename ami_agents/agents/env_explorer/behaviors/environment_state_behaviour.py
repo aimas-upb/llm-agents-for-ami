@@ -220,11 +220,10 @@ class EnvironmentStateBehaviour(CyclicBehaviour):
                 artifact_semantic_types = getattr(artifact, "semantic_types", []) or []
                 # Filter to ex: types only
                 ex_types = [st for st in artifact_semantic_types if isinstance(st, str) and st.startswith("ex:")]
-                self.agent.logger.info(demo(f"  Artifact types: {artifact_semantic_types} → ex: types: {ex_types}"))
                 if artifact_type not in ex_types:
-                    self.agent.logger.info(demo(f"  ✗ Type mismatch: {artifact_type} not in {ex_types}"))
+                    self.agent.logger.debug(f"  ✗ Type mismatch: {artifact_type} not in {ex_types}")
                     continue
-                self.agent.logger.info(demo(f"  ✓ Type matches: {artifact_type}"))
+                self.agent.logger.debug(f"  ✓ Type matches: {artifact_type}")
 
             # Check workspace_type constraint (match ex: semantic types only)
             if workspace_type and workspace_type != "NA":

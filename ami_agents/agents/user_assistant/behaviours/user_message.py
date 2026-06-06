@@ -11,6 +11,7 @@ signifier recording) is deterministic.
 
 import asyncio
 import json
+import os
 from typing import Any, Dict, Optional
 
 from spade.behaviour import CyclicBehaviour
@@ -285,8 +286,11 @@ class UserMessageBehaviour(CyclicBehaviour):
         except (json.JSONDecodeError, AttributeError):
             caps_summary = {}
 
+        # Filter capabilities for atomic segmentation (same filtering as for ENV_STATE_REQUEST parsing)
+        filtered_caps_for_segmentation = _filter_capabilities_json(caps_summary)
+
         # Segment the user text into atomic intents
-        atomic_intents = await self._segment_into_atomic_intents(text, json.dumps(caps_summary))
+        atomic_intents = await self._segment_into_atomic_intents(text, json.dumps(filtered_caps_for_segmentation))
         if not atomic_intents:
             await self._reply(msg, "I couldn't understand your request. Could you rephrase?")
             conv.phase = ConversationPhase.IDLE
@@ -326,6 +330,13 @@ class UserMessageBehaviour(CyclicBehaviour):
             conv.phase = ConversationPhase.EXTRACTING_INTENTS
             for intent in caps_intents:
                 extraction = await self._parse_atomic_intent(intent.span, intent.category, capabilities_hierarchical)
+                # Log parsed ENV_CAPABILITIES_REQUEST extraction with yellow label
+                no_color = bool(os.getenv("AMI_NO_COLOR")) or bool(os.getenv("NO_COLOR"))
+                if no_color:
+                    label = "[ENV_CAPABILITIES_REQUEST]"
+                else:
+                    label = "\x1b[1;33m[ENV_CAPABILITIES_REQUEST]\x1b[0m"
+                self.logger.info(demo(f"{label}:\n{json.dumps(extraction, indent=2)}"))
                 await self._handle_query_capabilities(msg, thread, conv, capabilities_ctx, extraction)
 
         # Phase 2: ENV_STATE_REQUEST (if any)
@@ -333,6 +344,13 @@ class UserMessageBehaviour(CyclicBehaviour):
             conv.phase = ConversationPhase.EXTRACTING_INTENTS
             for intent in state_intents:
                 extraction = await self._parse_atomic_intent(intent.span, intent.category, capabilities_hierarchical_state)
+                # Log parsed ENV_STATE_REQUEST extraction with yellow label
+                no_color = bool(os.getenv("AMI_NO_COLOR")) or bool(os.getenv("NO_COLOR"))
+                if no_color:
+                    label = "[ENV_STATE_REQUEST]"
+                else:
+                    label = "\x1b[1;33m[ENV_STATE_REQUEST]\x1b[0m"
+                self.logger.info(demo(f"{label}:\n{json.dumps(extraction, indent=2)}"))
                 await self._handle_query_state(msg, thread, conv, extraction)
 
         # Phase 3: GOAL_REQUEST (if any) — batch all goal intents into a single request
@@ -345,11 +363,18 @@ class UserMessageBehaviour(CyclicBehaviour):
             )
             # Convert to typed intent objects, filtering errors
             parsed_intents = []
+            no_color = bool(os.getenv("AMI_NO_COLOR")) or bool(os.getenv("NO_COLOR"))
+            if no_color:
+                label = "[GOAL_REQUEST]"
+            else:
+                label = "\x1b[1;33m[GOAL_REQUEST]\x1b[0m"
             for extraction in extractions:
                 if isinstance(extraction, Exception):
                     self.logger.error("Failed to parse atomic intent: %s", extraction)
                     continue
                 if isinstance(extraction, dict):
+                    # Log parsed GOAL_REQUEST extraction with yellow label
+                    self.logger.info(demo(f"{label}:\n{json.dumps(extraction, indent=2)}"))
                     parsed = goal_intent_from_dict(extraction)
                     parsed_intents.append(parsed)
 
@@ -806,6 +831,13 @@ class UserMessageBehaviour(CyclicBehaviour):
                 conv.phase = ConversationPhase.EXTRACTING_INTENTS
                 for intent in caps_intents:
                     extraction = await self._parse_atomic_intent(intent.span, intent.category, capabilities_hierarchical)
+                    # Log parsed ENV_CAPABILITIES_REQUEST extraction with yellow label
+                    no_color = bool(os.getenv("AMI_NO_COLOR")) or bool(os.getenv("NO_COLOR"))
+                    if no_color:
+                        label = "[ENV_CAPABILITIES_REQUEST]"
+                    else:
+                        label = "\x1b[1;33m[ENV_CAPABILITIES_REQUEST]\x1b[0m"
+                    self.logger.info(demo(f"{label}:\n{json.dumps(extraction, indent=2)}"))
                     await self._handle_query_capabilities(msg, thread, conv, capabilities_ctx, extraction)
 
             # Phase 2: ENV_STATE_REQUEST (if any)
@@ -813,6 +845,13 @@ class UserMessageBehaviour(CyclicBehaviour):
                 conv.phase = ConversationPhase.EXTRACTING_INTENTS
                 for intent in state_intents:
                     extraction = await self._parse_atomic_intent(intent.span, intent.category, capabilities_hierarchical)
+                    # Log parsed ENV_STATE_REQUEST extraction with yellow label
+                    no_color = bool(os.getenv("AMI_NO_COLOR")) or bool(os.getenv("NO_COLOR"))
+                    if no_color:
+                        label = "[ENV_STATE_REQUEST]"
+                    else:
+                        label = "\x1b[1;33m[ENV_STATE_REQUEST]\x1b[0m"
+                    self.logger.info(demo(f"{label}:\n{json.dumps(extraction, indent=2)}"))
                     await self._handle_query_state(msg, thread, conv, extraction)
 
             # Phase 3: GOAL_REQUEST (if any)
@@ -823,11 +862,18 @@ class UserMessageBehaviour(CyclicBehaviour):
                     return_exceptions=True,
                 )
                 parsed_intents = []
+                no_color = bool(os.getenv("AMI_NO_COLOR")) or bool(os.getenv("NO_COLOR"))
+                if no_color:
+                    label = "[GOAL_REQUEST]"
+                else:
+                    label = "\x1b[1;33m[GOAL_REQUEST]\x1b[0m"
                 for extraction in extractions:
                     if isinstance(extraction, Exception):
                         self.logger.error("Failed to parse atomic intent: %s", extraction)
                         continue
                     if isinstance(extraction, dict):
+                        # Log parsed GOAL_REQUEST extraction with yellow label
+                        self.logger.info(demo(f"{label}:\n{json.dumps(extraction, indent=2)}"))
                         parsed = goal_intent_from_dict(extraction)
                         parsed_intents.append(parsed)
 
@@ -1186,7 +1232,9 @@ class UserMessageBehaviour(CyclicBehaviour):
             self.logger.info(demo(f"ENV_STATE_RESPONSE received: {result.body}"))
 
             # Format the raw state response for user-friendly output
-            formatted = await self._format_query_response(result.body, conv.user_message)
+            # Use the extracted text_intent from the parsed intent, not the full user message
+            text_intent = extraction.get("text_intent", conv.user_message)
+            formatted = await self._format_query_response(result.body, text_intent)
             await self._reply(msg, formatted)
         except RpcTimeoutError:
             await self._reply(msg, "Timeout querying environment state. Please try again.")

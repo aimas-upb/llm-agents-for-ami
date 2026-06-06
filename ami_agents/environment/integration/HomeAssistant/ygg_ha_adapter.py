@@ -1220,3 +1220,94 @@ async def update_artifact_representation(workspace_id: str, artifact_name: str, 
 async def delete_artifact_representation(workspace_id: str, artifact_name: str):
     return Response(content="Action succeeded:")
 
+@app.api_route("/workspaces/{workspace_id}/artifacts/{artifact_name}/focus", methods=["POST", "GET"])
+async def focus_artifact(workspace_id: str, artifact_name: str, request: Request):
+    """
+    Handle Jacamo Focus action on a specific artifact by registering a WebSub subscription.
+
+    Payload expected:
+    {
+        "callbackUrl": "required, where to send events"
+    }
+    """
+    if request.method == "GET":
+        body = dict(request.query_params)
+    else:
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    callback_url = body.get("callbackUrl")
+
+    # Determine Topic URI using configured BASE_WS_URI
+    base = BASE_WS_URI.rstrip("/")
+    safe_name = urllib.parse.quote(artifact_name, safe="")
+    topic = f"{base}/workspaces/{workspace_id}/artifacts/{safe_name}#artifact"
+
+    if callback_url:
+        # Register subscription directly
+        subscription_id = f"{topic}-{callback_url}"
+        subscriptions[subscription_id] = {
+            "topic": topic,
+            "callback": callback_url,
+            "lease_seconds": None, # Infinite focus until explicit unfocus/unsubscribe
+            "timestamp": asyncio.get_event_loop().time(),
+            "type": "focus"
+        }
+        print(f"Agent focused on {topic} -> {callback_url}")
+    else:
+        print(f"Agent focused on {topic} (no callback)")
+
+    return Response(content="Focus succeeded")
+
+@app.api_route("/workspaces/{workspace_id}/artifacts/{artifact_name}/subscribe", methods=["POST", "GET"])
+async def subscribe_artifact(workspace_id: str, artifact_name: str, request: Request):
+    """
+    Handle WebSub subscription to a specific artifact.
+
+    Payload expected:
+    {
+        "hub.mode": "subscribe",
+        "hub.topic": "artifact_uri",
+        "hub.callback": "callback_url"
+    }
+    """
+    if request.method == "GET":
+        body = dict(request.query_params)
+    else:
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    hub_mode = body.get("hub.mode")
+    hub_callback = body.get("hub.callback")
+
+    # Determine Topic URI using configured BASE_WS_URI
+    base = BASE_WS_URI.rstrip("/")
+    safe_name = urllib.parse.quote(artifact_name, safe="")
+    topic = f"{base}/workspaces/{workspace_id}/artifacts/{safe_name}#artifact"
+
+    if hub_mode == "subscribe" and hub_callback:
+        # Register subscription
+        subscription_id = f"{topic}-{hub_callback}"
+        subscriptions[subscription_id] = {
+            "topic": topic,
+            "callback": hub_callback,
+            "lease_seconds": None,
+            "timestamp": asyncio.get_event_loop().time(),
+            "type": "websub"
+        }
+        print(f"WebSub subscription registered: {topic} -> {hub_callback}")
+        return Response(status_code=202, content="Subscription succeeded")
+    elif hub_mode == "unsubscribe" and hub_callback:
+        # Remove subscription
+        subscription_id = f"{topic}-{hub_callback}"
+        if subscription_id in subscriptions:
+            del subscriptions[subscription_id]
+            print(f"WebSub subscription removed: {topic}")
+        return Response(status_code=200, content="Unsubscription succeeded")
+    else:
+        raise HTTPException(status_code=400, detail="Invalid subscription request")
+
