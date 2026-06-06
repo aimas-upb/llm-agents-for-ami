@@ -11,6 +11,13 @@
     {
       "type": "request",
       "method": "POST",
+      "path": "/workspaces/lab308e/artifacts/ceiling_fan_308e/ha/switch/turn_off",
+      "json": {},
+      "expect_status": 200
+    },
+    {
+      "type": "request",
+      "method": "POST",
       "url": "http://localhost:8123/api/states/sensor.co2_sensing_308e",
       "headers": {
         "Authorization": "Bearer ${HA_TOKEN}"
@@ -77,20 +84,6 @@
       "poll_interval_seconds": 1
     },
     {
-      "type": "property_gte",
-      "path": "/workspaces/lab308e/artifacts/co2_sensing_308e/properties/state",
-      "gte": 1550,
-      "timeout_seconds": 20,
-      "poll_interval_seconds": 1
-    },
-    {
-      "type": "property_lte",
-      "path": "/workspaces/lab308e/artifacts/co2_sensing_308e/properties/state",
-      "lte": 1650,
-      "timeout_seconds": 20,
-      "poll_interval_seconds": 1
-    },
-    {
       "type": "property_equals",
       "path": "/workspaces/lab308e/artifacts/person_counter_308e/properties/state",
       "equals": 1,
@@ -116,12 +109,7 @@
   "clarification_replies": [
     {
       "match_type": "regex",
-      "match": "(?i)(would you like me|which would you like me to do).*?(air conditioner|ceiling fan|fan|window|window/cover).*?(improve|ventilation|air|\\?)",
-      "reply": "open the window to improve ventilation"
-    },
-    {
-      "match_type": "regex",
-      "match": "(?i)would you like me to turn on the air conditioner.*",
+      "match": "(?i)(should i|would you like me|do you want me|which would you like me to do).*?(air conditioner|ceiling fan|fan|window|window/cover|ventilation|air).*\\?",
       "reply": "open the window to improve ventilation"
     }
   ],

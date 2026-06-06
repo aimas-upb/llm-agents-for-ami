@@ -4,13 +4,36 @@
     {
       "type": "request",
       "method": "POST",
+      "path": "/workspaces/lab308e/artifacts/blinds_308e_cover/ha/cover/open_cover",
+      "json": {},
+      "expect_status": 200
+    },
+    {
+      "type": "request",
+      "method": "POST",
       "path": "/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/ha/cover/open_cover",
       "json": {},
       "expect_status": 200
     },
     {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/lab308e/artifacts/window_308e_cover/ha/cover/open_cover",
+      "json": {},
+      "expect_status": 200
+    },
+    {
       "type": "sleep",
-      "seconds": 2
+      "seconds": 4
+    }
+  ],
+  "pre_query_assertions": [
+    {
+      "type": "property_gte",
+      "path": "/workspaces/lab308e/artifacts/glare_sensing_308e/properties/state",
+      "gte": 50,
+      "timeout_seconds": 20,
+      "poll_interval_seconds": 1
     }
   ],
   "query": "reduce glare",
@@ -22,6 +45,31 @@
     "must_avoid_exact_numeric_thresholds": true
   },
   "clarification_replies": [
+    {
+      "match_type": "regex",
+      "match": "(?i)(dim|lights?).*(close|lower|blinds?).*(display|projector|screen|brightness).*glare",
+      "reply": "close the blackout blinds"
+    },
+    {
+      "match_type": "regex",
+      "match": "(?i)(display|projector|screen|brightness).*(dim|lights?).*(close|lower|blinds?).*glare",
+      "reply": "close the blackout blinds"
+    },
+    {
+      "match_type": "regex",
+      "match": "(?i)(close|lower|blinds?).*(dim|lights?).*(display|projector|screen|brightness).*glare",
+      "reply": "close the blackout blinds"
+    },
+    {
+      "match_type": "regex",
+      "match": "(?i)(would you like|do you want|which|what).*glare.*(blinds?|lights?|display|projector|screen|brightness)",
+      "reply": "close the blackout blinds"
+    },
+    {
+      "match_type": "regex",
+      "match": "(?i)(would you like|do you want|which|what).*(blinds?|lights?|display|projector|screen|brightness).*glare",
+      "reply": "close the blackout blinds"
+    },
     {
       "match_type": "regex",
       "match": "(?i)(would you like me|do you want me).*?(close|lower).*?blinds.*?dim.*?lights.*?glare",
