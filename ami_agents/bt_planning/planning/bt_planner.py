@@ -21,6 +21,8 @@ from .prompts import (
 
 logger = logging.getLogger(__name__)
 
+SETTLING_WAIT_MARGIN_SECONDS = 5.0
+
 
 class AsyncBTPlanner:
     """
@@ -197,6 +199,12 @@ class AsyncBTPlanner:
 
             # Normalize tree (fill in missing optional fields like 'name')
             tree_spec = self._normalize_tree(tree_spec)
+            settling_times = self._collect_action_settling_times(
+                affordances=affordances,
+                observable_property_hints=observable_property_hints,
+            )
+            if settling_times:
+                self._apply_settling_times(tree_spec, settling_times)
 
             # Validate
             validation_errors = self._validate_tree(tree_spec)
@@ -317,6 +325,110 @@ class AsyncBTPlanner:
             ]
 
         return spec
+
+    def _collect_action_settling_times(
+        self,
+        *,
+        affordances: list[dict],
+        observable_property_hints: Optional[dict],
+    ) -> dict[str, float]:
+        """Build action_url -> settling seconds from planner inputs."""
+        settling_times: dict[str, float] = {}
+
+        for aff in affordances or []:
+            if not isinstance(aff, dict):
+                continue
+            target = aff.get("target") or aff.get("affordance_uri") or aff.get("href")
+            seconds = aff.get("settling_time_seconds")
+            if isinstance(target, str) and target and isinstance(seconds, (int, float)):
+                target_key = self._normalize_action_url(target)
+                settling_times[target_key] = max(settling_times.get(target_key, 0.0), float(seconds))
+
+        results = (
+            observable_property_hints.get("results")
+            if isinstance(observable_property_hints, dict)
+            else None
+        )
+        if isinstance(results, list):
+            for result in results:
+                if not isinstance(result, dict):
+                    continue
+                actions = result.get("actions")
+                if not isinstance(actions, list):
+                    continue
+                for action in actions:
+                    if not isinstance(action, dict):
+                        continue
+                    target = action.get("action_target")
+                    seconds = action.get("settling_time_seconds")
+                    if isinstance(target, str) and target and isinstance(seconds, (int, float)):
+                        target_key = self._normalize_action_url(target)
+                        settling_times[target_key] = max(settling_times.get(target_key, 0.0), float(seconds))
+
+        return settling_times
+
+    @staticmethod
+    def _normalize_action_url(action_url: str) -> str:
+        return action_url.rstrip("/")
+
+    def _apply_settling_times(self, spec: dict, settling_times: dict[str, float]) -> float:
+        """
+        Annotate action nodes and expand following wait_condition timeouts.
+
+        Returns the maximum settling time that this subtree may introduce before
+        a parent sequence can verify its effects.
+        """
+        if not isinstance(spec, dict) or not spec:
+            return 0.0
+
+        node_type = spec.get("type")
+        if node_type == "action":
+            action_url = spec.get("action_url")
+            seconds = (
+                settling_times.get(self._normalize_action_url(action_url))
+                if isinstance(action_url, str)
+                else None
+            )
+            if seconds is not None and seconds > 0:
+                spec["settling_time_seconds"] = float(seconds)
+                return float(seconds)
+            return 0.0
+
+        if node_type == "wait_condition":
+            return 0.0
+
+        children = spec.get("children")
+        if not isinstance(children, list):
+            return 0.0
+
+        if node_type == "sequence":
+            pending_settling = 0.0
+            subtree_settling = 0.0
+            for child in children:
+                if not isinstance(child, dict):
+                    continue
+                if child.get("type") == "wait_condition" and pending_settling > 0:
+                    minimum_timeout = pending_settling + SETTLING_WAIT_MARGIN_SECONDS
+                    current_timeout = child.get("timeout_seconds", 30.0)
+                    if not isinstance(current_timeout, (int, float)) or float(current_timeout) < minimum_timeout:
+                        child["timeout_seconds"] = minimum_timeout
+                    pending_settling = 0.0
+                    self._apply_settling_times(child, settling_times)
+                    continue
+
+                child_settling = self._apply_settling_times(child, settling_times)
+                pending_settling = max(pending_settling, child_settling)
+                subtree_settling = max(subtree_settling, child_settling)
+            return subtree_settling
+
+        return max(
+            (
+                self._apply_settling_times(child, settling_times)
+                for child in children
+                if isinstance(child, dict)
+            ),
+            default=0.0,
+        )
 
     def _count_nodes(self, spec: dict) -> int:
         """Count nodes in a tree spec."""

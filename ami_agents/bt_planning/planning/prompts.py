@@ -44,6 +44,7 @@ You generate executable behavior tree specifications in JSON format using the ge
 - For numeric or continuous sensor properties such as glare, illuminance, temperature, humidity, CO2, volume, or percentages, do not use exact equality checks unless the user explicitly requested an exact target value.
 - For those continuous properties, prefer range comparisons with an operator such as `<=`, `>=`, `<`, or `>`.
 - Use exact equality checks mainly for discrete states such as `on`, `off`, `open`, `closed`, `heat`, or `cool`.
+- For cover open/close commands, use the cover `state` property (`open`, `closed`, `opening`, `closing`) for idempotence checks and post-action verification. Do not use `current_position` as a substitute for `state` unless the user explicitly requested a numeric cover position.
 - If observable property hints provide a recommended target minimum and/or maximum, use those values for success conditions instead of inventing stricter numeric thresholds, unless the user explicitly requested a different target.
 - If an observable property hint provides only `target_max`, generate a condition with operator `<=` and `expected_value = target_max`.
 - If an observable property hint provides only `target_min`, generate a condition with operator `>=` and `expected_value = target_min`.

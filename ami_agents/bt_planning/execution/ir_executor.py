@@ -5,7 +5,9 @@ Ported from behaviortree-planning-for-ami-agents with adjusted imports
 for the AAMAS 2026 demo multi-agent system.
 """
 
+import json
 import logging
+import os
 import time
 from typing import Optional
 
@@ -52,6 +54,7 @@ class IRExecutor:
             max_ticks = 10
 
         self.max_ticks = max_ticks
+        self._settling_times = self._load_settling_times()
 
     def execute_from_spec(self, tree_spec: dict) -> ExecutionResult:
         """
@@ -126,6 +129,10 @@ class IRExecutor:
                 name=name,
                 action_url=spec["action_url"],
                 parameters=spec.get("parameters", {}),
+                settling_time_seconds=self._settling_time_for_action(
+                    spec["action_url"],
+                    spec.get("settling_time_seconds"),
+                ),
             )
 
         elif node_type == "condition":
@@ -159,6 +166,67 @@ class IRExecutor:
 
         else:
             raise ValueError(f"Unknown node type: {node_type}")
+
+    def _load_settling_times(self) -> dict[str, float]:
+        """Load entity/action settling times from the lab TD-SOSA env mapping."""
+        raw = os.getenv("TD_SOSA_SETTLING_TIMES", "").strip()
+        if not raw:
+            return {}
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            logger.warning("Ignoring invalid TD_SOSA_SETTLING_TIMES JSON: %s", exc)
+            return {}
+        if not isinstance(payload, dict):
+            logger.warning("Ignoring TD_SOSA_SETTLING_TIMES because it is not an object")
+            return {}
+
+        settling_times: dict[str, float] = {}
+        for key, value in payload.items():
+            if not isinstance(key, str) or not isinstance(value, (int, float)):
+                continue
+            seconds = float(value)
+            if seconds > 0:
+                settling_times[key] = seconds
+        return settling_times
+
+    def _settling_time_for_action(
+        self,
+        action_url: str,
+        explicit_seconds: object = None,
+    ) -> float:
+        """Resolve settling time from the tree annotation, then the env mapping."""
+        if isinstance(explicit_seconds, (int, float)) and explicit_seconds > 0:
+            return float(explicit_seconds)
+
+        key = self._settling_key_for_action_url(action_url)
+        if key is None:
+            return 0.0
+        return self._settling_times.get(key, 0.0)
+
+    @staticmethod
+    def _settling_key_for_action_url(action_url: str) -> Optional[str]:
+        """
+        Convert HASP action URLs to TD-SOSA settling-time keys.
+
+        Example:
+        /workspaces/lab308e/artifacts/blackout_blinds_308e_cover/ha/cover/close_cover
+        -> entity:cover.blackout_blinds_308e_cover:action:cover.close_cover
+        """
+        if not isinstance(action_url, str):
+            return None
+
+        parts = [part for part in action_url.rstrip("/").split("/") if part]
+        try:
+            artifacts_index = parts.index("artifacts")
+            ha_index = parts.index("ha", artifacts_index + 1)
+            artifact = parts[artifacts_index + 1]
+            domain = parts[ha_index + 1]
+            service = parts[ha_index + 2]
+        except (ValueError, IndexError):
+            return None
+
+        return f"entity:{domain}.{artifact}:action:{domain}.{service}"
 
     def _execute_tree(self, tree: py_trees.behaviour.Behaviour) -> ExecutionResult:
         """

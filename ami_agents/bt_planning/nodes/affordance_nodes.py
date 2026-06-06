@@ -149,6 +149,7 @@ class ActionAffordanceNode(py_trees.behaviour.Behaviour):
         parameter_keys: Optional[Dict[str, str]] = None,
         store_result: bool = True,
         result_key: Optional[str] = None,
+        settling_time_seconds: float = 0.0,
     ):
         """
         Initialize the action affordance node.
@@ -160,6 +161,7 @@ class ActionAffordanceNode(py_trees.behaviour.Behaviour):
             parameter_keys: Map of parameter names to blackboard keys for dynamic values
             store_result: Whether to store the action result on the blackboard
             result_key: Custom blackboard key for the result (defaults to standard key)
+            settling_time_seconds: Seconds to wait after a successful action before returning
         """
         super().__init__(name)
         
@@ -168,6 +170,7 @@ class ActionAffordanceNode(py_trees.behaviour.Behaviour):
         self.parameter_keys = parameter_keys or {}
         self.store_result = store_result
         self.result_key = result_key or BlackboardKeys.LAST_ACTION_RESULT
+        self.settling_time_seconds = max(0.0, float(settling_time_seconds or 0.0))
 
         # HTTP client
         self._http_client: Optional[HTTPClient] = None
@@ -277,6 +280,12 @@ class ActionAffordanceNode(py_trees.behaviour.Behaviour):
                 )
                 
                 self._store_result()
+                if self.settling_time_seconds > 0:
+                    logger.info(
+                        f"[{self.name}] Waiting {self.settling_time_seconds:.1f}s "
+                        "for action effects to settle"
+                    )
+                    time.sleep(self.settling_time_seconds)
                 return Status.SUCCESS
             else:
                 self._last_result.error_message = f"HTTP {response.status_code}"
