@@ -778,6 +778,10 @@ class Lab308eHarness:
         await self._verify_setup_state_writes(ha_state_writes, reason="hard reset")
 
     async def _refresh_hasp_state_cache(self, *, reason: str, log: bool = True) -> None:
+        if self.args.no_td_sosa:
+            if log:
+                self.logger.info("Skipping HASP state cache refresh after %s (--no-td-sosa)", reason)
+            return
         url = f"{self.yggdrasil_url}/_graph/refresh-states"
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json={}) as resp:
@@ -1018,15 +1022,17 @@ class Lab308eHarness:
         env["PYTHONPATH"] = os.pathsep.join(python_path_parts)
 
         if self.args.manage_hasp:
+            adapter_module = "ygg_ha_adapter" if self.args.no_td_sosa else "hasp"
+            adapter_name = "ygg_ha_adapter" if self.args.no_td_sosa else "hasp"
             env["PORT"] = str(self._hasp_port())
             env.setdefault("BASE_WS_URI", self.yggdrasil_url + "/")
             self.hasp_service = ManagedService(
-                name="hasp",
+                name=adapter_name,
                 argv=[
                     sys.executable,
                     "-m",
                     "uvicorn",
-                    "hasp:app",
+                    f"{adapter_module}:app",
                     "--host",
                     self.args.hasp_host,
                     "--port",
@@ -1439,6 +1445,11 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     parser.add_argument("--dump-prompts", action="store_true")
     parser.add_argument("--no-hard-reset", action="store_true")
     parser.add_argument("--manage-hasp", action="store_true")
+    parser.add_argument(
+        "--no-td-sosa",
+        action="store_true",
+        help="When managing the adapter, start ygg_ha_adapter.py instead of hasp.py.",
+    )
     parser.add_argument("--manage-simulator", action="store_true")
     parser.add_argument("--hasp-host", default="0.0.0.0")
     parser.add_argument("--service-start-timeout", type=float, default=30.0)
