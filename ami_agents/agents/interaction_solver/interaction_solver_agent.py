@@ -433,6 +433,30 @@ class InteractionSolverAgent(Agent, IAgent):
 
     # ── Planning orchestration ─────────────────────────────────────
 
+    @staticmethod
+    def _summarise_signifier_matches(signifier_matches: Any) -> Dict[str, Any]:
+        if not isinstance(signifier_matches, dict):
+            return {"signifier_match_count": 0, "signifier_ids": []}
+
+        signifier_ids: List[str] = []
+        match_count = 0
+        for match_data in signifier_matches.values():
+            if not isinstance(match_data, dict):
+                continue
+            finals = match_data.get("final_matches")
+            if isinstance(finals, list):
+                signifier_ids.extend(str(f) for f in finals if str(f).strip())
+                match_count += len(finals)
+                continue
+            matches = match_data.get("matches")
+            if isinstance(matches, list):
+                match_count += len(matches)
+
+        return {
+            "signifier_match_count": match_count,
+            "signifier_ids": signifier_ids,
+        }
+
     async def _generate_plan(
         self,
         intents: List[Intent],
@@ -523,6 +547,7 @@ class InteractionSolverAgent(Agent, IAgent):
                 indent=2,
             )
 
+        signifier_summary = self._summarise_signifier_matches(context.get("signifier_matches"))
         output: Dict[str, Any] = {
             "plan_type": "behavior_tree",
             "tree": result.get("tree") or None,
@@ -530,6 +555,13 @@ class InteractionSolverAgent(Agent, IAgent):
             "intents": [i.to_dict() for i in intents],
             "workspace_id": workspace_id,
             "intent_type": intent_type,
+            "signifier_reuse": False,
+            "planning_path": (
+                "fresh_planning_with_signifier_hints"
+                if signifier_summary.get("signifier_match_count")
+                else "fresh_planning"
+            ),
+            **signifier_summary,
         }
         if result.get("impossible"):
             output["impossible"] = True
@@ -567,12 +599,7 @@ class InteractionSolverAgent(Agent, IAgent):
         if tree is None:
             return None
 
-        signifier_ids: List[str] = []
-        for intent_str in intent_strings:
-            match_data = signifier_matches.get(intent_str, {})
-            if isinstance(match_data, dict):
-                finals = match_data.get("final_matches", [])
-                signifier_ids.extend(str(f) for f in finals)
+        signifier_summary = self._summarise_signifier_matches(signifier_matches)
 
         return {
             "plan_type": "behavior_tree",
@@ -582,7 +609,8 @@ class InteractionSolverAgent(Agent, IAgent):
             "workspace_id": workspace_id,
             "intent_type": intent_type,
             "signifier_reuse": True,
-            "signifier_ids": signifier_ids,
+            "planning_path": "signifier_reuse",
+            **signifier_summary,
         }
 
     async def _gather_planning_context(

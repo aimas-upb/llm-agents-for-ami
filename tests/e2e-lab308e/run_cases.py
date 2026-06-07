@@ -40,6 +40,29 @@ from spade.behaviour import CyclicBehaviour
 from spade.message import Message as SpadeMessage
 from spade.template import Template
 
+RESULT_COLUMNS = [
+    "test_name",
+    "timestamp",
+    "model_name",
+    "passed",
+    "duration_seconds",
+    "llm_calls",
+    "input_tokens",
+    "output_tokens",
+    "plan",
+    "failure_stage",
+    "signifier_matches",
+    "signifier_reuse",
+    "reused_signifier_id",
+    "planning_path",
+]
+SIGNIFIER_RESULT_COLUMNS = [
+    "signifier_matches",
+    "signifier_reuse",
+    "reused_signifier_id",
+    "planning_path",
+]
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -1486,43 +1509,129 @@ def _discover_cases(args: argparse.Namespace) -> List[Path]:
     return matches
 
 
+def _parse_plan_json(plan: Any) -> Dict[str, Any]:
+    if isinstance(plan, dict):
+        return plan
+    if not isinstance(plan, str) or not plan.strip():
+        return {}
+    try:
+        parsed = json.loads(plan)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _normalise_signifier_ids(raw_ids: Any) -> List[str]:
+    if isinstance(raw_ids, str):
+        raw_ids = [raw_ids]
+    if not isinstance(raw_ids, list):
+        return []
+    return [str(item).strip() for item in raw_ids if str(item).strip()]
+
+
+def _count_signifier_matches(raw_matches: Any) -> Optional[int]:
+    if isinstance(raw_matches, list):
+        return len(raw_matches)
+    if not isinstance(raw_matches, dict):
+        return None
+
+    count = 0
+    saw_match_shape = False
+    for match_data in raw_matches.values():
+        if not isinstance(match_data, dict):
+            continue
+        for key in ("final_matches", "matches", "candidates"):
+            values = match_data.get(key)
+            if isinstance(values, list):
+                saw_match_shape = True
+                count += len(values)
+                break
+    return count if saw_match_shape else None
+
+
+def _extract_signifier_result_fields(plan: Any) -> Dict[str, Any]:
+    plan_obj = _parse_plan_json(plan)
+    signifier_ids = _normalise_signifier_ids(
+        plan_obj.get("signifier_ids") or plan_obj.get("reused_signifier_ids")
+    )
+    signifier_reuse = bool(plan_obj.get("signifier_reuse"))
+
+    signifier_matches = plan_obj.get("signifier_match_count")
+    if signifier_matches is None:
+        signifier_matches = _count_signifier_matches(plan_obj.get("signifier_matches"))
+    if signifier_matches is None:
+        signifier_matches = len(signifier_ids) if signifier_reuse else ""
+
+    planning_path = str(plan_obj.get("planning_path") or "").strip()
+    if not planning_path:
+        if signifier_reuse:
+            planning_path = "signifier_reuse"
+        elif plan_obj:
+            planning_path = "fresh_planning"
+        else:
+            planning_path = "no_plan"
+
+    return {
+        "signifier_matches": signifier_matches,
+        "signifier_reuse": "true" if signifier_reuse else "false",
+        "reused_signifier_id": ";".join(signifier_ids) if signifier_reuse else "",
+        "planning_path": planning_path,
+    }
+
+
+def _normalise_results_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    normalised = {column: row.get(column, "") for column in RESULT_COLUMNS}
+    extracted = _extract_signifier_result_fields(row.get("plan"))
+    for column in SIGNIFIER_RESULT_COLUMNS:
+        if normalised.get(column) in (None, ""):
+            normalised[column] = extracted[column]
+    return normalised
+
+
+def _ensure_results_csv_header(out_path: Path) -> None:
+    if not out_path.exists() or out_path.stat().st_size == 0:
+        return
+
+    with out_path.open(newline="") as fh:
+        reader = csv.DictReader(fh)
+        rows = list(reader)
+        existing_columns = reader.fieldnames or []
+
+    if existing_columns == RESULT_COLUMNS:
+        return
+
+    with out_path.open("w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=RESULT_COLUMNS)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(_normalise_results_row(row))
+
+
 def _append_results_csv(results: List[CaseResult]) -> Path:
     out_path = Path(__file__).resolve().parent / "results.csv"
-    write_header = not out_path.exists()
+    _ensure_results_csv_header(out_path)
+    write_header = not out_path.exists() or out_path.stat().st_size == 0
     with out_path.open("a", newline="") as fh:
-        writer = csv.writer(fh)
+        writer = csv.DictWriter(fh, fieldnames=RESULT_COLUMNS)
         if write_header:
-            writer.writerow(
-                [
-                    "test_name",
-                    "timestamp",
-                    "model_name",
-                    "passed",
-                    "duration_seconds",
-                    "llm_calls",
-                    "input_tokens",
-                    "output_tokens",
-                    "plan",
-                    "failure_stage",
-                ]
-            )
+            writer.writeheader()
         for result in results:
             details = result.details or {}
             case = details.get("case") or {}
-            writer.writerow(
-                [
-                    case.get("name") or result.path.stem,
-                    details.get("started_at") or datetime.now().astimezone().isoformat(),
-                    details.get("model_name"),
-                    "passed" if result.passed else "failed",
-                    details.get("duration_seconds"),
-                    details.get("llm_calls"),
-                    details.get("input_tokens"),
-                    details.get("output_tokens"),
-                    details.get("plan"),
-                    details.get("failure_stage"),
-                ]
-            )
+            row = {
+                "test_name": case.get("name") or result.path.stem,
+                "timestamp": details.get("started_at") or datetime.now().astimezone().isoformat(),
+                "model_name": details.get("model_name"),
+                "passed": "passed" if result.passed else "failed",
+                "duration_seconds": details.get("duration_seconds"),
+                "llm_calls": details.get("llm_calls"),
+                "input_tokens": details.get("input_tokens"),
+                "output_tokens": details.get("output_tokens"),
+                "plan": details.get("plan"),
+                "failure_stage": details.get("failure_stage"),
+            }
+            row.update(_extract_signifier_result_fields(details.get("plan")))
+            writer.writerow(row)
     return out_path
 
 
