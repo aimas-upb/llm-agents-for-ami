@@ -318,6 +318,77 @@ class HASPGraphCache:
             "actions": results,
         }
 
+    async def query_action_effects(
+        self, workspace_id: str, action_url: str
+    ) -> Dict[str, Any]:
+        """Query TD-SOSA observable-property effects for one action target/URI."""
+        action_url = str(action_url or "").strip()
+        artifact_prefix = f"{self.base_uri}workspaces/{workspace_id}/artifacts/"
+        action_query = f"""
+        PREFIX td: <{TD}>
+        PREFIX hctl: <{HCTL}>
+        PREFIX sosa: <{SOSA}>
+        PREFIX tdsosa: <{TDSOSA}>
+
+        SELECT DISTINCT ?artifact ?artifactTitle ?action ?actionName ?actionTarget ?actuation ?property ?dirType ?settlingNumeric ?settlingUnit
+        WHERE {{
+          ?artifact td:hasActionAffordance ?action .
+          ?action td:name ?actionName ;
+                  td:hasForm ?form ;
+                  tdsosa:hasEffectActuation ?actuation .
+          ?form hctl:hasTarget ?actionTarget .
+          ?actuation sosa:actsOnProperty ?property .
+          OPTIONAL {{ ?artifact td:title ?artifactTitle . }}
+          OPTIONAL {{
+            ?actuation a ?dirType .
+            FILTER(?dirType IN (tdsosa:IncreasingActuation, tdsosa:DecreasingActuation))
+          }}
+          OPTIONAL {{
+            ?actuation tdsosa:settlingTime ?settlingTime .
+            OPTIONAL {{ ?settlingTime <{TIME.numericDuration}> ?settlingNumeric . }}
+            OPTIONAL {{ ?settlingTime <{TIME.unitType}> ?settlingUnit . }}
+          }}
+          FILTER(STRSTARTS(STR(?artifact), "{artifact_prefix}"))
+          FILTER(STR(?actionTarget) = "{action_url}" || STR(?action) = "{action_url}")
+        }}
+        ORDER BY ?property ?artifact ?actionName
+        """
+        async with self._lock:
+            rows = list(self.full_graph.query(action_query))
+
+        effects: List[Dict[str, Any]] = []
+        for row in rows:
+            direction = ""
+            if row.dirType == TDSOSA.IncreasingActuation:
+                direction = "increase"
+            elif row.dirType == TDSOSA.DecreasingActuation:
+                direction = "decrease"
+            item: Dict[str, Any] = {
+                "artifact_uri": str(row.artifact),
+                "artifact_title": str(row.artifactTitle) if row.artifactTitle is not None else "",
+                "action_uri": str(row.action),
+                "action_name": str(row.actionName),
+                "action_target": str(row.actionTarget),
+                "actuation_uri": str(row.actuation),
+                "property_uri": str(row.property),
+                "property_name": str(row.property).rstrip("/").rsplit("/", 1)[-1],
+                "direction": direction,
+            }
+            if row.settlingNumeric is not None:
+                try:
+                    item["settling_time_seconds"] = float(row.settlingNumeric)
+                except (TypeError, ValueError):
+                    pass
+            if row.settlingUnit is not None:
+                item["settling_time_unit"] = str(row.settlingUnit)
+            effects.append(item)
+
+        return {
+            "workspace_id": workspace_id,
+            "action_url": action_url,
+            "effects": effects,
+        }
+
     async def get_workspaces_ttl(self) -> str:
         async with self._lock:
             return self.workspaces_ttl

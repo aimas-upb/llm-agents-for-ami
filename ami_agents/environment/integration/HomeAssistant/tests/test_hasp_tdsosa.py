@@ -311,3 +311,28 @@ def test_query_actions_affecting_observable_property_includes_settling_time(monk
     ]
     assert len(close_blinds) == 1
     assert close_blinds[0]["settling_time_seconds"] == 30.0
+
+
+def test_query_action_effects_for_action_target(monkeypatch):
+    monkeypatch.setattr(
+        appmod,
+        "TD_SOSA_SETTLING_TIMES",
+        {"entity:cover.blinds:action:cover.close_cover": 30},
+    )
+
+    client = TestClient(appmod.app)
+    action_url = "http://localhost:8080/workspaces/lab308/artifacts/blinds/ha/cover/close_cover"
+    r = client.post(
+        "/_graph/query/action-effects",
+        json={"workspace_id": "lab308", "action_url": action_url},
+    )
+    assert r.status_code == 200
+    payload = r.json()
+
+    assert payload["action_url"] == action_url
+    effects = payload["effects"]
+    assert len(effects) == 1
+    assert effects[0]["action_target"] == action_url
+    assert effects[0]["property_uri"] == "http://localhost:8080/workspaces/lab308/environment/luminosity"
+    assert effects[0]["direction"] == "decrease"
+    assert effects[0]["settling_time_seconds"] == 30.0

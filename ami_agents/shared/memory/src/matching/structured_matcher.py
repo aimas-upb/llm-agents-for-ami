@@ -216,9 +216,15 @@ class StructuredIntentMatcher(IntentMatcher):
         if not query_artifact or not sig_artifact:
             return 0.0
 
+        query_artifact = self._normalize_artifact_id(query_artifact)
+        sig_artifact = self._normalize_artifact_id(sig_artifact)
+
         # Exact match
         if query_artifact == sig_artifact:
             return 1.0
+
+        if query_artifact in sig_artifact or sig_artifact in query_artifact:
+            return 0.8
 
         # Extract artifact type (prefix before underscore/number)
         query_type = self._extract_artifact_type(query_artifact)
@@ -231,6 +237,12 @@ class StructuredIntentMatcher(IntentMatcher):
         # Same type, different ID -> partial match
         # This allows "lights_308" to partially match "lights_309"
         return 0.7
+
+    def _normalize_artifact_id(self, artifact_id: str) -> str:
+        """Normalize artifact labels from intent extraction and stored signifiers."""
+        artifact = re.sub(r"[^a-z0-9]+", "_", str(artifact_id or "").lower()).strip("_")
+        artifact = re.sub(r"(_cover)+$", "", artifact).strip("_")
+        return artifact
 
     def _extract_artifact_type(self, artifact_id: str) -> str:
         """Extract artifact type from artifact ID.

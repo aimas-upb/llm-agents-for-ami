@@ -397,6 +397,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         is_signifier_reuse = plan_obj.get("signifier_reuse", False)
         intent_type = plan_obj.get("intent_type")
         workspace_id = plan_obj.get("workspace_id")
+        td_sosa_supported = bool(plan_obj.get("td_sosa_supported", False))
 
         if not tree_spec or not isinstance(tree_spec, dict):
             return ExecutionResult(success=False, error="Plan has no behavior tree to execute")
@@ -427,7 +428,15 @@ class UserMessageBehaviour(CyclicBehaviour):
         self.logger.info(demo("State memory cache cleared after BT execution"))
 
         if exec_result.success and not is_signifier_reuse:
-            await self._record_signifiers(tree_spec, intents, exec_result, thread, intent_type, workspace_id)
+            await self._record_signifiers(
+                tree_spec,
+                intents,
+                exec_result,
+                thread,
+                intent_type,
+                workspace_id,
+                td_sosa_supported=td_sosa_supported,
+            )
 
         return exec_result
 
@@ -443,6 +452,7 @@ class UserMessageBehaviour(CyclicBehaviour):
         thread: str,
         intent_type: Optional[str] = None,
         workspace_id: Optional[str] = None,
+        td_sosa_supported: bool = False,
     ) -> None:
         """Extract and record signifiers from an executed BT."""
         intent_strings = [
@@ -494,6 +504,55 @@ class UserMessageBehaviour(CyclicBehaviour):
             except Exception as e:
                 self.logger.warning(demo("Failed to query state snapshot: %s (continuing without state)"), e)
 
+        semantic_effects_by_action: dict[str, list[dict]] = {}
+        if td_sosa_supported and explorer_jid and workspace_id:
+            action_urls = self._collect_action_urls(tree_spec)
+            if action_urls:
+                try:
+                    self.logger.info(
+                        demo("Querying TD-SOSA action effects for signifier recording: actions=%d"),
+                        len(action_urls),
+                    )
+                    semantic_response = await rpc_call(
+                        self.agent,
+                        to_jid=str(explorer_jid),
+                        request_type=MessageType.ENV_SEMANTIC_QUERY_REQUEST.value,
+                        body={
+                            "workspace_id": workspace_id,
+                            "action_urls": action_urls,
+                        },
+                        expect_type=MessageType.ENV_SEMANTIC_QUERY_RESPONSE.value,
+                        timeout=self.agent.signifier_match_timeout,
+                    )
+                    raw_semantic = (
+                        json.loads(semantic_response.body)
+                        if semantic_response and isinstance(semantic_response.body, str)
+                        else {}
+                    )
+                    if isinstance(raw_semantic, dict):
+                        for item in raw_semantic.get("action_effects") or []:
+                            if not isinstance(item, dict):
+                                continue
+                            action_url = str(item.get("action_url") or "").strip()
+                            effects = item.get("effects")
+                            if action_url and isinstance(effects, list):
+                                semantic_effects_by_action[action_url] = [
+                                    effect for effect in effects if isinstance(effect, dict)
+                                ]
+                    effect_count = sum(len(v) for v in semantic_effects_by_action.values())
+                    self.logger.info(
+                        demo("TD-SOSA action effects retrieved for signifier recording: actions=%d effects=%d"),
+                        len(semantic_effects_by_action),
+                        effect_count,
+                    )
+                except Exception as e:
+                    self.logger.warning(demo("Failed to query TD-SOSA action effects: %s"), e)
+
+        if state_snapshot is None and semantic_effects_by_action:
+            state_snapshot = {"artifacts": {}}
+        if state_snapshot is not None and semantic_effects_by_action:
+            state_snapshot["td_sosa_action_effects"] = semantic_effects_by_action
+
         signifiers = extract_signifiers_from_bt(
             tree_spec=tree_spec,
             intents=intent_strings,
@@ -502,6 +561,7 @@ class UserMessageBehaviour(CyclicBehaviour):
             state_snapshot=state_snapshot,
             intent_type=intent_type,
             structured_intents=structured_intents,
+            td_sosa_supported=td_sosa_supported,
         )
         if not signifiers:
             self.logger.info(demo("No signifiers extracted from BT"))
@@ -549,6 +609,26 @@ class UserMessageBehaviour(CyclicBehaviour):
                 except Exception:
                     pass
             self.logger.info(demo("Community signifier publishing: %d/%d published"), published, len(signifiers))
+
+    @staticmethod
+    def _collect_action_urls(tree_spec: dict) -> list[str]:
+        action_urls: list[str] = []
+        seen: set[str] = set()
+
+        def walk(node: dict) -> None:
+            if not isinstance(node, dict):
+                return
+            if node.get("type") == "action":
+                action_url = str(node.get("action_url") or "").strip()
+                if action_url and action_url not in seen:
+                    seen.add(action_url)
+                    action_urls.append(action_url)
+            for child in node.get("children") or []:
+                if isinstance(child, dict):
+                    walk(child)
+
+        walk(tree_spec)
+        return action_urls
 
     # ------------------------------------------------------------------
     # DETERMINISTIC: query handlers

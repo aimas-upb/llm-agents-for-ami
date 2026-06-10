@@ -125,7 +125,7 @@ def _flatten_tree(
     max_depth = depth
     if str(node.get("type") or "").lower() == "action":
         actions.append(node)
-    elif str(node.get("type") or "").lower() == "condition":
+    elif str(node.get("type") or "").lower() in ("condition", "wait_condition"):
         conditions.append(node)
 
     children = node.get("children") or []
@@ -165,7 +165,7 @@ def _guarded_action_keys(tree: Dict[str, Any]) -> set[Tuple[str, str]]:
         node_type = str(node.get("type") or "").lower()
         children = node.get("children") or []
         if node_type == "selector" and isinstance(children, list):
-            conditions = [c for c in children if isinstance(c, dict) and str(c.get("type") or "").lower() == "condition"]
+            conditions = [c for c in children if isinstance(c, dict) and str(c.get("type") or "").lower() in ("condition", "wait_condition")]
             actions = [c for c in children if isinstance(c, dict) and str(c.get("type") or "").lower() == "action"]
             for cond in conditions:
                 cond_artifact = _artifact_name_from_url(str(cond.get("property_url") or ""))

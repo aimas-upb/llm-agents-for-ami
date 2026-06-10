@@ -330,21 +330,26 @@ class InteractionSolverAgent(Agent, IAgent):
             return json.dumps({"error": "rpc_failed", "detail": str(e)})
 
     @staticmethod
-    def _infer_observable_properties_from_intents(intents: List[Intent]) -> List[str]:
+    def _infer_observable_properties_from_intents(intents: List[Any]) -> List[str]:
         inferred: List[str] = []
 
         def add(prop: str) -> None:
             if prop and prop not in inferred:
                 inferred.append(prop)
 
+        def field(intent: Any, name: str) -> Any:
+            if isinstance(intent, dict):
+                return intent.get(name)
+            return getattr(intent, name, None)
+
         for intent in intents or []:
             text = " ".join(
                 str(part or "")
                 for part in (
-                    intent.action,
-                    intent.artifact,
-                    intent.parameter,
-                    intent.intent_text,
+                    field(intent, "action"),
+                    field(intent, "artifact"),
+                    field(intent, "parameter"),
+                    field(intent, "intent_text"),
                 )
             ).lower()
             if "glare" in text:
@@ -500,7 +505,7 @@ class InteractionSolverAgent(Agent, IAgent):
                 intent_strings,
                 workspace_id=workspace_id,
                 intent_type=intent_type,
-                structured_intents=intents,
+                structured_intents=[i.to_dict() for i in intents],
             )
         except Exception as e:
             self.logger.warning(f"Context gathering failed: {e}")
@@ -555,6 +560,7 @@ class InteractionSolverAgent(Agent, IAgent):
             "intents": [i.to_dict() for i in intents],
             "workspace_id": workspace_id,
             "intent_type": intent_type,
+            "td_sosa_supported": self.td_sosa_supported,
             "signifier_reuse": False,
             "planning_path": (
                 "fresh_planning_with_signifier_hints"
@@ -608,6 +614,7 @@ class InteractionSolverAgent(Agent, IAgent):
             "intents": [i.to_dict() for i in intents],
             "workspace_id": workspace_id,
             "intent_type": intent_type,
+            "td_sosa_supported": self.td_sosa_supported,
             "signifier_reuse": True,
             "planning_path": "signifier_reuse",
             **signifier_summary,

@@ -26,6 +26,7 @@ def extract_signifiers_from_bt(
     state_snapshot: Optional[dict] = None,
     intent_type: Optional[str] = None,
     structured_intents: list[dict] | None = None,
+    td_sosa_supported: bool = False,
 ) -> list[dict]:
     """
     Walk a BT JSON IR tree and extract signifier-worthy leaf nodes.
@@ -63,7 +64,18 @@ def extract_signifiers_from_bt(
                 intent_to_structured[intent_str] = si
 
     signifiers: list[dict] = []
-    _walk_tree(tree_spec, intents, was_successful, signifiers, workspace_id, state_snapshot, intent_type, artifact_to_intent, intent_to_structured)
+    _walk_tree(
+        tree_spec,
+        intents,
+        was_successful,
+        signifiers,
+        workspace_id,
+        state_snapshot,
+        intent_type,
+        artifact_to_intent,
+        intent_to_structured,
+        td_sosa_supported,
+    )
     return signifiers
 
 
@@ -77,6 +89,7 @@ def _walk_tree(
     intent_type: Optional[str],
     artifact_to_intent: dict[str, str],
     intent_to_structured: dict[str, dict],
+    td_sosa_supported: bool,
     depth: int = 0,
 ) -> None:
     """Recursively walk the tree and collect action nodes as signifiers."""
@@ -93,9 +106,17 @@ def _walk_tree(
         # Try to match this action to an intent (using artifact-based matching if available)
         intent = _match_node_to_intent(node_name, action_url, intents, artifact_to_intent)
 
+        td_sosa_effects = _effects_for_action(state_snapshot, action_url) if td_sosa_supported else []
+        td_sosa_metadata = _build_td_sosa_metadata(td_sosa_effects) if td_sosa_supported else {}
+
         # Extract structured conditions from state snapshot
         structured_conditions = _extract_conditions_from_state(
-            state_snapshot, workspace_id, action_url, parameters
+            state_snapshot,
+            workspace_id,
+            action_url,
+            parameters,
+            td_sosa_metadata=td_sosa_metadata,
+            td_sosa_supported=td_sosa_supported,
         )
 
         # Build signifier dict with structured_intent if available
@@ -111,6 +132,8 @@ def _walk_tree(
             "structured_conditions": structured_conditions,
             "intent_type": intent_type,  # Add intent_type for memory engine filtering
         }
+        if td_sosa_metadata:
+            sig_dict["td_sosa"] = td_sosa_metadata
 
         # Add original structured_intent if available for this intent
         if intent in intent_to_structured:
@@ -120,7 +143,19 @@ def _walk_tree(
 
     elif node_type in ("sequence", "selector", "parallel"):
         for child in node.get("children", []):
-            _walk_tree(child, intents, was_successful, signifiers, workspace_id, state_snapshot, intent_type, artifact_to_intent, intent_to_structured, depth + 1)
+            _walk_tree(
+                child,
+                intents,
+                was_successful,
+                signifiers,
+                workspace_id,
+                state_snapshot,
+                intent_type,
+                artifact_to_intent,
+                intent_to_structured,
+                td_sosa_supported,
+                depth + 1,
+            )
 
 
 def _match_node_to_intent(
@@ -237,11 +272,85 @@ def _extract_action_name(url: str) -> str:
     return url.rstrip("/").rsplit("/", 1)[-1] if url else "unknown"
 
 
+def _effects_for_action(state_snapshot: Optional[dict], action_url: str) -> list[dict]:
+    if not isinstance(state_snapshot, dict):
+        return []
+    by_action = state_snapshot.get("td_sosa_action_effects")
+    if not isinstance(by_action, dict):
+        return []
+    effects = by_action.get(action_url)
+    return [effect for effect in effects if isinstance(effect, dict)] if isinstance(effects, list) else []
+
+
+def _build_td_sosa_metadata(effects: list[dict]) -> dict:
+    if not effects:
+        return {}
+
+    property_uris: list[str] = []
+    readable_property_urls: list[str] = []
+    directions: list[str] = []
+    settling_times: list[float] = []
+    seen_props: set[str] = set()
+    seen_urls: set[str] = set()
+    for effect in effects:
+        prop_uri = str(effect.get("property_uri") or "").strip()
+        if prop_uri and prop_uri not in seen_props:
+            seen_props.add(prop_uri)
+            property_uris.append(prop_uri)
+        direction = str(effect.get("direction") or "").strip()
+        if direction and direction not in directions:
+            directions.append(direction)
+        for property_url in effect.get("readable_property_urls") or []:
+            property_url = str(property_url or "").strip()
+            if property_url and property_url not in seen_urls:
+                seen_urls.add(property_url)
+                readable_property_urls.append(property_url)
+        settling_time = effect.get("settling_time_seconds")
+        if isinstance(settling_time, (int, float)):
+            settling_times.append(float(settling_time))
+
+    metadata: dict[str, Any] = {
+        "enabled": True,
+        "affected_observable_property_uris": property_uris,
+        "readable_property_urls": readable_property_urls,
+        "effect_directions": directions,
+    }
+    if settling_times:
+        metadata["settling_time_seconds"] = max(settling_times)
+    return metadata
+
+
+def _condition_property_url(artifact_uri: str, prop_name: str) -> str:
+    prop = str(prop_name or "").strip()
+    if prop.startswith(("http://", "https://")):
+        return prop.replace("/props/", "/properties/")
+    artifact_url = str(artifact_uri or "")
+    if artifact_url.endswith("#artifact"):
+        artifact_url = artifact_url[: -len("#artifact")]
+    if not artifact_url:
+        return prop
+    if prop in ("", "state"):
+        return f"{artifact_url}/properties/state"
+    return f"{artifact_url}/properties/{prop}"
+
+
+def _condition_matches_td_sosa(
+    condition: dict,
+    td_sosa_metadata: dict,
+) -> bool:
+    readable_urls = set(str(u) for u in td_sosa_metadata.get("readable_property_urls") or [])
+    if not readable_urls:
+        return False
+    return str(condition.get("property_affordance_url") or "") in readable_urls
+
+
 def _extract_conditions_from_state(
     state_snapshot: Optional[dict],
     workspace_id: Optional[str],
     action_url: str,
     parameters: dict,
+    td_sosa_metadata: Optional[dict] = None,
+    td_sosa_supported: bool = False,
 ) -> list[dict]:
     """
     Extract structured conditions from state snapshot for signifier context.
@@ -349,6 +458,7 @@ def _extract_conditions_from_state(
             condition = {
                 "artifact": artifact_uri,
                 "property_affordance": prop_uri,
+                "property_affordance_url": _condition_property_url(artifact_uri, prop_uri),
                 "value_conditions": [
                     {
                         "operator": operator,
@@ -356,7 +466,23 @@ def _extract_conditions_from_state(
                     }
                 ],
             }
+            if td_sosa_supported and td_sosa_metadata:
+                for prop_uri_value in td_sosa_metadata.get("affected_observable_property_uris") or []:
+                    condition["td_sosa_property_uri"] = prop_uri_value
+                    break
             conditions.append(condition)
+
+    if td_sosa_supported and td_sosa_metadata:
+        semantic_conditions = [
+            c for c in conditions if _condition_matches_td_sosa(c, td_sosa_metadata)
+        ]
+        if semantic_conditions:
+            logger.info(
+                demo("_extract_conditions_from_state: returning %d TD-SOSA semantic conditions (filtered from %d)"),
+                len(semantic_conditions),
+                len(conditions),
+            )
+            return semantic_conditions
 
     # If we have too many conditions (noisy state), filter to most relevant
     # Keep only conditions for the target artifact if identified

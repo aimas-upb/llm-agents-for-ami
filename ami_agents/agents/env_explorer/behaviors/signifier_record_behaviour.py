@@ -152,6 +152,9 @@ class SignifierRecordBehaviour(CyclicBehaviour):
                 intent_structured = {"intent": intent_text, "payload": payload_hint}
                 if action_name:
                     intent_structured["action_name"] = str(action_name)
+                td_sosa_metadata = sig_dict.get("td_sosa")
+                if isinstance(td_sosa_metadata, dict) and td_sosa_metadata:
+                    intent_structured["td_sosa"] = td_sosa_metadata
 
                 # Include original structured_intent (action, artifact, parameter, value) if available
                 structured_intent_orig = sig_dict.get("structured_intent")
@@ -176,6 +179,18 @@ class SignifierRecordBehaviour(CyclicBehaviour):
                 # Ensure it's a list (defensive)
                 if not isinstance(structured_conditions, list):
                     structured_conditions = []
+                semantic_structured_conditions = structured_conditions
+                structured_conditions = [
+                    {
+                        "artifact": condition.get("artifact"),
+                        "property_affordance": condition.get("property_affordance"),
+                        "value_conditions": condition.get("value_conditions") or [],
+                    }
+                    for condition in structured_conditions
+                    if isinstance(condition, dict)
+                ]
+                if isinstance(td_sosa_metadata, dict) and td_sosa_metadata:
+                    intent_structured["td_sosa_context_conditions"] = semantic_structured_conditions
 
                 # Extract intent_type (EXPLICIT or IMPLICIT classification)
                 intent_type = sig_dict.get("intent_type")

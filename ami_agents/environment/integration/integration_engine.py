@@ -1677,6 +1677,55 @@ class YggdrasilIntegration(IIntegrationEngine):
                     "actions": [],
                 }
 
+    async def query_action_effects(
+        self,
+        workspace_id: str,
+        action_url: str,
+    ) -> Dict[str, Any]:
+        """Query the environment for TD-SOSA effects of one action."""
+        base = self.yggdrasil_url.rstrip("/")
+        url = f"{base}/_graph/query/action-effects"
+        payload = {
+            "workspace_id": workspace_id,
+            "action_url": action_url,
+        }
+
+        async with aiohttp.ClientSession() as session:
+            try:
+                headers = {"Content-Type": "application/json"}
+                async with session.post(url, headers=headers, data=json.dumps(payload)) as response:
+                    text = await response.text()
+                    if response.status >= 400:
+                        logger.error(
+                            "Action effects query failed [%s] for workspace=%s action=%s: %s",
+                            response.status,
+                            workspace_id,
+                            action_url,
+                            text,
+                        )
+                        return {
+                            "workspace_id": workspace_id,
+                            "action_url": action_url,
+                            "error": f"http_{response.status}",
+                            "detail": text,
+                            "effects": [],
+                        }
+                    return json.loads(text or "{}")
+            except Exception as e:
+                logger.error(
+                    "Failed action effects query for workspace=%s action=%s: %s",
+                    workspace_id,
+                    action_url,
+                    e,
+                )
+                return {
+                    "workspace_id": workspace_id,
+                    "action_url": action_url,
+                    "error": "semantic_query_failed",
+                    "detail": str(e),
+                    "effects": [],
+                }
+
 
 class IntegrationEngineFactory:
     """Factory for creating integration engine instances."""

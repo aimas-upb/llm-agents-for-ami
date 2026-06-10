@@ -395,6 +395,42 @@ class TestStructuredIntentMatcher:
         assert results[0].signifier_id == "sig_on"
         assert results[0].similarity == 1.0
 
+    def test_artifact_containment_match_for_extracted_cover_labels(self):
+        matcher = StructuredIntentMatcher()
+
+        signifiers = [
+            {
+                "signifier_id": "sig_blinds",
+                "intent": {
+                    "nl_text": "close the blackout blinds",
+                    "structured": {
+                        "structured_intent": {
+                            "action": "set",
+                            "artifact": "blinds",
+                            "parameter": "open_close",
+                            "value": False,
+                        }
+                    },
+                },
+            }
+        ]
+
+        results = matcher.match(
+            intent_query="close the blackout blinds",
+            signifiers=signifiers,
+            k=5,
+            min_similarity=0.5,
+            query_structured_intent={
+                "action": "set",
+                "artifact": "blackout_blinds_308e cover",
+                "parameter": "open_close",
+                "value": False,
+            },
+        )
+
+        assert len(results) == 1
+        assert results[0].signifier_id == "sig_blinds"
+
     def test_get_default_matcher(self):
         """Test retrieving default matcher."""
         registry = IntentMatcherRegistry(default_version="v0")

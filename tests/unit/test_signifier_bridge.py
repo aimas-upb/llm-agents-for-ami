@@ -89,6 +89,51 @@ class TestExtractSignifiers:
         )
         assert sigs[0]["workspace_id"] == "http://localhost:8080/workspaces/lab308"
 
+    def test_extract_tdsosa_metadata_and_filters_context(self):
+        action_url = "http://localhost:8080/workspaces/lab308/artifacts/blinds/ha/cover/close_cover"
+        state_snapshot = {
+            "artifacts": {
+                "http://localhost:8080/workspaces/lab308/artifacts/glare_sensor": {
+                    "name": "glare sensor",
+                    "workspace_id": "lab308",
+                    "state": {"state": 900},
+                },
+                "http://localhost:8080/workspaces/lab308/artifacts/co2_sensor": {
+                    "name": "co2 sensor",
+                    "workspace_id": "lab308",
+                    "state": {"state": 600},
+                },
+            },
+            "td_sosa_action_effects": {
+                action_url: [
+                    {
+                        "property_uri": "http://localhost:8080/workspaces/lab308/environment/glare",
+                        "direction": "decrease",
+                        "settling_time_seconds": 15,
+                        "readable_property_urls": [
+                            "http://localhost:8080/workspaces/lab308/artifacts/glare_sensor/properties/state"
+                        ],
+                    }
+                ]
+            },
+        }
+        sigs = extract_signifiers_from_bt(
+            tree_spec={"name": "CloseBlinds", "type": "action", "action_url": action_url},
+            intents=["reduce glare"],
+            workspace_id="lab308",
+            state_snapshot=state_snapshot,
+            td_sosa_supported=True,
+        )
+
+        assert len(sigs) == 1
+        assert sigs[0]["td_sosa"]["affected_observable_property_uris"] == [
+            "http://localhost:8080/workspaces/lab308/environment/glare"
+        ]
+        assert sigs[0]["td_sosa"]["effect_directions"] == ["decrease"]
+        assert sigs[0]["td_sosa"]["settling_time_seconds"] == 15
+        assert len(sigs[0]["structured_conditions"]) == 1
+        assert sigs[0]["structured_conditions"][0]["artifact"].endswith("/glare_sensor")
+
 
 class TestBuildBTFromSignifiers:
     """Tests for build_bt_from_signifiers()."""

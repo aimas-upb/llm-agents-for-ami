@@ -25,7 +25,9 @@ import re
 import shutil
 import sys
 import time
+import traceback
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -40,6 +42,18 @@ from spade.behaviour import CyclicBehaviour
 from spade.message import Message as SpadeMessage
 from spade.template import Template
 
+LLM_PHASES = [
+    "initial_prompt",
+    "clarification",
+    "confirmation",
+    "plan_creation",
+    "other",
+]
+LLM_PHASE_COLUMNS = [
+    f"{phase}_{metric}"
+    for phase in LLM_PHASES
+    for metric in ("llm_calls", "input_tokens", "output_tokens")
+]
 RESULT_COLUMNS = [
     "test_name",
     "timestamp",
@@ -55,6 +69,7 @@ RESULT_COLUMNS = [
     "signifier_reuse",
     "reused_signifier_id",
     "planning_path",
+    *LLM_PHASE_COLUMNS,
 ]
 SIGNIFIER_RESULT_COLUMNS = [
     "signifier_matches",
@@ -130,26 +145,75 @@ class LLMCallCounter:
     total_calls: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    current_phase: str = "other"
+    phase_usage: Dict[str, Dict[str, int]] = {}
 
     @classmethod
     def reset(cls) -> None:
         cls.total_calls = 0
         cls.input_tokens = 0
         cls.output_tokens = 0
+        cls.current_phase = "other"
+        cls.phase_usage = {
+            phase: {"llm_calls": 0, "input_tokens": 0, "output_tokens": 0}
+            for phase in LLM_PHASES
+        }
 
     @classmethod
-    def increment(cls, *, input_tokens: int = 0, output_tokens: int = 0) -> None:
+    def increment(
+        cls,
+        *,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        phase: Optional[str] = None,
+    ) -> None:
+        phase = phase if phase in LLM_PHASES else cls.current_phase
+        if phase not in LLM_PHASES:
+            phase = "other"
         cls.total_calls += 1
         cls.input_tokens += int(input_tokens or 0)
         cls.output_tokens += int(output_tokens or 0)
+        cls.phase_usage.setdefault(
+            phase,
+            {"llm_calls": 0, "input_tokens": 0, "output_tokens": 0},
+        )
+        cls.phase_usage[phase]["llm_calls"] += 1
+        cls.phase_usage[phase]["input_tokens"] += int(input_tokens or 0)
+        cls.phase_usage[phase]["output_tokens"] += int(output_tokens or 0)
 
     @classmethod
     def snapshot(cls) -> dict[str, int]:
-        return {
+        snapshot = {
             "llm_calls": cls.total_calls,
             "input_tokens": cls.input_tokens,
             "output_tokens": cls.output_tokens,
         }
+        for phase in LLM_PHASES:
+            usage = cls.phase_usage.get(
+                phase,
+                {"llm_calls": 0, "input_tokens": 0, "output_tokens": 0},
+            )
+            for metric in ("llm_calls", "input_tokens", "output_tokens"):
+                snapshot[f"{phase}_{metric}"] = usage.get(metric, 0)
+        return snapshot
+
+    @classmethod
+    @contextmanager
+    def phase(cls, phase: str):
+        previous = cls.current_phase
+        cls.current_phase = phase if phase in LLM_PHASES else "other"
+        try:
+            yield
+        finally:
+            cls.current_phase = previous
+
+
+def _infer_llm_phase_from_stack(default_phase: str) -> str:
+    for frame in traceback.extract_stack(limit=30):
+        filename = frame.filename.replace("\\", "/")
+        if filename.endswith("ami_agents/bt_planning/planning/bt_planner.py"):
+            return "plan_creation"
+    return default_phase if default_phase in LLM_PHASES else "other"
 
 
 class PromptDumpState:
@@ -236,12 +300,17 @@ def _install_openai_call_counter() -> None:
     original_create = AsyncCompletions.create
 
     async def counted_create(self, *args, **kwargs):
+        phase = _infer_llm_phase_from_stack(LLMCallCounter.current_phase)
         PromptDumpState.append_call(kwargs)
         response = await original_create(self, *args, **kwargs)
         usage = getattr(response, "usage", None)
         prompt_tokens = getattr(usage, "prompt_tokens", 0) if usage is not None else 0
         completion_tokens = getattr(usage, "completion_tokens", 0) if usage is not None else 0
-        LLMCallCounter.increment(input_tokens=prompt_tokens, output_tokens=completion_tokens)
+        LLMCallCounter.increment(
+            input_tokens=prompt_tokens,
+            output_tokens=completion_tokens,
+            phase=phase,
+        )
         return response
 
     counted_create._ami_counting_wrapped = True  # type: ignore[attr-defined]
@@ -1214,8 +1283,9 @@ class Lab308eHarness:
                         return CaseResult(case_path, False, details)
 
             query = str(case["query"])
-            await self.user.ask(query)
-            first_reply = await self.user.wait_for_reply(case_response_timeout)
+            with LLMCallCounter.phase("initial_prompt"):
+                await self.user.ask(query)
+                first_reply = await self.user.wait_for_reply(case_response_timeout)
             details["transcript"].append({"role": "assistant", "phase": "proposal", "text": first_reply})
             details["first_reply"] = first_reply
             self._capture_plan(details)
@@ -1235,8 +1305,9 @@ class Lab308eHarness:
                     scripted_reply,
                 )
                 clarification_steps.append({"assistant": current_reply, "reply": scripted_reply})
-                await self.user.ask(scripted_reply)
-                current_reply = await self.user.wait_for_reply(case_response_timeout)
+                with LLMCallCounter.phase("clarification"):
+                    await self.user.ask(scripted_reply)
+                    current_reply = await self.user.wait_for_reply(case_response_timeout)
                 details["transcript"].append(
                     {"role": "assistant", "phase": f"clarification_{clarification_turn}", "text": current_reply}
                 )
@@ -1256,12 +1327,15 @@ class Lab308eHarness:
                         followup_text,
                     )
                     details["clarification_followup"] = followup_text
-                    await self.user.ask(followup_text)
+                    with LLMCallCounter.phase("confirmation"):
+                        await self.user.ask(followup_text)
                 else:
                     self.user.drain_replies()
                     await self._start_simulator_for_execution()
-                    await self.user.ask(confirm_text)
-                final_reply = await self._wait_for_terminal_reply(details, case_response_timeout)
+                    with LLMCallCounter.phase("confirmation"):
+                        await self.user.ask(confirm_text)
+                with LLMCallCounter.phase("confirmation"):
+                    final_reply = await self._wait_for_terminal_reply(details, case_response_timeout)
 
             if not details.get("plan"):
                 details["failure_stage"] = "clarification"
@@ -1608,7 +1682,8 @@ def _ensure_results_csv_header(out_path: Path) -> None:
 
 
 def _append_results_csv(results: List[CaseResult]) -> Path:
-    out_path = Path(__file__).resolve().parent / "results.csv"
+    results_prefix = os.getenv("E2E_RESULTS_PREFIX", "")
+    out_path = Path(__file__).resolve().parent / f"{results_prefix}results.csv"
     _ensure_results_csv_header(out_path)
     write_header = not out_path.exists() or out_path.stat().st_size == 0
     with out_path.open("a", newline="") as fh:
@@ -1630,6 +1705,8 @@ def _append_results_csv(results: List[CaseResult]) -> Path:
                 "plan": details.get("plan"),
                 "failure_stage": details.get("failure_stage"),
             }
+            for column in LLM_PHASE_COLUMNS:
+                row[column] = details.get(column, 0)
             row.update(_extract_signifier_result_fields(details.get("plan")))
             writer.writerow(row)
     return out_path

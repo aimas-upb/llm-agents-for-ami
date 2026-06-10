@@ -15,6 +15,58 @@ class SignifierMatchBehaviour(CyclicBehaviour):
     using Experience engine engine, SHACL validation, and intent compatibility checking.
     """
 
+    @staticmethod
+    def _infer_td_sosa_properties(intent: str, structured_intent: Optional[Dict[str, Any]]) -> set[str]:
+        text_parts = [str(intent or "")]
+        if isinstance(structured_intent, dict):
+            text_parts.extend(str(v) for v in structured_intent.values() if isinstance(v, (str, int, float)))
+        text = " ".join(text_parts).lower()
+        mapping = {
+            "glare": ("glare", "screen easier", "screen", "reflection"),
+            "air_quality": ("air quality", "stuffy", "co2", "fresh air"),
+            "thermal_comfort": ("thermal", "temperature", "hot", "cold", "cool", "warm"),
+            "luminosity": ("light", "bright", "dark", "luminos", "illumin"),
+            "humidity": ("humid", "humidity"),
+            "occupancy_presence": ("presence", "occupied", "people", "person"),
+        }
+        inferred: set[str] = set()
+        for prop, keywords in mapping.items():
+            if any(keyword in text for keyword in keywords):
+                inferred.add(prop)
+        return inferred
+
+    @staticmethod
+    def _signifier_td_sosa_properties(signifier) -> set[str]:
+        structured = getattr(getattr(signifier, "intent", None), "structured", None)
+        if not isinstance(structured, dict):
+            return set()
+        td_sosa = structured.get("td_sosa")
+        if not isinstance(td_sosa, dict):
+            return set()
+        props = set()
+        for uri in td_sosa.get("affected_observable_property_uris") or []:
+            local = str(uri or "").rstrip("/").rsplit("/", 1)[-1].lower()
+            if local:
+                props.add(local)
+        return props
+
+    @staticmethod
+    def _td_sosa_semantic_match(query_props: set[str], signifier_props: set[str]) -> bool:
+        if not query_props or not signifier_props:
+            return False
+        aliases = {
+            "air_quality": {"air_quality", "co2"},
+            "thermal_comfort": {"thermal_comfort", "temperature"},
+            "luminosity": {"luminosity", "desk_luminosity", "illuminance", "internal_light"},
+            "glare": {"glare"},
+            "humidity": {"humidity"},
+            "occupancy_presence": {"occupancy_presence", "presence", "person_counter"},
+        }
+        expanded_query: set[str] = set()
+        for prop in query_props:
+            expanded_query.update(aliases.get(prop, {prop}))
+        return bool(expanded_query.intersection(signifier_props))
+
     async def run(self):
         """Main behavior loop - handles signifier match requests."""
         msg = await self.receive(timeout=1)
@@ -177,6 +229,19 @@ class SignifierMatchBehaviour(CyclicBehaviour):
 
             # Process match results
             matches: List[Dict[str, Any]] = []
+            td_sosa_supported = bool(
+                (getattr(self.agent, "semantic_capabilities", {}) or {}).get("td_sosa_supported", False)
+            )
+            query_td_sosa_props = (
+                self._infer_td_sosa_properties(intent, query_structured_intent)
+                if td_sosa_supported
+                else set()
+            )
+            if query_td_sosa_props:
+                self.agent.logger.info(
+                    demo("TD-SOSA signifier matching enabled: inferred_properties=%s"),
+                    sorted(query_td_sosa_props),
+                )
             self.agent.logger.debug(f"Processing {len(match_results)} match results")
 
             for i, match in enumerate(match_results):
@@ -243,6 +308,17 @@ class SignifierMatchBehaviour(CyclicBehaviour):
                     self.agent.logger.debug(f"FILTERED OUT: signifier '{signifier_intent}' not compatible with query '{intent}'")
                     continue
 
+                signifier_td_sosa_props = self._signifier_td_sosa_properties(s)
+                semantic_match = self._td_sosa_semantic_match(query_td_sosa_props, signifier_td_sosa_props)
+                if query_td_sosa_props and signifier_td_sosa_props and not semantic_match:
+                    self.agent.logger.debug(
+                        "FILTERED OUT: signifier %s TD-SOSA properties %s do not match query properties %s",
+                        s.signifier_id,
+                        sorted(signifier_td_sosa_props),
+                        sorted(query_td_sosa_props),
+                    )
+                    continue
+
                 self.agent.logger.debug(f"PASSED: signifier '{signifier_intent}' is compatible with query '{intent}'")
 
                 # Build match data
@@ -256,6 +332,8 @@ class SignifierMatchBehaviour(CyclicBehaviour):
                     "shacl_conforms": shacl_conforms,
                     "shacl_violations": shacl_violations,
                     "payload_hint": payload_hint,
+                    "td_sosa_properties": sorted(signifier_td_sosa_props),
+                    "td_sosa_semantic_match": semantic_match,
                 }
                 matches.append(match_data)
 
@@ -277,6 +355,14 @@ class SignifierMatchBehaviour(CyclicBehaviour):
                 matches = rank_signifier_matches(matches, intent_type)
             else:
                 matches.sort(key=lambda m: m.get("intent_similarity", 0.0), reverse=True)
+            if query_td_sosa_props:
+                matches.sort(
+                    key=lambda m: (
+                        bool(m.get("td_sosa_semantic_match")),
+                        m.get("intent_similarity", 0.0),
+                    ),
+                    reverse=True,
+                )
 
             self.agent.logger.info(f"Returning {len(matches)} matches to requester")
             for i, match in enumerate(matches[:3]):  # Show first 3

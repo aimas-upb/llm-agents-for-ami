@@ -1379,6 +1379,24 @@ async def query_actions_affecting_observable_property(request: Request):
         "actions": matches.get("actions", []),
     }
 
+@app.post("/_graph/query/action-effects")
+async def query_action_effects(request: Request):
+    payload = await request.json()
+    workspace_id = payload.get("workspace_id") if isinstance(payload, dict) else None
+    action_url = payload.get("action_url") if isinstance(payload, dict) else None
+
+    if not isinstance(workspace_id, str) or not workspace_id.strip():
+        raise HTTPException(status_code=400, detail="workspace_id is required")
+    workspace_id = workspace_id.strip()
+    if not isinstance(action_url, str) or not action_url.strip():
+        raise HTTPException(status_code=400, detail="action_url is required")
+    action_url = action_url.strip()
+
+    cache = await _ensure_graph_cache()
+    if not await cache.has_workspace(workspace_id):
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return await cache.query_action_effects(workspace_id, action_url)
+
 @app.get("/workspaces/{workspace_id}", response_class=Response,
          responses={200: {"content": {"text/turtle": {}}}, 404: {"description": "Not found"}})
 async def workspace(workspace_id: str, request: Request):
