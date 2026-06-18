@@ -151,10 +151,86 @@ def _light_brightness_from_attrs(attributes: dict[str, Any]) -> int | None:
     return None
 
 
-def _fan_percentage_from_attrs(attributes: dict[str, Any]) -> int | None:
-    if isinstance(attributes.get("1.FanControl.PercentSetting"), (int, float)):
-        return int(round(float(attributes["1.FanControl.PercentSetting"])))
+def _matter_temp_c(value: Any) -> float | None:
+    if isinstance(value, (int, float)):
+        return round(float(value) / 100.0, 2)
     return None
+
+
+def _hvac_mode_from_attrs(attributes: dict[str, Any], *, device_type: str) -> str:
+    system_mode = attributes.get("1.Thermostat.SystemMode")
+    if device_type == "heat_pump":
+        system_mode = attributes.get("4.Thermostat.SystemMode", system_mode)
+
+    if system_mode == 0:
+        return "off"
+    if system_mode == 3:
+        return "cool"
+    if system_mode == 4:
+        return "heat"
+    if system_mode == 1:
+        return "auto"
+    if attributes.get("1.OnOff.OnOff") is False:
+        return "off"
+    return "cool" if device_type == "air_conditioner" else "heat"
+
+
+def _climate_temperature_from_attrs(attributes: dict[str, Any], *, device_type: str) -> float:
+    if device_type == "heat_pump":
+        mode = _hvac_mode_from_attrs(attributes, device_type=device_type)
+        if mode == "cool":
+            for key in ("4.Thermostat.OccupiedCoolingSetpoint", "1.Thermostat.OccupiedCoolingSetpoint"):
+                value = _matter_temp_c(attributes.get(key))
+                if value is not None:
+                    return value
+        for key in ("4.Thermostat.OccupiedHeatingSetpoint", "1.Thermostat.OccupiedHeatingSetpoint"):
+            value = _matter_temp_c(attributes.get(key))
+            if value is not None:
+                return value
+        value = _matter_temp_c(attributes.get("4.Thermostat.LocalTemperature"))
+        if value is not None:
+            return value
+        return 21.0
+
+    mode = _hvac_mode_from_attrs(attributes, device_type=device_type)
+    if mode == "heat":
+        value = _matter_temp_c(attributes.get("1.Thermostat.OccupiedHeatingSetpoint"))
+        if value is not None:
+            return value
+    value = _matter_temp_c(attributes.get("1.Thermostat.OccupiedCoolingSetpoint"))
+    if value is not None:
+        return value
+    value = _matter_temp_c(attributes.get("1.Thermostat.LocalTemperature"))
+    if value is not None:
+        return value
+    return 22.0
+
+
+def _climate_limits_from_attrs(attributes: dict[str, Any], *, device_type: str) -> tuple[float, float]:
+    candidates: list[float] = []
+    keys = [
+        "1.Thermostat.OccupiedCoolingSetpoint",
+        "1.Thermostat.OccupiedHeatingSetpoint",
+        "1.Thermostat.LocalTemperature",
+    ]
+    if device_type == "heat_pump":
+        keys.extend(
+            [
+                "4.Thermostat.OccupiedCoolingSetpoint",
+                "4.Thermostat.OccupiedHeatingSetpoint",
+                "4.Thermostat.LocalTemperature",
+            ]
+        )
+    for key in keys:
+        value = _matter_temp_c(attributes.get(key))
+        if value is not None:
+            candidates.append(value)
+
+    if not candidates:
+        return (16.0, 30.0)
+    low = min(candidates) - 8.0
+    high = max(candidates) + 8.0
+    return (max(5.0, round(low, 1)), min(40.0, round(high, 1)))
 
 
 def _bool_to_on_off(value: Any) -> str:
@@ -223,15 +299,15 @@ def _device_primary_entry(
         return entry
 
     if device_type in {"fan", "air_purifier", "humidifier", "dehumidifier"}:
-        entry = {
+        # The HA virtual fan platform rejects unknown config keys (such as
+        # initial_percentage), which silently kills every fan entity in the
+        # group. speed_count enables the set_percentage feature instead.
+        return {
             "platform": "fan",
             "name": entity_name,
             "initial_value": _bool_to_on_off(on_off),
+            "speed_count": 100,
         }
-        pct = _fan_percentage_from_attrs(attributes)
-        if pct is not None:
-            entry["initial_percentage"] = pct
-        return entry
 
     if device_type == "window_covering_controller":
         return {
@@ -240,7 +316,19 @@ def _device_primary_entry(
             "initial_position": _cover_position_from_attrs(attributes),
         }
 
-    if device_type in {"air_conditioner", "heat_pump", "freezer", "refrigerator"}:
+    if device_type in {"air_conditioner", "heat_pump"}:
+        min_temp, max_temp = _climate_limits_from_attrs(attributes, device_type=device_type)
+        return {
+            "platform": "climate",
+            "name": entity_name,
+            "initial_hvac_mode": _hvac_mode_from_attrs(attributes, device_type=device_type),
+            "initial_temperature": _climate_temperature_from_attrs(attributes, device_type=device_type),
+            "min_temp": min_temp,
+            "max_temp": max_temp,
+            "target_temp_step": 0.5,
+        }
+
+    if device_type in {"freezer", "refrigerator"}:
         return {
             "platform": "sensor",
             "name": entity_name,
@@ -358,6 +446,12 @@ def _convert_initial_home_config(payload: dict[str, Any], source_path: Path) -> 
                         raw_value=raw_value,
                     )
                 )
+
+    # Virtual entities default to persistent: true and restore the previous
+    # run's state on re-import, polluting the episode's initial conditions.
+    for entries in devices.values():
+        for entry in entries:
+            entry["persistent"] = False
 
     return {
         "version": 1,

@@ -562,6 +562,7 @@ class UserMessageBehaviour(CyclicBehaviour):
             intent_type=intent_type,
             structured_intents=structured_intents,
             td_sosa_supported=td_sosa_supported,
+            executed_actions=getattr(exec_result, "executed_actions", None),
         )
         if not signifiers:
             self.logger.info(demo("No signifiers extracted from BT"))

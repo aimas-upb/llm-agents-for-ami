@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import urllib.parse
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
@@ -130,6 +131,12 @@ class HASPGraphCache:
         self.artifacts_ttls: Dict[str, str] = {}
         self.artifact_ttls: Dict[Tuple[str, str], str] = {}
         self.full_graph: Graph = Graph(base=self.base_uri)
+        self._documents_dirty = False
+        self._last_rebuild_monotonic = 0.0
+        # With frequently-updating sensors the cache is dirty almost always;
+        # without a floor, every TTL read pays a full rebuild and a workspace
+        # crawl slows from seconds to minutes.
+        self.min_rebuild_interval_s = 10.0
 
     async def refresh(self) -> None:
         # Home Assistant websocket registry calls share one connection and are
@@ -186,7 +193,10 @@ class HASPGraphCache:
                 self.states_by_entity_id[entity_id] = dict(new_state)
             else:
                 self.states_by_entity_id.pop(entity_id, None)
-            self._rebuild_documents_unlocked()
+            # Rebuilding the RDF documents costs one TD build + turtle parse per
+            # entity. Doing it here for every state_changed event starves the
+            # event loop when sensors update frequently, so defer to readers.
+            self._documents_dirty = True
 
     async def apply_service_result(self, result: Any) -> None:
         updated = False
@@ -200,9 +210,16 @@ class HASPGraphCache:
                 self.states_by_entity_id[result["entity_id"]] = dict(result)
                 updated = True
             if updated:
-                self._rebuild_documents_unlocked()
+                self._documents_dirty = True
                 return
         await self.refresh_states()
+
+    def _ensure_documents_unlocked(self) -> None:
+        if not self._documents_dirty:
+            return
+        if time.monotonic() - self._last_rebuild_monotonic < self.min_rebuild_interval_s:
+            return
+        self._rebuild_documents_unlocked()
 
     async def has_workspace(self, workspace_id: str) -> bool:
         async with self._lock:
@@ -210,10 +227,12 @@ class HASPGraphCache:
 
     async def get_platform_ttl(self) -> str:
         async with self._lock:
+            self._ensure_documents_unlocked()
             return self.platform_ttl
 
     async def serialize_full_graph(self, fmt: str = "turtle") -> str:
         async with self._lock:
+            self._ensure_documents_unlocked()
             return self.full_graph.serialize(format=fmt)
 
     async def query_actions_affecting_observable_property(
@@ -265,6 +284,7 @@ class HASPGraphCache:
         LIMIT 1
         """
         async with self._lock:
+            self._ensure_documents_unlocked()
             rows = list(self.full_graph.query(action_query))
             meta_rows = list(self.full_graph.query(property_meta_query))
 
@@ -354,6 +374,7 @@ class HASPGraphCache:
         ORDER BY ?property ?artifact ?actionName
         """
         async with self._lock:
+            self._ensure_documents_unlocked()
             rows = list(self.full_graph.query(action_query))
 
         effects: List[Dict[str, Any]] = []
@@ -391,18 +412,22 @@ class HASPGraphCache:
 
     async def get_workspaces_ttl(self) -> str:
         async with self._lock:
+            self._ensure_documents_unlocked()
             return self.workspaces_ttl
 
     async def get_workspace_ttl(self, workspace_id: str) -> str:
         async with self._lock:
+            self._ensure_documents_unlocked()
             return self.workspace_ttls[workspace_id]
 
     async def get_artifacts_ttl(self, workspace_id: str) -> str:
         async with self._lock:
+            self._ensure_documents_unlocked()
             return self.artifacts_ttls[workspace_id]
 
     async def get_artifact_ttl(self, workspace_id: str, artifact_name: str) -> Tuple[str, str]:
         async with self._lock:
+            self._ensure_documents_unlocked()
             _, device_entities, device, artifact_label, safe_name = self._resolve_artifact_unlocked(workspace_id, artifact_name)
             return self.artifact_ttls[(workspace_id, safe_name)], artifact_label
 
@@ -608,6 +633,8 @@ class HASPGraphCache:
         return device, device_entities, device, decoded_name, urllib.parse.quote(decoded_name, safe="")
 
     def _rebuild_documents_unlocked(self) -> None:
+        self._documents_dirty = False
+        self._last_rebuild_monotonic = time.monotonic()
         self.platform_ttl = ""
         self.workspaces_ttl = ""
         self.workspace_ttls = {}

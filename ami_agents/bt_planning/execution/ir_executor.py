@@ -270,8 +270,21 @@ class IRExecutor:
         else:
             result.final_status = "RUNNING (max ticks reached)"
 
+        # Harvest the set of action leaves that actually invoked their HTTP
+        # endpoint successfully. Anything not in this list was short-circuited
+        # (e.g. by a sibling condition under a Selector) and must not be
+        # treated as a causal action by signifier extraction.
+        executed: list[tuple[str, str]] = []
+        for node in tree.iterate():
+            if isinstance(node, ActionAffordanceNode) and getattr(node, "_executed_successfully", False):
+                executed.append((node.name, node.action_url))
+        result.executed_actions = executed
+
         tree.shutdown()
-        logger.info(f"Execution complete: {result.final_status} after {result.ticks} ticks")
+        logger.info(
+            f"Execution complete: {result.final_status} after {result.ticks} ticks "
+            f"(executed_actions={len(executed)})"
+        )
         return result
 
     def validate_tree(self, spec: dict) -> list[str]:

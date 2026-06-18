@@ -368,6 +368,21 @@ class InteractionSolverAgent(Agent, IAgent):
                     "bad air",
                     "heavy air",
                     "fresh air",
+                    "crisp air",
+                    "air feels",
+                    "air is",
+                    "clean air",
+                    "too clean",
+                    "pm10",
+                    "pm2.5",
+                    "particul",
+                    "dust",
+                    "smoke",
+                    "smoky",
+                    "pollut",
+                    "purif",
+                    "nose tingle",
+                    "sneez",
                 )
             ):
                 add("air_quality")
@@ -435,6 +450,57 @@ class InteractionSolverAgent(Agent, IAgent):
                 seen.add(property_url)
                 candidates.append(property_url)
         return candidates
+
+    @staticmethod
+    def _narrow_state_to_semantic_context(
+        state_payload: Dict[str, Any],
+        affordances: Any,
+        observable_property_hints: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Keep only state artifacts relevant to the semantic planning context.
+
+        Large workspaces can expose hundreds of artifacts; dumping every one
+        into the planning prompt can exceed the model input-token limit. When
+        the TD-SOSA semantic query identified concrete actions, the state
+        context only needs the artifacts those actions/affordances belong to
+        plus the readable sensor artifacts.
+        """
+        if not isinstance(state_payload, dict) or not isinstance(state_payload.get("artifacts"), dict):
+            return state_payload
+        results = observable_property_hints.get("results") if isinstance(observable_property_hints, dict) else None
+        if not isinstance(results, list) or not results:
+            return state_payload
+
+        def _norm(uri: Any) -> str:
+            text = str(uri or "").strip()
+            if text.endswith("#artifact"):
+                text = text[: -len("#artifact")]
+            return text.rstrip("/")
+
+        relevant: set = set()
+        has_actions = False
+        for result in results:
+            if not isinstance(result, dict):
+                continue
+            for action in result.get("actions") or []:
+                if isinstance(action, dict):
+                    has_actions = True
+                    relevant.add(_norm(action.get("artifact_uri")))
+            for url in result.get("readable_property_urls") or []:
+                relevant.add(_norm(str(url).split("/properties/", 1)[0]))
+        if not has_actions:
+            return state_payload
+        if isinstance(affordances, list):
+            for aff in affordances:
+                if isinstance(aff, dict):
+                    relevant.add(_norm(aff.get("artifact_id") or aff.get("artifact_uri")))
+        relevant.discard("")
+
+        artifacts = state_payload["artifacts"]
+        narrowed = {aid: info for aid, info in artifacts.items() if _norm(aid) in relevant}
+        if not narrowed:
+            return state_payload
+        return {**state_payload, "artifacts": narrowed}
 
     # ── Planning orchestration ─────────────────────────────────────
 
@@ -748,10 +814,20 @@ class InteractionSolverAgent(Agent, IAgent):
         except Exception:
             pass
 
+        narrowed_payload = self._narrow_state_to_semantic_context(
+            state_payload, affordances, observable_property_hints
+        )
+        if narrowed_payload is not state_payload:
+            self.logger.info(
+                demo("State narrowed to semantic context: artifacts %s -> %s"),
+                len(state_payload.get("artifacts") or {}),
+                len(narrowed_payload.get("artifacts") or {}),
+            )
+
         return {
             "intents": intents,
             "affordances": affordances,
-            "state": state_payload.get("state") or state_payload,
+            "state": narrowed_payload.get("state") or narrowed_payload,
             "signifier_matches": signifier_matches,
             "observable_property_hints": observable_property_hints,
         }

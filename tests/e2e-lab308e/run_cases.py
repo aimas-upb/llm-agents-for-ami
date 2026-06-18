@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import aiohttp
 import spade
@@ -277,6 +277,30 @@ class PromptDumpState:
         cls.prompt_entries.append(entry)
 
     @classmethod
+    def append_response(cls, response: Any) -> None:
+        if not cls.enabled or not cls.prompt_entries:
+            return
+
+        answer = ""
+        try:
+            choices = getattr(response, "choices", None) or []
+            if choices:
+                message = getattr(choices[0], "message", None)
+                answer = getattr(message, "content", None) or ""
+        except Exception:
+            answer = ""
+
+        if not answer:
+            answer = "<empty response>"
+
+        cls.prompt_entries[-1] = (
+            cls.prompt_entries[-1].rstrip()
+            + "\n\n===== LLM Answer =====\n"
+            + str(answer).strip()
+            + "\n"
+        )
+
+    @classmethod
     def write_case_file(cls) -> Optional[Path]:
         if not cls.enabled or cls.output_dir is None or not cls.case_name:
             return None
@@ -303,6 +327,7 @@ def _install_openai_call_counter() -> None:
         phase = _infer_llm_phase_from_stack(LLMCallCounter.current_phase)
         PromptDumpState.append_call(kwargs)
         response = await original_create(self, *args, **kwargs)
+        PromptDumpState.append_response(response)
         usage = getattr(response, "usage", None)
         prompt_tokens = getattr(usage, "prompt_tokens", 0) if usage is not None else 0
         completion_tokens = getattr(usage, "completion_tokens", 0) if usage is not None else 0
@@ -722,6 +747,28 @@ class Lab308eHarness:
         self.user: Optional[HeadlessUserAgent] = None
         self.hasp_service: Optional[ManagedService] = None
         self.simulator_service: Optional[ManagedService] = None
+        self.healthcheck_target: Optional[str] = None
+
+    @staticmethod
+    def _infer_workspace_id(cases: List[Path]) -> Optional[str]:
+        for case_path in cases:
+            try:
+                case = json.loads(case_path.read_text())
+            except Exception:
+                continue
+            simuhome = case.get("simuhome") if isinstance(case, dict) else None
+            if isinstance(simuhome, dict) and isinstance(simuhome.get("workspace_id"), str):
+                return simuhome["workspace_id"].strip() or None
+            workspace_id = case.get("workspace_id") if isinstance(case, dict) else None
+            if isinstance(workspace_id, str) and workspace_id.strip():
+                return workspace_id.strip()
+        return None
+
+    def _healthcheck_url(self, cases: List[Path]) -> str:
+        workspace_id = self._infer_workspace_id(cases)
+        if workspace_id:
+            return f"{self.yggdrasil_url}/workspaces/{quote(workspace_id, safe='')}/artifacts"
+        return self.yggdrasil_url
 
     @staticmethod
     def _clarification_followup(first_reply: str, confirmation_text: str) -> Optional[str]:
@@ -1024,6 +1071,83 @@ class Lab308eHarness:
         )
         return any(marker in lowered for marker in terminal_markers)
 
+    async def _generate_dynamic_confirmation(
+        self,
+        *,
+        case: Dict[str, Any],
+        assistant_reply: str,
+        fallback: str,
+    ) -> Dict[str, Any]:
+        if not self.solver:
+            return {
+                "reply": fallback,
+                "source": "dynamic_fallback",
+                "raw_dynamic_reply": None,
+                "dynamic_error": "InteractionSolver agent is not available",
+            }
+
+        system_prompt = (
+            "You are generating the next user message for an automated smart-home "
+            "end-to-end test. The assistant may be asking for confirmation, asking "
+            "the user to choose between options, or reporting that planning failed. "
+            "Choose the shortest user reply that moves toward satisfying the original "
+            "request. If there is a concrete pending plan, reply exactly 'yes'. If "
+            "the assistant asks the user to pick an option, choose the option most "
+            "directly aligned with the original request. Do not explain. Return only "
+            "JSON with one string field named reply."
+        )
+        user_prompt = {
+            "original_request": str(case.get("query", "")),
+            "assistant_reply": assistant_reply,
+            "fallback_reply": fallback,
+        }
+        api_kwargs: Dict[str, Any] = {
+            "model": self.solver.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": json.dumps(user_prompt, ensure_ascii=True)},
+            ],
+        }
+        if not self.solver.model.lower().startswith(("o", "gpt-5")):
+            api_kwargs["temperature"] = self.solver.temperature
+            if self.solver.max_tokens is not None:
+                api_kwargs["max_tokens"] = min(int(self.solver.max_tokens), 256)
+        else:
+            if self.solver.reasoning_effort:
+                api_kwargs["reasoning_effort"] = self.solver.reasoning_effort
+            if self.solver.max_completion_tokens is not None:
+                api_kwargs["max_completion_tokens"] = min(int(self.solver.max_completion_tokens), 256)
+
+        content: Optional[str] = None
+        try:
+            response = await self.solver.llm_client.chat.completions.create(**api_kwargs)
+            content = response.choices[0].message.content or ""
+            start = content.find("{")
+            end = content.rfind("}")
+            payload = json.loads(content[start : end + 1] if start >= 0 and end >= start else content)
+            reply = str(payload.get("reply", "")).strip()
+            if not reply:
+                return {
+                    "reply": fallback,
+                    "source": "dynamic_fallback",
+                    "raw_dynamic_reply": content,
+                    "dynamic_error": "Dynamic confirmation JSON did not include a non-empty reply",
+                }
+            return {
+                "reply": reply,
+                "source": "dynamic",
+                "raw_dynamic_reply": content,
+                "dynamic_error": None,
+            }
+        except Exception as exc:
+            self.logger.warning("Dynamic confirmation generation failed: %s", exc)
+            return {
+                "reply": fallback,
+                "source": "dynamic_fallback",
+                "raw_dynamic_reply": content,
+                "dynamic_error": str(exc),
+            }
+
     async def _wait_for_terminal_reply(self, details: Dict[str, Any], timeout_s: float) -> str:
         deadline = asyncio.get_running_loop().time() + timeout_s
         last_reply = ""
@@ -1145,19 +1269,20 @@ class Lab308eHarness:
             )
 
     async def _wait_for_yggdrasil(self, timeout_s: float = 20.0) -> None:
+        healthcheck_url = self.healthcheck_target or self.yggdrasil_url
         deadline = asyncio.get_running_loop().time() + timeout_s
         last_error = ""
         while asyncio.get_running_loop().time() < deadline:
             try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(self.yggdrasil_url) as resp:
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5.0)) as session:
+                    async with session.get(healthcheck_url) as resp:
                         if resp.status < 400:
                             return
                         last_error = f"HTTP {resp.status}"
             except Exception as exc:
                 last_error = str(exc)
             await asyncio.sleep(0.5)
-        raise RuntimeError(f"Yggdrasil is not reachable at {self.yggdrasil_url}: {last_error}")
+        raise RuntimeError(f"Yggdrasil is not reachable at {healthcheck_url}: {last_error}")
 
     async def _stop_simulator_for_setup(self) -> None:
         if self.simulator_service is not None:
@@ -1173,8 +1298,9 @@ class Lab308eHarness:
         await self.hasp_service.restart()
         await self._wait_for_yggdrasil(timeout_s=float(self.args.service_start_timeout))
 
-    async def start(self) -> None:
+    async def start(self, cases: Optional[List[Path]] = None) -> None:
         _require_env("OPENAI_API_KEY")
+        self.healthcheck_target = self._healthcheck_url(cases or [])
 
         if self.args.clear_signifiers:
             storage_dir = _clear_signifier_storage()
@@ -1209,12 +1335,15 @@ class Lab308eHarness:
         await self.explorer.start(auto_register=True)
         await self.assistant.start(auto_register=True)
 
-        for _ in range(600):
+        discovery_timeout = float(getattr(self.args, "discovery_timeout", 300.0))
+        self.logger.info("Waiting for EnvExplorer discovery for up to %.1fs", discovery_timeout)
+        discovery_deadline = asyncio.get_running_loop().time() + discovery_timeout
+        while asyncio.get_running_loop().time() < discovery_deadline:
             if getattr(self.explorer, "discovery_complete", False):
                 break
             await asyncio.sleep(0.5)
         if not getattr(self.explorer, "discovery_complete", False):
-            raise RuntimeError("EnvExplorer discovery did not complete in time.")
+            raise RuntimeError(f"EnvExplorer discovery did not complete in {discovery_timeout:.1f}s.")
 
         if not self.args.skip_prewarm:
             self.logger.info(demo("Pre-warming UserAssistant execution engine..."))
@@ -1317,7 +1446,72 @@ class Lab308eHarness:
                 details["clarification_replies_used"] = clarification_steps
 
             final_reply = None
-            if case.get("auto_confirm", True):
+            if case.get("auto_confirm", True) and bool(case.get("dynamic_confirmation", False)):
+                confirm_text = str(case.get("confirmation_text", "yes"))
+                max_confirmation_turns = int(case.get("max_confirmation_turns", 3))
+                confirmation_steps: List[Dict[str, Any]] = []
+                await self._start_simulator_for_execution()
+                for confirmation_turn in range(1, max_confirmation_turns + 1):
+                    followup_text = self._clarification_followup(current_reply, confirm_text)
+                    if followup_text and followup_text != confirm_text:
+                        # The assistant asked a "Would you like me to X?" style
+                        # clarification question; there is no pending plan yet, so
+                        # replying "yes" dead-ends in CONFIRMATION_WITHOUT_PENDING_PLAN.
+                        # Resubmit the suggested action as a goal instead.
+                        next_user_text = followup_text
+                        confirmation_steps.append(
+                            {
+                                "assistant": current_reply,
+                                "reply": next_user_text,
+                                "source": "clarification_followup",
+                            }
+                        )
+                    else:
+                        next_user_text = confirm_text
+                        with LLMCallCounter.phase("confirmation"):
+                            dynamic_result = await self._generate_dynamic_confirmation(
+                                case=case,
+                                assistant_reply=current_reply,
+                                fallback=next_user_text,
+                            )
+                        next_user_text = str(dynamic_result["reply"])
+                        confirmation_steps.append(
+                            {
+                                "assistant": current_reply,
+                                "reply": next_user_text,
+                                "source": str(dynamic_result["source"]),
+                                "raw_dynamic_reply": dynamic_result.get("raw_dynamic_reply"),
+                                "dynamic_error": dynamic_result.get("dynamic_error"),
+                            }
+                        )
+                    details["confirmation_replies_used"] = confirmation_steps
+
+                    if next_user_text.strip().lower() in {"yes", "y"}:
+                        self.user.drain_replies()
+                    with LLMCallCounter.phase("confirmation"):
+                        await self.user.ask(next_user_text)
+                        try:
+                            reply = await self.user.wait_for_reply(case_response_timeout)
+                        except asyncio.TimeoutError:
+                            raise asyncio.TimeoutError("Timed out waiting for assistant reply after confirmation")
+
+                    details["transcript"].append(
+                        {
+                            "role": "assistant",
+                            "phase": f"confirmation_{confirmation_turn}",
+                            "text": reply,
+                        }
+                    )
+                    details["final_reply"] = reply
+                    self._capture_plan(details)
+                    current_reply = reply
+                    if self._is_terminal_reply(reply):
+                        final_reply = reply
+                        break
+
+                if final_reply is None:
+                    final_reply = current_reply
+            elif case.get("auto_confirm", True):
                 confirm_text = str(case.get("confirmation_text", "yes"))
                 followup_text = self._clarification_followup(current_reply, confirm_text)
                 if followup_text and followup_text != confirm_text:
@@ -1535,6 +1729,7 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     parser.add_argument("--case", help="Run one specific JSON file.")
     parser.add_argument("--case-name", help="Run one specific test by JSON 'name' field.")
     parser.add_argument("--response-timeout", type=float, default=900.0)
+    parser.add_argument("--discovery-timeout", type=float, default=300.0)
     parser.add_argument("--settle-seconds", type=float, default=2.0)
     parser.add_argument("--clear-signifiers", action="store_true")
     parser.add_argument("--clear-signifiers-per-case", action="store_true")
@@ -1552,6 +1747,10 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     parser.add_argument("--service-start-timeout", type=float, default=30.0)
     parser.add_argument("--log-level", default="INFO")
     parser.add_argument("--write-results", action="store_true")
+    parser.add_argument(
+        "--results-csv",
+        help="Append result rows to this CSV path instead of the default results.csv next to this script.",
+    )
     return parser.parse_args(argv)
 
 
@@ -1681,9 +1880,11 @@ def _ensure_results_csv_header(out_path: Path) -> None:
             writer.writerow(_normalise_results_row(row))
 
 
-def _append_results_csv(results: List[CaseResult]) -> Path:
-    results_prefix = os.getenv("E2E_RESULTS_PREFIX", "")
-    out_path = Path(__file__).resolve().parent / f"{results_prefix}results.csv"
+def _append_results_csv(results: List[CaseResult], out_path: Optional[Path] = None) -> Path:
+    if out_path is None:
+        results_prefix = os.getenv("E2E_RESULTS_PREFIX", "")
+        out_path = Path(__file__).resolve().parent / f"{results_prefix}results.csv"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     _ensure_results_csv_header(out_path)
     write_header = not out_path.exists() or out_path.stat().st_size == 0
     with out_path.open("a", newline="") as fh:
@@ -1723,7 +1924,7 @@ async def _async_main(args: argparse.Namespace) -> int:
     harness = Lab308eHarness(args, logger)
     results: List[CaseResult] = []
     try:
-        await harness.start()
+        await harness.start(cases)
         for case_path in cases:
             results.append(await harness.run_case(case_path))
     finally:
@@ -1738,7 +1939,10 @@ async def _async_main(args: argparse.Namespace) -> int:
             print(f"  error: {result.details['error']}")
     print(f"Passed {len(results) - len(failures)}/{len(results)} cases")
 
-    csv_path = _append_results_csv(results)
+    csv_path = _append_results_csv(
+        results,
+        Path(args.results_csv).expanduser().resolve() if args.results_csv else None,
+    )
     print(f"Appended results to {csv_path}")
 
     if args.write_results:
@@ -1753,7 +1957,18 @@ async def _async_main(args: argparse.Namespace) -> int:
 
 def main() -> int:
     args = _parse_args(sys.argv[1:])
-    return spade.run(_async_main(args))
+    result_holder: Dict[str, int] = {"code": 2}
+
+    async def _run_with_result() -> None:
+        result_holder["code"] = await _async_main(args)
+
+    try:
+        spade.run(_run_with_result())
+    except Exception:
+        logger = _configure_logging(args.log_level)
+        logger.exception("lab308e E2E harness failed before completing case execution")
+        return 2
+    return int(result_holder["code"])
 
 
 if __name__ == "__main__":

@@ -479,6 +479,25 @@ def _resolve_env_var_override(
     return None
 
 
+_OVERRIDE_DIRECTIONS = {"increase", "decrease", "affects"}
+
+
+def _split_override_direction(value: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    """Split an override value like "air_quality:decrease" into (key, direction).
+
+    Service-name heuristics cannot know device semantics (turning an air
+    purifier ON decreases pm10), so override values may carry an explicit
+    actuation direction suffix.
+    """
+    if not value or ":" not in value:
+        return value, None
+    head, _, tail = value.rpartition(":")
+    tail_norm = tail.strip().lower()
+    if tail_norm in _OVERRIDE_DIRECTIONS and head:
+        return head, tail_norm
+    return value, None
+
+
 def _env_var_uri(base: str, workspace_id: str, env_var: str) -> URIRef:
     if env_var.startswith("http://") or env_var.startswith("https://"):
         return URIRef(env_var)
@@ -604,6 +623,24 @@ def _effect_direction(service_name: str) -> Optional[str]:
     return None
 
 
+# Setpoint-style services can move their observable property in either
+# direction, so they get a direction-neutral actuation instead of none.
+_SETPOINT_SERVICES = {
+    "set_temperature",
+    "set_hvac_mode",
+    "set_percentage",
+    "set_speed",
+    "set_humidity",
+    "set_cover_position",
+    "set_position",
+    "set_value",
+}
+
+
+def _is_setpoint_service(service_name: str) -> bool:
+    return service_name.lower() in _SETPOINT_SERVICES
+
+
 def _domain_is_observer(domain: str) -> bool:
     return domain in {"sensor", "binary_sensor", "weather", "person", "device_tracker"}
 
@@ -647,14 +684,18 @@ def _add_tdsosa_action_effect(
     env_var_uri: URIRef,
     env_var_key: Optional[str],
     actuation_uri: URIRef,
-    direction: str,
+    direction: Optional[str],
     settling_time_seconds: Optional[float] = None,
 ) -> None:
     rdf.g.add((action_affordance, TDSOSA.hasEffectActuation, actuation_uri))
     rdf.g.add((actuation_uri, RDF.type, SOSA.Actuation))
-    rdf.g.add((actuation_uri, RDF.type, TDSOSA.IncreasingActuation if direction == "increase" else TDSOSA.DecreasingActuation))
+    if direction == "increase":
+        rdf.g.add((actuation_uri, RDF.type, TDSOSA.IncreasingActuation))
+        rdf.g.add((actuation_uri, TDSOSA.increasesObservableProperty, env_var_uri))
+    elif direction == "decrease":
+        rdf.g.add((actuation_uri, RDF.type, TDSOSA.DecreasingActuation))
+        rdf.g.add((actuation_uri, TDSOSA.decreasesObservableProperty, env_var_uri))
     rdf.g.add((actuation_uri, SOSA.actsOnProperty, env_var_uri))
-    rdf.g.add((actuation_uri, TDSOSA.increasesObservableProperty if direction == "increase" else TDSOSA.decreasesObservableProperty, env_var_uri))
     amount = BNode()
     rdf.g.add((actuation_uri, TDSOSA.amount, amount))
     rdf.g.add((amount, RDF.type, QUDT.QuantityValue))
@@ -1147,12 +1188,18 @@ def _build_cached_artifact_ttl(
                 domain=domain,
                 service_name=svc_name,
             ) or _ambient_var_for_action(domain, svc_name)
-            direction = _effect_direction(svc_name)
-            if action_affordance and env_var_key and direction:
+            env_var_key, override_direction = _split_override_direction(env_var_key)
+            if override_direction in {"increase", "decrease"}:
+                direction = override_direction
+            elif override_direction == "affects":
+                direction = None
+            else:
+                direction = _effect_direction(svc_name)
+            if action_affordance and env_var_key and (direction or override_direction or _is_setpoint_service(svc_name)):
                 env_var_uri = _env_var_uri(rdf.base, aid, env_var_key)
                 actuation_uri = URIRef(
                     f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/actuations/"
-                    f"{urllib.parse.quote(domain, safe='')}_{urllib.parse.quote(svc_name, safe='')}_{direction}"
+                    f"{urllib.parse.quote(domain, safe='')}_{urllib.parse.quote(svc_name, safe='')}_{direction or 'affects'}"
                 )
                 settling_time_seconds = _resolve_settling_time(
                     entity=domain_entity_meta,
@@ -1214,6 +1261,7 @@ def _build_cached_artifact_ttl(
                 entity=entity, device=device, artifact_label=artifact_label,
                 domain=entity_domain, signal_name="state",
             ) or _ambient_var_from_signals(entity_domain, entity_attrs.get("device_class"), "state")
+            state_env_key, _ = _split_override_direction(state_env_key)
             if state_prop and state_env_key:
                 env_var_uri = _env_var_uri(rdf.base, aid, state_env_key)
                 _add_tdsosa_property_links(
@@ -1240,6 +1288,7 @@ def _build_cached_artifact_ttl(
                     entity=entity, device=device, artifact_label=artifact_label,
                     domain=domain, signal_name=attr_name,
                 ) or _ambient_var_from_signals(domain, entity_attrs.get("device_class"), attr_name)
+                env_var_key, _ = _split_override_direction(env_var_key)
                 if op_prop and env_var_key:
                     env_var_uri = _env_var_uri(rdf.base, aid, env_var_key)
                     _add_tdsosa_property_links(

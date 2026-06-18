@@ -168,7 +168,89 @@ The script outputs JSON including:
 - `missing_devices`
 - `hasp_artifact_slugs`
 
-## 8. Remove a Workspace from Home Assistant
+## 8. Run the SimuHome Sidecar Simulator
+
+Use:
+
+- `simulate_simuhome_scenario.py`
+
+This script watches the Home Assistant entities generated from one SimuHome
+benchmark JSON and updates the room environment sensors:
+
+- `temperature`
+- `humidity`
+- `illuminance`
+- `pm10`
+
+Usage:
+
+```bash
+python tests/simuhome/simulate_simuhome_scenario.py \
+  /path/to/SimuHome/data/benchmark/qt2_feasible_seed_1.json
+```
+
+Optional controls:
+
+```bash
+SIMUHOME_TICK_SECONDS=0.1 SIMUHOME_SIM_SPEED=1 SIMUHOME_HA_SYNC_SECONDS=1 \
+python tests/simuhome/simulate_simuhome_scenario.py \
+  /path/to/SimuHome/data/benchmark/qt2_feasible_seed_1.json
+```
+
+`SIMUHOME_SIM_SPEED` controls how many simulated seconds elapse per real second.
+The default is `1`, and `SIMUHOME_TICK_SECONDS` defaults to the scenario
+`tick_interval`, matching SimuHome's real-time pacing.
+`SIMUHOME_HA_SYNC_SECONDS` controls how often the sidecar refreshes actuator
+state from Home Assistant and writes sensor updates back; the default is `1`.
+
+Important:
+
+- The script expects entity names produced by
+  `initial_home_config_to_homeassistant_yaml.py`.
+- It updates sensors only. Actuators remain under Home Assistant / agent control.
+- Devices currently exported as read-only sensors, such as some HVAC entities,
+  can only influence the simulation if their control/state sensors are changed
+  elsewhere.
+
+## 9. Run One SimuHome E2E Case
+
+Use:
+
+- `run_simuhome_e2e.py`
+
+This script orchestrates one supported SimuHome benchmark JSON through the full
+Home Assistant/HASP/AMI runner path:
+
+1. Converts the benchmark JSON to Virtual Devices YAML.
+2. Imports the YAML into Home Assistant.
+3. Starts HASP for the imported workspace.
+4. Starts `simulate_simuhome_scenario.py`.
+5. Generates a temporary e2e case and runs `tests/e2e-lab308e/run_cases.py`.
+6. Saves logs, generated YAML, generated case JSON, and a manifest under
+   `tests/simuhome/results/`.
+7. Stops subprocesses and removes the imported Virtual Devices workspace.
+
+Current scope:
+
+- `qt2` feasible environmental-control cases.
+
+Usage:
+
+```bash
+HA_URL=ws://localhost:8123/api/websocket HA_TOKEN=... OPENAI_API_KEY=... \
+~/aiml/env-spade-3/bin/python tests/simuhome/run_simuhome_e2e.py \
+  /path/to/SimuHome/data/benchmark/qt2_feasible_seed_1.json \
+  --virtual-yaml-dir /path/to/homeassistant/custom_components/virtual
+```
+
+Useful options:
+
+- `--hasp-port 8081` if port 8080 is already in use.
+- `--keep-workspace` to inspect the imported Home Assistant workspace after a run.
+- `--dump-prompts` to forward prompt dumping to the underlying e2e runner.
+- `--delta temperature=0.1` to loosen or tighten a generated directional assertion.
+
+## 10. Remove a Workspace from Home Assistant
 
 Use:
 
@@ -200,4 +282,6 @@ Notes:
 4. Read the printed `area_id` and set `AREAS=<area_id>` for `HASP`.
 5. Start `HASP`.
 6. Check exposure with `check_virtual_devices_exposed.py`.
-7. Remove the imported workspace later with `remove_virtual_devices.py`.
+7. Run `simulate_simuhome_scenario.py` for scenarios that need environment dynamics.
+8. Or use `run_simuhome_e2e.py` for a one-command supported qt2 run.
+9. Remove the imported workspace later with `remove_virtual_devices.py`.

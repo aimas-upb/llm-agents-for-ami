@@ -177,6 +177,11 @@ class ActionAffordanceNode(py_trees.behaviour.Behaviour):
         
         # Runtime state
         self._last_result: Optional[ActionResult] = None
+        # Set to True once the action's HTTP call returns 2xx during this
+        # execution. The IRExecutor consumes this after the tree finishes so
+        # that signifier extraction can distinguish actions that physically
+        # ran from those short-circuited by a guarding Selector condition.
+        self._executed_successfully: bool = False
         
         # Blackboard setup
         self.blackboard = self.attach_blackboard_client(name=self.name)
@@ -278,7 +283,8 @@ class ActionAffordanceNode(py_trees.behaviour.Behaviour):
                     f"[{self.name}] Action succeeded (status: {response.status_code}, "
                     f"time: {response.elapsed_time:.3f}s)"
                 )
-                
+
+                self._executed_successfully = True
                 self._store_result()
                 if self.settling_time_seconds > 0:
                     logger.info(
@@ -780,14 +786,31 @@ class ComparisonPropertyConditionNode(PropertyConditionNode):
     def _compare(self, actual: Any, expected: Any) -> bool:
         """
         Compare two values using the configured operator.
-        
+
         Args:
             actual: The actual value from the property
             expected: The expected value to compare against
-            
+
         Returns:
             True if the comparison succeeds, False otherwise
         """
+        # The LLM sometimes points wait conditions at composite endpoints
+        # (e.g. /getThermostatState) that return a dict instead of a scalar.
+        # When the expected side is a scalar, fish a likely numeric field out
+        # of the dict so the comparison can succeed rather than spinning
+        # until the wait times out.
+        if isinstance(actual, dict) and not isinstance(expected, dict):
+            for key in (
+                "value", "state",
+                "current_temperature", "temperature",
+                "current_humidity", "humidity",
+                "current_position", "position",
+                "percentage", "brightness",
+                "illuminance", "pm10",
+            ):
+                if key in actual and not isinstance(actual[key], (dict, list)):
+                    actual = actual[key]
+                    break
         try:
             if self.operator == ComparisonOperator.EQUAL:
                 return actual == expected

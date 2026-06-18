@@ -313,6 +313,36 @@ class TestBuildBTFromSignifiers:
         # Should use intent's value (50) not signifier's payload_hint (100)
         assert bt["parameters"] == {"brightness": 50}
 
+    def test_build_set_intent_keeps_payload_when_parameter_mismatches_action(self):
+        """Do not send hvac_mode to set_temperature when reusing signifiers."""
+        matches = {
+            "cool down the room": {
+                "matches": [
+                    {
+                        "signifier_id": "s1",
+                        "affordance_uri": "http://localhost/ha/climate/set_temperature",
+                        "payload_hint": {"temperature": 22},
+                    }
+                ],
+                "final_matches": ["s1"],
+            },
+        }
+        bt = build_bt_from_signifiers(
+            signifier_matches=matches,
+            intents=[
+                Intent(
+                    action="set",
+                    artifact="air_conditioner",
+                    parameter="hvac_mode",
+                    value="cool",
+                    intent_text="cool down the room",
+                )
+            ],
+        )
+        assert bt is not None
+        assert bt["action_url"].endswith("/set_temperature")
+        assert bt["parameters"] == {"temperature": 22}
+
     def test_build_returns_none_for_modify_intent(self, sample_signifier_matches):
         """modify intents cannot be fast-pathed (need read-compute-set)."""
         bt = build_bt_from_signifiers(

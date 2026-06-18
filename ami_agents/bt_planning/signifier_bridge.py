@@ -27,6 +27,7 @@ def extract_signifiers_from_bt(
     intent_type: Optional[str] = None,
     structured_intents: list[dict] | None = None,
     td_sosa_supported: bool = False,
+    executed_actions: Optional[list] = None,
 ) -> list[dict]:
     """
     Walk a BT JSON IR tree and extract signifier-worthy leaf nodes.
@@ -63,6 +64,10 @@ def extract_signifiers_from_bt(
                 # Store the full structured_intent for later use
                 intent_to_structured[intent_str] = si
 
+    executed_filter: Optional[set] = None
+    if executed_actions is not None:
+        executed_filter = {(str(name), str(url)) for name, url in executed_actions}
+
     signifiers: list[dict] = []
     _walk_tree(
         tree_spec,
@@ -75,6 +80,7 @@ def extract_signifiers_from_bt(
         artifact_to_intent,
         intent_to_structured,
         td_sosa_supported,
+        executed_filter=executed_filter,
     )
     return signifiers
 
@@ -91,6 +97,7 @@ def _walk_tree(
     intent_to_structured: dict[str, dict],
     td_sosa_supported: bool,
     depth: int = 0,
+    executed_filter: Optional[set] = None,
 ) -> None:
     """Recursively walk the tree and collect action nodes as signifiers."""
     if not isinstance(node, dict):
@@ -102,6 +109,13 @@ def _walk_tree(
         action_url = node.get("action_url", "")
         parameters = node.get("parameters", {})
         node_name = node.get("name", "")
+
+        # Skip action nodes that never invoked their HTTP endpoint -- e.g.
+        # an action under a Selector whose sibling Condition succeeded first.
+        # Otherwise defensive preconditions would be stored as reusable
+        # signifiers and matched back as no-op plans.
+        if executed_filter is not None and (str(node_name), str(action_url)) not in executed_filter:
+            return
 
         # Try to match this action to an intent (using artifact-based matching if available)
         intent = _match_node_to_intent(node_name, action_url, intents, artifact_to_intent)
@@ -155,6 +169,7 @@ def _walk_tree(
                 intent_to_structured,
                 td_sosa_supported,
                 depth + 1,
+                executed_filter=executed_filter,
             )
 
 
@@ -523,6 +538,41 @@ def _resolve_final_matches(finals: list, matches: list[dict]) -> list[dict]:
     return resolved
 
 
+def _action_name_from_affordance_uri(affordance_uri: str) -> str:
+    """Return the terminal action name from an affordance URI."""
+    return str(affordance_uri or "").rstrip("/").rsplit("/", 1)[-1].lower()
+
+
+def _action_accepts_intent_parameter(affordance_uri: str, parameter: str) -> bool:
+    """Best-effort guard before overriding a signifier payload.
+
+    Signifier matches are action-specific.  If a matched affordance is
+    ``set_temperature`` and the extracted intent says ``hvac_mode=cool``,
+    blindly overriding the stored payload produces an invalid call.  Only
+    override when the action name is compatible with the extracted parameter.
+    """
+    action_name = _action_name_from_affordance_uri(affordance_uri)
+    parameter = str(parameter or "").strip().lower()
+    if not action_name or not parameter:
+        return False
+
+    aliases = {
+        "hvac_mode": {"set_hvac_mode"},
+        "temperature": {"set_temperature"},
+        "target_temperature": {"set_temperature"},
+        "position": {"set_cover_position"},
+        "brightness": {"turn_on", "set_brightness"},
+        "brightness_pct": {"turn_on", "set_brightness"},
+    }
+    allowed_actions = aliases.get(parameter)
+    if allowed_actions is not None:
+        return action_name in allowed_actions
+
+    normalized_parameter = parameter.replace("_", "")
+    normalized_action = action_name.replace("set_", "").replace("_", "")
+    return normalized_parameter == normalized_action or normalized_parameter in normalized_action
+
+
 def build_bt_from_signifiers(
     signifier_matches: dict,
     intents: list[Intent],
@@ -594,21 +644,41 @@ def build_bt_from_signifiers(
                 "action_url": affordance_uri,
             }
 
+            payload = m.get("payload_hint") or m.get("payload")
+
             # Intent-aware payload selection
             if intent.action == "set" and intent.value is not None and intent.parameter:
                 # Special case: 'on_off' is a semantic parameter, not an API parameter
                 # The action (turn_on vs turn_off) is already encoded in the affordance_uri
                 if intent.parameter == "on_off":
                     logger.info(demo("build_bt_from_signifiers: SET action with on_off parameter - skipping (encoded in affordance_uri)"))
-                else:
-                    # Use the caller's actual target value, not the stale signifier hint
+                elif _action_accepts_intent_parameter(affordance_uri, intent.parameter):
+                    # Use the caller's actual target value when it matches the selected affordance.
                     action_node["parameters"] = {intent.parameter: intent.value}
-                    logger.info(demo("build_bt_from_signifiers: SET action - overriding payload_hint with intent value: %s=%s"), intent.parameter, intent.value)
+                    logger.info(
+                        demo("build_bt_from_signifiers: SET action - overriding payload_hint with intent value: %s=%s"),
+                        intent.parameter,
+                        intent.value,
+                    )
+                elif payload and isinstance(payload, dict):
+                    action_node["parameters"] = payload
+                    logger.info(
+                        demo("build_bt_from_signifiers: SET parameter %r incompatible with action %r; using payload_hint: %s"),
+                        intent.parameter,
+                        _action_name_from_affordance_uri(affordance_uri),
+                        payload,
+                    )
+                else:
+                    logger.info(
+                        demo("build_bt_from_signifiers: SET parameter %r incompatible with action %r and no payload_hint available; bailing"),
+                        intent.parameter,
+                        _action_name_from_affordance_uri(affordance_uri),
+                    )
+                    return None
             elif intent.action == "check":
                 logger.info(demo("build_bt_from_signifiers: CHECK action - no parameters needed"))
             else:
                 # Fallback: reuse signifier's payload_hint as-is
-                payload = m.get("payload_hint") or m.get("payload")
                 if payload and isinstance(payload, dict):
                     action_node["parameters"] = payload
                     logger.info(demo("build_bt_from_signifiers: using payload_hint from signifier (fallback): %s"), payload)
