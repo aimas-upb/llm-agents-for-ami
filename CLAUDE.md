@@ -254,6 +254,6 @@ conda run -n ami python tests/manual_test_full_flow_plan.py --sequence 3 --clear
 | Tweak BT planner prompts | `ami_agents/bt_planning/planning/prompts.py` |
 | Change a timeout | `ami_agents/config/agents.yaml > timeouts:` |
 | Add a config-driven feature | yaml key + `LLMClientConfig`-style dataclass in `utils/` |
-| Add a new BT node type | `ami_agents/bt_planning/nodes/` + register in `signifier_bridge.py` if needed |
+| Add a new BT node type | Define the `py_trees` node in `ami_agents/bt_planning/nodes/`, then `register_node_type(...)` in `nodes/registry.py` (compile + validate). Custom compute logic goes through a named op in `compute_node.py` — never embed code in the IR (keeps it JSON-serialisable for cross-agent transport, issue #22) |
 | Wire a new HA entity into the demo | `ami_agents/environment/integration/HomeAssistant/` + `config/environment.yaml` |
 | Run a single sequence end-to-end | `tests/manual_test_full_flow_plan.py --sequence <N>` |
