@@ -739,7 +739,11 @@ class Lab308eHarness:
         self.assistant_jid = f"user_assistant@{self.xmpp_server}"
         self.solver_jid = f"interaction_solver@{self.xmpp_server}"
         self.runner_jid = f"e2e_lab308e_runner@{self.xmpp_server}"
-        self.prompt_dump_dir = Path(__file__).resolve().parent / "prompt_dumps"
+        self.prompt_dump_dir = (
+            Path(args.prompt_dump_dir).expanduser().resolve()
+            if getattr(args, "prompt_dump_dir", None)
+            else Path(__file__).resolve().parent / "prompt_dumps"
+        )
 
         self.explorer: Optional[EnvExplorerAgent] = None
         self.assistant: Optional[UserAssistantAgent] = None
@@ -1735,6 +1739,10 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     parser.add_argument("--clear-signifiers-per-case", action="store_true")
     parser.add_argument("--skip-prewarm", action="store_true")
     parser.add_argument("--dump-prompts", action="store_true")
+    parser.add_argument(
+        "--prompt-dump-dir",
+        help="Directory for --dump-prompts output; default <script dir>/prompt_dumps.",
+    )
     parser.add_argument("--no-hard-reset", action="store_true")
     parser.add_argument("--manage-hasp", action="store_true")
     parser.add_argument(

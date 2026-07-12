@@ -756,6 +756,10 @@ def run(args: argparse.Namespace) -> int:
             runner_cmd.append("--clear-signifiers-per-case")
         if args.dump_prompts:
             runner_cmd.append("--dump-prompts")
+        if args.prompt_dump_dir:
+            prompt_dump_dir = args.prompt_dump_dir.expanduser().resolve()
+            manifest["prompt_dump_dir"] = str(prompt_dump_dir)
+            runner_cmd.extend(["--prompt-dump-dir", str(prompt_dump_dir)])
         if args.skip_prewarm:
             runner_cmd.append("--skip-prewarm")
 
@@ -840,6 +844,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--clear-signifiers-per-case", action="store_true")
     parser.add_argument("--dump-prompts", action="store_true")
+    parser.add_argument(
+        "--prompt-dump-dir",
+        type=Path,
+        help="Directory for --dump-prompts output; default <e2e-lab308e dir>/prompt_dumps.",
+    )
     parser.add_argument("--skip-prewarm", action="store_true")
     parser.add_argument("--keep-workspace", action="store_true", help="Do not remove the HA Virtual Devices workspace")
     parser.add_argument("--delete-work-dir", action="store_true", help="Delete generated YAML/case working directory")

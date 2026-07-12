@@ -719,7 +719,11 @@ class UserMessageBehaviour(CyclicBehaviour):
     # ------------------------------------------------------------------
 
     async def _fetch_capabilities(self) -> str:
-        """Fetch environment capabilities from EnvExplorer via RPC."""
+        """Fetch environment capabilities from EnvExplorer via RPC.
+
+        Returns the compact 'summary' listing (names, descriptions, parameter
+        names) rather than the full machine payload to keep LLM prompts small.
+        """
         explorer_jid = self.agent.target_jids.get("explorer")
         if not explorer_jid:
             self.logger.info(demo("Capability fetch skipped: no explorer JID configured"))
@@ -733,11 +737,19 @@ class UserMessageBehaviour(CyclicBehaviour):
                 expect_type=MessageType.ENV_CAPABILITIES_RESPONSE.value,
                 timeout=self.agent.rpc_call_timeout,
             )
+            body = result.body or ""
             self.logger.info(
                 demo("Capabilities fetched: body_len=%d"),
-                len(result.body or ""),
+                len(body),
             )
-            return result.body or ""
+            try:
+                payload = json.loads(body)
+                summary = payload.get("summary") if isinstance(payload, dict) else None
+                if isinstance(summary, str) and summary.strip():
+                    return summary
+            except (json.JSONDecodeError, TypeError):
+                pass
+            return body
         except Exception as exc:
             self.logger.warning("Failed to fetch capabilities: %s", exc)
             return ""

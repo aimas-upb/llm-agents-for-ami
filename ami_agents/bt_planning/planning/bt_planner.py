@@ -14,6 +14,8 @@ from openai import AsyncOpenAI
 from .schema import GENERATE_BT_TOOL
 from .prompts import (
     BT_PLANNING_SYSTEM_PROMPT,
+    build_affordance_index,
+    build_url_to_ref,
     format_capability_context,
     format_observable_property_hints,
     format_signifier_hints,
@@ -87,10 +89,13 @@ class AsyncBTPlanner:
         if client is None:
             raise ValueError("AsyncOpenAI client is required")
 
-        # Build the planning prompt
-        capability_context = format_capability_context(affordances, state)
-        sig_hints_text = format_signifier_hints(signifier_hints)
-        obs_hints_text = format_observable_property_hints(observable_property_hints)
+        # Build the planning prompt.  Affordances are shown as short ids and
+        # resolved back to target URLs after generation.
+        affordance_index = build_affordance_index(affordances)
+        url_to_ref = build_url_to_ref(affordance_index)
+        capability_context = format_capability_context(affordances, state, index=affordance_index)
+        sig_hints_text = format_signifier_hints(signifier_hints, url_to_ref=url_to_ref)
+        obs_hints_text = format_observable_property_hints(observable_property_hints, url_to_ref=url_to_ref)
 
         system_prompt = BT_PLANNING_SYSTEM_PROMPT.format(
             capability_context=capability_context,
@@ -197,6 +202,10 @@ class AsyncBTPlanner:
                     "intents": intents,
                 }
 
+            # Resolve short affordance ids back to target URLs so the final
+            # IR is executable and downstream consumers stay URL-based.
+            resolution_errors = self._resolve_affordance_refs(tree_spec, affordance_index)
+
             # Normalize tree (fill in missing optional fields like 'name')
             tree_spec = self._normalize_tree(tree_spec)
             settling_times = self._collect_action_settling_times(
@@ -207,7 +216,7 @@ class AsyncBTPlanner:
                 self._apply_settling_times(tree_spec, settling_times)
 
             # Validate
-            validation_errors = self._validate_tree(tree_spec)
+            validation_errors = resolution_errors + self._validate_tree(tree_spec)
             if not validation_errors:
                 node_count = self._count_nodes(tree_spec)
                 logger.info(f"Generated JSON IR with {node_count} nodes")
@@ -287,6 +296,68 @@ class AsyncBTPlanner:
 
         return kwargs
 
+    def _resolve_affordance_refs(
+        self, spec: dict, index: dict[str, dict], path: str = "tree"
+    ) -> list[str]:
+        """
+        Resolve short ``affordance_id`` references to target URLs in-place.
+
+        Action nodes get ``action_url``; condition/wait_condition nodes get
+        ``property_url``. Unknown ids become validation errors so the LLM
+        retry loop can correct them. Literal http(s) URLs are passed through
+        for condition nodes fed by state keys or observable-property hints,
+        and for legacy trees that already carry URLs.
+        """
+        errors: list[str] = []
+        if not isinstance(spec, dict) or not spec:
+            return errors
+
+        node_type = spec.get("type")
+        if node_type == "action":
+            errors.extend(self._resolve_node_ref(spec, index, "action_url", path))
+        elif node_type in {"condition", "wait_condition"}:
+            errors.extend(self._resolve_node_ref(spec, index, "property_url", path))
+
+        children = spec.get("children")
+        if isinstance(children, list):
+            for idx, child in enumerate(children):
+                errors.extend(
+                    self._resolve_affordance_refs(child, index, path=f"{path}.children[{idx}]")
+                )
+        return errors
+
+    def _resolve_node_ref(
+        self, spec: dict, index: dict[str, dict], url_field: str, path: str
+    ) -> list[str]:
+        node_type = spec.get("type")
+        ref = spec.get("affordance_id")
+
+        if not ref or not isinstance(ref, str):
+            legacy_url = spec.get(url_field)
+            if isinstance(legacy_url, str) and legacy_url:
+                return []
+            return [f"{path}: {node_type} nodes require 'affordance_id'"]
+
+        aff = index.get(ref)
+        if aff is not None:
+            aff_type = str(aff.get("affordance_type") or "action")
+            if node_type == "action" and aff_type != "action":
+                return [
+                    f"{path}: affordance '{ref}' is a {aff_type} affordance; "
+                    "action nodes require an [action] affordance id"
+                ]
+            target = aff.get("target") or aff.get("affordance_uri") or aff.get("href")
+            if not isinstance(target, str) or not target:
+                return [f"{path}: affordance '{ref}' has no target URL"]
+            spec[url_field] = target
+            return []
+
+        if ref.startswith("http://") or ref.startswith("https://"):
+            spec[url_field] = ref
+            return []
+
+        return [f"{path}: unknown affordance_id '{ref}' (use an exact id from the affordances list)"]
+
     def _normalize_tree(self, spec: dict, _counter: list | None = None) -> dict:
         """
         Normalize a tree spec by filling in default values for optional fields.
@@ -304,11 +375,11 @@ class AsyncBTPlanner:
         if not spec.get("name") or not isinstance(spec.get("name"), str):
             node_type = spec.get("type", "node")
             if node_type == "action":
-                url = spec.get("action_url", "")
+                url = spec.get("affordance_id") or spec.get("action_url", "")
                 action_name = url.rstrip("/").rsplit("/", 1)[-1] if url else "action"
                 spec["name"] = action_name.replace("_", " ").title().replace(" ", "")
             elif node_type in {"condition", "wait_condition"}:
-                prop = spec.get("property_url", "")
+                prop = spec.get("affordance_id") or spec.get("property_url", "")
                 prop_name = prop.rstrip("/").rsplit("/", 1)[-1] if prop else "check"
                 expected = spec.get("expected_value", "")
                 prefix = "WaitFor" if node_type == "wait_condition" else "Check"
@@ -472,11 +543,11 @@ class AsyncBTPlanner:
         elif node_type == "action":
             action_url = spec.get("action_url")
             if not action_url or not isinstance(action_url, str):
-                errors.append(f"{path}: action nodes require 'action_url'")
+                errors.append(f"{path}: action nodes require a resolvable 'affordance_id'")
         elif node_type in {"condition", "wait_condition"}:
             property_url = spec.get("property_url")
             if not property_url or not isinstance(property_url, str):
-                errors.append(f"{path}: {node_type} nodes require 'property_url'")
+                errors.append(f"{path}: {node_type} nodes require a resolvable 'affordance_id'")
             if "expected_value" not in spec:
                 errors.append(f"{path}: {node_type} nodes require 'expected_value'")
             if node_type == "wait_condition":

@@ -48,7 +48,13 @@ Rules:
 - If the request implies multiple actions (e.g. "turn on and set brightness"), split them.
 - Use the EXACT artifact_id from the capabilities IF the user explicitly specifies it.
 - If the user is VAGUE (e.g., "a light", "the light"), use generic artifact name ("light").
-- If the user mentions a workspace (e.g. "in lab308"), extract it as workspace_id.
+- If the user mentions a workspace or room, extract it as workspace_id -- but ONLY
+  use workspace ids that appear in the capabilities. If the user does not mention
+  one, omit workspace_id entirely. NEVER copy ids from the examples below.
+- Comfort complaints or environment observations that imply a desired change
+  (e.g. "it's too warm in here", "the air feels stuffy", "it's dark here",
+  "there is a draft") are GOALS with action "modify" (value null unless an
+  amount is given). They are NOT "check", "query_state", or "unclear".
 
 ## Intent Type Classification (CRITICAL)
 
@@ -100,7 +106,8 @@ constraint or parameter (usually a target value).
 
 Respond with valid JSON only.  No markdown fences, no extra text.
 
-Examples:
+Examples (all ids such as "light308" and "lab308" are PLACEHOLDERS -- always
+use the actual ids from the capabilities, never these):
 
 Goal (turn on = boolean set) - IMPLICIT:
 {"classification": "goal", "intent_type": "implicit", "intents": [{"action": "set", "artifact": "light", "parameter": "on_off", "value": true, "intent_text": "turn on the light"}], "workspace_id": "lab308"}
@@ -119,6 +126,9 @@ Modify with explicit amount - IMPLICIT:
 
 Modify without explicit amount - IMPLICIT:
 {"classification": "goal", "intent_type": "implicit", "intents": [{"action": "modify", "artifact": "light", "parameter": "brightness", "value": null, "intent_text": "dim the light"}]}
+
+Comfort complaint (implies a change) - IMPLICIT:
+{"classification": "goal", "intent_type": "implicit", "intents": [{"action": "modify", "artifact": "thermostat", "parameter": "temperature", "value": null, "intent_text": "it's too warm in the bedroom"}], "workspace_id": "bedroom"}
 
 Check status - IMPLICIT:
 {"classification": "goal", "intent_type": "implicit", "intents": [{"action": "check", "artifact": "light", "intent_text": "check the light status"}]}

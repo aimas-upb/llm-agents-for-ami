@@ -2,66 +2,157 @@
 Data formatting utilities for EnvExplorer agent.
 """
 
-import json
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any, Dict, List
 
 from ....shared.models.environment import AffordanceType
 
 
+def _short_iri(value: Any) -> str:
+    """Return the last path segment of an IRI (without a #fragment)."""
+    text = str(value or "").split("#")[0].rstrip("/")
+    return text.rsplit("/", 1)[-1] if text else ""
+
+
+def _normalized(name: str) -> str:
+    """Normalize a display name the way artifact ids are derived from it."""
+    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
+
+def _short_type(param_type: Any) -> str:
+    """Shorten schema type IRIs like ``...json-schema#NumberSchema`` to ``number``."""
+    text = str(param_type or "")
+    if "#" in text:
+        text = text.rsplit("#", 1)[-1]
+    if text.endswith("Schema"):
+        text = text[: -len("Schema")]
+    return text.lower()
+
+
+def _is_generic_description(description: Any, name: str) -> bool:
+    """True for empty or auto-generated descriptions that add no information."""
+    d = str(description or "").strip().lower()
+    n = name.lower()
+    return d in {"", n, f"property affordance: {n}", f"action affordance: {n}"}
+
+
+def _schema_param_summary(schema: Any) -> str:
+    """Summarise a JSON Schema as compact ``name:type*`` parameter labels."""
+    if not isinstance(schema, dict):
+        return ""
+    props = schema.get("properties")
+    if not isinstance(props, dict) or not props:
+        return ""
+    required = set(schema.get("required") or [])
+    parts: List[str] = []
+    for key, sub in props.items():
+        param_type = _short_type(sub.get("type")) if isinstance(sub, dict) else ""
+        label = f"{key}:{param_type}" if param_type else str(key)
+        if key in required:
+            label += "*"
+        parts.append(label)
+    return ", ".join(parts)
+
+
 def format_capabilities_summary(agent_instance) -> str:
     """
-    Format capabilities for human consumption.
+    Compact, LLM-friendly listing of workspaces, artifacts, and affordances.
 
-    Formats the internal artifact map into a detailed string for the LLM.
-    Includes Forms and Input Schemas so the LLM understands parameters.
+    Contains names, descriptions, and parameter names only (no URLs or full
+    JSON Schemas) to keep LLM prompts small.
 
     Args:
         agent_instance: The EnvExplorerAgent instance
 
     Returns:
-        Human-readable string summary of environment capabilities
+        Compact string summary of environment capabilities
     """
-    # 1. Check readiness
     if not agent_instance.discovery_complete:
         return "Environment discovery is still in progress. Please try again later."
 
-    # 2. Read from Agent Memory (populated by InitialDiscoveryBehaviour)
-    artifacts = agent_instance.artifacts.values()
-
+    artifacts = list(agent_instance.artifacts.values())
     if not artifacts:
         return "No artifacts found in the environment."
 
-    summary = "Available Environment Capabilities:\n"
+    lines: List[str] = []
 
+    workspaces = list((agent_instance.environment_map or {}).values())
+    multiple_workspaces = len(workspaces) > 1
+    if workspaces:
+        ws_parts = []
+        for ws in workspaces:
+            label = _short_iri(ws.workspace_id) or str(ws.workspace_id)
+            name = getattr(ws, "name", None)
+            if name and name != label:
+                label = f"{label} ({name})"
+            ws_parts.append(label)
+        lines.append("Workspaces: " + ", ".join(ws_parts))
+        lines.append("")
+
+    # First pass: gather affordances per artifact and factor out property
+    # names shared by every artifact (large environments repeat the same
+    # generic properties hundreds of times).
+    entries = []
     for artifact in artifacts:
-        # 3. Retrieve actions
-        # We use the engine's helper to filter affordances for this artifact ID
-        actions = agent_instance.integration_engine.get_affordances_for_artifact(artifact.artifact_id)
+        affs = agent_instance.integration_engine.get_affordances_for_artifact(artifact.artifact_id)
+        actions = [a for a in affs if a.affordance_type == AffordanceType.ACTION]
+        properties = [a for a in affs if a.affordance_type == AffordanceType.PROPERTY]
+        if not actions and not properties:
+            continue
+        entries.append((artifact, actions, [p.name for p in properties]))
 
-        # Filter for ACTION types (we only care about what we can DO)
-        action_affordances = [a for a in actions if a.affordance_type.value == "action"]
+    prop_sets = [set(prop_names) for _, _, prop_names in entries if prop_names]
+    common_props = set.intersection(*prop_sets) if len(prop_sets) > 1 else set()
 
-        if action_affordances:
-            summary += f"Artifact: {artifact.name}\n"
-            summary += f"  ID: {artifact.artifact_id}\n"
-            summary += f"  Capabilities:\n"
+    if common_props:
+        lines.append(
+            "Common properties (every artifact below also has these): "
+            + ", ".join(sorted(common_props))
+        )
+        lines.append("")
 
-            for action in action_affordances:
-                summary += f"    - Action: {action.name}\n"
+    def _artifact_label(artifact) -> str:
+        short_id = _short_iri(artifact.artifact_id) or str(artifact.artifact_id)
+        name = str(artifact.name or "")
+        # Skip the name when the id is just its normalized form.
+        label = short_id if _normalized(name) == short_id else f"{name} (id: {short_id})"
+        if multiple_workspaces:
+            workspace_id = getattr(artifact, "workspace_id", None)
+            if workspace_id:
+                label += f" [workspace: {_short_iri(workspace_id) or workspace_id}]"
+        return label
 
-                # Include Form Details (Method + URL)
-                # This helps the LLM distinguish between GET (read) and POST (write)
-                if action.form:
-                    summary += f"      Target: [{action.form.method}] {action.form.href}\n"
+    for artifact, actions, prop_names in entries:
+        if not actions:
+            continue
+        lines.append(f"Artifact: {_artifact_label(artifact)}")
+        lines.append("  Actions:")
+        for action in actions:
+            entry = f"    - {action.name}"
+            params = _schema_param_summary(action.input_schema)
+            if params:
+                entry += f" (params: {params})"
+            if not _is_generic_description(action.description, action.name):
+                entry += f" -- {str(action.description).strip()}"
+            lines.append(entry)
 
-                # Include Input Schema (Parameters)
-                # This tells the LLM what arguments (e.g. brightness level) are required
-                if action.input_schema:
-                    summary += f"      Schema: {json.dumps(action.input_schema)}\n"
+        extra_props = [p for p in prop_names if p not in common_props]
+        if extra_props:
+            lines.append("  Properties: " + ", ".join(extra_props))
+        lines.append("")
 
-            summary += "\n"
+    property_only = [(artifact, prop_names) for artifact, actions, prop_names in entries if not actions]
+    if property_only:
+        lines.append("Property-only artifacts (id: extra properties):")
+        for artifact, prop_names in property_only:
+            extra_props = [p for p in prop_names if p not in common_props]
+            entry = f"- {_artifact_label(artifact)}"
+            if extra_props:
+                entry += ": " + ", ".join(extra_props)
+            lines.append(entry)
+        lines.append("")
 
-    return summary
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def format_capabilities_payload(agent_instance) -> Dict[str, Any]:
@@ -69,7 +160,10 @@ def format_capabilities_payload(agent_instance) -> Dict[str, Any]:
     Format capabilities for machine consumption.
 
     Machine-readable capabilities payload for other agents (planning, etc.).
-    Includes a human-friendly 'summary' field for convenience.
+    Includes a compact LLM-friendly 'summary' field for prompt injection.
+
+    The ``affordances`` list contains both action and property affordances;
+    property affordances carry the readable target URL for condition nodes.
 
     Args:
         agent_instance: The EnvExplorerAgent instance
@@ -122,32 +216,9 @@ def format_capabilities_payload(agent_instance) -> Dict[str, Any]:
     for artifact in artifacts:
         affs = agent_instance.integration_engine.get_affordances_for_artifact(artifact.artifact_id)
         action_affordances = [a for a in affs if a.affordance_type == AffordanceType.ACTION]
+        property_affordances = [a for a in affs if a.affordance_type == AffordanceType.PROPERTY]
 
-        actions_out: List[Dict[str, Any]] = []
         for action in action_affordances:
-            form = action.form
-            actions_out.append(
-                {
-                    "affordance_id": action.affordance_id,
-                    "name": action.name,
-                    "description": action.description,
-                    "artifact_id": action.artifact_id,
-                    "affordance_type": action.affordance_type.value,
-                    "semantic_types": list(action.semantic_types or []),
-                    "form": {
-                        "href": getattr(form, "href", None),
-                        "method": getattr(form, "method", None),
-                        "content_type": getattr(form, "content_type", None),
-                        "operation_type": getattr(form, "operation_type", None),
-                        "additional_fields": getattr(form, "additional_fields", None) or {},
-                    }
-                    if form
-                    else None,
-                    "input_schema": action.input_schema,
-                    "output_schema": action.output_schema,
-                }
-            )
-
             affordances_out.append(
                 {
                     "artifact_id": artifact.artifact_id,
@@ -156,10 +227,29 @@ def format_capabilities_payload(agent_instance) -> Dict[str, Any]:
                     "affordance_id": action.affordance_id,
                     "affordance_type": action.affordance_type.value,
                     "action_name": action.name,
+                    "name": action.name,
+                    "description": action.description,
                     "method": getattr(action.form, "method", None) if action.form else None,
                     "target": getattr(action.form, "href", None) if action.form else None,
                     "content_type": getattr(action.form, "content_type", None) if action.form else None,
                     "input_schema": action.input_schema,
+                }
+            )
+
+        for prop in property_affordances:
+            affordances_out.append(
+                {
+                    "artifact_id": artifact.artifact_id,
+                    "artifact_name": artifact.name,
+                    "workspace_id": getattr(artifact, "workspace_id", None),
+                    "affordance_id": prop.affordance_id,
+                    "affordance_type": prop.affordance_type.value,
+                    "name": prop.name,
+                    "description": prop.description,
+                    "method": (getattr(prop.form, "method", None) if prop.form else None) or "GET",
+                    "target": getattr(prop.form, "href", None) if prop.form else None,
+                    "content_type": getattr(prop.form, "content_type", None) if prop.form else None,
+                    "output_schema": prop.output_schema,
                 }
             )
 
@@ -168,7 +258,8 @@ def format_capabilities_payload(agent_instance) -> Dict[str, Any]:
                 "artifact_id": artifact.artifact_id,
                 "name": artifact.name,
                 "workspace_id": getattr(artifact, "workspace_id", None),
-                "actions": actions_out,
+                "actions": [a.name for a in action_affordances],
+                "properties": [p.name for p in property_affordances],
             }
         )
 
@@ -180,4 +271,3 @@ def format_capabilities_payload(agent_instance) -> Dict[str, Any]:
         "affordances": affordances_out,
         "semantic_capabilities": dict(getattr(agent_instance, "semantic_capabilities", {}) or {}),
     }
-

@@ -1,0 +1,416 @@
+"""
+Unit tests for compact affordance ids in BT planning prompts and their
+resolution back to target URLs in the planner.
+"""
+
+import json
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from ami_agents.bt_planning.planning.bt_planner import AsyncBTPlanner
+from ami_agents.bt_planning.planning.prompts import (
+    build_affordance_index,
+    build_url_to_ref,
+    format_capability_context,
+    format_observable_property_hints,
+    format_signifier_hints,
+)
+
+
+LIGHT_ACTION = {
+    "artifact_id": "http://localhost:8080/workspaces/lab308/artifacts/light308#artifact",
+    "artifact_name": "light308",
+    "affordance_id": "http://localhost:8080/workspaces/lab308/artifacts/light308/setBrightness",
+    "affordance_type": "action",
+    "action_name": "setBrightness",
+    "method": "POST",
+    "target": "http://localhost:8080/workspaces/lab308/artifacts/light308/setBrightness",
+    "input_schema": {
+        "type": "object",
+        "properties": {"brightness": {"type": "integer"}},
+        "required": ["brightness"],
+    },
+}
+
+LIGHT_PROPERTY = {
+    "artifact_id": "http://localhost:8080/workspaces/lab308/artifacts/light308#artifact",
+    "artifact_name": "light308",
+    "affordance_id": "http://localhost:8080/workspaces/lab308/artifacts/light308/properties/brightness",
+    "affordance_type": "property",
+    "name": "brightness",
+    "method": "GET",
+    "target": "http://localhost:8080/workspaces/lab308/artifacts/light308/properties/brightness",
+}
+
+AFFORDANCES = [LIGHT_ACTION, LIGHT_PROPERTY]
+
+
+@pytest.fixture
+def planner():
+    return AsyncBTPlanner(max_attempts=1)
+
+
+class TestBuildAffordanceIndex:
+    def test_assigns_artifact_slash_name_refs(self):
+        index = build_affordance_index(AFFORDANCES)
+        assert index["light308/setBrightness"] is LIGHT_ACTION
+        assert index["light308/brightness"] is LIGHT_PROPERTY
+
+    def test_collisions_get_numeric_suffix(self):
+        dup = dict(LIGHT_ACTION)
+        index = build_affordance_index([LIGHT_ACTION, dup])
+        assert set(index) == {"light308/setBrightness", "light308/setBrightness-2"}
+
+    def test_url_to_ref_round_trip(self):
+        index = build_affordance_index(AFFORDANCES)
+        url_to_ref = build_url_to_ref(index)
+        assert url_to_ref[LIGHT_ACTION["target"]] == "light308/setBrightness"
+        assert url_to_ref[LIGHT_PROPERTY["target"]] == "light308/brightness"
+
+    def test_ignores_non_dict_entries(self):
+        index = build_affordance_index([None, "junk", LIGHT_ACTION])
+        assert list(index) == ["light308/setBrightness"]
+
+
+class TestFormatCapabilityContext:
+    def test_contains_refs_but_not_urls_or_schemas(self):
+        context = format_capability_context(AFFORDANCES)
+        assert "light308/setBrightness" in context
+        assert "light308/brightness" in context
+        assert "brightness:integer*" in context
+        assert "http://localhost:8080" not in context
+        assert '"properties"' not in context
+
+    def test_state_section_is_preserved(self):
+        state = {"artifacts": {"light308": {"brightness": 50}}}
+        context = format_capability_context(AFFORDANCES, state)
+        assert "### Current State" in context
+        assert "light308: brightness=50" in context
+
+    def test_no_affordances(self):
+        assert format_capability_context([]) == "No affordances available."
+
+    def test_state_uris_are_shortened_and_aggregates_flattened(self):
+        artifact_uri = "http://localhost:8080/workspaces/lab308/artifacts/light308#artifact"
+        base = artifact_uri.split("#")[0]
+        state = {
+            "artifacts": {
+                artifact_uri: {
+                    "name": "Light 308",
+                    "workspace_id": "http://localhost:8080/workspaces/lab308#workspace",
+                    f"{base}/properties/metadata": {"vendor": "x"},
+                    # Some adapters nest the actual values in one aggregate dict
+                    f"{base}/properties/state": {
+                        f"{base}/properties/brightness": 50,
+                        f"{base}/properties/on_off": True,
+                        f"{base}/properties/metadata": {"vendor": "x"},
+                    },
+                }
+            }
+        }
+        context = format_capability_context(AFFORDANCES, state)
+        state_sec = context.split("### Current State")[1]
+        assert "- light308:" in state_sec
+        assert "- brightness: 50" in state_sec
+        assert "- on_off: True" in state_sec
+        assert "http://localhost:8080" not in state_sec
+        assert "metadata" not in state_sec
+        assert "Light 308" not in state_sec
+
+    def test_single_prop_artifact_renders_one_line(self):
+        state = {"artifacts": {"cover1": {"state": "open", "persistent": False}}}
+        context = format_capability_context(AFFORDANCES, state)
+        assert "- cover1: state=open" in context
+        assert "persistent" not in context
+
+    def test_sensor_only_property_affordances_not_listed_but_resolvable(self):
+        sensor_prop = {
+            "artifact_id": "http://localhost:8080/workspaces/lab308/artifacts/sensor42#artifact",
+            "artifact_name": "sensor42",
+            "affordance_id": "http://localhost:8080/workspaces/lab308/artifacts/sensor42/properties/glare",
+            "affordance_type": "property",
+            "name": "glare",
+            "method": "GET",
+            "target": "http://localhost:8080/workspaces/lab308/artifacts/sensor42/properties/glare",
+        }
+        affordances = AFFORDANCES + [sensor_prop]
+        index = build_affordance_index(affordances)
+        context = format_capability_context(affordances, index=index)
+
+        # Not listed (sensor42 has no actions), light308 property still listed
+        assert "sensor42/glare" not in context
+        assert "light308/brightness" in context
+
+        # Still resolvable through the full index (e.g. when a hint names it)
+        planner = AsyncBTPlanner(max_attempts=1)
+        spec = {
+            "name": "CheckGlare",
+            "type": "condition",
+            "affordance_id": "sensor42/glare",
+            "expected_value": 40,
+        }
+        assert planner._resolve_affordance_refs(spec, index) == []
+        assert spec["property_url"] == sensor_prop["target"]
+
+
+class TestResolveAffordanceRefs:
+    def test_resolves_action_ref_to_action_url(self, planner):
+        index = build_affordance_index(AFFORDANCES)
+        spec = {
+            "name": "SetBrightness",
+            "type": "action",
+            "affordance_id": "light308/setBrightness",
+            "parameters": {"brightness": 75},
+        }
+        errors = planner._resolve_affordance_refs(spec, index)
+        assert errors == []
+        assert spec["action_url"] == LIGHT_ACTION["target"]
+
+    def test_resolves_condition_ref_to_property_url(self, planner):
+        index = build_affordance_index(AFFORDANCES)
+        spec = {
+            "name": "CheckBrightness",
+            "type": "condition",
+            "affordance_id": "light308/brightness",
+            "expected_value": 75,
+        }
+        errors = planner._resolve_affordance_refs(spec, index)
+        assert errors == []
+        assert spec["property_url"] == LIGHT_PROPERTY["target"]
+
+    def test_resolves_nested_children(self, planner):
+        index = build_affordance_index(AFFORDANCES)
+        spec = {
+            "name": "Root",
+            "type": "selector",
+            "children": [
+                {
+                    "name": "AlreadyBright",
+                    "type": "condition",
+                    "affordance_id": "light308/brightness",
+                    "expected_value": 75,
+                },
+                {
+                    "name": "SetBrightness",
+                    "type": "action",
+                    "affordance_id": "light308/setBrightness",
+                },
+            ],
+        }
+        errors = planner._resolve_affordance_refs(spec, index)
+        assert errors == []
+        assert spec["children"][0]["property_url"] == LIGHT_PROPERTY["target"]
+        assert spec["children"][1]["action_url"] == LIGHT_ACTION["target"]
+
+    def test_unknown_ref_is_error(self, planner):
+        index = build_affordance_index(AFFORDANCES)
+        spec = {"name": "Bad", "type": "action", "affordance_id": "light308/hallucinated"}
+        errors = planner._resolve_affordance_refs(spec, index)
+        assert len(errors) == 1
+        assert "unknown affordance_id" in errors[0]
+        assert "action_url" not in spec
+
+    def test_action_node_rejects_property_ref(self, planner):
+        index = build_affordance_index(AFFORDANCES)
+        spec = {"name": "Bad", "type": "action", "affordance_id": "light308/brightness"}
+        errors = planner._resolve_affordance_refs(spec, index)
+        assert len(errors) == 1
+        assert "property affordance" in errors[0]
+
+    def test_condition_accepts_action_ref(self, planner):
+        # No-TD-SOSA path: readable GET targets are exposed as action affordances.
+        index = build_affordance_index(AFFORDANCES)
+        spec = {
+            "name": "Check",
+            "type": "condition",
+            "affordance_id": "light308/setBrightness",
+            "expected_value": 75,
+        }
+        errors = planner._resolve_affordance_refs(spec, index)
+        assert errors == []
+        assert spec["property_url"] == LIGHT_ACTION["target"]
+
+    def test_condition_accepts_literal_url_passthrough(self, planner):
+        # TD-SOSA hints and state keys provide readable property URLs verbatim.
+        index = build_affordance_index(AFFORDANCES)
+        url = "http://localhost:8080/workspaces/lab308/artifacts/sensor1/properties/glare"
+        spec = {
+            "name": "CheckGlare",
+            "type": "wait_condition",
+            "affordance_id": url,
+            "expected_value": 50,
+            "operator": "<=",
+        }
+        errors = planner._resolve_affordance_refs(spec, index)
+        assert errors == []
+        assert spec["property_url"] == url
+
+    def test_legacy_tree_with_urls_still_valid(self, planner):
+        # Signifier-reuse trees carry action_url/property_url directly.
+        index = build_affordance_index(AFFORDANCES)
+        spec = {
+            "name": "Legacy",
+            "type": "action",
+            "action_url": LIGHT_ACTION["target"],
+        }
+        errors = planner._resolve_affordance_refs(spec, index)
+        assert errors == []
+        assert spec["action_url"] == LIGHT_ACTION["target"]
+
+    def test_missing_ref_and_url_is_error(self, planner):
+        errors = planner._resolve_affordance_refs(
+            {"name": "Bad", "type": "action"}, build_affordance_index(AFFORDANCES)
+        )
+        assert len(errors) == 1
+        assert "require 'affordance_id'" in errors[0]
+
+    def test_resolved_tree_passes_validation(self, planner):
+        index = build_affordance_index(AFFORDANCES)
+        spec = {
+            "name": "SetBrightness",
+            "type": "action",
+            "affordance_id": "light308/setBrightness",
+        }
+        assert planner._resolve_affordance_refs(spec, index) == []
+        assert planner._validate_tree(spec) == []
+
+
+def _tool_call_response(tree: dict, explanation: str = "ok", impossible: bool = False):
+    arguments = json.dumps({"tree": tree, "explanation": explanation, "impossible": impossible})
+    tool_call = SimpleNamespace(id="call-1", function=SimpleNamespace(arguments=arguments))
+    message = SimpleNamespace(content=None, tool_calls=[tool_call])
+    return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+
+class TestGenerateBTEndToEnd:
+    @pytest.mark.asyncio
+    async def test_generates_resolved_tree_from_refs(self):
+        planner = AsyncBTPlanner(max_attempts=1)
+        client = MagicMock()
+        client.chat.completions.create = AsyncMock(
+            return_value=_tool_call_response(
+                {
+                    "name": "SetBrightness",
+                    "type": "action",
+                    "affordance_id": "light308/setBrightness",
+                    "parameters": {"brightness": 75},
+                }
+            )
+        )
+
+        result = await planner.generate_bt(
+            intents=["set the brightness to 75"],
+            affordances=AFFORDANCES,
+            state={"artifacts": {"light308": {"brightness": 10}}},
+            client=client,
+            model="gpt-4o-mini",
+        )
+
+        assert result["impossible"] is False
+        assert result["tree"]["action_url"] == LIGHT_ACTION["target"]
+
+        # Prompt must be compact: refs shown, affordance URLs hidden.
+        system_prompt = client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+        assert "light308/setBrightness" in system_prompt
+        assert LIGHT_ACTION["target"] not in system_prompt
+
+    @pytest.mark.asyncio
+    async def test_hallucinated_ref_triggers_retry_then_success(self):
+        planner = AsyncBTPlanner(max_attempts=2)
+        client = MagicMock()
+        client.chat.completions.create = AsyncMock(
+            side_effect=[
+                _tool_call_response(
+                    {"name": "Bad", "type": "action", "affordance_id": "light999/doesNotExist"}
+                ),
+                _tool_call_response(
+                    {"name": "Good", "type": "action", "affordance_id": "light308/setBrightness"}
+                ),
+            ]
+        )
+
+        result = await planner.generate_bt(
+            intents=["set the brightness"],
+            affordances=AFFORDANCES,
+            client=client,
+            model="gpt-4o-mini",
+        )
+
+        assert client.chat.completions.create.await_count == 2
+        assert result["tree"]["action_url"] == LIGHT_ACTION["target"]
+
+        # Retry feedback must mention the unknown id.
+        retry_messages = client.chat.completions.create.call_args.kwargs["messages"]
+        feedback = [m for m in retry_messages if m.get("role") == "tool"]
+        assert feedback and "unknown affordance_id" in feedback[0]["content"]
+
+
+class TestHintFormatting:
+    def test_signifier_hints_show_refs(self):
+        index = build_affordance_index(AFFORDANCES)
+        url_to_ref = build_url_to_ref(index)
+        hints = format_signifier_hints(
+            {
+                "turn on the light": {
+                    "final_matches": ["sig-1"],
+                    "matches": [
+                        {
+                            "signifier_id": "sig-1",
+                            "affordance_uri": LIGHT_ACTION["target"],
+                            "intent_similarity": 0.97,
+                            "payload": {"brightness": 100},
+                        }
+                    ],
+                }
+            },
+            url_to_ref=url_to_ref,
+        )
+        assert "Recommended affordance_id: light308/setBrightness" in hints
+
+    def test_signifier_hints_fall_back_to_url(self):
+        hints = format_signifier_hints(
+            {
+                "x": {
+                    "final_matches": ["sig-1"],
+                    "matches": [
+                        {
+                            "signifier_id": "sig-1",
+                            "affordance_uri": "http://elsewhere/unknown",
+                            "intent_similarity": 0.9,
+                        }
+                    ],
+                }
+            },
+            url_to_ref={},
+        )
+        assert "Recommended affordance_id: http://elsewhere/unknown" in hints
+
+    def test_observable_hints_map_urls_to_refs(self):
+        index = build_affordance_index(AFFORDANCES)
+        url_to_ref = build_url_to_ref(index)
+        hints = format_observable_property_hints(
+            {
+                "results": [
+                    {
+                        "property_uri": "http://localhost:8080/workspaces/lab308/environment/glare",
+                        "target_max": 60,
+                        "readable_property_urls": [LIGHT_PROPERTY["target"]],
+                        "actions": [
+                            {
+                                "artifact_title": "light308",
+                                "action_name": "setBrightness",
+                                "direction": "decreases",
+                                "action_target": LIGHT_ACTION["target"],
+                                "settling_time_seconds": 10,
+                            }
+                        ],
+                    }
+                ]
+            },
+            url_to_ref=url_to_ref,
+        )
+        assert "light308/brightness" in hints
+        assert "affordance_id: light308/setBrightness" in hints
+        assert "settling_time=10s" in hints

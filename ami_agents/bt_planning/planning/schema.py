@@ -25,17 +25,17 @@ TREE_PARAMETER_SCHEMA = {
             "enum": ["success_on_all", "success_on_one"],
             "description": "Policy for parallel nodes.",
         },
-        "action_url": {
+        "affordance_id": {
             "type": "string",
-            "description": "HTTP POST URL to invoke for action nodes.",
+            "description": (
+                "Exact affordance id from the affordances list "
+                "(e.g. 'light308/setBrightness'). For condition nodes a readable "
+                "property URL from the hints or current state is also accepted."
+            ),
         },
         "parameters": {
             "type": "object",
             "description": "Optional parameters for action nodes.",
-        },
-        "property_url": {
-            "type": "string",
-            "description": "HTTP GET URL to check for condition nodes.",
         },
         "expected_value": {
             "description": "Expected value for condition nodes.",
@@ -80,17 +80,17 @@ TREE_PARAMETER_SCHEMA = {
         {
             "title": "Action",
             "properties": {"type": {"const": "action"}},
-            "required": ["action_url"],
+            "required": ["affordance_id"],
         },
         {
             "title": "Condition",
             "properties": {"type": {"const": "condition"}},
-            "required": ["property_url", "expected_value"],
+            "required": ["affordance_id", "expected_value"],
         },
         {
             "title": "WaitCondition",
             "properties": {"type": {"const": "wait_condition"}},
-            "required": ["property_url", "expected_value"],
+            "required": ["affordance_id", "expected_value"],
         },
     ],
     "description": (
