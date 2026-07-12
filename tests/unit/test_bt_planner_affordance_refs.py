@@ -284,6 +284,44 @@ def _tool_call_response(tree: dict, explanation: str = "ok", impossible: bool = 
     return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
 
+def _content_response(content: str):
+    """A response with no structured tool call, only text content."""
+    message = SimpleNamespace(content=content, tool_calls=None)
+    return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+
+class TestParseToolCallContent:
+    def test_fenced_tool_call_wrapper(self):
+        content = (
+            "Here is the plan:\n```json\n"
+            '{"name": "generate_behavior_tree", "arguments": '
+            '{"tree": {"name": "T", "type": "action", "affordance_id": "a/b"}, '
+            '"explanation": "x", "impossible": false}}\n```'
+        )
+        args = AsyncBTPlanner._parse_tool_call_content(content)
+        assert args["tree"]["affordance_id"] == "a/b"
+
+    def test_bare_arguments_without_wrapper(self):
+        content = '```json\n{"tree": {"name": "T", "type": "action"}, "impossible": false}\n```'
+        args = AsyncBTPlanner._parse_tool_call_content(content)
+        assert args["tree"]["name"] == "T"
+
+    def test_arguments_as_json_string(self):
+        content = json.dumps({"name": "generate_behavior_tree", "arguments": json.dumps({"tree": {"name": "T"}})})
+        args = AsyncBTPlanner._parse_tool_call_content(content)
+        assert args["tree"]["name"] == "T"
+
+    def test_unfenced_json_with_surrounding_prose(self):
+        content = 'Sure! {"tree": {"name": "T", "type": "action"}, "impossible": false} Hope this helps.'
+        args = AsyncBTPlanner._parse_tool_call_content(content)
+        assert args["tree"]["name"] == "T"
+
+    def test_prose_returns_none(self):
+        assert AsyncBTPlanner._parse_tool_call_content("I cannot generate a plan right now.") is None
+        assert AsyncBTPlanner._parse_tool_call_content(None) is None
+        assert AsyncBTPlanner._parse_tool_call_content("") is None
+
+
 class TestGenerateBTEndToEnd:
     @pytest.mark.asyncio
     async def test_generates_resolved_tree_from_refs(self):
@@ -345,6 +383,66 @@ class TestGenerateBTEndToEnd:
         retry_messages = client.chat.completions.create.call_args.kwargs["messages"]
         feedback = [m for m in retry_messages if m.get("role") == "tool"]
         assert feedback and "unknown affordance_id" in feedback[0]["content"]
+
+    @pytest.mark.asyncio
+    async def test_tool_call_recovered_from_text_content(self):
+        # Ollama models often emit the tool call as fenced JSON text.
+        planner = AsyncBTPlanner(max_attempts=1)
+        client = MagicMock()
+        content = (
+            "```json\n"
+            + json.dumps({
+                "name": "generate_behavior_tree",
+                "arguments": {
+                    "tree": {
+                        "name": "SetBrightness",
+                        "type": "action",
+                        "affordance_id": "light308/setBrightness",
+                    },
+                    "explanation": "ok",
+                    "impossible": False,
+                },
+            })
+            + "\n```"
+        )
+        client.chat.completions.create = AsyncMock(return_value=_content_response(content))
+
+        result = await planner.generate_bt(
+            intents=["set the brightness"],
+            affordances=AFFORDANCES,
+            client=client,
+            model="qwen2.5-coder:3b",
+        )
+
+        assert result["tree"]["action_url"] == LIGHT_ACTION["target"]
+
+    @pytest.mark.asyncio
+    async def test_prose_response_retries_then_succeeds(self):
+        planner = AsyncBTPlanner(max_attempts=2)
+        client = MagicMock()
+        client.chat.completions.create = AsyncMock(
+            side_effect=[
+                _content_response("I think you should turn up the light."),
+                _tool_call_response(
+                    {"name": "Good", "type": "action", "affordance_id": "light308/setBrightness"}
+                ),
+            ]
+        )
+
+        result = await planner.generate_bt(
+            intents=["set the brightness"],
+            affordances=AFFORDANCES,
+            client=client,
+            model="qwen2.5-coder:3b",
+        )
+
+        assert client.chat.completions.create.await_count == 2
+        assert result["tree"]["action_url"] == LIGHT_ACTION["target"]
+
+        # Without a tool_call_id the retry feedback must be a user message.
+        retry_messages = client.chat.completions.create.call_args.kwargs["messages"]
+        feedback = [m for m in retry_messages if m.get("role") == "user" and "invalid" in str(m.get("content"))]
+        assert feedback
 
 
 class TestHintFormatting:

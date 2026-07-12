@@ -726,6 +726,9 @@ class InteractionSolverAgent(Agent, IAgent):
         )
 
         if workspace_id:
+            unscoped_affordances = affordances
+            unscoped_state_payload = state_payload
+
             if isinstance(affordances, list):
                 affordances = [
                     a for a in affordances
@@ -738,6 +741,17 @@ class InteractionSolverAgent(Agent, IAgent):
                     if isinstance(ainfo, dict) and match_workspace(ainfo.get("workspace_id"), workspace_id):
                         filtered_artifacts[aid] = ainfo
                 state_payload = {**state_payload, "artifacts": filtered_artifacts}
+
+            if not affordances:
+                # The extracted workspace_id often names a room rather than an
+                # actual workspace; planning against an empty environment only
+                # produces hallucinated affordances, so fall back to unscoped.
+                self.logger.warning(
+                    demo("Workspace scoping matched nothing (workspace_id=%r); falling back to unscoped context"),
+                    workspace_id,
+                )
+                affordances = unscoped_affordances
+                state_payload = unscoped_state_payload
 
             self.logger.info(
                 demo("Workspace scoping applied: affordances=%s artifacts_in_state=%s workspace_id=%r"),

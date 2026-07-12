@@ -7,6 +7,7 @@ adapted for the SPADE multi-agent context in the AAMAS 2026 demo.
 
 import json
 import logging
+import re
 from typing import Any, Optional
 
 from openai import AsyncOpenAI
@@ -168,82 +169,93 @@ class AsyncBTPlanner:
                 assistant_msg["tool_calls"] = message.tool_calls
             messages.append(assistant_msg)
 
-            if not message.tool_calls:
-                logger.warning("No tool call in response")
-                return {
-                    "tree": {},
-                    "explanation": f"Generation failed: {message.content}",
-                    "impossible": False,
-                    "intents": intents,
-                }
+            args: Optional[dict] = None
+            tool_call_id: Optional[str] = None
+            if message.tool_calls:
+                tool_call = message.tool_calls[0]
+                tool_call_id = tool_call.id
+                try:
+                    args = json.loads(tool_call.function.arguments)
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse tool call arguments: {e}")
+                    validation_errors = [f"the tool call arguments were not valid JSON: {e}"]
+            else:
+                # Small local models often emit the tool call as fenced JSON
+                # text instead of a structured tool call; recover it.
+                args = self._parse_tool_call_content(message.content)
+                if args is not None:
+                    logger.info("Recovered generate_behavior_tree arguments from message content")
+                else:
+                    logger.warning(
+                        "No tool call in response and content fallback failed (attempt %d/%d)",
+                        attempt + 1,
+                        self.max_attempts,
+                    )
+                    validation_errors = [
+                        "the response contained neither a generate_behavior_tree tool call "
+                        "nor parseable JSON arguments"
+                    ]
 
-            tool_call = message.tool_calls[0]
-            try:
-                args = json.loads(tool_call.function.arguments)
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse JSON: {e}")
-                return {
-                    "tree": {},
-                    "explanation": f"JSON parse error: {e}",
-                    "impossible": False,
-                    "intents": intents,
-                }
+            if args is not None:
+                tree_spec = args.get("tree", {})
+                last_explanation = args.get("explanation", "")
+                impossible = args.get("impossible", False)
 
-            tree_spec = args.get("tree", {})
-            last_explanation = args.get("explanation", "")
-            impossible = args.get("impossible", False)
+                if impossible:
+                    logger.info(f"Goal marked as impossible: {last_explanation}")
+                    return {
+                        "tree": {},
+                        "explanation": last_explanation,
+                        "impossible": True,
+                        "intents": intents,
+                    }
 
-            if impossible:
-                logger.info(f"Goal marked as impossible: {last_explanation}")
-                return {
-                    "tree": {},
-                    "explanation": last_explanation,
-                    "impossible": True,
-                    "intents": intents,
-                }
+                # Resolve short affordance ids back to target URLs so the final
+                # IR is executable and downstream consumers stay URL-based.
+                resolution_errors = self._resolve_affordance_refs(tree_spec, affordance_index)
 
-            # Resolve short affordance ids back to target URLs so the final
-            # IR is executable and downstream consumers stay URL-based.
-            resolution_errors = self._resolve_affordance_refs(tree_spec, affordance_index)
+                # Normalize tree (fill in missing optional fields like 'name')
+                tree_spec = self._normalize_tree(tree_spec)
+                settling_times = self._collect_action_settling_times(
+                    affordances=affordances,
+                    observable_property_hints=observable_property_hints,
+                )
+                if settling_times:
+                    self._apply_settling_times(tree_spec, settling_times)
 
-            # Normalize tree (fill in missing optional fields like 'name')
-            tree_spec = self._normalize_tree(tree_spec)
-            settling_times = self._collect_action_settling_times(
-                affordances=affordances,
-                observable_property_hints=observable_property_hints,
-            )
-            if settling_times:
-                self._apply_settling_times(tree_spec, settling_times)
+                # Validate
+                validation_errors = resolution_errors + self._validate_tree(tree_spec)
+                if not validation_errors:
+                    node_count = self._count_nodes(tree_spec)
+                    logger.info(f"Generated JSON IR with {node_count} nodes")
+                    return {
+                        "tree": tree_spec,
+                        "explanation": last_explanation,
+                        "impossible": False,
+                        "intents": intents,
+                    }
 
-            # Validate
-            validation_errors = resolution_errors + self._validate_tree(tree_spec)
-            if not validation_errors:
-                node_count = self._count_nodes(tree_spec)
-                logger.info(f"Generated JSON IR with {node_count} nodes")
-                return {
-                    "tree": tree_spec,
-                    "explanation": last_explanation,
-                    "impossible": False,
-                    "intents": intents,
-                }
-
-            logger.warning(
-                "Invalid tree spec (attempt %d/%d): %s",
-                attempt + 1,
-                self.max_attempts,
-                "; ".join(validation_errors),
-            )
+                logger.warning(
+                    "Invalid tree spec (attempt %d/%d): %s",
+                    attempt + 1,
+                    self.max_attempts,
+                    "; ".join(validation_errors),
+                )
 
             # Provide feedback for retry
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tool_call.id,
-                "content": (
-                    "The previous behavior tree was invalid:\n- "
-                    + "\n- ".join(validation_errors)
-                    + "\nPlease call generate_behavior_tree again with a corrected, non-empty tree."
-                ),
-            })
+            feedback = (
+                "The previous response was invalid:\n- "
+                + "\n- ".join(validation_errors)
+                + "\nPlease call generate_behavior_tree again with a corrected, non-empty tree."
+            )
+            if tool_call_id:
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": feedback,
+                })
+            else:
+                messages.append({"role": "user", "content": feedback})
 
             # Update kwargs with new messages
             api_kwargs["messages"] = messages
@@ -254,6 +266,50 @@ class AsyncBTPlanner:
             "impossible": False,
             "intents": intents,
         }
+
+    @staticmethod
+    def _parse_tool_call_content(content: Optional[str]) -> Optional[dict]:
+        """
+        Recover generate_behavior_tree arguments from plain-text content.
+
+        Ollama does not enforce tool_choice, so small local models often emit
+        the tool call as (fenced) JSON text. Accepts either the tool-call
+        wrapper ``{"name": ..., "arguments": {...}}`` or the bare arguments
+        ``{"tree": ..., "explanation": ..., "impossible": ...}``.
+        """
+        if not content or not isinstance(content, str):
+            return None
+
+        candidates = [m.group(1) for m in re.finditer(r"```(?:json)?\s*(.*?)```", content, re.S)]
+        candidates.append(content)
+
+        for candidate in candidates:
+            candidate = candidate.strip()
+            data = None
+            try:
+                data = json.loads(candidate)
+            except json.JSONDecodeError:
+                start = candidate.find("{")
+                end = candidate.rfind("}")
+                if start != -1 and end > start:
+                    try:
+                        data = json.loads(candidate[start:end + 1])
+                    except json.JSONDecodeError:
+                        data = None
+            if not isinstance(data, dict):
+                continue
+
+            arguments = data.get("arguments")
+            if isinstance(arguments, str):
+                try:
+                    arguments = json.loads(arguments)
+                except json.JSONDecodeError:
+                    arguments = None
+            if isinstance(arguments, dict):
+                return arguments
+            if "tree" in data:
+                return data
+        return None
 
     def _format_user_message(self, intents: list[str]) -> str:
         """Format the user message from intents."""
