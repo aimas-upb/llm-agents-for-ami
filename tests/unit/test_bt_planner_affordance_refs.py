@@ -212,6 +212,15 @@ class TestResolveAffordanceRefs:
         assert "unknown affordance_id" in errors[0]
         assert "action_url" not in spec
 
+    def test_unknown_ref_suggests_close_matches(self, planner):
+        index = build_affordance_index(AFFORDANCES)
+        # Typical hallucination: near-miss mash-up of a real id
+        spec = {"name": "Bad", "type": "action", "affordance_id": "light309/setBrightness"}
+        errors = planner._resolve_affordance_refs(spec, index)
+        assert len(errors) == 1
+        assert "did you mean" in errors[0]
+        assert "light308/setBrightness" in errors[0]
+
     def test_action_node_rejects_property_ref(self, planner):
         index = build_affordance_index(AFFORDANCES)
         spec = {"name": "Bad", "type": "action", "affordance_id": "light308/brightness"}
@@ -443,6 +452,67 @@ class TestGenerateBTEndToEnd:
         retry_messages = client.chat.completions.create.call_args.kwargs["messages"]
         feedback = [m for m in retry_messages if m.get("role") == "user" and "invalid" in str(m.get("content"))]
         assert feedback
+
+
+class TestEqualityGateDetection:
+    def _seq(self, condition, action=None):
+        action = action or {"name": "Act", "type": "action", "action_url": "http://x/a"}
+        return {"name": "S", "type": "sequence", "children": [condition, action]}
+
+    def test_numeric_equality_gate_before_action_is_flagged(self):
+        planner = AsyncBTPlanner()
+        cond = {"name": "C", "type": "condition", "property_url": "http://x/p",
+                "operator": "==", "expected_value": 71}
+        errors = planner._detect_equality_gates(self._seq(cond))
+        assert len(errors) == 1
+        assert "selector" in errors[0]
+
+    def test_default_operator_counts_as_equality(self):
+        planner = AsyncBTPlanner()
+        cond = {"name": "C", "type": "condition", "property_url": "http://x/p",
+                "expected_value": 36.124}
+        errors = planner._detect_equality_gates(self._seq(cond))
+        assert len(errors) == 1
+
+    def test_range_operator_is_fine(self):
+        planner = AsyncBTPlanner()
+        cond = {"name": "C", "type": "condition", "property_url": "http://x/p",
+                "operator": "<=", "expected_value": 50}
+        assert planner._detect_equality_gates(self._seq(cond)) == []
+
+    def test_discrete_and_boolean_values_are_fine(self):
+        planner = AsyncBTPlanner()
+        for expected in ("on", True):
+            cond = {"name": "C", "type": "condition", "property_url": "http://x/p",
+                    "operator": "==", "expected_value": expected}
+            assert planner._detect_equality_gates(self._seq(cond)) == []
+
+    def test_selector_idempotent_pattern_is_fine(self):
+        planner = AsyncBTPlanner()
+        tree = {"name": "S", "type": "selector", "children": [
+            {"name": "C", "type": "condition", "property_url": "http://x/p",
+             "operator": "==", "expected_value": 71},
+            {"name": "Act", "type": "action", "action_url": "http://x/a"},
+        ]}
+        assert planner._detect_equality_gates(tree) == []
+
+    def test_post_action_verification_is_fine(self):
+        planner = AsyncBTPlanner()
+        tree = {"name": "S", "type": "sequence", "children": [
+            {"name": "Act", "type": "action", "action_url": "http://x/a"},
+            {"name": "C", "type": "condition", "property_url": "http://x/p",
+             "operator": "==", "expected_value": 75},
+        ]}
+        assert planner._detect_equality_gates(tree) == []
+
+    def test_nested_sequences_are_checked(self):
+        planner = AsyncBTPlanner()
+        inner = self._seq({"name": "C", "type": "condition", "property_url": "http://x/p",
+                           "operator": "==", "expected_value": 10})
+        tree = {"name": "Root", "type": "selector", "children": [inner]}
+        errors = planner._detect_equality_gates(tree)
+        assert len(errors) == 1
+        assert errors[0].startswith("tree.children[0].children[0]")
 
 
 class TestHintFormatting:

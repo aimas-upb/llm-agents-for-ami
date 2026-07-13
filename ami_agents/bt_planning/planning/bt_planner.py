@@ -5,6 +5,7 @@ Generates JSON IR behavior trees using async OpenAI API,
 adapted for the SPADE multi-agent context in the AAMAS 2026 demo.
 """
 
+import difflib
 import json
 import logging
 import re
@@ -224,7 +225,11 @@ class AsyncBTPlanner:
                     self._apply_settling_times(tree_spec, settling_times)
 
                 # Validate
-                validation_errors = resolution_errors + self._validate_tree(tree_spec)
+                validation_errors = (
+                    resolution_errors
+                    + self._validate_tree(tree_spec)
+                    + self._detect_equality_gates(tree_spec)
+                )
                 if not validation_errors:
                     node_count = self._count_nodes(tree_spec)
                     logger.info(f"Generated JSON IR with {node_count} nodes")
@@ -412,7 +417,15 @@ class AsyncBTPlanner:
             spec[url_field] = ref
             return []
 
-        return [f"{path}: unknown affordance_id '{ref}' (use an exact id from the affordances list)"]
+        # Models tend to repeat a hallucinated id verbatim across retries when
+        # only told it is unknown; suggesting close matches breaks that loop.
+        suggestions = difflib.get_close_matches(ref, index.keys(), n=3, cutoff=0.6)
+        message = f"{path}: unknown affordance_id '{ref}'"
+        if suggestions:
+            message += " -- did you mean: " + ", ".join(suggestions) + "?"
+        else:
+            message += " (use an exact id from the affordances list)"
+        return [message]
 
     def _normalize_tree(self, spec: dict, _counter: list | None = None) -> dict:
         """
@@ -556,6 +569,47 @@ class AsyncBTPlanner:
             ),
             default=0.0,
         )
+
+    def _detect_equality_gates(self, spec: dict, path: str = "tree") -> list[str]:
+        """
+        Flag the equality-gate anti-pattern: a sequence whose first child is a
+        numeric ``==`` condition followed by an action. When the current value
+        does not match exactly, the sequence fails before the action ever
+        runs, so the plan silently does nothing. The correct forms are a
+        selector (idempotent check) or a range operator.
+        """
+        errors: list[str] = []
+        if not isinstance(spec, dict):
+            return errors
+
+        children = spec.get("children")
+        if isinstance(children, list) and children:
+            if spec.get("type") == "sequence":
+                first = children[0] if isinstance(children[0], dict) else {}
+                expected = first.get("expected_value")
+                has_action_after = any(
+                    isinstance(child, dict) and child.get("type") == "action"
+                    for child in children[1:]
+                )
+                if (
+                    first.get("type") == "condition"
+                    and first.get("operator", "==") == "=="
+                    and isinstance(expected, (int, float))
+                    and not isinstance(expected, bool)
+                    and has_action_after
+                ):
+                    errors.append(
+                        f"{path}.children[0]: a sequence must not start with an equality "
+                        f"condition on a numeric value (== {expected}) before an action -- "
+                        "if the current value differs, the action never runs. Use a "
+                        "selector (condition 'already in desired state' first, action "
+                        "second) or a range operator (<=, >=)."
+                    )
+            for idx, child in enumerate(children):
+                errors.extend(
+                    self._detect_equality_gates(child, path=f"{path}.children[{idx}]")
+                )
+        return errors
 
     def _count_nodes(self, spec: dict) -> int:
         """Count nodes in a tree spec."""
