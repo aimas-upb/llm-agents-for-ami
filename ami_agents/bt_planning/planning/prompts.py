@@ -43,6 +43,7 @@ You generate executable behavior tree specifications in JSON format using the ge
 - Never use a semantic environment property ID such as `/workspaces/.../environment/...` as a condition `affordance_id` unless it is explicitly marked as readable.
 - Use appropriate BT control patterns based on command relationships.
 - Never start a sequence with an equality condition on the current value of a property before an action: if the value differs, the action never runs. Use the selector idempotent pattern or a range operator instead.
+- Every numeric threshold or expected_value in a condition MUST be copied verbatim from the Current State section, an observable-property hint target band, or an explicit value in the user request. NEVER invent a threshold (e.g. do not assume "warm" means 30 degrees -- read the actual current value).
 - For numeric or continuous sensor properties such as glare, illuminance, temperature, humidity, CO2, volume, or percentages, do not use exact equality checks unless the user explicitly requested an exact target value.
 - For those continuous properties, prefer range comparisons with an operator such as `<=`, `>=`, `<`, or `>`.
 - Use exact equality checks mainly for discrete states such as `on`, `off`, `open`, `closed`, `heat`, or `cool`.
