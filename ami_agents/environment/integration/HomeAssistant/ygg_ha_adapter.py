@@ -1013,7 +1013,28 @@ async def action_ha_service(workspace_id: str, artifact_name: str, domain: str, 
             payload = {}
     payload = {**payload, "entity_id": ent}
 
-    await ha_rest.call_service(domain, service, payload)
+    try:
+        await ha_rest.call_service(domain, service, payload)
+    except httpx.HTTPStatusError as exc:
+        response_text = ""
+        with contextlib.suppress(Exception):
+            response_text = exc.response.text
+        detail = {
+            "error": "home_assistant_service_call_failed",
+            "domain": domain,
+            "service": service,
+            "artifact_name": artifact_name,
+            "entity_id": ent,
+            "payload": payload,
+            "home_assistant_status": exc.response.status_code if exc.response is not None else None,
+            "home_assistant_response": response_text,
+        }
+        print(
+            f"YggHA service forward failed: domain={domain} service={service} "
+            f"entity_id={ent} status={detail['home_assistant_status']} "
+            f"response={response_text}"
+        )
+        raise HTTPException(status_code=502, detail=detail)
     return Response(content="Action succeeded:")
 
 # Jacamo/WebSub stubs

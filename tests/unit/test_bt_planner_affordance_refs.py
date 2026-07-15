@@ -454,6 +454,137 @@ class TestGenerateBTEndToEnd:
         assert feedback
 
 
+SEED1_AC_ACTION = {
+    "artifact_id": "http://h/w/artifacts/qt2_feasible_seed_1_utility_room_environment#artifact",
+    "artifact_name": "qt2_feasible_seed_1_utility_room_environment",
+    "affordance_type": "action",
+    "action_name": "getHumidityInPercent",
+    "target": "http://h/w/artifacts/qt2_feasible_seed_1_utility_room_environment/getHumidityInPercent",
+}
+
+SET_TEMPERATURE = {
+    "artifact_id": "http://h/w/artifacts/ac1#artifact",
+    "artifact_name": "ac1",
+    "affordance_type": "action",
+    "action_name": "ClimateSetTemperature",
+    "target": "http://h/w/artifacts/ac1/ha/climate/set_temperature",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "temperature": {"type": "number"},
+            "target_temp_high": {"type": "number"},
+            "target_temp_low": {"type": "number"},
+            "hvac_mode": {"type": "string"},
+        },
+    },
+}
+
+
+class TestSuffixMatchResolution:
+    def test_unique_token_boundary_suffix_resolves(self, planner):
+        # The exact failure from ablation 006: prefix dropped from long ids.
+        index = build_affordance_index([SEED1_AC_ACTION])
+        spec = {
+            "name": "N", "type": "action",
+            "affordance_id": "utility_room_environment/getHumidityInPercent",
+        }
+        errors = planner._resolve_affordance_refs(spec, index)
+        assert errors == []
+        assert spec["action_url"] == SEED1_AC_ACTION["target"]
+        assert spec["affordance_id"] == "qt2_feasible_seed_1_utility_room_environment/getHumidityInPercent"
+
+    def test_case_insensitive_exact_match(self, planner):
+        index = build_affordance_index([LIGHT_ACTION])
+        spec = {"name": "N", "type": "action", "affordance_id": "Light308/setBrightness"}
+        assert planner._resolve_affordance_refs(spec, index) == []
+        assert spec["action_url"] == LIGHT_ACTION["target"]
+
+    def test_mid_token_suffix_does_not_match(self, planner):
+        # 'room_environment/...' must not match 'bathroom_environment/...'
+        aff = dict(SEED1_AC_ACTION)
+        aff["artifact_name"] = "qt2_bathroom_environment"
+        index = build_affordance_index([aff])
+        spec = {"name": "N", "type": "action", "affordance_id": "room_environment/getHumidityInPercent"}
+        errors = planner._resolve_affordance_refs(spec, index)
+        assert len(errors) == 1 and "unknown affordance_id" in errors[0]
+
+    def test_ambiguous_suffix_is_error_listing_candidates(self, planner):
+        aff2 = dict(SEED1_AC_ACTION)
+        aff2["artifact_name"] = "qt2_feasible_seed_2_utility_room_environment"
+        index = build_affordance_index([SEED1_AC_ACTION, aff2])
+        spec = {"name": "N", "type": "action", "affordance_id": "utility_room_environment/getHumidityInPercent"}
+        errors = planner._resolve_affordance_refs(spec, index)
+        assert len(errors) == 1
+        assert "ambiguous" in errors[0]
+        assert "seed_1" in errors[0] and "seed_2" in errors[0]
+
+    def test_suffix_match_still_enforces_type_check(self, planner):
+        index = build_affordance_index(AFFORDANCES)
+        spec = {"name": "N", "type": "action", "affordance_id": "light308/brightness"}
+        # exact match already covers this; sanity: suffix path re-enters the
+        # normal resolution incl. the action-vs-property check
+        errors = planner._resolve_affordance_refs(spec, index)
+        assert len(errors) == 1 and "property affordance" in errors[0]
+
+
+class TestActionParameterValidation:
+    def _resolve(self, planner, params):
+        index = build_affordance_index([SET_TEMPERATURE])
+        spec = {
+            "name": "N", "type": "action",
+            "affordance_id": "ac1/ClimateSetTemperature",
+            "parameters": params,
+        }
+        return planner._resolve_affordance_refs(spec, index), spec
+
+    def test_temperature_only_is_valid(self, planner):
+        errors, _ = self._resolve(planner, {"temperature": 24.0, "hvac_mode": "cool"})
+        assert errors == []
+
+    def test_range_pair_is_valid(self, planner):
+        errors, _ = self._resolve(planner, {"target_temp_high": 26.0, "target_temp_low": 22.0})
+        assert errors == []
+
+    def test_mixed_styles_rejected(self, planner):
+        errors, _ = self._resolve(
+            planner, {"temperature": 24.0, "target_temp_high": 30.0, "target_temp_low": 20.0}
+        )
+        assert len(errors) == 1 and "never both styles" in errors[0]
+
+    def test_partial_range_rejected(self, planner):
+        errors, _ = self._resolve(planner, {"target_temp_high": 26.0})
+        assert len(errors) == 1 and "both" in errors[0]
+
+    def test_hvac_mode_alone_rejected(self, planner):
+        # The exact HA 400 from ablation 005/006.
+        errors, _ = self._resolve(planner, {"hvac_mode": "cool"})
+        assert len(errors) == 1 and "'hvac_mode' alone is not valid" in errors[0]
+
+    def test_unknown_parameter_rejected(self, planner):
+        errors, _ = self._resolve(planner, {"temperature": 24.0, "brightness": 50})
+        assert len(errors) == 1
+        assert "unknown parameter" in errors[0] and "brightness" in errors[0]
+
+    def test_schema_known_param_passes(self, planner):
+        index = build_affordance_index([LIGHT_ACTION])
+        spec = {
+            "name": "N", "type": "action",
+            "affordance_id": "light308/setBrightness",
+            "parameters": {"brightness": 75},
+        }
+        assert planner._resolve_affordance_refs(spec, index) == []
+
+    def test_no_schema_skips_unknown_check(self, planner):
+        aff = {k: v for k, v in LIGHT_ACTION.items() if k != "input_schema"}
+        index = build_affordance_index([aff])
+        spec = {
+            "name": "N", "type": "action",
+            "affordance_id": "light308/setBrightness",
+            "parameters": {"anything": 1},
+        }
+        assert planner._resolve_affordance_refs(spec, index) == []
+
+
 class TestEqualityGateDetection:
     def _seq(self, condition, action=None):
         action = action or {"name": "Act", "type": "action", "action_url": "http://x/a"}

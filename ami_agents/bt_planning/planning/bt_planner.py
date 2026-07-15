@@ -411,11 +411,28 @@ class AsyncBTPlanner:
             if not isinstance(target, str) or not target:
                 return [f"{path}: affordance '{ref}' has no target URL"]
             spec[url_field] = target
+            if node_type == "action":
+                return self._validate_action_parameters(spec, aff, path)
             return []
 
         if ref.startswith("http://") or ref.startswith("https://"):
             spec[url_field] = ref
             return []
+
+        # Models often drop long artifact-id prefixes (e.g.
+        # 'utility_room_environment/x' for 'qt2_feasible_seed_1_utility_room_environment/x');
+        # accept the ref when it is an unambiguous token-boundary suffix.
+        suffix_matches = self._suffix_matches(ref, index)
+        if len(suffix_matches) == 1:
+            resolved = suffix_matches[0]
+            logger.info("Resolved affordance_id '%s' via unique suffix match '%s'", ref, resolved)
+            spec["affordance_id"] = resolved
+            return self._resolve_node_ref(spec, index, url_field, path)
+        if len(suffix_matches) > 1:
+            return [
+                f"{path}: affordance_id '{ref}' is ambiguous -- matches: "
+                + ", ".join(suffix_matches[:4])
+            ]
 
         # Models tend to repeat a hallucinated id verbatim across retries when
         # only told it is unknown; suggesting close matches breaks that loop.
@@ -426,6 +443,73 @@ class AsyncBTPlanner:
         else:
             message += " (use an exact id from the affordances list)"
         return [message]
+
+    @staticmethod
+    def _validate_action_parameters(spec: dict, aff: dict, path: str) -> list[str]:
+        """
+        Validate action parameters against the affordance's input schema, plus
+        the Home Assistant climate.set_temperature payload rules that only
+        surface as HTTP 400 at execution time otherwise.
+        """
+        errors: list[str] = []
+        params = spec.get("parameters")
+        if params is None:
+            params = {}
+        if not isinstance(params, dict):
+            return [f"{path}: action 'parameters' must be an object"]
+
+        schema = aff.get("input_schema")
+        props = schema.get("properties") if isinstance(schema, dict) else None
+        if isinstance(props, dict) and props:
+            unknown = sorted(k for k in params if k not in props)
+            if unknown:
+                errors.append(
+                    f"{path}: unknown parameter(s) {', '.join(unknown)} -- "
+                    f"allowed: {', '.join(sorted(props))}"
+                )
+
+        name = str(aff.get("action_name") or aff.get("name") or "")
+        target = str(aff.get("target") or "")
+        is_set_temperature = (
+            target.rstrip("/").endswith("set_temperature")
+            or "settemperature" in name.replace("_", "").lower()
+        )
+        if is_set_temperature:
+            has_temp = "temperature" in params
+            has_high = "target_temp_high" in params
+            has_low = "target_temp_low" in params
+            if has_temp and (has_high or has_low):
+                errors.append(
+                    f"{path}: set_temperature must use either 'temperature' or the pair "
+                    "'target_temp_high'+'target_temp_low', never both styles"
+                )
+            elif has_high != has_low:
+                errors.append(
+                    f"{path}: set_temperature range mode requires both "
+                    "'target_temp_high' and 'target_temp_low'"
+                )
+            elif not has_temp and not has_high:
+                errors.append(
+                    f"{path}: set_temperature requires 'temperature' (or "
+                    "'target_temp_high'+'target_temp_low'); 'hvac_mode' alone is not valid"
+                )
+        return errors
+
+    @staticmethod
+    def _suffix_matches(ref: str, index: dict[str, dict]) -> list[str]:
+        """Index keys for which ``ref`` is a token-boundary suffix."""
+        matches = []
+        ref_lower = ref.lower()
+        for key in index:
+            key_lower = key.lower()
+            if key_lower == ref_lower:
+                matches.append(key)
+                continue
+            if key_lower.endswith(ref_lower):
+                boundary = key_lower[-len(ref_lower) - 1]
+                if boundary in "_/.-:":
+                    matches.append(key)
+        return matches
 
     def _normalize_tree(self, spec: dict, _counter: list | None = None) -> dict:
         """
