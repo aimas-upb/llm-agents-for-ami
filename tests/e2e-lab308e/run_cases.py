@@ -252,6 +252,14 @@ class PromptDumpState:
         response_format = kwargs.get("response_format")
         if response_format:
             parts.append(f"Response format: {json.dumps(response_format, ensure_ascii=False, default=str)}")
+        tools = kwargs.get("tools")
+        if tools:
+            parts.append("Tools:")
+            parts.append(json.dumps(tools, ensure_ascii=False, indent=2, default=str))
+        tool_choice = kwargs.get("tool_choice")
+        if tool_choice:
+            parts.append("Tool choice:")
+            parts.append(json.dumps(tool_choice, ensure_ascii=False, indent=2, default=str))
         messages = kwargs.get("messages")
         if isinstance(messages, list):
             parts.append("Messages:")
@@ -264,6 +272,10 @@ class PromptDumpState:
                         parts.append(content)
                     else:
                         parts.append(json.dumps(content, ensure_ascii=False, indent=2, default=str))
+                    tool_calls = message.get("tool_calls")
+                    if tool_calls:
+                        parts.append("tool_calls:")
+                        parts.append(json.dumps(cls._serialise_tool_calls(tool_calls), ensure_ascii=False, indent=2, default=str))
                 else:
                     parts.append(json.dumps(message, ensure_ascii=False, indent=2, default=str))
         elif "input" in kwargs:
@@ -276,29 +288,61 @@ class PromptDumpState:
         entry = f"===== LLM Call {call_index} =====\n" + "\n".join(parts).strip() + "\n"
         cls.prompt_entries.append(entry)
 
+    @staticmethod
+    def _serialise_tool_calls(tool_calls: Any) -> Any:
+        serialised: List[Dict[str, Any]] = []
+        for tool_call in tool_calls or []:
+            function = getattr(tool_call, "function", None)
+            if isinstance(tool_call, dict):
+                function = tool_call.get("function")
+                serialised.append(
+                    {
+                        "id": tool_call.get("id"),
+                        "type": tool_call.get("type"),
+                        "function": function,
+                    }
+                )
+                continue
+            serialised.append(
+                {
+                    "id": getattr(tool_call, "id", None),
+                    "type": getattr(tool_call, "type", None),
+                    "function": {
+                        "name": getattr(function, "name", None),
+                        "arguments": getattr(function, "arguments", None),
+                    },
+                }
+            )
+        return serialised
+
     @classmethod
     def append_response(cls, response: Any) -> None:
         if not cls.enabled or not cls.prompt_entries:
             return
 
         answer = ""
+        tool_calls = None
         try:
             choices = getattr(response, "choices", None) or []
             if choices:
                 message = getattr(choices[0], "message", None)
                 answer = getattr(message, "content", None) or ""
+                tool_calls = getattr(message, "tool_calls", None)
         except Exception:
             answer = ""
 
         if not answer:
             answer = "<empty response>"
 
-        cls.prompt_entries[-1] = (
-            cls.prompt_entries[-1].rstrip()
-            + "\n\n===== LLM Answer =====\n"
-            + str(answer).strip()
-            + "\n"
-        )
+        entry = cls.prompt_entries[-1].rstrip()
+        entry += "\n\n===== LLM Answer =====\n" + str(answer).strip() + "\n"
+        if tool_calls:
+            entry += (
+                "\n===== LLM Tool Calls =====\n"
+                + json.dumps(cls._serialise_tool_calls(tool_calls), ensure_ascii=False, indent=2, default=str)
+                + "\n"
+            )
+        cls.prompt_entries[-1] = entry
 
     @classmethod
     def write_case_file(cls) -> Optional[Path]:
