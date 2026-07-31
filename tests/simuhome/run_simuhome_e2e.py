@@ -301,13 +301,13 @@ def _load_episode(path: Path) -> Dict[str, Any]:
 
 def _validate_supported_episode(episode: Dict[str, Any], path: Path) -> None:
     meta = episode.get("meta") if isinstance(episode.get("meta"), dict) else {}
-    if meta.get("query_type") != "qt2":
+    if meta.get("query_type") not in {"qt1", "qt2"}:
         raise ValueError(
-            f"{path.name} is {meta.get('query_type')!r}; this e2e orchestrator currently supports qt2 only"
+            f"{path.name} is {meta.get('query_type')!r}; this e2e orchestrator currently supports qt1/qt2 only"
         )
     if meta.get("case") != "feasible":
         raise ValueError(
-            f"{path.name} is case={meta.get('case')!r}; this e2e orchestrator currently supports feasible qt2 only"
+            f"{path.name} is case={meta.get('case')!r}; this e2e orchestrator currently supports feasible qt1/qt2 only"
         )
 
 
@@ -325,6 +325,24 @@ def _initial_room_state(episode: Dict[str, Any], room_id: str, state_name: str) 
     if not isinstance(state, dict) or state_name not in state:
         raise ValueError(f"Room state {room_id}.{state_name} not found in initial_home_config")
     return _room_state_value(state_name, state[state_name])
+
+
+def _initial_device_attribute(episode: Dict[str, Any], room_id: str, device_id: str, attribute: str) -> Any:
+    rooms = (((episode.get("initial_home_config") or {}).get("rooms")) or {})
+    room = rooms.get(room_id)
+    if not isinstance(room, dict):
+        raise ValueError(f"Room {room_id!r} not found in initial_home_config")
+    devices = room.get("devices")
+    if not isinstance(devices, list):
+        raise ValueError(f"Room {room_id!r} has no device list in initial_home_config")
+    for device in devices:
+        if not isinstance(device, dict) or device.get("device_id") != device_id:
+            continue
+        attributes = device.get("attributes")
+        if not isinstance(attributes, dict) or attribute not in attributes:
+            raise ValueError(f"Device attribute {room_id}.{device_id}.{attribute} not found in initial_home_config")
+        return attributes[attribute]
+    raise ValueError(f"Device {room_id}.{device_id} not found in initial_home_config")
 
 
 def _build_qt2_case(
@@ -381,6 +399,73 @@ def _build_qt2_case(
             {"type": "all_of", "assertions": assertions},
             {"type": "final_reply_contains", "value": "success"},
         ],
+        "simuhome": {
+            "source_json": str(scenario_path),
+            "workspace_id": workspace_id,
+            "meta": episode.get("meta"),
+        },
+    }
+
+
+def _reply_value_assertion(value: Any) -> Dict[str, Any]:
+    candidates = []
+    if isinstance(value, bool):
+        candidates.extend(["true", "on", "yes"] if value else ["false", "off", "no"])
+    elif isinstance(value, (int, float)):
+        numeric = float(value)
+        candidates.append(f"{numeric:g}")
+        candidates.append(f"{numeric:.1f}")
+        candidates.append(f"{numeric:.2f}")
+    else:
+        candidates.append(str(value))
+    assertions = [
+        {"type": "final_reply_contains", "value": candidate}
+        for candidate in dict.fromkeys(candidates)
+        if candidate
+    ]
+    if len(assertions) == 1:
+        return assertions[0]
+    return {"type": "any_of", "assertions": assertions}
+
+
+def _build_qt1_case(
+    *,
+    episode: Dict[str, Any],
+    scenario_path: Path,
+    workspace_id: str,
+    settle_seconds: float,
+) -> Dict[str, Any]:
+    goals = ((episode.get("eval") or {}).get("goals")) or []
+    assertions: list[Dict[str, Any]] = []
+    for goal in goals:
+        if not isinstance(goal, dict):
+            continue
+        if goal.get("variant") != "room_state":
+            if goal.get("variant") != "device_attribute":
+                continue
+            room_id = str(goal.get("room_id") or "").strip()
+            device_id = str(goal.get("device_id") or "").strip()
+            attribute = str(goal.get("attribute") or "").strip()
+            if not room_id or not device_id or not attribute:
+                continue
+            value = _initial_device_attribute(episode, room_id, device_id, attribute)
+        else:
+            if "current_value" not in goal:
+                continue
+            value = goal["current_value"]
+        assertions.append(_reply_value_assertion(value))
+
+    if not assertions:
+        raise ValueError("No transformable feasible qt1 room-state goals found in SimuHome JSON")
+
+    return {
+        "name": f"simuhome_{scenario_path.stem}",
+        "hard_reset": False,
+        "initial_state": [{"type": "sleep", "seconds": 2}],
+        "query": episode["query"],
+        "auto_confirm": False,
+        "settle_seconds": settle_seconds,
+        "pass_criteria": [{"type": "all_of", "assertions": assertions}],
         "simuhome": {
             "source_json": str(scenario_path),
             "workspace_id": workspace_id,
@@ -601,7 +686,8 @@ def run(args: argparse.Namespace) -> int:
         manifest["workspace_id"] = workspace_id
         manifest["add_virtual_devices"] = add_info
 
-        if args.no_td_sosa:
+        query_type = str((episode.get("meta") or {}).get("query_type") or "")
+        if args.no_td_sosa or query_type == "qt1":
             tdsosa_hints = {"TD_SOSA_ENV_VAR_OVERRIDES": {}, "TD_SOSA_PROPERTY_RANGES": {}}
             adapter_app = "ygg_ha_adapter:app"
             hasp_env = _env_with_pythonpath(
@@ -713,15 +799,23 @@ def run(args: argparse.Namespace) -> int:
         _ensure_running("HASP", hasp_proc, log_path=result_dir / "hasp.log")
 
         print("[simuhome-e2e] Generating temporary e2e case", flush=True)
-        case = _build_qt2_case(
-            episode=episode,
-            scenario_path=scenario_path,
-            workspace_id=workspace_id,
-            settle_seconds=args.settle_seconds,
-            assertion_timeout=args.assertion_timeout,
-            assertion_poll_interval=args.assertion_poll_interval,
-            deltas=delta_overrides,
-        )
+        if query_type == "qt1":
+            case = _build_qt1_case(
+                episode=episode,
+                scenario_path=scenario_path,
+                workspace_id=workspace_id,
+                settle_seconds=args.settle_seconds,
+            )
+        else:
+            case = _build_qt2_case(
+                episode=episode,
+                scenario_path=scenario_path,
+                workspace_id=workspace_id,
+                settle_seconds=args.settle_seconds,
+                assertion_timeout=args.assertion_timeout,
+                assertion_poll_interval=args.assertion_poll_interval,
+                deltas=delta_overrides,
+            )
         case_path = work_dir / f"{scenario_path.stem}.case.json"
         case_path.write_text(json.dumps(case, indent=2, ensure_ascii=True), encoding="utf-8")
         manifest["case_path"] = str(case_path)
