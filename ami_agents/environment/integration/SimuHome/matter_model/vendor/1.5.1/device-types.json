@@ -1,0 +1,3520 @@
+{
+  "10": {
+    "id_hex": "0x000A",
+    "name": "Door Lock",
+    "revision": 4,
+    "source_file": "DoorLock.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 257,
+        "id_hex": "0x0101",
+        "name": "Door Lock",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "11": {
+    "id_hex": "0x000B",
+    "name": "Door Lock Controller",
+    "revision": 3,
+    "source_file": "DoorLockController.xml",
+    "required_clusters": [
+      {
+        "id": 257,
+        "id_hex": "0x0101",
+        "name": "Door Lock",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "client"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "client"
+      }
+    ]
+  },
+  "14": {
+    "id_hex": "0x000E",
+    "name": "Aggregator",
+    "revision": 2,
+    "source_file": "Aggregator.xml",
+    "required_clusters": [
+      {
+        "id": 1873,
+        "id_hex": "0x0751",
+        "name": "Commissioner Control",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 37,
+        "id_hex": "0x0025",
+        "name": "Actions",
+        "side": "server"
+      }
+    ]
+  },
+  "15": {
+    "id_hex": "0x000F",
+    "name": "Generic Switch",
+    "revision": 3,
+    "source_file": "GenericSwitch.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 59,
+        "id_hex": "0x003B",
+        "name": "Switch",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "17": {
+    "id_hex": "0x0011",
+    "name": "Power Source",
+    "revision": 1,
+    "source_file": "PowerSource.xml",
+    "required_clusters": [
+      {
+        "id": 47,
+        "id_hex": "0x002F",
+        "name": "Power Source",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "18": {
+    "id_hex": "0x0012",
+    "name": "OTA Requestor",
+    "revision": 1,
+    "source_file": "OtaRequestor.xml",
+    "required_clusters": [
+      {
+        "id": 41,
+        "id_hex": "0x0029",
+        "name": "OTA Software Update Provider",
+        "side": "client"
+      },
+      {
+        "id": 42,
+        "id_hex": "0x002A",
+        "name": "OTA Software Update Requestor",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "19": {
+    "id_hex": "0x0013",
+    "name": "Bridged Node",
+    "revision": 3,
+    "source_file": "BridgedNode.xml",
+    "required_clusters": [
+      {
+        "id": 47,
+        "id_hex": "0x002F",
+        "name": "Power Source",
+        "side": "server"
+      },
+      {
+        "id": 57,
+        "id_hex": "0x0039",
+        "name": "Bridged Device Basic Information",
+        "side": "server"
+      },
+      {
+        "id": 60,
+        "id_hex": "0x003C",
+        "name": "Administrator Commissioning",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "20": {
+    "id_hex": "0x0014",
+    "name": "OTA Provider",
+    "revision": 1,
+    "source_file": "OtaProvider.xml",
+    "required_clusters": [
+      {
+        "id": 41,
+        "id_hex": "0x0029",
+        "name": "OTA Software Update Provider",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 42,
+        "id_hex": "0x002A",
+        "name": "OTA Software Update Requestor",
+        "side": "client"
+      }
+    ]
+  },
+  "21": {
+    "id_hex": "0x0015",
+    "name": "Contact Sensor",
+    "revision": 2,
+    "source_file": "ContactSensor.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 69,
+        "id_hex": "0x0045",
+        "name": "Boolean State",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 128,
+        "id_hex": "0x0080",
+        "name": "Boolean State Configuration",
+        "side": "server"
+      }
+    ]
+  },
+  "22": {
+    "id_hex": "0x0016",
+    "name": "Root Node",
+    "revision": 4,
+    "source_file": "RootNodeDeviceType.xml",
+    "required_clusters": [
+      {
+        "id": 31,
+        "id_hex": "0x001F",
+        "name": "Access Control",
+        "side": "server"
+      },
+      {
+        "id": 40,
+        "id_hex": "0x0028",
+        "name": "Basic Information",
+        "side": "server"
+      },
+      {
+        "id": 43,
+        "id_hex": "0x002B",
+        "name": "Localization Configuration",
+        "side": "server"
+      },
+      {
+        "id": 44,
+        "id_hex": "0x002C",
+        "name": "Time Format Localization",
+        "side": "server"
+      },
+      {
+        "id": 45,
+        "id_hex": "0x002D",
+        "name": "Unit Localization",
+        "side": "server"
+      },
+      {
+        "id": 48,
+        "id_hex": "0x0030",
+        "name": "General Commissioning",
+        "side": "server"
+      },
+      {
+        "id": 49,
+        "id_hex": "0x0031",
+        "name": "Network Commissioning",
+        "side": "server"
+      },
+      {
+        "id": 51,
+        "id_hex": "0x0033",
+        "name": "General Diagnostics",
+        "side": "server"
+      },
+      {
+        "id": 60,
+        "id_hex": "0x003C",
+        "name": "Administrator Commissioning",
+        "side": "server"
+      },
+      {
+        "id": 62,
+        "id_hex": "0x003E",
+        "name": "Operational Credentials",
+        "side": "server"
+      },
+      {
+        "id": 63,
+        "id_hex": "0x003F",
+        "name": "Group Key Management",
+        "side": "server"
+      },
+      {
+        "id": 70,
+        "id_hex": "0x0046",
+        "name": "ICD Management",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 50,
+        "id_hex": "0x0032",
+        "name": "Diagnostic Logs",
+        "side": "server"
+      },
+      {
+        "id": 52,
+        "id_hex": "0x0034",
+        "name": "Software Diagnostics",
+        "side": "server"
+      },
+      {
+        "id": 53,
+        "id_hex": "0x0035",
+        "name": "Thread Network Diagnostics",
+        "side": "server"
+      },
+      {
+        "id": 54,
+        "id_hex": "0x0036",
+        "name": "Wi-Fi Network Diagnostics",
+        "side": "server"
+      },
+      {
+        "id": 55,
+        "id_hex": "0x0037",
+        "name": "Ethernet Network Diagnostics",
+        "side": "server"
+      }
+    ]
+  },
+  "23": {
+    "id_hex": "0x0017",
+    "name": "Solar Power",
+    "revision": 1,
+    "source_file": "SolarPower.xml",
+    "required_clusters": [],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      }
+    ]
+  },
+  "24": {
+    "id_hex": "0x0018",
+    "name": "Battery Storage",
+    "revision": 2,
+    "source_file": "BatteryStorage.xml",
+    "required_clusters": [],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      }
+    ]
+  },
+  "25": {
+    "id_hex": "0x0019",
+    "name": "Secondary Network Interface",
+    "revision": 1,
+    "source_file": "SecondaryNetworkInterface.xml",
+    "required_clusters": [
+      {
+        "id": 49,
+        "id_hex": "0x0031",
+        "name": "Network Commissioning",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 53,
+        "id_hex": "0x0035",
+        "name": "Thread Network Diagnostics",
+        "side": "server"
+      },
+      {
+        "id": 54,
+        "id_hex": "0x0036",
+        "name": "Wi-Fi Network Diagnostics",
+        "side": "server"
+      },
+      {
+        "id": 55,
+        "id_hex": "0x0037",
+        "name": "Ethernet Network Diagnostics",
+        "side": "server"
+      }
+    ]
+  },
+  "34": {
+    "id_hex": "0x0022",
+    "name": "Speaker",
+    "revision": 1,
+    "source_file": "Speaker.xml",
+    "required_clusters": [
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "35": {
+    "id_hex": "0x0023",
+    "name": "Casting Video Player",
+    "revision": 2,
+    "source_file": "CastingVideoPlayer.xml",
+    "required_clusters": [
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 1286,
+        "id_hex": "0x0506",
+        "name": "Media Playback",
+        "side": "server"
+      },
+      {
+        "id": 1287,
+        "id_hex": "0x0507",
+        "name": "Media Input",
+        "side": "server"
+      },
+      {
+        "id": 1289,
+        "id_hex": "0x0509",
+        "name": "Keypad Input",
+        "side": "server"
+      },
+      {
+        "id": 1290,
+        "id_hex": "0x050A",
+        "name": "Content Launcher",
+        "side": "server"
+      },
+      {
+        "id": 1292,
+        "id_hex": "0x050C",
+        "name": "Application Launcher",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 151,
+        "id_hex": "0x0097",
+        "name": "Messages",
+        "side": "server"
+      },
+      {
+        "id": 1283,
+        "id_hex": "0x0503",
+        "name": "Wake On LAN",
+        "side": "server"
+      },
+      {
+        "id": 1284,
+        "id_hex": "0x0504",
+        "name": "Channel",
+        "side": "server"
+      },
+      {
+        "id": 1285,
+        "id_hex": "0x0505",
+        "name": "Target Navigator",
+        "side": "server"
+      },
+      {
+        "id": 1288,
+        "id_hex": "0x0508",
+        "name": "Low Power",
+        "side": "server"
+      },
+      {
+        "id": 1291,
+        "id_hex": "0x050B",
+        "name": "Audio Output",
+        "side": "server"
+      },
+      {
+        "id": 1294,
+        "id_hex": "0x050E",
+        "name": "Account Login",
+        "side": "server"
+      }
+    ]
+  },
+  "36": {
+    "id_hex": "0x0024",
+    "name": "Content App",
+    "revision": 2,
+    "source_file": "ContentApp.xml",
+    "required_clusters": [
+      {
+        "id": 1289,
+        "id_hex": "0x0509",
+        "name": "Keypad Input",
+        "side": "server"
+      },
+      {
+        "id": 1292,
+        "id_hex": "0x050C",
+        "name": "Application Launcher",
+        "side": "server"
+      },
+      {
+        "id": 1293,
+        "id_hex": "0x050D",
+        "name": "Application Basic",
+        "side": "server"
+      },
+      {
+        "id": 1296,
+        "id_hex": "0x0510",
+        "name": "Content App Observer",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 1284,
+        "id_hex": "0x0504",
+        "name": "Channel",
+        "side": "server"
+      },
+      {
+        "id": 1285,
+        "id_hex": "0x0505",
+        "name": "Target Navigator",
+        "side": "server"
+      },
+      {
+        "id": 1286,
+        "id_hex": "0x0506",
+        "name": "Media Playback",
+        "side": "server"
+      },
+      {
+        "id": 1290,
+        "id_hex": "0x050A",
+        "name": "Content Launcher",
+        "side": "server"
+      },
+      {
+        "id": 1294,
+        "id_hex": "0x050E",
+        "name": "Account Login",
+        "side": "server"
+      }
+    ]
+  },
+  "39": {
+    "id_hex": "0x0027",
+    "name": "Mode Select",
+    "revision": 1,
+    "source_file": "ModeSelectDeviceType.xml",
+    "required_clusters": [
+      {
+        "id": 80,
+        "id_hex": "0x0050",
+        "name": "Mode Select",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "40": {
+    "id_hex": "0x0028",
+    "name": "Basic Video Player",
+    "revision": 2,
+    "source_file": "BasicVideoPlayer.xml",
+    "required_clusters": [
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 1286,
+        "id_hex": "0x0506",
+        "name": "Media Playback",
+        "side": "server"
+      },
+      {
+        "id": 1287,
+        "id_hex": "0x0507",
+        "name": "Media Input",
+        "side": "server"
+      },
+      {
+        "id": 1289,
+        "id_hex": "0x0509",
+        "name": "Keypad Input",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 151,
+        "id_hex": "0x0097",
+        "name": "Messages",
+        "side": "server"
+      },
+      {
+        "id": 1283,
+        "id_hex": "0x0503",
+        "name": "Wake On LAN",
+        "side": "server"
+      },
+      {
+        "id": 1284,
+        "id_hex": "0x0504",
+        "name": "Channel",
+        "side": "server"
+      },
+      {
+        "id": 1285,
+        "id_hex": "0x0505",
+        "name": "Target Navigator",
+        "side": "server"
+      },
+      {
+        "id": 1288,
+        "id_hex": "0x0508",
+        "name": "Low Power",
+        "side": "server"
+      },
+      {
+        "id": 1291,
+        "id_hex": "0x050B",
+        "name": "Audio Output",
+        "side": "server"
+      }
+    ]
+  },
+  "41": {
+    "id_hex": "0x0029",
+    "name": "Casting Video Client",
+    "revision": 2,
+    "source_file": "CastingVideoClient.xml",
+    "required_clusters": [
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "client"
+      },
+      {
+        "id": 1289,
+        "id_hex": "0x0509",
+        "name": "Keypad Input",
+        "side": "client"
+      },
+      {
+        "id": 1290,
+        "id_hex": "0x050A",
+        "name": "Content Launcher",
+        "side": "client"
+      },
+      {
+        "id": 1293,
+        "id_hex": "0x050D",
+        "name": "Application Basic",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "client"
+      },
+      {
+        "id": 151,
+        "id_hex": "0x0097",
+        "name": "Messages",
+        "side": "client"
+      },
+      {
+        "id": 1283,
+        "id_hex": "0x0503",
+        "name": "Wake On LAN",
+        "side": "client"
+      },
+      {
+        "id": 1284,
+        "id_hex": "0x0504",
+        "name": "Channel",
+        "side": "client"
+      },
+      {
+        "id": 1285,
+        "id_hex": "0x0505",
+        "name": "Target Navigator",
+        "side": "client"
+      },
+      {
+        "id": 1286,
+        "id_hex": "0x0506",
+        "name": "Media Playback",
+        "side": "client"
+      },
+      {
+        "id": 1287,
+        "id_hex": "0x0507",
+        "name": "Media Input",
+        "side": "client"
+      },
+      {
+        "id": 1288,
+        "id_hex": "0x0508",
+        "name": "Low Power",
+        "side": "client"
+      },
+      {
+        "id": 1291,
+        "id_hex": "0x050B",
+        "name": "Audio Output",
+        "side": "client"
+      },
+      {
+        "id": 1292,
+        "id_hex": "0x050C",
+        "name": "Application Launcher",
+        "side": "client"
+      },
+      {
+        "id": 1294,
+        "id_hex": "0x050E",
+        "name": "Account Login",
+        "side": "client"
+      },
+      {
+        "id": 1296,
+        "id_hex": "0x0510",
+        "name": "Content App Observer",
+        "side": "server"
+      }
+    ]
+  },
+  "42": {
+    "id_hex": "0x002A",
+    "name": "Video Remote Control",
+    "revision": 2,
+    "source_file": "VideoRemoteControl.xml",
+    "required_clusters": [
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "client"
+      },
+      {
+        "id": 1286,
+        "id_hex": "0x0506",
+        "name": "Media Playback",
+        "side": "client"
+      },
+      {
+        "id": 1289,
+        "id_hex": "0x0509",
+        "name": "Keypad Input",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "client"
+      },
+      {
+        "id": 1283,
+        "id_hex": "0x0503",
+        "name": "Wake On LAN",
+        "side": "client"
+      },
+      {
+        "id": 1284,
+        "id_hex": "0x0504",
+        "name": "Channel",
+        "side": "client"
+      },
+      {
+        "id": 1285,
+        "id_hex": "0x0505",
+        "name": "Target Navigator",
+        "side": "client"
+      },
+      {
+        "id": 1287,
+        "id_hex": "0x0507",
+        "name": "Media Input",
+        "side": "client"
+      },
+      {
+        "id": 1288,
+        "id_hex": "0x0508",
+        "name": "Low Power",
+        "side": "client"
+      },
+      {
+        "id": 1290,
+        "id_hex": "0x050A",
+        "name": "Content Launcher",
+        "side": "client"
+      },
+      {
+        "id": 1291,
+        "id_hex": "0x050B",
+        "name": "Audio Output",
+        "side": "client"
+      },
+      {
+        "id": 1292,
+        "id_hex": "0x050C",
+        "name": "Application Launcher",
+        "side": "client"
+      },
+      {
+        "id": 1294,
+        "id_hex": "0x050E",
+        "name": "Account Login",
+        "side": "client"
+      }
+    ]
+  },
+  "43": {
+    "id_hex": "0x002B",
+    "name": "Fan",
+    "revision": 4,
+    "source_file": "Fan.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "server"
+      },
+      {
+        "id": 514,
+        "id_hex": "0x0202",
+        "name": "Fan Control",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      }
+    ]
+  },
+  "44": {
+    "id_hex": "0x002C",
+    "name": "Air Quality Sensor",
+    "revision": 1,
+    "source_file": "AirQualitySensor.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 91,
+        "id_hex": "0x005B",
+        "name": "Air Quality",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 1026,
+        "id_hex": "0x0402",
+        "name": "Temperature Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1029,
+        "id_hex": "0x0405",
+        "name": "Relative Humidity Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1036,
+        "id_hex": "0x040C",
+        "name": "Carbon Monoxide Concentration Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1037,
+        "id_hex": "0x040D",
+        "name": "Carbon Dioxide Concentration Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1043,
+        "id_hex": "0x0413",
+        "name": "Nitrogen Dioxide Concentration Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1045,
+        "id_hex": "0x0415",
+        "name": "Ozone Concentration Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1066,
+        "id_hex": "0x042A",
+        "name": "PM2.5 Concentration Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1067,
+        "id_hex": "0x042B",
+        "name": "Formaldehyde Concentration Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1068,
+        "id_hex": "0x042C",
+        "name": "PM1 Concentration Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1069,
+        "id_hex": "0x042D",
+        "name": "PM10 Concentration Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1070,
+        "id_hex": "0x042E",
+        "name": "Total Volatile Organic Compounds Concentration Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1071,
+        "id_hex": "0x042F",
+        "name": "Radon Concentration Measurement",
+        "side": "server"
+      }
+    ]
+  },
+  "45": {
+    "id_hex": "0x002D",
+    "name": "Air Purifier",
+    "revision": 2,
+    "source_file": "AirPurifier.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 514,
+        "id_hex": "0x0202",
+        "name": "Fan Control",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "server"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 113,
+        "id_hex": "0x0071",
+        "name": "HEPA Filter Monitoring",
+        "side": "server"
+      },
+      {
+        "id": 114,
+        "id_hex": "0x0072",
+        "name": "Activated Carbon Filter Monitoring",
+        "side": "server"
+      }
+    ]
+  },
+  "64": {
+    "id_hex": "0x0040",
+    "name": "Irrigation System",
+    "revision": 1,
+    "source_file": "IrrigationSystem.xml",
+    "required_clusters": [],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 96,
+        "id_hex": "0x0060",
+        "name": "Operational State",
+        "side": "server"
+      },
+      {
+        "id": 1028,
+        "id_hex": "0x0404",
+        "name": "Flow Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1028,
+        "id_hex": "0x0404",
+        "name": "Flow Measurement",
+        "side": "client"
+      }
+    ]
+  },
+  "65": {
+    "id_hex": "0x0041",
+    "name": "Water Freeze Detector",
+    "revision": 1,
+    "source_file": "WaterFreezeDetector.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 69,
+        "id_hex": "0x0045",
+        "name": "Boolean State",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 128,
+        "id_hex": "0x0080",
+        "name": "Boolean State Configuration",
+        "side": "server"
+      }
+    ]
+  },
+  "66": {
+    "id_hex": "0x0042",
+    "name": "Water Valve",
+    "revision": 1,
+    "source_file": "WaterValve.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 129,
+        "id_hex": "0x0081",
+        "name": "Valve Configuration and Control",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 1028,
+        "id_hex": "0x0404",
+        "name": "Flow Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1028,
+        "id_hex": "0x0404",
+        "name": "Flow Measurement",
+        "side": "client"
+      }
+    ]
+  },
+  "67": {
+    "id_hex": "0x0043",
+    "name": "Water Leak Detector",
+    "revision": 1,
+    "source_file": "WaterLeakDetector.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 69,
+        "id_hex": "0x0045",
+        "name": "Boolean State",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 128,
+        "id_hex": "0x0080",
+        "name": "Boolean State Configuration",
+        "side": "server"
+      }
+    ]
+  },
+  "68": {
+    "id_hex": "0x0044",
+    "name": "Rain Sensor",
+    "revision": 1,
+    "source_file": "RainSensor.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 69,
+        "id_hex": "0x0045",
+        "name": "Boolean State",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 128,
+        "id_hex": "0x0080",
+        "name": "Boolean State Configuration",
+        "side": "server"
+      }
+    ]
+  },
+  "69": {
+    "id_hex": "0x0045",
+    "name": "Soil Sensor",
+    "revision": 1,
+    "source_file": "SoilSensor.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 1072,
+        "id_hex": "0x0430",
+        "name": "Soil Measurement",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 1026,
+        "id_hex": "0x0402",
+        "name": "Temperature Measurement",
+        "side": "server"
+      }
+    ]
+  },
+  "112": {
+    "id_hex": "0x0070",
+    "name": "Refrigerator",
+    "revision": 2,
+    "source_file": "Refrigerator.xml",
+    "required_clusters": [],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 82,
+        "id_hex": "0x0052",
+        "name": "Refrigerator And Temperature Controlled Cabinet Mode",
+        "side": "server"
+      },
+      {
+        "id": 87,
+        "id_hex": "0x0057",
+        "name": "Refrigerator Alarm",
+        "side": "server"
+      }
+    ]
+  },
+  "113": {
+    "id_hex": "0x0071",
+    "name": "Temperature Controlled Cabinet",
+    "revision": 5,
+    "source_file": "TemperatureControlledCabinet.xml",
+    "required_clusters": [
+      {
+        "id": 86,
+        "id_hex": "0x0056",
+        "name": "Temperature Control",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 72,
+        "id_hex": "0x0048",
+        "name": "Oven Cavity Operational State",
+        "side": "server"
+      },
+      {
+        "id": 73,
+        "id_hex": "0x0049",
+        "name": "Oven Mode",
+        "side": "server"
+      },
+      {
+        "id": 82,
+        "id_hex": "0x0052",
+        "name": "Refrigerator And Temperature Controlled Cabinet Mode",
+        "side": "server"
+      },
+      {
+        "id": 1026,
+        "id_hex": "0x0402",
+        "name": "Temperature Measurement",
+        "side": "server"
+      }
+    ]
+  },
+  "114": {
+    "id_hex": "0x0072",
+    "name": "Room Air Conditioner",
+    "revision": 3,
+    "source_file": "RoomAirConditioner.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 513,
+        "id_hex": "0x0201",
+        "name": "Thermostat",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "server"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "server"
+      },
+      {
+        "id": 113,
+        "id_hex": "0x0071",
+        "name": "HEPA Filter Monitoring",
+        "side": "server"
+      },
+      {
+        "id": 114,
+        "id_hex": "0x0072",
+        "name": "Activated Carbon Filter Monitoring",
+        "side": "server"
+      },
+      {
+        "id": 514,
+        "id_hex": "0x0202",
+        "name": "Fan Control",
+        "side": "server"
+      },
+      {
+        "id": 516,
+        "id_hex": "0x0204",
+        "name": "Thermostat User Interface Configuration",
+        "side": "server"
+      },
+      {
+        "id": 1026,
+        "id_hex": "0x0402",
+        "name": "Temperature Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1029,
+        "id_hex": "0x0405",
+        "name": "Relative Humidity Measurement",
+        "side": "server"
+      }
+    ]
+  },
+  "115": {
+    "id_hex": "0x0073",
+    "name": "Laundry Washer",
+    "revision": 2,
+    "source_file": "LaundryWasher.xml",
+    "required_clusters": [
+      {
+        "id": 96,
+        "id_hex": "0x0060",
+        "name": "Operational State",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 81,
+        "id_hex": "0x0051",
+        "name": "Laundry Washer Mode",
+        "side": "server"
+      },
+      {
+        "id": 83,
+        "id_hex": "0x0053",
+        "name": "Laundry Washer Controls",
+        "side": "server"
+      },
+      {
+        "id": 86,
+        "id_hex": "0x0056",
+        "name": "Temperature Control",
+        "side": "server"
+      }
+    ]
+  },
+  "116": {
+    "id_hex": "0x0074",
+    "name": "Robotic Vacuum Cleaner",
+    "revision": 4,
+    "source_file": "RoboticVacuumCleaner.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 84,
+        "id_hex": "0x0054",
+        "name": "RVC Run Mode",
+        "side": "server"
+      },
+      {
+        "id": 97,
+        "id_hex": "0x0061",
+        "name": "RVC Operational State",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 85,
+        "id_hex": "0x0055",
+        "name": "RVC Clean Mode",
+        "side": "server"
+      },
+      {
+        "id": 336,
+        "id_hex": "0x0150",
+        "name": "Service Area",
+        "side": "server"
+      }
+    ]
+  },
+  "117": {
+    "id_hex": "0x0075",
+    "name": "Dishwasher",
+    "revision": 2,
+    "source_file": "Dishwasher.xml",
+    "required_clusters": [
+      {
+        "id": 96,
+        "id_hex": "0x0060",
+        "name": "Operational State",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 86,
+        "id_hex": "0x0056",
+        "name": "Temperature Control",
+        "side": "server"
+      },
+      {
+        "id": 89,
+        "id_hex": "0x0059",
+        "name": "Dishwasher Mode",
+        "side": "server"
+      },
+      {
+        "id": 93,
+        "id_hex": "0x005D",
+        "name": "Dishwasher Alarm",
+        "side": "server"
+      }
+    ]
+  },
+  "118": {
+    "id_hex": "0x0076",
+    "name": "Smoke CO Alarm",
+    "revision": 1,
+    "source_file": "SmokeCOAlarm.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 92,
+        "id_hex": "0x005C",
+        "name": "Smoke CO Alarm",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "server"
+      },
+      {
+        "id": 1026,
+        "id_hex": "0x0402",
+        "name": "Temperature Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1029,
+        "id_hex": "0x0405",
+        "name": "Relative Humidity Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1036,
+        "id_hex": "0x040C",
+        "name": "Carbon Monoxide Concentration Measurement",
+        "side": "server"
+      }
+    ]
+  },
+  "119": {
+    "id_hex": "0x0077",
+    "name": "Cook Surface",
+    "revision": 2,
+    "source_file": "CookSurface.xml",
+    "required_clusters": [],
+    "optional_clusters": [
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 86,
+        "id_hex": "0x0056",
+        "name": "Temperature Control",
+        "side": "server"
+      },
+      {
+        "id": 1026,
+        "id_hex": "0x0402",
+        "name": "Temperature Measurement",
+        "side": "server"
+      }
+    ]
+  },
+  "120": {
+    "id_hex": "0x0078",
+    "name": "Cooktop",
+    "revision": 1,
+    "source_file": "Cooktop.xml",
+    "required_clusters": [
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      }
+    ]
+  },
+  "121": {
+    "id_hex": "0x0079",
+    "name": "Microwave Oven",
+    "revision": 2,
+    "source_file": "MicrowaveOven.xml",
+    "required_clusters": [
+      {
+        "id": 94,
+        "id_hex": "0x005E",
+        "name": "Microwave Oven Mode",
+        "side": "server"
+      },
+      {
+        "id": 95,
+        "id_hex": "0x005F",
+        "name": "Microwave Oven Control",
+        "side": "server"
+      },
+      {
+        "id": 96,
+        "id_hex": "0x0060",
+        "name": "Operational State",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 514,
+        "id_hex": "0x0202",
+        "name": "Fan Control",
+        "side": "server"
+      }
+    ]
+  },
+  "122": {
+    "id_hex": "0x007A",
+    "name": "Extractor Hood",
+    "revision": 1,
+    "source_file": "ExtractorHood.xml",
+    "required_clusters": [
+      {
+        "id": 514,
+        "id_hex": "0x0202",
+        "name": "Fan Control",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 113,
+        "id_hex": "0x0071",
+        "name": "HEPA Filter Monitoring",
+        "side": "server"
+      },
+      {
+        "id": 114,
+        "id_hex": "0x0072",
+        "name": "Activated Carbon Filter Monitoring",
+        "side": "server"
+      }
+    ]
+  },
+  "123": {
+    "id_hex": "0x007B",
+    "name": "Oven",
+    "revision": 2,
+    "source_file": "Oven.xml",
+    "required_clusters": [],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      }
+    ]
+  },
+  "124": {
+    "id_hex": "0x007C",
+    "name": "Laundry Dryer",
+    "revision": 2,
+    "source_file": "LaundryDryer.xml",
+    "required_clusters": [
+      {
+        "id": 96,
+        "id_hex": "0x0060",
+        "name": "Operational State",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 74,
+        "id_hex": "0x004A",
+        "name": "Laundry Dryer Controls",
+        "side": "server"
+      },
+      {
+        "id": 81,
+        "id_hex": "0x0051",
+        "name": "Laundry Washer Mode",
+        "side": "server"
+      },
+      {
+        "id": 86,
+        "id_hex": "0x0056",
+        "name": "Temperature Control",
+        "side": "server"
+      }
+    ]
+  },
+  "144": {
+    "id_hex": "0x0090",
+    "name": "Network Infrastructure Manager",
+    "revision": 2,
+    "source_file": "NetworkInfraManager.xml",
+    "required_clusters": [
+      {
+        "id": 53,
+        "id_hex": "0x0035",
+        "name": "Thread Network Diagnostics",
+        "side": "server"
+      },
+      {
+        "id": 1105,
+        "id_hex": "0x0451",
+        "name": "Wi-Fi Network Management",
+        "side": "server"
+      },
+      {
+        "id": 1106,
+        "id_hex": "0x0452",
+        "name": "Thread Border Router Management",
+        "side": "server"
+      },
+      {
+        "id": 1107,
+        "id_hex": "0x0453",
+        "name": "Thread Network Directory",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "145": {
+    "id_hex": "0x0091",
+    "name": "Thread Border Router",
+    "revision": 2,
+    "source_file": "ThreadBorderRouter.xml",
+    "required_clusters": [
+      {
+        "id": 53,
+        "id_hex": "0x0035",
+        "name": "Thread Network Diagnostics",
+        "side": "server"
+      },
+      {
+        "id": 1106,
+        "id_hex": "0x0452",
+        "name": "Thread Border Router Management",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 1107,
+        "id_hex": "0x0453",
+        "name": "Thread Network Directory",
+        "side": "server"
+      }
+    ]
+  },
+  "256": {
+    "id_hex": "0x0100",
+    "name": "On/Off Light",
+    "revision": 3,
+    "source_file": "OnOffLight.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "server"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "server"
+      },
+      {
+        "id": 1030,
+        "id_hex": "0x0406",
+        "name": "Occupancy Sensing",
+        "side": "client"
+      }
+    ]
+  },
+  "257": {
+    "id_hex": "0x0101",
+    "name": "Dimmable Light",
+    "revision": 3,
+    "source_file": "DimmableLight.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "server"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "server"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 1030,
+        "id_hex": "0x0406",
+        "name": "Occupancy Sensing",
+        "side": "client"
+      }
+    ]
+  },
+  "259": {
+    "id_hex": "0x0103",
+    "name": "On/Off Light Switch",
+    "revision": 3,
+    "source_file": "OnOffLightSwitch.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "client"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "client"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "client"
+      }
+    ]
+  },
+  "260": {
+    "id_hex": "0x0104",
+    "name": "Dimmer Switch",
+    "revision": 3,
+    "source_file": "DimmerSwitch.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "client"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "client"
+      },
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "client"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "client"
+      }
+    ]
+  },
+  "261": {
+    "id_hex": "0x0105",
+    "name": "Color Dimmer Switch",
+    "revision": 3,
+    "source_file": "ColorDimmerSwitch.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "client"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "client"
+      },
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "client"
+      },
+      {
+        "id": 768,
+        "id_hex": "0x0300",
+        "name": "Color Control",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "client"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "client"
+      }
+    ]
+  },
+  "262": {
+    "id_hex": "0x0106",
+    "name": "Light Sensor",
+    "revision": 4,
+    "source_file": "LightSensor.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 1024,
+        "id_hex": "0x0400",
+        "name": "Illuminance Measurement",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "263": {
+    "id_hex": "0x0107",
+    "name": "Occupancy Sensor",
+    "revision": 4,
+    "source_file": "OccupancySensor.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 1030,
+        "id_hex": "0x0406",
+        "name": "Occupancy Sensing",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 128,
+        "id_hex": "0x0080",
+        "name": "Boolean State Configuration",
+        "side": "server"
+      }
+    ]
+  },
+  "266": {
+    "id_hex": "0x010A",
+    "name": "On/Off Plug-in Unit",
+    "revision": 4,
+    "source_file": "OnOffPlug-inUnit.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "server"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "server"
+      },
+      {
+        "id": 1030,
+        "id_hex": "0x0406",
+        "name": "Occupancy Sensing",
+        "side": "client"
+      }
+    ]
+  },
+  "267": {
+    "id_hex": "0x010B",
+    "name": "Dimmable Plug-In Unit",
+    "revision": 5,
+    "source_file": "DimmablePlug-InUnit.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "server"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "server"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 1030,
+        "id_hex": "0x0406",
+        "name": "Occupancy Sensing",
+        "side": "client"
+      }
+    ]
+  },
+  "268": {
+    "id_hex": "0x010C",
+    "name": "Color Temperature Light",
+    "revision": 4,
+    "source_file": "ColorTemperatureLight.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "server"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "server"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "server"
+      },
+      {
+        "id": 768,
+        "id_hex": "0x0300",
+        "name": "Color Control",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 1030,
+        "id_hex": "0x0406",
+        "name": "Occupancy Sensing",
+        "side": "client"
+      }
+    ]
+  },
+  "269": {
+    "id_hex": "0x010D",
+    "name": "Extended Color Light",
+    "revision": 4,
+    "source_file": "ExtendedColorLight.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "server"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "server"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "server"
+      },
+      {
+        "id": 768,
+        "id_hex": "0x0300",
+        "name": "Color Control",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 1030,
+        "id_hex": "0x0406",
+        "name": "Occupancy Sensing",
+        "side": "client"
+      }
+    ]
+  },
+  "271": {
+    "id_hex": "0x010F",
+    "name": "Mounted On/Off Control",
+    "revision": 2,
+    "source_file": "MountedOnOffControl.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "server"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "server"
+      },
+      {
+        "id": 1030,
+        "id_hex": "0x0406",
+        "name": "Occupancy Sensing",
+        "side": "client"
+      }
+    ]
+  },
+  "272": {
+    "id_hex": "0x0110",
+    "name": "Mounted Dimmable Load Control",
+    "revision": 2,
+    "source_file": "MountedDimmableLoadControl.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "server"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "server"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 1030,
+        "id_hex": "0x0406",
+        "name": "Occupancy Sensing",
+        "side": "client"
+      }
+    ]
+  },
+  "304": {
+    "id_hex": "0x0130",
+    "name": "Joint Fabric Administrator",
+    "revision": 1,
+    "source_file": "JointFabricAdmin.xml",
+    "required_clusters": [
+      {
+        "id": 1874,
+        "id_hex": "0x0752",
+        "name": "Joint Fabric Datastore",
+        "side": "server"
+      },
+      {
+        "id": 1875,
+        "id_hex": "0x0753",
+        "name": "Joint Fabric Administrator",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "320": {
+    "id_hex": "0x0140",
+    "name": "Intercom",
+    "revision": 2,
+    "source_file": "Intercom.xml",
+    "required_clusters": [
+      {
+        "id": 1361,
+        "id_hex": "0x0551",
+        "name": "Camera AV Stream Management",
+        "side": "server"
+      },
+      {
+        "id": 1363,
+        "id_hex": "0x0553",
+        "name": "WebRTC Transport Provider",
+        "side": "server"
+      },
+      {
+        "id": 1363,
+        "id_hex": "0x0553",
+        "name": "WebRTC Transport Provider",
+        "side": "client"
+      },
+      {
+        "id": 1364,
+        "id_hex": "0x0554",
+        "name": "WebRTC Transport Requestor",
+        "side": "server"
+      },
+      {
+        "id": 1364,
+        "id_hex": "0x0554",
+        "name": "WebRTC Transport Requestor",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 1362,
+        "id_hex": "0x0552",
+        "name": "Camera AV Settings User Level Management",
+        "side": "server"
+      },
+      {
+        "id": 1366,
+        "id_hex": "0x0556",
+        "name": "Chime",
+        "side": "client"
+      }
+    ]
+  },
+  "321": {
+    "id_hex": "0x0141",
+    "name": "Audio Doorbell",
+    "revision": 1,
+    "source_file": "AudioDoorbell.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 59,
+        "id_hex": "0x003B",
+        "name": "Switch",
+        "side": "server"
+      },
+      {
+        "id": 1361,
+        "id_hex": "0x0551",
+        "name": "Camera AV Stream Management",
+        "side": "server"
+      },
+      {
+        "id": 1363,
+        "id_hex": "0x0553",
+        "name": "WebRTC Transport Provider",
+        "side": "server"
+      },
+      {
+        "id": 1364,
+        "id_hex": "0x0554",
+        "name": "WebRTC Transport Requestor",
+        "side": "client"
+      },
+      {
+        "id": 1366,
+        "id_hex": "0x0556",
+        "name": "Chime",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 1363,
+        "id_hex": "0x0553",
+        "name": "WebRTC Transport Provider",
+        "side": "client"
+      },
+      {
+        "id": 1364,
+        "id_hex": "0x0554",
+        "name": "WebRTC Transport Requestor",
+        "side": "server"
+      },
+      {
+        "id": 1365,
+        "id_hex": "0x0555",
+        "name": "Push AV Stream Transport",
+        "side": "server"
+      }
+    ]
+  },
+  "322": {
+    "id_hex": "0x0142",
+    "name": "Camera",
+    "revision": 1,
+    "source_file": "Camera.xml",
+    "required_clusters": [
+      {
+        "id": 1361,
+        "id_hex": "0x0551",
+        "name": "Camera AV Stream Management",
+        "side": "server"
+      },
+      {
+        "id": 1363,
+        "id_hex": "0x0553",
+        "name": "WebRTC Transport Provider",
+        "side": "server"
+      },
+      {
+        "id": 1364,
+        "id_hex": "0x0554",
+        "name": "WebRTC Transport Requestor",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 1030,
+        "id_hex": "0x0406",
+        "name": "Occupancy Sensing",
+        "side": "server"
+      },
+      {
+        "id": 1360,
+        "id_hex": "0x0550",
+        "name": "Zone Management",
+        "side": "server"
+      },
+      {
+        "id": 1362,
+        "id_hex": "0x0552",
+        "name": "Camera AV Settings User Level Management",
+        "side": "server"
+      },
+      {
+        "id": 1363,
+        "id_hex": "0x0553",
+        "name": "WebRTC Transport Provider",
+        "side": "client"
+      },
+      {
+        "id": 1364,
+        "id_hex": "0x0554",
+        "name": "WebRTC Transport Requestor",
+        "side": "server"
+      },
+      {
+        "id": 1365,
+        "id_hex": "0x0555",
+        "name": "Push AV Stream Transport",
+        "side": "server"
+      }
+    ]
+  },
+  "323": {
+    "id_hex": "0x0143",
+    "name": "Video Doorbell",
+    "revision": 1,
+    "source_file": "VideoDoorbell.xml",
+    "required_clusters": [],
+    "optional_clusters": []
+  },
+  "324": {
+    "id_hex": "0x0144",
+    "name": "Floodlight Camera",
+    "revision": 1,
+    "source_file": "FloodlightCamera.xml",
+    "required_clusters": [],
+    "optional_clusters": []
+  },
+  "325": {
+    "id_hex": "0x0145",
+    "name": "Snapshot Camera",
+    "revision": 1,
+    "source_file": "SnapshotCamera.xml",
+    "required_clusters": [
+      {
+        "id": 1361,
+        "id_hex": "0x0551",
+        "name": "Camera AV Stream Management",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 1030,
+        "id_hex": "0x0406",
+        "name": "Occupancy Sensing",
+        "side": "server"
+      },
+      {
+        "id": 1360,
+        "id_hex": "0x0550",
+        "name": "Zone Management",
+        "side": "server"
+      },
+      {
+        "id": 1362,
+        "id_hex": "0x0552",
+        "name": "Camera AV Settings User Level Management",
+        "side": "server"
+      }
+    ]
+  },
+  "326": {
+    "id_hex": "0x0146",
+    "name": "Chime",
+    "revision": 1,
+    "source_file": "Chime.xml",
+    "required_clusters": [
+      {
+        "id": 1366,
+        "id_hex": "0x0556",
+        "name": "Chime",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      }
+    ]
+  },
+  "327": {
+    "id_hex": "0x0147",
+    "name": "Camera Controller",
+    "revision": 1,
+    "source_file": "CameraController.xml",
+    "required_clusters": [
+      {
+        "id": 1363,
+        "id_hex": "0x0553",
+        "name": "WebRTC Transport Provider",
+        "side": "client"
+      },
+      {
+        "id": 1364,
+        "id_hex": "0x0554",
+        "name": "WebRTC Transport Requestor",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "client"
+      },
+      {
+        "id": 47,
+        "id_hex": "0x002F",
+        "name": "Power Source",
+        "side": "client"
+      },
+      {
+        "id": 1030,
+        "id_hex": "0x0406",
+        "name": "Occupancy Sensing",
+        "side": "client"
+      },
+      {
+        "id": 1360,
+        "id_hex": "0x0550",
+        "name": "Zone Management",
+        "side": "client"
+      },
+      {
+        "id": 1361,
+        "id_hex": "0x0551",
+        "name": "Camera AV Stream Management",
+        "side": "client"
+      },
+      {
+        "id": 1362,
+        "id_hex": "0x0552",
+        "name": "Camera AV Settings User Level Management",
+        "side": "client"
+      },
+      {
+        "id": 1365,
+        "id_hex": "0x0555",
+        "name": "Push AV Stream Transport",
+        "side": "client"
+      },
+      {
+        "id": 2049,
+        "id_hex": "0x0801",
+        "name": "TLS Certificate Management",
+        "side": "client"
+      },
+      {
+        "id": 2050,
+        "id_hex": "0x0802",
+        "name": "TLS Client Management",
+        "side": "client"
+      }
+    ]
+  },
+  "328": {
+    "id_hex": "0x0148",
+    "name": "Doorbell",
+    "revision": 1,
+    "source_file": "Doorbell.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 59,
+        "id_hex": "0x003B",
+        "name": "Switch",
+        "side": "server"
+      },
+      {
+        "id": 1366,
+        "id_hex": "0x0556",
+        "name": "Chime",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "514": {
+    "id_hex": "0x0202",
+    "name": "Window Covering",
+    "revision": 6,
+    "source_file": "WindowCovering.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 258,
+        "id_hex": "0x0102",
+        "name": "Window Covering",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "515": {
+    "id_hex": "0x0203",
+    "name": "Window Covering Controller",
+    "revision": 4,
+    "source_file": "WindowCoveringController.xml",
+    "required_clusters": [
+      {
+        "id": 258,
+        "id_hex": "0x0102",
+        "name": "Window Covering",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "client"
+      }
+    ]
+  },
+  "560": {
+    "id_hex": "0x0230",
+    "name": "Closure",
+    "revision": 1,
+    "source_file": "Closure.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 260,
+        "id_hex": "0x0104",
+        "name": "Closure Control",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "561": {
+    "id_hex": "0x0231",
+    "name": "Closure Panel",
+    "revision": 1,
+    "source_file": "ClosurePanel.xml",
+    "required_clusters": [
+      {
+        "id": 261,
+        "id_hex": "0x0105",
+        "name": "Closure Dimension",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "574": {
+    "id_hex": "0x023E",
+    "name": "Closure Controller",
+    "revision": 1,
+    "source_file": "ClosureController.xml",
+    "required_clusters": [
+      {
+        "id": 260,
+        "id_hex": "0x0104",
+        "name": "Closure Control",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "client"
+      },
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "client"
+      },
+      {
+        "id": 261,
+        "id_hex": "0x0105",
+        "name": "Closure Dimension",
+        "side": "client"
+      }
+    ]
+  },
+  "769": {
+    "id_hex": "0x0301",
+    "name": "Thermostat",
+    "revision": 5,
+    "source_file": "Thermostat.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "server"
+      },
+      {
+        "id": 513,
+        "id_hex": "0x0201",
+        "name": "Thermostat",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 155,
+        "id_hex": "0x009B",
+        "name": "Energy Preference",
+        "side": "server"
+      },
+      {
+        "id": 514,
+        "id_hex": "0x0202",
+        "name": "Fan Control",
+        "side": "client"
+      },
+      {
+        "id": 516,
+        "id_hex": "0x0204",
+        "name": "Thermostat User Interface Configuration",
+        "side": "server"
+      },
+      {
+        "id": 1026,
+        "id_hex": "0x0402",
+        "name": "Temperature Measurement",
+        "side": "client"
+      },
+      {
+        "id": 1029,
+        "id_hex": "0x0405",
+        "name": "Relative Humidity Measurement",
+        "side": "client"
+      },
+      {
+        "id": 1030,
+        "id_hex": "0x0406",
+        "name": "Occupancy Sensing",
+        "side": "client"
+      }
+    ]
+  },
+  "770": {
+    "id_hex": "0x0302",
+    "name": "Temperature Sensor",
+    "revision": 3,
+    "source_file": "TemperatureSensor.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 1026,
+        "id_hex": "0x0402",
+        "name": "Temperature Measurement",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 516,
+        "id_hex": "0x0204",
+        "name": "Thermostat User Interface Configuration",
+        "side": "server"
+      }
+    ]
+  },
+  "771": {
+    "id_hex": "0x0303",
+    "name": "Pump",
+    "revision": 3,
+    "source_file": "Pump.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "server"
+      },
+      {
+        "id": 512,
+        "id_hex": "0x0200",
+        "name": "Pump Configuration and Control",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "server"
+      },
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "server"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "server"
+      },
+      {
+        "id": 1026,
+        "id_hex": "0x0402",
+        "name": "Temperature Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1026,
+        "id_hex": "0x0402",
+        "name": "Temperature Measurement",
+        "side": "client"
+      },
+      {
+        "id": 1027,
+        "id_hex": "0x0403",
+        "name": "Pressure Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1027,
+        "id_hex": "0x0403",
+        "name": "Pressure Measurement",
+        "side": "client"
+      },
+      {
+        "id": 1028,
+        "id_hex": "0x0404",
+        "name": "Flow Measurement",
+        "side": "server"
+      },
+      {
+        "id": 1028,
+        "id_hex": "0x0404",
+        "name": "Flow Measurement",
+        "side": "client"
+      },
+      {
+        "id": 1030,
+        "id_hex": "0x0406",
+        "name": "Occupancy Sensing",
+        "side": "client"
+      }
+    ]
+  },
+  "772": {
+    "id_hex": "0x0304",
+    "name": "Pump Controller",
+    "revision": 4,
+    "source_file": "PumpController.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "client"
+      },
+      {
+        "id": 512,
+        "id_hex": "0x0200",
+        "name": "Pump Configuration and Control",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "client"
+      },
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "client"
+      },
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "client"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "client"
+      },
+      {
+        "id": 1026,
+        "id_hex": "0x0402",
+        "name": "Temperature Measurement",
+        "side": "client"
+      },
+      {
+        "id": 1027,
+        "id_hex": "0x0403",
+        "name": "Pressure Measurement",
+        "side": "client"
+      },
+      {
+        "id": 1028,
+        "id_hex": "0x0404",
+        "name": "Flow Measurement",
+        "side": "client"
+      }
+    ]
+  },
+  "773": {
+    "id_hex": "0x0305",
+    "name": "Pressure Sensor",
+    "revision": 3,
+    "source_file": "PressureSensor.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 1027,
+        "id_hex": "0x0403",
+        "name": "Pressure Measurement",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "774": {
+    "id_hex": "0x0306",
+    "name": "Flow Sensor",
+    "revision": 3,
+    "source_file": "FlowSensor.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 1028,
+        "id_hex": "0x0404",
+        "name": "Flow Measurement",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "775": {
+    "id_hex": "0x0307",
+    "name": "Humidity Sensor",
+    "revision": 3,
+    "source_file": "HumiditySensor.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 1029,
+        "id_hex": "0x0405",
+        "name": "Relative Humidity Measurement",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "777": {
+    "id_hex": "0x0309",
+    "name": "Heat Pump",
+    "revision": 1,
+    "source_file": "HeatPump.xml",
+    "required_clusters": [],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 513,
+        "id_hex": "0x0201",
+        "name": "Thermostat",
+        "side": "client"
+      }
+    ]
+  },
+  "778": {
+    "id_hex": "0x030A",
+    "name": "Thermostat Controller",
+    "revision": 1,
+    "source_file": "ThermostatController.xml",
+    "required_clusters": [
+      {
+        "id": 513,
+        "id_hex": "0x0201",
+        "name": "Thermostat",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "client"
+      },
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "client"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "client"
+      }
+    ]
+  },
+  "1292": {
+    "id_hex": "0x050C",
+    "name": "Energy EVSE",
+    "revision": 2,
+    "source_file": "EVSE.xml",
+    "required_clusters": [
+      {
+        "id": 153,
+        "id_hex": "0x0099",
+        "name": "Energy EVSE",
+        "side": "server"
+      },
+      {
+        "id": 157,
+        "id_hex": "0x009D",
+        "name": "Energy EVSE Mode",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 1026,
+        "id_hex": "0x0402",
+        "name": "Temperature Measurement",
+        "side": "server"
+      }
+    ]
+  },
+  "1293": {
+    "id_hex": "0x050D",
+    "name": "Device Energy Management",
+    "revision": 3,
+    "source_file": "DeviceEnergyManagement.xml",
+    "required_clusters": [
+      {
+        "id": 152,
+        "id_hex": "0x0098",
+        "name": "Device Energy Management",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 160,
+        "id_hex": "0x00A0",
+        "name": "Electrical Grid Conditions",
+        "side": "client"
+      }
+    ]
+  },
+  "1295": {
+    "id_hex": "0x050F",
+    "name": "Water Heater",
+    "revision": 1,
+    "source_file": "WaterHeater.xml",
+    "required_clusters": [
+      {
+        "id": 148,
+        "id_hex": "0x0094",
+        "name": "Water Heater Management",
+        "side": "server"
+      },
+      {
+        "id": 158,
+        "id_hex": "0x009E",
+        "name": "Water Heater Mode",
+        "side": "server"
+      },
+      {
+        "id": 513,
+        "id_hex": "0x0201",
+        "name": "Thermostat",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      }
+    ]
+  },
+  "1296": {
+    "id_hex": "0x0510",
+    "name": "Electrical Sensor",
+    "revision": 1,
+    "source_file": "ElectricalSensor.xml",
+    "required_clusters": [
+      {
+        "id": 156,
+        "id_hex": "0x009C",
+        "name": "Power Topology",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 144,
+        "id_hex": "0x0090",
+        "name": "Electrical Power Measurement",
+        "side": "server"
+      },
+      {
+        "id": 145,
+        "id_hex": "0x0091",
+        "name": "Electrical Energy Measurement",
+        "side": "server"
+      }
+    ]
+  },
+  "1297": {
+    "id_hex": "0x0511",
+    "name": "Electrical Utility Meter",
+    "revision": 1,
+    "source_file": "ElectricalUtilityMeter.xml",
+    "required_clusters": [
+      {
+        "id": 2822,
+        "id_hex": "0x0B06",
+        "name": "Meter Identification",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "1298": {
+    "id_hex": "0x0512",
+    "name": "Meter Reference Point",
+    "revision": 1,
+    "source_file": "MeterReferencePoint.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "1299": {
+    "id_hex": "0x0513",
+    "name": "Electrical Energy Tariff",
+    "revision": 1,
+    "source_file": "ElectricalEnergyTariff.xml",
+    "required_clusters": [],
+    "optional_clusters": [
+      {
+        "id": 149,
+        "id_hex": "0x0095",
+        "name": "Commodity Price",
+        "side": "server"
+      },
+      {
+        "id": 160,
+        "id_hex": "0x00A0",
+        "name": "Electrical Grid Conditions",
+        "side": "server"
+      },
+      {
+        "id": 1792,
+        "id_hex": "0x0700",
+        "name": "Commodity Tariff",
+        "side": "server"
+      }
+    ]
+  },
+  "1300": {
+    "id_hex": "0x0514",
+    "name": "Electrical Meter",
+    "revision": 1,
+    "source_file": "ElectricalMeter.xml",
+    "required_clusters": [
+      {
+        "id": 144,
+        "id_hex": "0x0090",
+        "name": "Electrical Power Measurement",
+        "side": "server"
+      },
+      {
+        "id": 145,
+        "id_hex": "0x0091",
+        "name": "Electrical Energy Measurement",
+        "side": "server"
+      }
+    ],
+    "optional_clusters": []
+  },
+  "2112": {
+    "id_hex": "0x0840",
+    "name": "Control Bridge",
+    "revision": 3,
+    "source_file": "ControlBridge.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "client"
+      },
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "client"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "client"
+      },
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "client"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "client"
+      },
+      {
+        "id": 768,
+        "id_hex": "0x0300",
+        "name": "Color Control",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 1024,
+        "id_hex": "0x0400",
+        "name": "Illuminance Measurement",
+        "side": "client"
+      },
+      {
+        "id": 1030,
+        "id_hex": "0x0406",
+        "name": "Occupancy Sensing",
+        "side": "client"
+      }
+    ]
+  },
+  "2128": {
+    "id_hex": "0x0850",
+    "name": "On/Off Sensor",
+    "revision": 3,
+    "source_file": "OnOffSensor.xml",
+    "required_clusters": [
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "server"
+      },
+      {
+        "id": 3,
+        "id_hex": "0x0003",
+        "name": "Identify",
+        "side": "client"
+      },
+      {
+        "id": 6,
+        "id_hex": "0x0006",
+        "name": "On/Off",
+        "side": "client"
+      }
+    ],
+    "optional_clusters": [
+      {
+        "id": 4,
+        "id_hex": "0x0004",
+        "name": "Groups",
+        "side": "client"
+      },
+      {
+        "id": 8,
+        "id_hex": "0x0008",
+        "name": "Level Control",
+        "side": "client"
+      },
+      {
+        "id": 98,
+        "id_hex": "0x0062",
+        "name": "Scenes Management",
+        "side": "client"
+      },
+      {
+        "id": 768,
+        "id_hex": "0x0300",
+        "name": "Color Control",
+        "side": "client"
+      }
+    ]
+  }
+}

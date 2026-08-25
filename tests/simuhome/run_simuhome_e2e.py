@@ -112,6 +112,12 @@ def _domain_for_device_type(device_type: str) -> Optional[str]:
         return "climate"
     if device_type == "window_covering_controller":
         return "cover"
+    # Kept in step with the converter and the sidecar: cabinets are `number`
+    # (settable target temperature), start/stop appliances are `switch`.
+    if device_type in {"freezer", "refrigerator"}:
+        return "number"
+    if device_type in {"dishwasher", "laundry_washer", "laundry_dryer", "tv", "rvc"}:
+        return "switch"
     return None
 
 

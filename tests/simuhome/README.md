@@ -30,6 +30,32 @@ Python packages needed by the scripts in this directory:
 pip install pyyaml httpx websockets rdflib
 ```
 
+## 2b. Vendored Matter Data Model (offline)
+
+The registry has **moved** to `ami_agents/environment/integration/SimuHome/matter_model/`: it is owned by the SHTD
+integration (which serves SimuHome as Thing Descriptions) and consumed from
+here. It holds `bootstrap.py`, `normalize_model.py`, `registry.py`,
+`selftest.py`, and the vendored data in `vendor/<VER>/`.
+
+`ami_agents/environment/integration/SimuHome/matter_model/vendor/1.5.1/` holds the CSA Matter data model vendored from
+`project-chip/connectedhomeip` at tag **v1.5.1.0**, commit
+**abcc720b48c5e59c0edcfe65c516f76ca9448aa3**, spec version **1.5.1** — the XML plus
+`clusters.json` (132 clusters), `device-types.json` (91 device types) and
+`manifest.json` (provenance + sha256 of every file). It is the single source of
+truth for Matter facts: device types, clusters, attributes, commands and events
+are resolved from these tables, never from model memory.
+
+`ami_agents/environment/integration/SimuHome/matter_model/bootstrap.py` is the **only** network step in this directory. It is
+run once; everything downstream is offline.
+
+```bash
+python ami_agents/environment/integration/SimuHome/matter_model/bootstrap.py                 # re-vendor (network)
+python ami_agents/environment/integration/SimuHome/matter_model/bootstrap.py --validate-only # offline check
+```
+
+Airgapped? Run the clone on a connected host and copy
+`ami_agents/environment/integration/SimuHome/matter_model/vendor/<VER>/` in; the manifest sha256 proves the version.
+
 ## 3. Prepare SimuHome Scenarios as Home Assistant YAML
 
 Use:
@@ -37,6 +63,26 @@ Use:
 - `initial_home_config_to_homeassistant_yaml.py`
 
 It walks a directory recursively, reads each SimuHome JSON file, extracts `initial_home_config`, and writes a sibling `.yaml` file next to the original `.json`.
+
+Units, scaling and device classes are resolved from the vendored Matter data
+model (see 2b) using each attribute's declared spec type — `temperature`
+(centi-°C), `percent` (0..100, unscaled), `percent100ths` (0..10000) — rather
+than from hardcoded attribute-name lists.
+
+By default it omits Matter protocol plumbing: global attributes
+(`ClusterRevision`, `FeatureMap`, `AttributeList`, …) and the
+`BasicInformation`/`Descriptor`/`Identify`/`PowerTopology` clusters. These
+describe the protocol, not the home, and no downstream consumer reads them.
+Across the 600-episode benchmark this cuts entities per scenario from a median
+of 505 to 313 (-37.6%); a single air purifier goes from 19 entities to 6. Pass
+`--keep-boilerplate` to emit them anyway.
+
+Verify the mappings at any time (offline):
+
+```bash
+python ami_agents/environment/integration/SimuHome/matter_model/selftest.py \
+  --benchmark /path/to/SimuHome/data/benchmark
+```
 
 Example:
 

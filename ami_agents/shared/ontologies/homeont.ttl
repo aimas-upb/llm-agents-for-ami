@@ -1,0 +1,416 @@
+@prefix : <http://example.org/homeont/> .
+@prefix hmas: <https://purl.org/hmas/> .
+@prefix td: <https://www.w3.org/2019/wot/td#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+@prefix js: <https://www.w3.org/2019/wot/json-schema#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix quantitykind: <http://qudt.org/vocab/quantitykind/> .
+@prefix saref: <https://saref.etsi.org/core/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://example.org/homeont/> a owl:Ontology ;
+    rdfs:label "Home Ontology"@en ;
+    rdfs:comment """Vocabulary for smart-home environments: the spaces of a
+building, the devices situated in them, the environment within a space, and the
+observable properties of that environment.
+
+Four groups of terms:
+
+  * BUILDING SPACES -- kitchens, bedrooms, utility rooms. A space is where
+    things ARE.
+  * THE ENVIRONMENT of a space -- a distinct resource, and the sosa:FeatureOfInterest
+    whose properties sensors observe and actuators change. A device is located
+    in a space; only a device that perceives or affects one of the environment's
+    variables relates to the environment. A freezer sits in a kitchen but senses
+    its own compartment, not the kitchen's air.
+  * DEVICE FAMILIES -- anchored to SAREF, which defines exactly five subclasses
+    of saref:Device (Actuator, Appliance, HVAC, Meter, Sensor).
+  * ANNOTATIONS used when projecting devices as W3C Thing Descriptions,
+    including Matter provenance kept out of IRIs and URLs."""@en ;
+    owl:imports <http://www.w3.org/ns/sosa/> .
+
+# Spaces, devices, and the environment, for smart environments (homes, offices).
+
+# ===============================================================================
+# Building and Building Space Types (House, Apartment, Office, Dining Room, etc.)
+# ===============================================================================
+
+:Building a owl:Class ;
+    rdfs:comment "A building represents a structure that provides shelter for its occupants or contents and stands in one place. The building is also used to provide a basic element within the spatial structure hierarchy for the components of a building project (together with site, storey, and space)."@en ;
+    rdfs:label "Building"@en .
+
+:BuildingSpace a owl:Class ;
+    rdfs:comment "An entity used to define the physical spaces of the building. A building space contains devices or other building space objects."@en ; 
+    rdfs:label "Building Space"@en .
+
+:Balcony a owl:Class ;
+    rdfs:subClassOf :BuildingSpace ;
+    rdfs:comment "A Balcony is a kind of BuildingSpace: an outdoor or semi-outdoor elevated platform attached to a building such as a house or apartment." ;
+    rdfs:label "Balcony"@en .
+
+:Bathroom a owl:Class ;
+    rdfs:subClassOf :BuildingSpace ;
+    rdfs:comment "A Bathroom is a kind of BuildingSpace: a room equipped with bathing and sanitary facilities." ;
+    rdfs:label "Bathroom"@en .
+
+:Bedroom a owl:Class ;
+    rdfs:subClassOf :BuildingSpace ;
+    rdfs:comment "A Bedroom is a kind of BuildingSpace: a room furnished for sleeping." ;
+    rdfs:label "Bedroom"@en .
+
+:Corridor a owl:Class ;
+    rdfs:subClassOf :BuildingSpace ;
+    rdfs:comment "A Corridor is a kind of BuildingSpace: a hallway or passage connecting different rooms in the home." ;
+    rdfs:label "Corridor"@en .
+
+:DiningRoom a owl:Class ;
+    rdfs:subClassOf :BuildingSpace ;
+    rdfs:comment "A DiningRoom is a kind of BuildingSpace: a room designated for eating meals." ;
+    rdfs:label "Dining Room"@en .
+
+:Foyer a owl:Class ;
+    rdfs:subClassOf :BuildingSpace ;
+    rdfs:comment "A Foyer is a kind of BuildingSpace: an entrance hall or lobby area of the home." ;
+    rdfs:label "Foyer"@en .
+
+:Garage a owl:Class ;
+    rdfs:subClassOf :BuildingSpace ;
+    rdfs:comment "A Garage is a kind of BuildingSpace: an enclosed space for parking vehicles and storage." ;
+    rdfs:label "Garage"@en .
+
+:GuestBedroom a owl:Class ;
+    rdfs:subClassOf :Bedroom ;
+    rdfs:comment "A GuestBedroom is a kind of BuildingSpace: a bedroom designated for guests." ;
+    rdfs:label "Guest Bedroom"@en .
+
+:KidsRoom a owl:Class ;
+    rdfs:subClassOf :Bedroom ;
+    rdfs:comment "A KidsRoom is a kind of Bedroom: a bedroom designated for children, typically combining sleeping and play areas." ;
+    rdfs:label "Kids Room"@en .
+
+:Kitchen a owl:Class ;
+    rdfs:subClassOf :BuildingSpace ;
+    rdfs:comment "A Kitchen is a kind of BuildingSpace: a room used for cooking and food preparation." ;
+    rdfs:label "Kitchen"@en .
+
+:LivingRoom a owl:Class ;
+    rdfs:subClassOf :BuildingSpace ;
+    rdfs:comment "A LivingRoom is a kind of BuildingSpace: a main living area used for relaxation and socializing." ;
+    rdfs:label "Living Room"@en .
+
+:MasterBedroom a owl:Class ;
+    rdfs:subClassOf :Bedroom ;
+    rdfs:comment "A MasterBedroom is a kind of BuildingSpace: the primary bedroom in the home." ;
+    rdfs:label "Master Bedroom"@en .
+
+:Office a owl:Class ;
+    rdfs:subClassOf :BuildingSpace ;
+    rdfs:comment "An Office is a kind of BuildingSpace: a room used for professional or administrative work." ;
+    rdfs:label "Office"@en .
+
+:StoreRoom a owl:Class ;
+    rdfs:subClassOf :BuildingSpace ;
+    rdfs:comment "A StoreRoom is a kind of BuildingSpace: a room used for storing household items." ;
+    rdfs:label "Store Room"@en .
+
+:StudyRoom a owl:Class ;
+    rdfs:subClassOf :BuildingSpace ;
+    rdfs:comment "A StudyRoom is a kind of BuildingSpace: a room designated for reading, working, or studying." ;
+    rdfs:label "Study Room"@en .
+
+:UtilityRoom a owl:Class ;
+    rdfs:subClassOf :BuildingSpace ;
+    rdfs:comment "A UtilityRoom is a kind of BuildingSpace: a room housing laundry and household service appliances." ;
+    rdfs:label "Utility Room"@en .
+
+# ================================================
+# Properties for Building and Building Space Types
+# ================================================
+
+:hasSpace a owl:ObjectProperty ;
+    rdfs:domain :Building, :BuildingSpace ;
+    rdfs:range :BuildingSpace ;
+    rdfs:comment "A property that relates a Building or BuildingSpace to its constituent BuildingSpaces."@en ;
+    rdfs:label "hasSpace"@en .
+
+:isSpaceOf a owl:ObjectProperty ;
+    rdfs:domain :BuildingSpace ;
+    rdfs:range :Building, :BuildingSpace ;
+    rdfs:comment "A property that relates a BuildingSpace to the Building or BuildingSpace it is part of."@en ;
+    rdfs:label "isSpaceOf"@en ;
+    owl:inverseOf :hasSpace .
+
+# ===============================================================================
+# Situating artifacts in space
+#
+# An HMAS artifact stands for a device that physically sits somewhere. That is a
+# purely spatial fact, and it is separate from what the device observes or acts
+# on: a freezer is located in a kitchen but senses its own compartment, not the
+# kitchen's air.
+# ===============================================================================
+
+:isLocatedIn a owl:ObjectProperty ;
+    rdfs:domain hmas:Artifact ;
+    rdfs:range :BuildingSpace ;
+    rdfs:comment "Relates an artifact to the building space it is physically located in. Purely spatial: it says nothing about what the device senses or affects."@en ;
+    rdfs:label "isLocatedIn"@en ;
+    owl:inverseOf :containsArtifact .
+
+:containsArtifact a owl:ObjectProperty ;
+    rdfs:domain :BuildingSpace ;
+    rdfs:range hmas:Artifact ;
+    rdfs:comment "Relates a building space to the artifacts physically located in it."@en ;
+    rdfs:label "containsArtifact"@en ;
+    owl:inverseOf :isLocatedIn .
+
+:isSpaceOfWorkspace a owl:ObjectProperty ;
+    rdfs:domain :BuildingSpace ;
+    rdfs:range hmas:Workspace ;
+    rdfs:comment "Relates a building space to the HMAS workspace that groups the artifacts situated in it. The workspace is a logical container; the space is the physical room."@en ;
+    rdfs:label "isSpaceOfWorkspace"@en ;
+    owl:inverseOf :hasSpace .
+
+# ===============================================================================
+# The environment of a building space
+#
+# A space and the environment within it are two distinct resources. The space is
+# where things ARE; the environment is what is OBSERVED and ACTED ON -- the air
+# whose temperature, humidity, illuminance and particulate concentration sensors
+# measure and actuators change.
+#
+# Only devices that actually perceive or affect one of those variables relate to
+# the environment. Every device relates to the space.
+# ===============================================================================
+
+:Environment a owl:Class ;
+    rdfs:subClassOf sosa:FeatureOfInterest ;
+    rdfs:comment "The environment within a building space: the feature of interest whose observable properties (air temperature, relative humidity, illuminance, particulate concentration) sensors observe and actuators change."@en ;
+    rdfs:label "Environment"@en .
+
+:hasEnvironment a owl:ObjectProperty ;
+    rdfs:domain :BuildingSpace ;
+    rdfs:range :Environment ;
+    rdfs:comment "Relates a building space to the environment within it."@en ;
+    rdfs:label "hasEnvironment"@en ;
+    owl:inverseOf :isEnvironmentOf .
+
+:isEnvironmentOf a owl:ObjectProperty ;
+    rdfs:domain :Environment ;
+    rdfs:range :BuildingSpace ;
+    rdfs:comment "Relates an environment to the building space it belongs to."@en ;
+    rdfs:label "isEnvironmentOf"@en ;
+    owl:inverseOf :hasEnvironment .
+
+################################################################################
+# Matter provenance annotations
+#
+# Matter names are provenance, not identity: the planner addresses a property by
+# its `td:name`, and SHTD resolves that back to cluster / attribute / endpoint
+# from the registry when it dispatches. These properties record the origin so
+# nothing is lost, while keeping cluster ids out of the URL surface.
+################################################################################
+
+:matterType a owl:DatatypeProperty ;
+	rdfs:label "Matter type"@en ;
+	rdfs:comment """The Matter data-model type of a value, verbatim from the
+registry -- "bool", "uint8", "temperature", "SystemModeEnum",
+"ChannelInfoStruct", "power-mW".
+
+Worth keeping even though the schema is already typed: `power-mW` and `uint32`
+are both js:IntegerSchema, but only the former is in milliwatts. The physical
+quantity types carry their unit and scale in the name."""@en ;
+	rdfs:domain js:DataSchema ;
+	rdfs:range xsd:string .
+
+:matterEntryType a owl:DatatypeProperty ;
+	rdfs:label "Matter entry type"@en ;
+	rdfs:comment """Element type of a list-valued attribute. Matter declares such
+an attribute as type "list" and puts the element type in a child <entry>, so
+"list" alone says nothing about what the list holds."""@en ;
+	rdfs:domain js:ArraySchema ;
+	rdfs:range xsd:string .
+
+:matterScale a owl:DatatypeProperty ;
+	rdfs:label "Matter scale"@en ;
+	rdfs:comment """Declares that the simulator stores this quantity in a scaled
+integer unit while the Thing Description reports the human value. Currently only
+"centi": Matter carries temperature and relative humidity in hundredths, so a
+room at 23.62 °C is stored as 2362.
+
+Stated explicitly so nobody divides twice. This is static shape -- the read
+route always applies the same conversion -- which is why it belongs on the
+schema, unlike a reading."""@en ;
+	rdfs:domain js:DataSchema ;
+	rdfs:range xsd:string .
+
+# NOTE -- units are carried by `qudt:unit` alone.
+#
+# A local unit-symbol property was removed as redundant: the QUDT unit IRI
+# already carries `qudt:symbol` ("°C", "mW") and a language-less `rdfs:label`
+# ("Degree Celsius"), so restating the symbol added nothing.
+#
+# TODO (planner-context serialization): the helper functions that render a TD
+# into an agent's context must resolve each qudt:unit IRI to those two values.
+# QUDT publishes rdfs:label in many languages -- take the one with no language
+# tag. Verified present for every unit this corpus uses.
+
+################################################################################
+# Affordance annotations
+################################################################################
+
+:mechanism a owl:DatatypeProperty ;
+	rdfs:label "actuation mechanism"@en ;
+	rdfs:comment """How SHTD actuates this property against the simulator.
+
+Matter actuates two ways, and the split is invisible to the planner by design:
+SHTD dispatches to the right SimuHome endpoint either way.
+
+  "attribute_write" -- the spec declares the attribute writable; SHTD POSTs to
+                       /api/devices/{id}/attributes/write
+  "command"         -- the attribute is read-only but a cluster command drives
+                       it (OnOff.OnOff is read-only, yet On/Off/Toggle set it);
+                       SHTD POSTs to /api/devices/{id}/commands"""@en ;
+	rdfs:domain td:PropertyAffordance ;
+	rdfs:range xsd:string .
+
+:sosaRole a owl:DatatypeProperty ;
+	rdfs:label "SOSA role"@en ;
+	rdfs:comment """What kind of thing the value is, which decides how it relates
+to SOSA. Introduced because a Matter attribute name alone is misleading:
+`MeasuredValue` is not a property, it is the RESULT of observing one.
+
+  "quantity_result"  -- a measured value of an observable quantity
+  "quantity_target"  -- a setpoint or target for a quantity
+  "device_state"     -- internal device state (on/off, current mode)
+  "sensor_metadata"  -- declared capability rather than a reading
+
+Min/Max bounds do not appear as affordances at all: they constrain a sibling's
+value, so they are emitted as js:minimum/js:maximum on that sibling's schema
+rather than as readable properties of their own."""@en ;
+	rdfs:domain td:PropertyAffordance ;
+	rdfs:range xsd:string .
+
+################################################################################
+# Matter BasicInformation is NOT represented here.
+#
+# Vendor and product registration details are not something a planner acts on.
+# A device's human-readable type is its rdfs:label -- taken from the curated
+# family table, which matches Matter's ProductName on every device in the
+# corpus -- and its name is its td:title, the SimuHome device id
+# ("kitchen_freezer_1"), verbatim from the episode JSON and unique per home.
+################################################################################
+
+################################################################################
+# Device families
+#
+# One class per SimuHome device family, each a subclass of a SAREF device class.
+# SAREF v3.2.1 defines exactly five subclasses of saref:Device -- Actuator,
+# Appliance, HVAC, Meter, Sensor -- and no others are used here. (An earlier
+# draft invented `saref:Lighting`; the mapping tables now reject any SAREF
+# parent SAREF does not define.)
+################################################################################
+
+:AirConditioner a owl:Class ;
+	rdfs:label "Air Conditioner"@en ;
+	rdfs:subClassOf saref:HVAC .
+
+:HeatPump a owl:Class ;
+	rdfs:label "Heat Pump"@en ;
+	rdfs:subClassOf saref:HVAC .
+
+:OnOffLight a owl:Class ;
+	rdfs:label "On/Off Light"@en ;
+	rdfs:subClassOf saref:Actuator .
+
+:DimmableLight a owl:Class ;
+	rdfs:label "Dimmable Light"@en ;
+	rdfs:subClassOf saref:Actuator .
+
+:WindowCoveringController a owl:Class ;
+	rdfs:label "Window Covering Controller"@en ;
+	rdfs:subClassOf saref:Actuator .
+
+:AirPurifier a owl:Class ;
+	rdfs:label "Air Purifier"@en ;
+	rdfs:subClassOf saref:Appliance .
+
+:Humidifier a owl:Class ;
+	rdfs:label "Humidifier"@en ;
+	rdfs:subClassOf saref:Appliance .
+
+:Dehumidifier a owl:Class ;
+	rdfs:label "Dehumidifier"@en ;
+	rdfs:subClassOf saref:Appliance .
+
+:Fan a owl:Class ;
+	rdfs:label "Fan"@en ;
+	rdfs:subClassOf saref:Appliance .
+
+:Dishwasher a owl:Class ;
+	rdfs:label "Dishwasher"@en ;
+	rdfs:subClassOf saref:Appliance .
+
+:LaundryWasher a owl:Class ;
+	rdfs:label "Laundry Washer"@en ;
+	rdfs:subClassOf saref:Appliance .
+
+:LaundryDryer a owl:Class ;
+	rdfs:label "Laundry Dryer"@en ;
+	rdfs:subClassOf saref:Appliance .
+
+:Refrigerator a owl:Class ;
+	rdfs:label "Refrigerator"@en ;
+	rdfs:subClassOf saref:Appliance .
+
+:Freezer a owl:Class ;
+	rdfs:label "Freezer"@en ;
+	rdfs:subClassOf saref:Appliance .
+
+:Rvc a owl:Class ;
+	rdfs:label "RVC"@en ;
+	skos:altLabel "Robotic Vacuum Cleaner"@en ;
+	rdfs:subClassOf saref:Appliance .
+
+:Tv a owl:Class ;
+	rdfs:label "TV"@en ;
+	rdfs:subClassOf saref:Appliance .
+
+################################################################################
+# Environmental properties
+#
+# The four variables SimuHome simulates. Named after the physical quantity they
+# measure, matching their QUDT quantity kind -- not after the Matter attribute
+# that happens to report them. ("Illuminance", not "luminosity".)
+################################################################################
+
+:AirTemperature a owl:Class ;
+	rdfs:label "Air Temperature"@en ;
+	rdfs:subClassOf sosa:ObservableProperty ;
+	qudt:hasQuantityKind quantitykind:ThermodynamicTemperature ;
+	qudt:unit unit:DEG_C .
+
+:RelativeHumidity a owl:Class ;
+	rdfs:label "Relative Humidity"@en ;
+	rdfs:subClassOf sosa:ObservableProperty ;
+	qudt:hasQuantityKind quantitykind:RelativeHumidity ;
+	qudt:unit unit:PERCENT .
+
+:Illuminance a owl:Class ;
+	rdfs:label "Illuminance"@en ;
+	rdfs:subClassOf sosa:ObservableProperty ;
+	qudt:hasQuantityKind quantitykind:Illuminance ;
+	qudt:unit unit:LUX .
+
+:Pm10MassConcentration a owl:Class ;
+	rdfs:label "PM10 Mass Concentration"@en ;
+	rdfs:comment """Particulate matter up to 10 micrometres, as a mass
+concentration. quantitykind:MassConcentration is the closest QUDT quantity kind;
+it does not encode the particle-size cut-off, which is carried by this class."""@en ;
+	rdfs:subClassOf sosa:ObservableProperty ;
+	qudt:hasQuantityKind quantitykind:MassConcentration ;
+	qudt:unit unit:MicroGM-PER-M3 .
