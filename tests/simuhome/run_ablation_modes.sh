@@ -135,6 +135,14 @@ for model in "${MODELS[@]}"; do
               printf '  DRY_RUN:'; printf ' %q' "${cmd[@]}"; printf '\n'
               continue
             fi
+            # A run that aborted mid-flight can leak its HASP/adapter or
+            # sidecar; a leftover bound to port 8080 makes every later run
+            # die at startup ("HASP exited unexpectedly"). Sweep before
+            # starting. Patterns are narrow enough not to match this script.
+            pkill -f "uvicorn hasp:app" 2>/dev/null || true
+            pkill -f "uvicorn ygg_ha_adapter:app" 2>/dev/null || true
+            pkill -f "simulate_simuhome_scenario[.]py" 2>/dev/null || true
+            sleep 1
             "${cmd[@]}" 2>&1 | tee "${log}"
             status="${PIPESTATUS[0]}"
             echo "[${run_tag}] exit=${status}"

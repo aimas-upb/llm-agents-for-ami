@@ -162,6 +162,36 @@ async def _ensure_area(ws, area_name: str) -> str:
     return area_id
 
 
+async def _delete_stale_virtual_entries(client: httpx.AsyncClient, group_name: str) -> None:
+    """Remove leftover Virtual Devices entries for this group.
+
+    A run that aborts mid-cleanup leaks its config entry; the next run of the
+    same seed then fails the creation flow with ``group_name_used`` and every
+    later run of that seed cascades. Deleting a stale entry up front makes
+    workspace creation idempotent.
+    """
+    try:
+        resp = await client.get("/api/config/config_entries/entry")
+        resp.raise_for_status()
+        entries = resp.json()
+    except Exception as exc:  # noqa: BLE001 — best-effort sweep
+        print(f"warning: could not list config entries for stale sweep: {exc}", file=sys.stderr)
+        return
+    for entry in entries if isinstance(entries, list) else []:
+        if entry.get("domain") != "virtual":
+            continue
+        if entry.get("title") != group_name:
+            continue
+        entry_id = entry.get("entry_id")
+        if not entry_id:
+            continue
+        try:
+            await client.delete(f"/api/config/config_entries/entry/{entry_id}")
+            print(f"deleted stale virtual entry {entry_id} ({group_name})", file=sys.stderr)
+        except Exception as exc:  # noqa: BLE001
+            print(f"warning: failed to delete stale entry {entry_id}: {exc}", file=sys.stderr)
+
+
 async def _run_virtual_flow(
     client: httpx.AsyncClient,
     *,
@@ -311,6 +341,8 @@ async def main() -> None:
             timeout=20.0,
         ) as client:
             area_id = await _ensure_area(ws, area_name)
+
+            await _delete_stale_virtual_entries(client, group_name)
 
             flow_result = await _run_virtual_flow(
                 client,
