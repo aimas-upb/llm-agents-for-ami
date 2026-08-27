@@ -77,8 +77,8 @@ interaction_solver:
       temperature: 0.5
       max_tokens: 2000
 
-      # Behavior Tree generation
-      output_format: "behavior_tree"
+      # Plan generation mode: behavior_tree (JSON IR tool call) | python_code (builder-DSL script)
+      output_format: "${BT_PLAN_MODE:-behavior_tree}"
       max_planning_attempts: 3  # retries for BT generation
 
       # Node template features

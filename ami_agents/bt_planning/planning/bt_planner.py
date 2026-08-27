@@ -100,10 +100,11 @@ class AsyncBTPlanner:
         sig_hints_text = format_signifier_hints(signifier_hints, url_to_ref=url_to_ref)
         obs_hints_text = format_observable_property_hints(observable_property_hints, url_to_ref=url_to_ref)
 
-        system_prompt = BT_PLANNING_SYSTEM_PROMPT.format(
+        system_prompt = self._system_prompt(
             capability_context=capability_context,
             signifier_hints=sig_hints_text,
             observable_property_hints=obs_hints_text,
+            state=state,
         )
 
         # Format user message with intents
@@ -161,6 +162,7 @@ class AsyncBTPlanner:
                     "explanation": f"LLM call failed: {e}",
                     "impossible": False,
                     "intents": intents,
+                    **self._extra_result_fields(),
                 }
 
             message = response.choices[0].message
@@ -171,32 +173,9 @@ class AsyncBTPlanner:
                 assistant_msg["tool_calls"] = message.tool_calls
             messages.append(assistant_msg)
 
-            args: Optional[dict] = None
-            tool_call_id: Optional[str] = None
-            if message.tool_calls:
-                tool_call = message.tool_calls[0]
-                tool_call_id = tool_call.id
-                try:
-                    args = json.loads(tool_call.function.arguments)
-                except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse tool call arguments: {e}")
-                    validation_errors = [f"the tool call arguments were not valid JSON: {e}"]
-            else:
-                # Small local models often emit the tool call as fenced JSON
-                # text instead of a structured tool call; recover it.
-                args = self._parse_tool_call_content(message.content)
-                if args is not None:
-                    logger.info("Recovered generate_behavior_tree arguments from message content")
-                else:
-                    logger.warning(
-                        "No tool call in response and content fallback failed (attempt %d/%d)",
-                        attempt + 1,
-                        self.max_attempts,
-                    )
-                    validation_errors = [
-                        "the response contained neither a generate_behavior_tree tool call "
-                        "nor parseable JSON arguments"
-                    ]
+            args, tool_call_id, extract_errors = self._extract_args(message, attempt)
+            if extract_errors:
+                validation_errors = extract_errors
 
             if args is not None:
                 tree_spec = args.get("tree", {})
@@ -210,6 +189,7 @@ class AsyncBTPlanner:
                         "explanation": last_explanation,
                         "impossible": True,
                         "intents": intents,
+                        **self._extra_result_fields(),
                     }
 
                 # Resolve short affordance ids back to target URLs so the final
@@ -239,6 +219,7 @@ class AsyncBTPlanner:
                         "explanation": last_explanation,
                         "impossible": False,
                         "intents": intents,
+                        **self._extra_result_fields(),
                     }
 
                 logger.warning(
@@ -249,11 +230,7 @@ class AsyncBTPlanner:
                 )
 
             # Provide feedback for retry
-            feedback = (
-                "The previous response was invalid:\n- "
-                + "\n- ".join(validation_errors)
-                + "\nPlease call generate_behavior_tree again with a corrected, non-empty tree."
-            )
+            feedback = self._retry_feedback(validation_errors)
             if tool_call_id:
                 messages.append({
                     "role": "tool",
@@ -271,7 +248,72 @@ class AsyncBTPlanner:
             "explanation": "Generation failed: " + "; ".join(validation_errors),
             "impossible": False,
             "intents": intents,
+            **self._extra_result_fields(),
         }
+
+    # ------------------------------------------------------------------ #
+    # Mode hooks — overridden by AsyncCodeBTPlanner (direct-code mode).
+    # The retry loop and the post-generation pipeline above stay shared so
+    # both generation modes are compared on identical validation machinery.
+    # ------------------------------------------------------------------ #
+    def _system_prompt(
+        self,
+        capability_context: str,
+        signifier_hints: str,
+        observable_property_hints: str,
+        state: Optional[dict],
+    ) -> str:
+        """Render the system prompt. ``state`` is unused in IR mode."""
+        return BT_PLANNING_SYSTEM_PROMPT.format(
+            capability_context=capability_context,
+            signifier_hints=signifier_hints,
+            observable_property_hints=observable_property_hints,
+        )
+
+    def _extract_args(
+        self, message: Any, attempt: int
+    ) -> tuple[Optional[dict], Optional[str], list[str]]:
+        """
+        Extract generate_behavior_tree arguments from an LLM response message.
+
+        Returns ``(args, tool_call_id, errors)``; ``args`` is None when
+        extraction failed and ``errors`` explains why (fed back for retry).
+        """
+        if message.tool_calls:
+            tool_call = message.tool_calls[0]
+            try:
+                return json.loads(tool_call.function.arguments), tool_call.id, []
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse tool call arguments: {e}")
+                return None, tool_call.id, [f"the tool call arguments were not valid JSON: {e}"]
+
+        # Small local models often emit the tool call as fenced JSON
+        # text instead of a structured tool call; recover it.
+        args = self._parse_tool_call_content(message.content)
+        if args is not None:
+            logger.info("Recovered generate_behavior_tree arguments from message content")
+            return args, None, []
+        logger.warning(
+            "No tool call in response and content fallback failed (attempt %d/%d)",
+            attempt + 1,
+            self.max_attempts,
+        )
+        return None, None, [
+            "the response contained neither a generate_behavior_tree tool call "
+            "nor parseable JSON arguments"
+        ]
+
+    def _retry_feedback(self, validation_errors: list[str]) -> str:
+        """Compose the corrective message appended after a failed attempt."""
+        return (
+            "The previous response was invalid:\n- "
+            + "\n- ".join(validation_errors)
+            + "\nPlease call generate_behavior_tree again with a corrected, non-empty tree."
+        )
+
+    def _extra_result_fields(self) -> dict:
+        """Mode-specific fields merged into every generate_bt result."""
+        return {"plan_mode": "behavior_tree"}
 
     @staticmethod
     def _parse_tool_call_content(content: Optional[str]) -> Optional[dict]:

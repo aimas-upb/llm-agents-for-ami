@@ -91,3 +91,100 @@ def test_infer_observable_properties_still_accepts_intent_objects():
     )
 
     assert "air_quality" in properties
+
+
+class TestPlanModeSelection:
+    """output_format (agents.yaml planning.llm_planning) picks the planner class."""
+
+    def _agent(self, monkeypatch, output_format=None):
+        from ami_agents.bt_planning.planning.bt_planner import AsyncBTPlanner
+        from ami_agents.bt_planning.planning.code_planner import AsyncCodeBTPlanner
+
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        config = {}
+        if output_format is not None:
+            config = {"planning": {"llm_planning": {"output_format": output_format}}}
+        return InteractionSolverAgent("test@localhost", "pw", config)
+
+    def test_python_code_selects_code_planner(self, monkeypatch):
+        from ami_agents.bt_planning.planning.code_planner import AsyncCodeBTPlanner
+
+        agent = self._agent(monkeypatch, "python_code")
+        assert agent.plan_mode == "python_code"
+        assert isinstance(agent.bt_planner, AsyncCodeBTPlanner)
+
+    def test_default_is_behavior_tree(self, monkeypatch):
+        from ami_agents.bt_planning.planning.bt_planner import AsyncBTPlanner
+        from ami_agents.bt_planning.planning.code_planner import AsyncCodeBTPlanner
+
+        agent = self._agent(monkeypatch)
+        assert agent.plan_mode == "behavior_tree"
+        assert isinstance(agent.bt_planner, AsyncBTPlanner)
+        assert not isinstance(agent.bt_planner, AsyncCodeBTPlanner)
+
+    def test_garbage_value_falls_back_to_behavior_tree(self, monkeypatch):
+        agent = self._agent(monkeypatch, "garbage")
+        assert agent.plan_mode == "behavior_tree"
+
+
+class TestGeneratePlanEnvelope:
+    """The plan envelope must carry plan_mode/generated_code and keep the
+    intent chain (intents + intent_type) intact."""
+
+    def _solver_for_generate(self):
+        agent = _bare_solver()
+        agent.plan_mode = "python_code"
+        agent._resolve_workspace_id = AsyncMock(return_value="home")
+        agent._try_build_plan_from_signifiers = AsyncMock(return_value=None)
+        agent._gather_planning_context = AsyncMock(
+            return_value={"affordances": [AFF_LIGHT], "state": {}, "signifier_matches": {}}
+        )
+        agent.bt_planner = AsyncMock()
+        agent.bt_planner.generate_bt = AsyncMock(
+            return_value={
+                "tree": {"name": "N", "type": "action", "action_url": AFF_LIGHT["target"]},
+                "explanation": "ok",
+                "impossible": False,
+                "intents": ["turn on the light"],
+                "plan_mode": "python_code",
+                "generated_code": "tree = action('light1/turnOn')",
+            }
+        )
+        agent.llm_client = object()
+        agent.model = "gpt-4o-mini"
+        agent.temperature = 0.5
+        agent.reasoning_effort = None
+        agent.max_completion_tokens = None
+        return agent
+
+    @pytest.mark.asyncio
+    async def test_envelope_carries_mode_code_and_intents(self):
+        agent = self._solver_for_generate()
+        intent = Intent(
+            action="set", artifact="light1", parameter="state", value="on",
+            intent_text="turn on the light",
+        )
+        raw = await agent._generate_plan([intent], workspace_id="home", intent_type="EXPLICIT")
+        envelope = json.loads(raw)
+
+        assert envelope["plan_type"] == "behavior_tree"
+        assert envelope["plan_mode"] == "python_code"
+        assert envelope["generated_code"] == "tree = action('light1/turnOn')"
+        assert envelope["intent_type"] == "EXPLICIT"
+        assert envelope["intents"][0]["intent_text"] == "turn on the light"
+        assert envelope["tree"]["action_url"] == AFF_LIGHT["target"]
+
+    @pytest.mark.asyncio
+    async def test_error_envelope_carries_mode(self):
+        agent = self._solver_for_generate()
+        agent._gather_planning_context = AsyncMock(side_effect=RuntimeError("boom"))
+        intent = Intent(
+            action="set", artifact="light1", parameter="state", value="on",
+            intent_text="turn on the light",
+        )
+        raw = await agent._generate_plan([intent], workspace_id="home", intent_type="IMPLICIT")
+        envelope = json.loads(raw)
+
+        assert envelope["error"] == "context_gathering_failed"
+        assert envelope["plan_mode"] == "python_code"
+        assert envelope["intent_type"] == "IMPLICIT"
