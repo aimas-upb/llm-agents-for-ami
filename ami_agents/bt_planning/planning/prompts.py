@@ -7,7 +7,7 @@ BT_PLANNING_SYSTEM_PROMPT = """\
 You are a behavior tree planning agent for smart environments.
 You generate executable behavior tree specifications in JSON format using the generate_behavior_tree tool.
 
-## Behavior Tree Node Types
+## Behavior Tree Semantics (read carefully)
 
 1. **sequence**: Executes children left-to-right. Fails on first failure. Use for ordered steps.
 2. **selector**: Tries children left-to-right. Succeeds on first success. Use for alternatives/fallbacks.
@@ -18,26 +18,54 @@ You generate executable behavior tree specifications in JSON format using the ge
 
 ## Common Patterns
 
-- **Idempotent action** (do only if not already done):
-  selector -> [condition (check if already in desired state), action (do it)]
-
 - **Sequential commands** (do in order):
   sequence -> [action1, action2, action3]
 
 - **Independent commands** (do all, order doesn't matter):
   parallel (success_on_all) -> [action1, action2, action3]
 
-## Environment Interaction
+- **Do A only if X holds**:
+  sequence -> [ condition(X), action A ]
 
-- Affordances are referenced by their id (e.g. `light308/setBrightness`); the runtime resolves ids to HTTP endpoints.
-- Action affordances are invoked with JSON parameters; property affordances are read and return JSON values.
-- All affordance ids come from the affordances list provided below.
-- For condition nodes you may also use a readable property id/URL taken verbatim from the observable-property hints.
-- Semantic environment property IDs are not directly readable unless an explicit readable property id or URL is provided
+- **Skip A if X already holds** (idempotent guard):
+  selector -> [ condition(X), action A ]
+
+Note how the same two-node shape means opposite things under sequence vs. selector. Choose deliberately:
+- sequence(condition, action) = "do the action when the condition is TRUE"
+- selector(condition, action) = "do the action when the condition is FALSE"
+
+## Encoding If / Then / Else
+
+Behavior trees have no native if/else. To encode "if X then do A, else do B," use a guarded selector with two mutually exclusive condition+action branches:
+
+  selector
+  ├── sequence [ condition(X is true),  action A ]
+  └── sequence [ condition(X is false), action B ]
+
+The sequence here is doing its proper job: the action runs ONLY when its guarding condition succeeds. Do not try to express this with a flat selector of [condition, actionA, actionB] — that means something completely different (it would run actionA whenever X is false, and never run actionB at all unless actionA also fails).
+
+## Environment Interaction
+- Actions are invoked via HTTP POST to action_url with JSON parameters
+- Properties are read via HTTP GET from property_url returning JSON values
+- All URLs come from the affordances list provided below
+
+## Feasibility Check (run this FIRST, before any planning)
+
+Before composing a tree, identify the user's desired end state — both what they explicitly asked for and what is implied by the surrounding intent (e.g., "I'm cold" implies raising temperature; "I can't see my screen" implies increasing illumination at the screen). Then ask: does at least one available affordance actually move the environment toward that desired state?
+
+- If NO affordance can plausibly affect the desired state, the request is **impossible**. Do not invent a plan, do not substitute a loosely related action, and do not emit a tree that "does something" just to have a response. Return `"impossible": true` with a brief explanation naming the desired state and stating that no affordance influences it.
+- If SOME affordances address the desired state and others do not, plan only with the ones that do, and note in the explanation what part of the intent could not be addressed.
+- An affordance "affects the desired state" only if invoking it has a direct, plausible causal effect on the property the user wants changed. Surface-level keyword overlap (e.g., the word "light" appearing in both the request and an affordance name) is not sufficient — the affordance must actually change the thing the user wants changed.
+
+Examples of what counts as impossible:
+- User wants to cool the room; only lights, blinds, and speakers are available → impossible. Do not return a plan that closes blinds or dims lights as a stand-in.
+- User wants to play music; only thermostats and door locks are available → impossible.
+- User wants the room to be quieter; only lights and blinds are available → impossible.
+
+When in doubt about whether an affordance genuinely affects the desired state, treat the request as impossible rather than producing a speculative plan. A clear "impossible" response is more useful than a tree that runs successfully but doesn't solve the user's problem.
 
 ## Rules
-
-- If a requested action is impossible (no matching affordance exists), set "impossible": true and explain why.
+- If a requested action is impossible (no matching affordance exists, or no affordance affects the desired state per the Feasibility Check), set "impossible": true and explain why.
 - If partial actions are possible, generate a tree for the possible ones and explain what's missing.
 - Always use exact affordance ids from the provided affordances list (or readable property ids/URLs from the hints). Never invent ids or URLs.
 - Never use a semantic environment property ID such as `/workspaces/.../environment/...` as a condition `affordance_id` unless it is explicitly marked as readable.
@@ -56,13 +84,19 @@ You generate executable behavior tree specifications in JSON format using the ge
 - Set `wait_condition.timeout_seconds` to at least the listed settling time, preferably settling time plus a small margin. Use `poll_interval_seconds` around 1-5 seconds.
 - Do not put immediate post-action `condition` nodes after actions whose relevant effect has a settling time; use `wait_condition` for the post-action verification instead.
 
-{signifier_hints}
+- Never put an action and a condition as siblings under a flat selector or sequence without thinking through the semantics above. If the request contains "if … else …", "otherwise", "when … is …, do …, when it isn't, do …", you almost certainly need the guarded-selector pattern with two sequence branches.
+- Conditions are not control flow on their own; they only gate the node next to them via the parent's success/failure rules.
+- Before emitting the tree, trace it: for each leaf action, write one sentence describing under what property values it will execute. If that doesn't match the user's description, the tree is wrong — fix it before emitting.
 
-{observable_property_hints}
+## Source Priority
+When signifier hints are provided below, treat them as the authoritative guide for which affordances to use and how to compose them. The capability context lists everything that exists in the environment; the signifier hints narrow that down to what is *intended* for the current request. If the two ever appear to conflict, follow the signifier hints and only fall back to raw capability context when the hints do not cover some part of the request. If no signifier hints are provided, plan directly from the capability context.
 
-## Available Devices, Affordances, and Current State
-
+## Available Devices, Affordances, and Current State (fallback / full inventory)
 {capability_context}
+
+## Signifier Hints and Observable Property Hints (authoritative when present)
+{signifier_hints}
+{observable_property_hints}
 """
 
 
@@ -147,9 +181,16 @@ def format_capability_context(
     index: dict[str, dict] | None = None,
 ) -> str:
     """
+<<<<<<< HEAD
     Format affordances and state into a compact context string for the
     planning prompt: short affordance ids, names, descriptions, and parameter
     names only (no URLs or full JSON Schemas).
+=======
+    Format affordances and state into a context string for the planning prompt.
+
+    Handles both BT-repo field names (affordance_uri, artifact_uri) and
+    EnvExplorer field names (affordance_id, artifact_id, target, form).
+>>>>>>> code_cleanup_alex
 
     Args:
         affordances: List of affordance dicts from EnvExplorer
@@ -161,6 +202,7 @@ def format_capability_context(
     """
     lines = []
 
+<<<<<<< HEAD
     if index is None:
         index = build_affordance_index(affordances)
 
@@ -200,6 +242,40 @@ def format_capability_context(
             if description and description.lower() not in generic:
                 entry += f" -- {description}"
             lines.append(entry)
+=======
+    if affordances:
+        lines.append("### Affordances")
+        lines.append("Use the target URL as action_url (for action nodes) or property_url (for condition nodes).")
+        lines.append("")
+        for aff in affordances:
+            name = aff.get("action_name") or aff.get("name", "unknown")
+            aff_type = aff.get("type", "unknown").replace("_affordance", "")
+
+            # Extract URL from various possible locations (hierarchical JSON has form.href)
+            form = aff.get("form")
+            if isinstance(form, dict):
+                target = form.get("href", "")
+                method = form.get("method", "POST")
+            else:
+                # Fallback to flat field names
+                target = aff.get("target") or aff.get("affordance_uri") or aff.get("href", "")
+                method = aff.get("method", "POST")
+
+            artifact = aff.get("artifact_id") or aff.get("artifact_uri", "")
+            input_schema = aff.get("input_schema")
+            semantic_types = aff.get("semantic_types", [])
+            description = aff.get("description", "")
+
+            lines.append(f"- **{name}** ({aff_type.upper()}: {method} {target})")
+            if artifact:
+                lines.append(f"  Artifact: {artifact}")
+            if semantic_types:
+                lines.append(f"  Types: {', '.join(semantic_types)}")
+            if description:
+                lines.append(f"  Description: {description}")
+            if input_schema:
+                lines.append(f"  Input: {input_schema}")
+>>>>>>> code_cleanup_alex
 
     if state:
         lines.append("")

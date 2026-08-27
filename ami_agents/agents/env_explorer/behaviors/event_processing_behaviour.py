@@ -24,6 +24,8 @@ class EventProcessingBehaviour(CyclicBehaviour):
 
             event_data = await self.integration.event_queue.get()
 
+            self.agent.logger.debug(f"[EVENT RECEIVED] {event_data}")
+
             # 2. Extract Identity
             # Yggdrasil sends "artifactUri" in the payload
             artifact_uri = event_data.get("artifactUri")
@@ -47,9 +49,34 @@ class EventProcessingBehaviour(CyclicBehaviour):
             value = event_data.get("value")
 
             if property_uri and value is not None:
-                # Update Internal State
-                artifact.current_state[property_uri] = value
-                self.agent.logger.info(f"STATE UPDATE: {artifact.name} -> {property_uri} = {value}")
+                # Normalize property URI: prefer /properties/ over /props/ for consistency
+                canonical_property_uri = property_uri
+                if "/props/" in property_uri and "/properties/" not in property_uri:
+                    # Convert /props/ to /properties/ for canonical storage
+                    base = artifact.artifact_id.split("#")[0].rstrip("/")
+                    suffix = property_uri.split("/props/", 1)[-1]
+                    if suffix:
+                        canonical_property_uri = f"{base}/properties/{suffix}"
+
+                # Update Internal State with canonical URI
+                artifact.current_state[canonical_property_uri] = value
+
+                # Also remove any old /props/ variant if it exists (cleanup duplicates)
+                if "/properties/" in canonical_property_uri:
+                    base = artifact.artifact_id.split("#")[0].rstrip("/")
+                    suffix = canonical_property_uri.split("/properties/", 1)[-1]
+                    props_variant = f"{base}/props/{suffix}"
+                    if props_variant in artifact.current_state:
+                        del artifact.current_state[props_variant]
+
+                self.agent.logger.info(f"STATE UPDATE: {artifact.name} -> {canonical_property_uri} = {value}")
+
+                # Refresh full artifact state to capture all related property changes
+                self.agent.logger.debug(f"Refreshing full state for {artifact.name} after property update...")
+                try:
+                    await self.integration.refresh_artifact_state(artifact_uri)
+                except Exception as refresh_err:
+                    self.agent.logger.debug(f"Could not refresh artifact state: {refresh_err}")
 
         except Exception as e:
             self.agent.logger.error(f"Error processing event: {e}")

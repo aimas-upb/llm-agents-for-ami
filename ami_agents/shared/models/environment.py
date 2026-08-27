@@ -73,6 +73,9 @@ class Artifact:
     # Current state
     current_state: Dict[str, Any] = field(default_factory=dict)
 
+    # Semantic types extracted from RDF (e.g., "ex:Light", "ex:Blinds")
+    semantic_types: List[str] = field(default_factory=list)
+
     # Metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
     timestamp_added: datetime = field(default_factory=datetime.now)
@@ -87,9 +90,12 @@ class Workspace:
     name: str
     parent_workspace_id: Optional[str] = None
 
-    # RDF representation of the workspace - this will always hold the full RDF/Turtle serialization 
+    # RDF representation of the workspace - this will always hold the full RDF/Turtle serialization
     # as obtained from the Integration Engine
     rdf: str = None
+
+    # Semantic types extracted from RDF (e.g., "ex:Kitchen", "ex:LivingRoom")
+    semantic_types: List[str] = field(default_factory=list)
 
     # Contained artifacts
     artifacts: List[str] = field(default_factory=list)  # artifact IDs

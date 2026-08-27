@@ -9,6 +9,7 @@ signifier recording — is handled by deterministic SPADE behaviours.
 
 import asyncio
 import os
+from pathlib import Path
 from typing import Any, Dict
 
 from spade.agent import Agent
@@ -36,7 +37,7 @@ from ...environment.integration.integration_engine import YggdrasilIntegration
 
 from .models import ConversationState
 from .behaviours import UserMessageBehaviour, DemoRequestClassifierBehaviour
-from .utils import build_llm_client, build_llm_call_kwargs, LLMClientConfig
+from .utils import build_llm_client, build_llm_call_kwargs, build_behaviour_llm_client, LLMClientConfig
 
 # Global logger will be replaced by per-instance loggers
 # logger = logging.getLogger("UserAssistant")
@@ -73,14 +74,26 @@ class UserAssistantAgent(Agent, IAgent):
         logging_config = self.config.get("logging", {})
         self.logger = LoggerFactory.get_logger(f"UserAssistant[{jid}]", logging_config)
 
-        # ── LLM client (component, not base class) ──────────────────
-        self._llm_cfg: LLMClientConfig = build_llm_client(config)
-        self.llm_client = self._llm_cfg.client
-        self.llm_model: str = self._llm_cfg.model
-        self.llm_base_url: str = self._llm_cfg.base_url
-        self.llm_temperature: float = self._llm_cfg.temperature
-        self.llm_reasoning_effort = self._llm_cfg.reasoning_effort
-        self.llm_max_completion_tokens = self._llm_cfg.max_completion_tokens
+        # ── Per-behaviour LLM clients ──────────────────────────────
+        # Each behaviour (atomic segmentation, intent parsing, plan summarization)
+        # gets its own configured client.
+        self._behaviour_llm_cfgs: Dict[str, LLMClientConfig] = {}
+
+        # Lazy-initialize per-behaviour configs on first access
+        self._behaviour_keys = [
+            "atomic_segmentation",
+            "intent_parsing",
+            "plan_summarization",
+        ]
+
+        # Legacy support: expose a default client (uses atomic_segmentation config)
+        self._default_llm_cfg = build_behaviour_llm_client(config, "atomic_segmentation")
+        self.llm_client = self._default_llm_cfg.client
+        self.llm_model: str = self._default_llm_cfg.model
+        self.llm_base_url: str = self._default_llm_cfg.base_url
+        self.llm_temperature: float = self._default_llm_cfg.temperature
+        self.llm_reasoning_effort = self._default_llm_cfg.reasoning_effort
+        self.llm_max_completion_tokens = self._default_llm_cfg.max_completion_tokens
 
         # ── Timeouts / tick limits (pulled from yaml) ───────────────
         timeouts = config.get("timeouts", {}) or {}
@@ -131,11 +144,34 @@ class UserAssistantAgent(Agent, IAgent):
             self._conversations[thread] = ConversationState()
         return self._conversations[thread]
 
-    # ── LLM kwargs builder ──────────────────────────────────────────
+    # ── LLM clients and kwargs builders ─────────────────────────────
+
+    def get_llm_client_for_behaviour(self, behaviour_key: str) -> LLMClientConfig:
+        """Get or create a behaviour-specific LLM client config.
+
+        Args:
+            behaviour_key: One of "atomic_segmentation", "intent_parsing", "plan_summarization"
+
+        Returns:
+            LLMClientConfig with behaviour-specific settings.
+        """
+        if behaviour_key not in self._behaviour_llm_cfgs:
+            self._behaviour_llm_cfgs[behaviour_key] = build_behaviour_llm_client(
+                self.config, behaviour_key
+            )
+        return self._behaviour_llm_cfgs[behaviour_key]
 
     def build_llm_kwargs(self) -> Dict[str, Any]:
-        """Build extra kwargs for ``llm_client.chat.completions.create``."""
-        return build_llm_call_kwargs(self._llm_cfg)
+        """Build extra kwargs for ``llm_client.chat.completions.create``.
+
+        Uses the default (atomic_segmentation) config for backward compatibility.
+        """
+        return build_llm_call_kwargs(self._default_llm_cfg)
+
+    def build_llm_kwargs_for_behaviour(self, behaviour_key: str) -> Dict[str, Any]:
+        """Build behaviour-specific LLM kwargs."""
+        cfg = self.get_llm_client_for_behaviour(behaviour_key)
+        return build_llm_call_kwargs(cfg)
 
     # ── Execution engine ────────────────────────────────────────────
 
@@ -162,15 +198,22 @@ class UserAssistantAgent(Agent, IAgent):
     async def setup(self):
         await super().setup()
 
+        # Load ontology file for per-span intent parsing
+        ontology_path = Path(__file__).resolve().parents[3] / "ontologies" / "homeont.ttl"
+        try:
+            self.ontology_ttl = ontology_path.read_text() if ontology_path.exists() else ""
+            if not self.ontology_ttl:
+                self.logger.warning("Ontology file not found at %s", ontology_path)
+        except Exception as e:
+            self.logger.warning("Failed to load ontology: %s", e)
+            self.ontology_ttl = ""
+
         temp_display = "default" if self.llm_model.startswith("o") else self.llm_temperature
         self.logger.info(
             demo(
-                "UserAssistant booting (model=%s, base_url=%s, temperature=%s, reasoning_effort=%s)"
-            ),
-            self.llm_model,
-            self.llm_base_url,
-            temp_display,
-            self.llm_reasoning_effort or "default",
+                f"UserAssistant booting (model={self.llm_model}, base_url={self.llm_base_url}, "
+                f"temperature={temp_display}, reasoning_effort={self.llm_reasoning_effort or 'default'})"
+            )
         )
 
         # Register behaviours with template routing

@@ -1,0 +1,362 @@
+@prefix cc: <http://creativecommons.org/ns#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix hmas: <https://purl.org/hmas/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix schema: <http://schema.org/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix vann: <http://purl.org/vocab/vann/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+_:bn2 rdf:type owl:AllDisjointClasses ;
+owl:members ( hmas:Agent hmas:Artifact hmas:ResourceProfile hmas:Signifier ) .
+
+cc:license rdf:type owl:AnnotationProperty .
+
+<http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne> schema:mainEntityOfPage <https://mines-stetienne.fr> ;
+schema:name "MINES Saint-Étienne" ;
+rdf:type schema:CollegeOrUniversity .
+
+<http://dbpedia.org/resource/French_Institute_for_Research_in_Computer_Science_and_Automation> schema:mainEntityOfPage <https://inria.fr/> ;
+schema:name "Inria" ;
+rdf:type schema:ResearchOrganization .
+
+<http://dbpedia.org/resource/University_of_St._Gallen> schema:mainEntityOfPage <https://www.unisg.ch> ;
+schema:name "University of St.Gallen" ;
+rdf:type schema:CollegeOrUniversity .
+
+<http://maxime-lefrancois.info/me#> schema:affiliation <http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne> ;
+schema:email "maxime.lefrancois@emse.fr" ;
+schema:identifier "https://orcid.org/0000-0001-9814-8991#orcid-id"^^xsd:anyURI ;
+schema:mainEntityOfPage <http://maxime-lefrancois.info/> ;
+schema:name "Maxime Lefrançois" ;
+rdf:type schema:Person ;
+owl:sameAs <https://orcid.org/0000-0001-9814-8991> .
+
+<http://ns.inria.fr/fabien.gandon#me> schema:affiliation <http://dbpedia.org/resource/French_Institute_for_Research_in_Computer_Science_and_Automation> ;
+schema:email "fabien.gandon@inria.fr" ;
+schema:identifier "https://orcid.org/0000-0003-0543-1232#orcid-id"^^xsd:anyURI ;
+schema:mainEntityOfPage <http://fabien.info/> ;
+schema:name "Fabien Gandon" ;
+rdf:type schema:Person ;
+owl:sameAs <https://orcid.org/0000-0003-0543-1232> .
+
+dct:contributor rdf:type owl:AnnotationProperty .
+
+dct:creator rdf:type owl:AnnotationProperty .
+
+dct:description rdf:type owl:AnnotationProperty .
+
+dct:issued rdf:type owl:AnnotationProperty .
+
+dct:source rdf:type owl:AnnotationProperty .
+
+dct:title rdf:type owl:AnnotationProperty .
+
+vann:preferredNamespacePrefix rdf:type owl:AnnotationProperty .
+
+vann:preferredNamespaceUri rdf:type owl:AnnotationProperty .
+
+schema:affiliation rdf:type owl:AnnotationProperty .
+
+schema:CollegeOrUniversity rdf:type owl:Class .
+
+schema:email rdf:type owl:AnnotationProperty .
+
+schema:identifier rdf:type owl:AnnotationProperty .
+
+schema:mainEntityOfPage rdf:type owl:AnnotationProperty .
+
+schema:name rdf:type owl:AnnotationProperty .
+
+schema:Person rdf:type owl:Class .
+
+schema:ResearchOrganization rdf:type owl:Class .
+
+schema:url rdf:type owl:AnnotationProperty .
+
+<http://w3id.org/people/az/me> schema:affiliation <http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne> ;
+schema:email "antoine.zimmermann@emse.fr" ;
+schema:identifier "http://w3id.org/people/az/me"^^xsd:anyURI ,
+"https://orcid.org/0000-0003-1502-6986#orcid-id"^^xsd:anyURI ;
+schema:mainEntityOfPage <http://w3id.org/people/az/cv> ;
+schema:name "Antoine Zimmermann" ;
+rdf:type schema:Person .
+
+skos:example rdf:type owl:AnnotationProperty .
+
+skos:note rdf:type owl:AnnotationProperty .
+
+<https://danaivach.inrupt.net/profile/card#me> schema:affiliation <http://dbpedia.org/resource/University_of_St._Gallen> ;
+schema:email "danai.vachtsevanou@unisg.ch" ;
+schema:identifier "https://orcid.org/0000-0002-6697-0427#orcid-id"^^xsd:anyURI ;
+schema:mainEntityOfPage <https://scholar.google.com/citations?user=ju1FICsAAAAJ> ;
+schema:name "Danai Vachtsevanou" ;
+rdf:type schema:Person ;
+owl:sameAs <https://orcid.org/0000-0002-6697-0427> .
+
+<https://id.inrupt.com/andreiciortea> schema:affiliation <http://dbpedia.org/resource/University_of_St._Gallen> ;
+schema:email "andrei.ciortea@unisg.ch" ;
+schema:identifier "https://orcid.org/0000-0003-0721-4135#orcid-id"^^xsd:anyURI ;
+schema:mainEntityOfPage <http://andreiciortea.ro/> ;
+schema:name "Andrei Ciortea" ;
+rdf:type schema:Person ;
+owl:sameAs <https://orcid.org/0000-0003-0721-4135> .
+
+<https://id.inrupt.com/smnmyr> schema:affiliation <http://dbpedia.org/resource/University_of_St._Gallen> ;
+schema:email "simon.mayer@unisg.ch" ;
+schema:identifier "https://orcid.org/0000-0001-6367-3454#orcid-id"^^xsd:anyURI ;
+schema:mainEntityOfPage <https://www.linkedin.com/in/simon-mayer-b7979936/> ;
+schema:name "Simon Mayer" ;
+rdf:type schema:Person ;
+owl:sameAs <https://orcid.org/0000-0001-6367-3454> .
+
+<https://orcid.org/0000-0002-2956-0533> schema:affiliation <http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne> ;
+schema:email "olivier.boissier@emse.fr" ;
+schema:identifier "https://orcid.org/0000-0002-2956-0533#orcid-id"^^xsd:anyURI ;
+schema:mainEntityOfPage <https://www.emse.fr/~boissier/> ;
+schema:name "Olivier Boissier" ;
+rdf:type schema:Person .
+
+<https://orcid.org/0000-0002-3497-8758> schema:affiliation <http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne> ;
+schema:email "nesrine.hafiene@emse.fr" ;
+schema:identifier "https://orcid.org/0000-0002-3497-8758#orcid-id"^^xsd:anyURI ;
+schema:mainEntityOfPage <https://www.linkedin.com/in/nesrine-hafiene-059120114/> ;
+schema:name "Nesrine Hafiene" ;
+rdf:type schema:Person .
+
+<https://orcid.org/0000-0002-4506-2745> schema:affiliation <http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne> ;
+schema:email "luisgustavo.nardin@emse.fr" ;
+schema:identifier "https://orcid.org/0000-0002-4506-2745#orcid-id"^^xsd:anyURI ;
+schema:mainEntityOfPage <http://gnardin.github.io/website/> ;
+schema:name "Luis Gustavo Nardin" ;
+rdf:type schema:Person .
+
+<https://orcid.org/0000-0003-0821-6095> schema:affiliation <http://dbpedia.org/resource/French_Institute_for_Research_in_Computer_Science_and_Automation> ;
+schema:email "christopher.leturc@inria.fr" ;
+schema:identifier "https://orcid.org/0000-0003-0821-6095#orcid-id"^^xsd:anyURI ;
+schema:mainEntityOfPage <https://www.linkedin.com/in/christopher-leturc/> ;
+schema:name "Chistopher Leturc" ;
+rdf:type schema:Person .
+
+<https://orcid.org/0000-0003-4509-9537> schema:affiliation <http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne> ;
+schema:email "yousouf.taghzouti@emse.fr" ;
+schema:identifier "https://orcid.org/0000-0003-4509-9537#orcid-id"^^xsd:anyURI ;
+schema:mainEntityOfPage <https://youctagh.github.io/> ;
+schema:name "Yousouf Taghzouti" ;
+rdf:type schema:Person .
+
+hmas:Affordance dct:references [
+dct:bibliographicCitation "Chemero, A., & Turvey, M. T. (2007). Complexity, hypersets, and the ecological perspective on perception-action. Biological Theory, 2(1), 23-36."@en ;
+dct:identifier <https://doi.org/10.1162/biot.2007.2.1.23> ;
+rdf:type owl:NamedIndividual ;
+rdfs:label "Chemero and Turvey, 2007"@en
+] ,
+[
+dct:bibliographicCitation "Norman, D. (2013). The design of everyday things: Revised and expanded edition. Basic books."@en ;
+dct:identifier <https://mitpress.mit.edu/9780262640374/> ;
+rdf:type owl:NamedIndividual ;
+rdfs:label "Norman, 2013"@en
+] ;
+rdf:type skos:Concept ;
+rdfs:isDefinedBy hmas:core ;
+skos:definition "A behavior possibility that is a relationship between an ability of an agent and a situation that includes agents and features of the environment."@en ;
+skos:editorialNote "The concept has been considered as a candidate term for representing interaction cues and metadata in the Hypermedia MAS Core Ontology. The term :Signifier is selected instead for the following reasons: 1) Affordances emerge upon the presence of individual agents in the appropriate situation, while signifiers are defined with respect to agent types to preserve the evolvability and reusability of interaction cues without requiring prior knowledge about individual agents; 2) Affordances are defined in [Chemero and Turvey, 2007] for studying interactions of animals, while signifiers are defined here for supporting interactions of autonomous agents, which exhibit more heterogeneous abilities than animals — including agents whose cognitive abilities exclusively rely on computational processes such as reasoning over representations. Here, the concept is provided to support the discussion, management, and modelling of signifiers, which reveal information about affordances [Norman, 2013]. For example, the association between the two terms enables examining the dynamic exposure of signifiers based on the run-time availability of agent abilities and situations, or the modelling of signifiers that reveal information about affordances for both artificial and human agents."@en ;
+skos:historyNote "The definition of the concept follows affordance theorists [Chemero and Turvey, 2007]."@en ;
+skos:prefLabel "affordance"@en ;
+skos:related hmas:Signifier .
+
+hmas:Agent rdf:type owl:Class ;
+rdfs:comment "An entity that is capable of autonomous behavior."@en ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "agent"@en .
+
+hmas:Artifact rdf:type owl:Class ;
+rdfs:comment "A resource that can be dynamically constructed, shared, and used by agents to support their activities. In a Hypermedia MAS, an artifact exposes and can be accessed through a hypermedia interface (in addition to other possible interfaces, such as a physical interface)."@en ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "artéfact"@fr ,
+"artifact"@en ;
+rdfs:seeAlso <https://github.com/HyperAgents/ns.hyperagents.org/issues/38> .
+
+hmas:contains dct:source <https://github.com/HyperAgents/ns.hyperagents.org/issues/18#issuecomment-1040448029> ;
+rdf:type owl:ObjectProperty ;
+rdfs:comment "A relation that refers to a direct logical containment relation and is related to the definition of a workspace as a logical container."@en ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "contient directement"@fr ,
+"directly contains"@en ;
+rdfs:subPropertyOf hmas:transitivelyContains ;
+owl:inverseOf hmas:isContainedIn .
+
+hmas:core cc:license <https://creativecommons.org/licenses/by/4.0/> ;
+dct:contributor <http://maxime-lefrancois.info/me#> ,
+<http://ns.inria.fr/fabien.gandon#me> ,
+<http://w3id.org/people/az/me> ,
+<https://danaivach.inrupt.net/profile/card#me> ,
+<https://id.inrupt.com/smnmyr> ,
+<https://orcid.org/0000-0002-2956-0533> ,
+<https://orcid.org/0000-0002-4506-2745> ,
+<https://orcid.org/0000-0003-0821-6095> ,
+<https://www.vcharpenay.link/#me> ;
+dct:creator <https://id.inrupt.com/andreiciortea> ;
+dct:description "An ontology to describe Hypermedia Multi-Agent Systems."@en ,
+"Une ontologie pour la description de systèmes multi-agents hypermédias."@fr ;
+dct:issued "2021-11-21"^^xsd:date ;
+dct:title "Hypermedia MAS Core Ontology"@en ,
+"Ontologie Centrale des SMA Hypermédias"@fr ;
+vann:preferredNamespacePrefix "hmas" ;
+vann:preferredNamespaceUri <https://purl.org/hmas/> ;
+rdf:type owl:Ontology .
+
+hmas:exposesSignifier dct:source <https://github.com/HyperAgents/ns.hyperagents.org/issues/13#issuecomment-1029349488> ;
+rdf:type owl:ObjectProperty ;
+rdfs:comment "A relation between a resource profile and a signifier it exposes."@en ;
+rdfs:domain hmas:ResourceProfile ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "expose le signifiant"@fr ,
+"exposes signifier"@en ;
+rdfs:range hmas:Signifier ;
+rdfs:seeAlso <https://github.com/HyperAgents/ns.hyperagents.org/issues/13> ;
+owl:inverseOf hmas:isExposedIn .
+
+hmas:hasProfile rdf:type owl:AsymmetricProperty ,
+owl:ObjectProperty ;
+rdfs:comment "A relation that links a resource to its profile."@en ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "a pour profil"@fr ,
+"has for profile"@en ;
+rdfs:range hmas:ResourceProfile ;
+owl:inverseOf hmas:isProfileOf .
+
+hmas:hosts dct:source <https://github.com/HyperAgents/ns.hyperagents.org/issues/8#issuecomment-1025991719> ;
+rdf:type owl:AsymmetricProperty ,
+owl:ObjectProperty ;
+rdfs:comment "A relation that refers to an information resource or a process that is hosted on a platform. A hosting relation might have further implications, e.g. the usage of the hosted resource (or the usage of platform resources by the hosted resource) could be subject to terms of service or data licensing policies specific to the hosting platform."@en ;
+rdfs:domain hmas:HypermediaMASPlatform ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "héberge"@fr ,
+"hosts"@en ;
+rdfs:seeAlso <https://github.com/HyperAgents/ns.hyperagents.org/issues/18> ,
+<https://github.com/HyperAgents/ns.hyperagents.org/issues/49> ;
+owl:inverseOf hmas:isHostedOn .
+
+hmas:HypermediaMASPlatform rdf:type owl:Class ;
+rdfs:comment "A Hypermedia MAS (HMAS) platform is a system providing a collection of features to support Hypermedia MAS. Common features include support for communication and interaction, runtime environments for agents, artifacts, or organizations, etc."@en ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "HMAS platform"@en ,
+"platforme SMAH"@fr ;
+rdfs:seeAlso <https://github.com/HyperAgents/ns.hyperagents.org/issues/20> ,
+<https://github.com/HyperAgents/ns.hyperagents.org/issues/32> ;
+skos:example "Examples of hmas:HypermediaMASPlatform include Twitter, Facebook, a JADE node/delpoyment, or a JaCaMo node/delpoyment — all of which provide features that could support Hypermedia MAS & hybrid communities."@en .
+
+hmas:isContainedIn rdf:type owl:ObjectProperty ;
+rdfs:comment "A relation that describes a workspace that contains a resource."@en ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "est directement contenu dans"@fr ,
+"is directly contained in"@en ;
+rdfs:subPropertyOf hmas:isTransitivelyContainedIn ;
+owl:inverseOf hmas:contains .
+
+hmas:isExposedIn rdf:type owl:ObjectProperty ;
+rdfs:comment "A relation between a signifier and a resource profile it is exposed in."@en ;
+rdfs:domain hmas:Signifier ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "est exposé dans"@fr ,
+"is exposed in"@en ;
+rdfs:range hmas:ResourceProfile ;
+owl:inverseOf hmas:exposesSignifier .
+
+hmas:isHostedOn rdf:type owl:AsymmetricProperty ,
+owl:ObjectProperty ;
+rdfs:comment "A relation that refers to the platform that hosts the information resource or process."@en ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "est hébergé sur"@fr ,
+"is hosted on"@en ;
+rdfs:range hmas:HypermediaMASPlatform ;
+owl:inverseOf hmas:hosts .
+
+hmas:isMaterialOf rdf:type owl:ObjectProperty ;
+rdfs:comment "A relation between an Artifact and an Organization it belongs to."@en ;
+rdfs:domain hmas:Artifact ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "is material of"@en ;
+rdfs:range hmas:Organization .
+
+hmas:isMemberOf rdf:type owl:ObjectProperty ;
+rdfs:comment "A relation between an Agent and an Organization it belongs to."@en ;
+rdfs:domain hmas:Agent ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "is member of"@en ;
+rdfs:range hmas:Organization .
+
+hmas:isProfileOf rdf:type owl:ObjectProperty ;
+rdfs:comment "A relation that links a resource profile to the resource it is a profile of."@en ;
+rdfs:domain hmas:ResourceProfile ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "est le profil de"@fr ,
+"is profile of"@en ;
+rdfs:seeAlso <https://github.com/HyperAgents/ns.hyperagents.org/issues/13> ,
+<https://github.com/HyperAgents/ns.hyperagents.org/issues/26> ;
+owl:inverseOf hmas:hasProfile .
+
+hmas:isTransitivelyContainedIn rdf:type owl:ObjectProperty ,
+owl:TransitiveProperty ;
+rdfs:comment "A relation that refers to all workspaces in which a resource is contained. "@en ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "est transitivement contenu dans"@fr ,
+"is transitively contained in"@en ;
+rdfs:range hmas:Workspace ;
+owl:inverseOf hmas:transitivelyContains .
+
+hmas:Organization rdf:type owl:Class ;
+rdfs:comment "An Organization is an entity situated on Agents and Artifacts, and regulated by a regulation system."@en ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "organisation"@fr ,
+"organization"@en .
+
+hmas:ResourceProfile rdf:type owl:Class ;
+rdfs:comment "Structured data describing a resource through general metadata, domain- and application-specific metadata, and signifiers."@en ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "profil de ressource"@fr ,
+"resource profile"@en ;
+skos:example "e.g., a Thing Description document, a Hydra document, an Socio-Technical Network platform description, an agent description based on the FIPA standard"@en .
+
+hmas:Signifier rdf:type owl:Class ;
+rdfs:comment "A perceivable sign/cue that can be interpreted meaningfully by an agent to reveal information about a behavior possibility."@en ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "signifiant"@fr ,
+"signifier"@en ;
+rdfs:seeAlso <https://github.com/HyperAgents/ns.hyperagents.org/issues/13#issuecomment-1028904491> ,
+<https://github.com/HyperAgents/ns.hyperagents.org/issues/41> ;
+skos:note ":Signifier works as a bridge between the Core and the Interaction Vocabularies."@en ;
+skos:related hmas:Affordance .
+
+hmas:transitivelyContains dct:source <https://github.com/HyperAgents/ns.hyperagents.org/issues/8#issuecomment-1025991719> ;
+rdf:type owl:ObjectProperty ,
+owl:TransitiveProperty ;
+rdfs:comment "Links all the resources that are logically contained in a workspaces, directly or indirectly by transitivity."@en ;
+rdfs:domain hmas:Workspace ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "contient transitivement"@fr ,
+"transitively contains"@en ;
+rdfs:seeAlso <https://github.com/HyperAgents/ns.hyperagents.org/issues/18> ,
+<https://github.com/HyperAgents/ns.hyperagents.org/issues/39> ;
+owl:inverseOf hmas:isTransitivelyContainedIn .
+
+hmas:Workspace rdf:type owl:Class ;
+rdfs:comment "A logical container for any resource in general and in particular for agents, artifacts or other workspaces. Workspaces can be created or deleted by agents on a needed basis. All agent interactions happen in the context of a workspace whether or not the worspace was explicitly reified. A workspace can be, for instance, implemented on top of an LDP (Linked Data Platform) indirect container."@en ;
+rdfs:isDefinedBy hmas:core ;
+rdfs:label "espace de travail"@fr ,
+"workspace"@en ;
+rdfs:seeAlso <https://github.com/HyperAgents/ns.hyperagents.org/issues/24> ,
+<https://github.com/HyperAgents/ns.hyperagents.org/issues/32> ,
+<https://github.com/HyperAgents/ns.hyperagents.org/issues/36> ,
+<https://github.com/HyperAgents/ns.hyperagents.org/issues/138> ,
+<https://www.w3.org/ns/ldp#> .
+
+<https://www.vcharpenay.link/#me> schema:affiliation <http://dbpedia.org/resource/École_nationale_supérieure_des_mines_de_Saint-Étienne> ;
+schema:email "victor.charpenay@emse.fr" ;
+schema:identifier "https://orcid.org/0000-0002-9210-1583#orcid-id"^^xsd:anyURI ;
+schema:mainEntityOfPage <https://www.vcharpenay.link/> ;
+schema:name "Victor Charpenay" ;
+rdf:type schema:Person .

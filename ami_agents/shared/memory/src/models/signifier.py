@@ -85,6 +85,7 @@ class Signifier(BaseModel):
 
     affordance_uri: str = Field(..., min_length=1)
     intent_type: Optional[str] = Field(default=None, pattern="^(EXPLICIT|IMPLICIT)$")
+    affected_env_vars: Optional[List[Dict[str, str]]] = Field(default=None)
     provenance: Optional[Provenance] = None
 
     def to_json_doc(self) -> Dict[str, Any]:

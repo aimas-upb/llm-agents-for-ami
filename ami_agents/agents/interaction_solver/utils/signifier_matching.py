@@ -23,18 +23,24 @@ async def query_local_signifier_match(
     workspace_id: Optional[str],
     intent_type: Optional[str],
     structured_intent: Optional[Dict[str, Any]],
+    affected_env_vars: Optional[List[Dict[str, str]]] = None,
     k: int = 5,
 ) -> Dict[str, Any]:
-    """Send a SIGNIFIER_MATCH_REQUEST to EnvExplorer for one intent."""
+    """Send a SIGNIFIER_MATCH_REQUEST to EnvExplorer for one intent.
+
+    For implicit intents, affected_env_vars enables v3 environment-variable
+    based matching in the signifier engine.
+    """
     logger.info(
         demo(
             "[INTENT_TYPE] Sending SIGNIFIER_MATCH_REQUEST: intent=%r, "
-            "workspace_id=%r, intent_type=%r, has_structured_intent=%s"
+            "workspace_id=%r, intent_type=%r, has_structured_intent=%s, has_env_vars=%s"
         ),
         intent,
         workspace_id,
         intent_type,
         bool(structured_intent),
+        bool(affected_env_vars),
     )
     body: Dict[str, Any] = {
         "intent": intent,
@@ -42,6 +48,7 @@ async def query_local_signifier_match(
         **({"workspace_id": str(workspace_id)} if workspace_id else {}),
         **({"intent_type": str(intent_type)} if intent_type else {}),
         **({"query_structured_intent": structured_intent} if structured_intent else {}),
+        **({"affected_env_vars": affected_env_vars} if affected_env_vars else {}),
     }
     raw = await query_env_explorer(
         MessageType.SIGNIFIER_MATCH_REQUEST.value,
@@ -84,48 +91,65 @@ def merge_signifier_matches(
 
     Local matches take priority. Community matches supplement gaps.
     Dedup key is ``signifier_id``.
+
+    Handles both new format (exact_matches/affordance_hints) and old format
+    (matches/final_matches) for backward compatibility.
     """
     merged: Dict[str, Any] = {}
     for intent in intents:
         local_data = local.get(intent, {}) if isinstance(local.get(intent, {}), dict) else {}
         community_data = community.get(intent, {}) if isinstance(community.get(intent, {}), dict) else {}
 
-        local_matches = local_data.get("matches") if isinstance(local_data.get("matches"), list) else []
-        local_finals = local_data.get("final_matches") if isinstance(local_data.get("final_matches"), list) else []
-        community_matches = community_data.get("matches") if isinstance(community_data.get("matches"), list) else []
-        community_finals = community_data.get("final_matches") if isinstance(community_data.get("final_matches"), list) else []
+        # Support both new (exact_matches/affordance_hints) and old (matches/final_matches) formats
+        local_exact = local_data.get("exact_matches") if isinstance(local_data.get("exact_matches"), list) else []
+        local_affordance = local_data.get("affordance_hints") if isinstance(local_data.get("affordance_hints"), list) else []
+        # Backward compat: old format had matches and final_matches
+        if not local_exact and not local_affordance:
+            local_exact = local_data.get("final_matches") if isinstance(local_data.get("final_matches"), list) else []
+            local_affordance = []
 
+        community_exact = community_data.get("exact_matches") if isinstance(community_data.get("exact_matches"), list) else []
+        community_affordance = community_data.get("affordance_hints") if isinstance(community_data.get("affordance_hints"), list) else []
+        # Backward compat: old format had matches and final_matches
+        if not community_exact and not community_affordance:
+            community_exact = community_data.get("final_matches") if isinstance(community_data.get("final_matches"), list) else []
+            community_affordance = []
+
+        # Merge exact matches (for fast-path)
         seen_ids: set = set()
-        combined_matches: List[Dict[str, Any]] = []
-        for m in local_matches:
+        combined_exact: List[Dict[str, Any]] = []
+        for m in local_exact:
             if isinstance(m, dict):
                 sid = m.get("signifier_id", "")
                 if sid not in seen_ids:
                     seen_ids.add(sid)
-                    combined_matches.append(m)
-        for m in community_matches:
+                    combined_exact.append(m)
+        for m in community_exact:
             if isinstance(m, dict):
                 sid = m.get("signifier_id", "")
                 if sid not in seen_ids:
                     seen_ids.add(sid)
-                    combined_matches.append(m)
+                    combined_exact.append(m)
 
-        combined_finals: List[str] = []
-        seen_final_ids: set = set()
-        for f in local_finals:
-            sf = str(f)
-            if sf not in seen_final_ids:
-                seen_final_ids.add(sf)
-                combined_finals.append(sf)
-        for f in community_finals:
-            sf = str(f)
-            if sf not in seen_final_ids:
-                seen_final_ids.add(sf)
-                combined_finals.append(sf)
+        # Merge affordance hints (for BT planner)
+        combined_affordance: List[Dict[str, Any]] = []
+        seen_ids_affordance: set = set()
+        for m in local_affordance:
+            if isinstance(m, dict):
+                sid = m.get("signifier_id", "")
+                if sid not in seen_ids_affordance:
+                    seen_ids_affordance.add(sid)
+                    combined_affordance.append(m)
+        for m in community_affordance:
+            if isinstance(m, dict):
+                sid = m.get("signifier_id", "")
+                if sid not in seen_ids_affordance and sid not in seen_ids:
+                    seen_ids_affordance.add(sid)
+                    combined_affordance.append(m)
 
         merged[intent] = {
-            "matches": combined_matches,
-            "final_matches": combined_finals,
+            "exact_matches": combined_exact,
+            "affordance_hints": combined_affordance,
         }
         if local_data.get("error"):
             merged[intent]["error"] = local_data["error"]

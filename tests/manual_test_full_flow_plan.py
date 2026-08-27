@@ -79,7 +79,7 @@ Prereqs:
 - A running Yggdrasil instance (default http://localhost:8080/ or set YGGDRASIL_URL).
 
 Notes:
-- This test defaults to the OpenAI model `o3` (unless overridden by OPENAI_MODEL).
+- This test defaults to the OpenAI model `gpt-4o-mini` (unless overridden by OPENAI_MODEL).
 - For reasoning models (`o*`), this test sets `reasoning_effort=high` by default (override via OPENAI_REASONING_EFFORT).
 - If you are using a non-OpenAI provider, set OPENAI_BASE_URL + OPENAI_MODEL accordingly.
 """
@@ -1241,7 +1241,7 @@ async def main():
 
     # UserAssistant and Solver configs (new agents.yaml-compatible structure)
     # Default model requested by user:
-    model = os.getenv("OPENAI_MODEL", "o3")
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     # This model name is typically served via OpenRouter's OpenAI-compatible API.
     base_url = os.getenv("OPENAI_BASE_URL")
     if not base_url:

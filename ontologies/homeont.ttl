@@ -1,0 +1,273 @@
+@prefix ex: <http://example.org/> .
+@prefix hmas: <https://purl.org/hmas/> .
+@prefix td: <https://www.w3.org/2019/wot/td#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+# Ontology of workspace types, device types, and action affordances
+# for smart home environments.
+# Auto-generated from HomeBench home description data.
+
+# ============================================================
+# Properties
+# ============================================================
+
+ex:hasPossibleCommand a rdf:Property ;
+    rdfs:domain hmas:Artifact ;
+    rdfs:range td:ActionAffordance ;
+    rdfs:comment "Indicates a command that may be available on instances of a device type. Not all instances necessarily support every possible command listed." .
+
+# ============================================================
+# Workspace Types (Home and Rooms)
+# ============================================================
+
+ex:Home a rdfs:Class ;
+    rdfs:subClassOf hmas:Workspace ;
+    rdfs:comment "A smart home environment composed of multiple rooms and spaces." .
+
+ex:Balcony a rdfs:Class ;
+    rdfs:subClassOf hmas:Workspace ;
+    rdfs:comment "An outdoor or semi-outdoor elevated platform attached to the home." .
+
+ex:Bathroom a rdfs:Class ;
+    rdfs:subClassOf hmas:Workspace ;
+    rdfs:comment "A room equipped with bathing and sanitary facilities." .
+
+ex:Corridor a rdfs:Class ;
+    rdfs:subClassOf hmas:Workspace ;
+    rdfs:comment "A hallway or passage connecting different rooms in the home." .
+
+ex:DiningRoom a rdfs:Class ;
+    rdfs:subClassOf hmas:Workspace ;
+    rdfs:comment "A room designated for eating meals." .
+
+ex:Foyer a rdfs:Class ;
+    rdfs:subClassOf hmas:Workspace ;
+    rdfs:comment "An entrance hall or lobby area of the home." .
+
+ex:Garage a rdfs:Class ;
+    rdfs:subClassOf hmas:Workspace ;
+    rdfs:comment "An enclosed space for parking vehicles and storage." .
+
+ex:GuestBedroom a rdfs:Class ;
+    rdfs:subClassOf hmas:Workspace ;
+    rdfs:comment "A bedroom designated for guests." .
+
+ex:Kitchen a rdfs:Class ;
+    rdfs:subClassOf hmas:Workspace ;
+    rdfs:comment "A room used for cooking and food preparation." .
+
+ex:LivingRoom a rdfs:Class ;
+    rdfs:subClassOf hmas:Workspace ;
+    rdfs:comment "A main living area used for relaxation and socializing." .
+
+ex:MasterBedroom a rdfs:Class ;
+    rdfs:subClassOf hmas:Workspace ;
+    rdfs:comment "The primary bedroom in the home." .
+
+ex:StoreRoom a rdfs:Class ;
+    rdfs:subClassOf hmas:Workspace ;
+    rdfs:comment "A room used for storing household items." .
+
+ex:StudyRoom a rdfs:Class ;
+    rdfs:subClassOf hmas:Workspace ;
+    rdfs:comment "A room designated for reading, working, or studying." .
+
+# ============================================================
+# Device Types
+# ============================================================
+
+ex:AirConditioner a rdfs:Class ;
+    rdfs:subClassOf hmas:Artifact ;
+    rdfs:comment "A smart air conditioning unit used to regulate indoor climate." .
+
+ex:AirPurifier a rdfs:Class ;
+    rdfs:subClassOf hmas:Artifact ;
+    rdfs:comment "A smart air purifier that filters and cleans indoor air." .
+
+ex:Aromatherapy a rdfs:Class ;
+    rdfs:subClassOf hmas:Artifact ;
+    rdfs:comment "A smart aromatherapy diffuser that releases scented vapors into the room." .
+
+ex:Blinds a rdfs:Class ;
+    rdfs:subClassOf hmas:Artifact ;
+    rdfs:comment "Smart window blinds used to control light and privacy." .
+
+ex:Curtain a rdfs:Class ;
+    rdfs:subClassOf hmas:Artifact ;
+    rdfs:comment "A smart window curtain used to control light and privacy." .
+
+ex:Dehumidifier a rdfs:Class ;
+    rdfs:subClassOf hmas:Artifact ;
+    rdfs:comment "A smart dehumidifier that reduces indoor humidity levels." .
+
+ex:Fan a rdfs:Class ;
+    rdfs:subClassOf hmas:Artifact ;
+    rdfs:comment "A smart electric fan used to circulate air." .
+
+ex:GarageDoor a rdfs:Class ;
+    rdfs:subClassOf hmas:Artifact ;
+    rdfs:comment "A smart motorized garage door." .
+
+ex:Heating a rdfs:Class ;
+    rdfs:subClassOf hmas:Artifact ;
+    rdfs:comment "A smart heating unit used to warm the room." .
+
+ex:Humidifier a rdfs:Class ;
+    rdfs:subClassOf hmas:Artifact ;
+    rdfs:comment "A smart humidifier that increases indoor humidity levels." .
+
+ex:Light a rdfs:Class ;
+    rdfs:subClassOf hmas:Artifact ;
+    rdfs:comment "A smart light fixture with controllable illumination properties." .
+
+ex:MediaPlayer a rdfs:Class ;
+    rdfs:subClassOf hmas:Artifact ;
+    rdfs:comment "A smart media player for audio playback." .
+
+ex:Trash a rdfs:Class ;
+    rdfs:subClassOf hmas:Artifact ;
+    rdfs:comment "A smart trash compactor." .
+
+ex:VacuumRobot a rdfs:Class ;
+    rdfs:subClassOf hmas:Artifact ;
+    rdfs:comment "A smart robotic vacuum cleaner that can autonomously clean designated areas." .
+
+ex:WaterHeater a rdfs:Class ;
+    rdfs:subClassOf hmas:Artifact ;
+    rdfs:comment "A smart water heater used to heat water to a target temperature." .
+
+# ============================================================
+# Action Affordance Types (Commands)
+# ============================================================
+
+ex:CloseCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to close the device (e.g. close blinds, curtains, or a garage door)." .
+
+ex:OpenCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to open the device (e.g. open blinds, curtains, or a garage door)." .
+
+ex:PackCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to pack or compress the contents (e.g. compact trash)." .
+
+ex:PauseCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to pause the current playback on a media player." .
+
+ex:PlayCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to start or resume playback on a media player." .
+
+ex:SetArtistCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to set the artist filter for media playback. Requires a string 'artist' parameter." .
+
+ex:SetBrightnessCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to set the brightness level. Requires an integer 'brightness' parameter (0-100)." .
+
+ex:SetCleaningAreaCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to set the cleaning area for a vacuum robot. Requires a string 'area' parameter." .
+
+ex:SetColorCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to set the color. Requires a 'color' parameter as an array of integers (e.g. RGB values)." .
+
+ex:SetDegreeCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to set the opening degree. Requires an integer 'degree' parameter." .
+
+ex:SetFanSpeedCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to set the fan speed. Requires an integer 'fan_speed' parameter." .
+
+ex:SetIntensityCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to set the intensity level. Requires an integer 'intensity' parameter (0-100)." .
+
+ex:SetIntervalCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to set the operating interval. Requires an integer 'interval' parameter (10-60 minutes)." .
+
+ex:SetModeCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to set the operating mode. Requires a string 'mode' parameter." .
+
+ex:SetSongCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to set the song to play on a media player. Requires a string 'song' parameter." .
+
+ex:SetSpeedCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to set the speed. Requires an integer 'speed' parameter." .
+
+ex:SetStyleCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to set the music style/genre on a media player. Requires a string 'style' parameter." .
+
+ex:SetSwingCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to set the swing direction. Requires a string 'swing' parameter." .
+
+ex:SetTemperatureCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to set the target temperature. Requires an integer 'temperature' parameter." .
+
+ex:SetVolumeCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to set the playback volume. Requires an integer 'volume' parameter (0-100)." .
+
+ex:StopCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to stop the current playback on a media player." .
+
+ex:TurnOffCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to turn the device off." .
+
+ex:TurnOnCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to turn the device on." .
+
+ex:ToggleCommand a rdfs:Class ;
+    rdfs:subClassOf td:ActionAffordance ;
+    rdfs:comment "Command to toggle the device between on and off states." .
+
+# ============================================================
+# Device Type to Possible Action Affordance Associations
+# ============================================================
+
+ex:AirConditioner ex:hasPossibleCommand ex:SetFanSpeedCommand, ex:SetModeCommand, ex:SetSwingCommand, ex:SetTemperatureCommand, ex:TurnOffCommand, ex:TurnOnCommand, ex:ToggleCommand .
+
+ex:AirPurifier ex:hasPossibleCommand ex:SetFanSpeedCommand, ex:SetModeCommand, ex:TurnOffCommand, ex:TurnOnCommand, ex:ToggleCommand .
+
+ex:Aromatherapy ex:hasPossibleCommand ex:SetIntensityCommand, ex:SetIntervalCommand, ex:TurnOffCommand, ex:TurnOnCommand, ex:ToggleCommand .
+
+ex:Blinds ex:hasPossibleCommand ex:CloseCommand, ex:OpenCommand .
+
+ex:Curtain ex:hasPossibleCommand ex:CloseCommand, ex:OpenCommand, ex:SetDegreeCommand .
+
+ex:Dehumidifier ex:hasPossibleCommand ex:SetIntensityCommand, ex:SetModeCommand, ex:TurnOffCommand, ex:TurnOnCommand, ex:ToggleCommand .
+
+ex:Fan ex:hasPossibleCommand ex:SetSpeedCommand, ex:SetSwingCommand, ex:TurnOffCommand, ex:TurnOnCommand, ex:ToggleCommand .
+
+ex:GarageDoor ex:hasPossibleCommand ex:CloseCommand, ex:OpenCommand .
+
+ex:Heating ex:hasPossibleCommand ex:SetFanSpeedCommand, ex:SetModeCommand, ex:SetTemperatureCommand, ex:TurnOffCommand, ex:TurnOnCommand, ex:ToggleCommand .
+
+ex:Humidifier ex:hasPossibleCommand ex:SetIntensityCommand, ex:SetModeCommand, ex:TurnOffCommand, ex:TurnOnCommand, ex:ToggleCommand .
+
+ex:Light ex:hasPossibleCommand ex:SetBrightnessCommand, ex:SetColorCommand, ex:TurnOffCommand, ex:TurnOnCommand, ex:ToggleCommand .
+
+ex:MediaPlayer ex:hasPossibleCommand ex:PauseCommand, ex:PlayCommand, ex:SetArtistCommand, ex:SetSongCommand, ex:SetStyleCommand, ex:SetVolumeCommand, ex:StopCommand .
+
+ex:Trash ex:hasPossibleCommand ex:PackCommand .
+
+ex:VacuumRobot ex:hasPossibleCommand ex:SetCleaningAreaCommand, ex:SetModeCommand .
+
+ex:WaterHeater ex:hasPossibleCommand ex:SetTemperatureCommand, ex:TurnOffCommand, ex:TurnOnCommand, ex:ToggleCommand .

@@ -650,7 +650,15 @@ class PropertyConditionNode(py_trees.behaviour.Behaviour):
         return self.expected_value
     
     def _navigate_value(self, value: Any) -> Any:
-        """Navigate to a nested value using the value_path."""
+        """Navigate to a nested value using the value_path.
+
+        If the response is a scalar (not dict/list) and value_path is set,
+        return the scalar directly, ignoring value_path.
+        """
+        # If no path to navigate or value is scalar, return as-is
+        if not self.value_path or not isinstance(value, (dict, list)):
+            return value
+
         result = value
         for key in self.value_path:
             if isinstance(result, dict):

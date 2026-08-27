@@ -138,48 +138,23 @@ class TestBtPreview:
 
 
 class TestIntentCanonicalStrings:
-    """Test that Intent canonical strings are compatible with InteractionSolver expectations."""
+    """Tests for slim Intent class with intent_text only.
 
-    def test_multiple_intents_produce_list(self):
-        intents = [
-            Intent(action="set", artifact="light308", parameter="on_off", value=True),
-            Intent(action="set", artifact="light308", parameter="brightness", value=100),
-        ]
-        strings = [i.to_canonical_string() for i in intents]
-        assert strings == ["set light308 on_off to True", "set light308 brightness to 100"]
+    Note: Old canonical string functionality has been removed.
+    The new Intent class is a simple dataclass with intent_text field.
+    """
 
-    def test_set_with_zero_value(self):
-        i = Intent(action="set", artifact="light308", parameter="brightness", value=0)
-        assert i.to_canonical_string() == "set light308 brightness to 0"
-
-    def test_set_missing_value_falls_back(self):
-        """If value is None, set falls through to the fallback path."""
-        i = Intent(action="set", artifact="light308", parameter="brightness", value=None)
-        result = i.to_canonical_string()
-        assert "set" in result
-        assert "light308" in result
-
-    def test_modify_canonical_string(self):
-        i = Intent(action="modify", artifact="light308", parameter="brightness", value=10)
-        assert i.to_canonical_string() == "modify light308 brightness by 10"
-
-    def test_modify_null_value_canonical(self):
-        i = Intent(action="modify", artifact="light308", parameter="brightness")
-        assert i.to_canonical_string() == "modify light308 brightness"
-
-    def test_check_canonical_string(self):
-        i = Intent(action="check", artifact="light308")
-        assert i.to_canonical_string() == "check light308"
-
-    def test_intent_text_preferred_over_canonical(self):
-        """When intent_text is set, to_query_string() should prefer it."""
-        i = Intent(action="set", artifact="light308", parameter="on_off", value=True,
-                   intent_text="turn on the light")
+    def test_intent_text_query_string(self):
+        i = Intent(intent_text="turn on the light")
         assert i.to_query_string() == "turn on the light"
 
-    def test_canonical_fallback_when_no_intent_text(self):
-        i = Intent(action="set", artifact="light308", parameter="on_off", value=True)
-        assert i.to_query_string() == "set light308 on_off to True"
+    def test_multiple_intents_query_strings(self):
+        intents = [
+            Intent(intent_text="turn on the light"),
+            Intent(intent_text="set brightness to 100"),
+        ]
+        strings = [i.to_query_string() for i in intents]
+        assert strings == ["turn on the light", "set brightness to 100"]
 
 
 # Confirmation token tests
@@ -211,11 +186,12 @@ class TestConversationStateFlow:
 
     def test_goal_flow_phases(self):
         """Verify the expected phase transitions for a goal request."""
+        from ami_agents.shared.models.intents import ImplicitGoalIntent
         conv = ConversationState()
         assert conv.phase == ConversationPhase.IDLE
 
         conv.phase = ConversationPhase.EXTRACTING_INTENTS
-        conv.intents = [Intent(action="set", artifact="light308", parameter="on_off", value=True)]
+        conv.intents = [ImplicitGoalIntent(text_intent="turn on the light", reason="User wants light on")]
         assert conv.phase == ConversationPhase.EXTRACTING_INTENTS
 
         conv.phase = ConversationPhase.AWAITING_PLAN
@@ -239,12 +215,13 @@ class TestConversationStateFlow:
 
     def test_reject_flow(self):
         """Verify that rejecting a plan clears state properly."""
+        from ami_agents.shared.models.intents import ImplicitGoalIntent
         conv = ConversationState(
             phase=ConversationPhase.AWAITING_CONFIRMATION,
             plan_json='{"tree": {}}',
             plan_hash="abc",
             plan_summary="A plan",
-            intents=[Intent(action="set", artifact="light308", parameter="on_off", value=True)],
+            intents=[ImplicitGoalIntent(text_intent="turn on the light", reason="User wants light on")],
         )
         conv.clear_plan()
         conv.phase = ConversationPhase.IDLE

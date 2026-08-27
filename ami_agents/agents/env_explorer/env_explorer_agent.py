@@ -27,6 +27,7 @@ from ...environment.integration.integration_engine import YggdrasilIntegration
 # Import extracted behaviors
 from .behaviors import (
     InitialDiscoveryBehaviour,
+    InitializeExperienceEngineBehaviour,
     EventProcessingBehaviour,
     SignifierMatchBehaviour,
     SignifierRecordBehaviour,
@@ -104,7 +105,8 @@ class EnvExplorerAgent(Agent, IAgent):
         self._experience_engine_context_builder = None
         self._experience_engine_shacl_validator = None
         self._experience_engine_default_matcher_version = self.config.get("experience_engine", {}).get("default_matcher_version", _EXPERIENCE_ENGINE_DEFAULTS["default_matcher_version"])
-        self._experience_engine_default_min_similarity = self.config.get("experience_engine", {}).get("default_min_similarity", _EXPERIENCE_ENGINE_DEFAULTS["default_min_similarity"])
+        min_similarity_raw = self.config.get("experience_engine", {}).get("default_min_similarity", _EXPERIENCE_ENGINE_DEFAULTS["default_min_similarity"])
+        self._experience_engine_default_min_similarity = float(min_similarity_raw)
         self._experience_engine_shacl_validation_enabled = self.config.get("experience_engine", {}).get("shacl_validation_enabled", "false").lower() == "true"
 
     async def setup(self):
@@ -127,6 +129,11 @@ class EnvExplorerAgent(Agent, IAgent):
 
         sign_list_template = Template()
         sign_list_template.set_metadata("type", MessageType.SIGNIFIER_LIST_REQUEST.value)
+
+        # Bootstrap the Experience Engine explicitly during setup so engine
+        # readiness is a discrete, observable lifecycle event rather than a
+        # side-effect of the first incoming SIGNIFIER_MATCH_REQUEST.
+        self.add_behaviour(InitializeExperienceEngineBehaviour())
 
         self.add_behaviour(InitialDiscoveryBehaviour())
         self.add_behaviour(EnvironmentCapabilitiesBehaviour(), template=env_cap_template)

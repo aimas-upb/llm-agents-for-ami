@@ -1,136 +1,101 @@
 # Agent Configuration
-# Defines settings for all agents in the AMI system
-
-# SPADE Configuration
-spade:
-  host: "${SPADE_HOST:-localhost}"
-  port: "${SPADE_PORT:-5222}"
-  tls_enabled: "${SPADE_TLS:-false}"
+# Defines settings for all agents in the AMI system.
+#
+# Conventions:
+# - Only keys actually consumed by Python code live here. SPADE host/port
+#   are picked up from the JID and the SPADE library's own env vars; they
+#   are not read from this file.
+# - Env-var substitution: "${VAR:-default}" -> reads VAR or falls back.
 
 # UserAssistant Agent Configuration
 user_assistant:
   jid: "user_assistant@localhost"
   password: "${SPADE_USER_ASSISTANT_PASSWORD}"
 
+  llm:
+    # LLM for atomic intent splitting and per-span intent parsing
+    atomic_segmentation:
+      model: "gpt-5-mini"
+      reasoning_effort: "medium"
+    intent_parsing:
+      model: "gpt-5-mini"
+      reasoning_effort: "medium"
+    plan_summarization:
+      model: "gpt-4o-mini"
+      temperature: 0.5
+      max_tokens: 4096
+    capabilities_analysis:
+      model: "gpt-5-mini"
+      reasoning_effort: "medium"
 
 # EnvExplorer Agent Configuration
 env_explorer:
   jid: "env_explorer@localhost"
   password: "${SPADE_ENV_EXPLORER_PASSWORD}"
 
-  # Experience Engine Settings - Combined configuration for signifier matching and storage
+  llm:
+    # LLM for answering env state and env capability queries
+    query_response:
+      model: "gpt-4o-mini"
+      temperature: 0.0
+      max_tokens: 8192
+
+  # Experience Engine — signifier registry, matcher, optional SHACL validator.
   experience_engine:
-    # Core engine configuration
-    default_matcher_version: "${SIGNIFIER_MATCHER_VERSION:-v2}"
+    default_matcher_version: "${SIGNIFIER_MATCHER_VERSION:-v3}"
     default_min_similarity: "${SIGNIFIER_MIN_SIMILARITY:-0.5}"
     signifier_limit: "${SIGNIFIER_LIMIT:-10000}"
-    shacl_shape_version: "${SHACL_SHAPE_VERSION:-1}"
-    shacl_cache_enabled: "${SHACL_CACHE_ENABLED:-false}"
-    shacl_validation_enabled: "${SHACL_VALIDATION_ENABLED:-false}"
+    shacl_validation_enabled: "${SHACL_VALIDATION_ENABLED:-true}"
+    enable_shacl_cache: "${SHACL_CACHE_ENABLED:-false}"
 
-    # Storage configuration (from signifiers)
-    storage_backend: "sqlite"
-    database_path: "data/signifiers.db"
-
-    # Matching configuration (from signifiers + centralized signifiers section)
-    intent_similarity_threshold: 0.8
-    context_matching_enabled: true
-    matcher_version: "v2"
-    min_similarity: "${SIGNIFIER_MIN_SIMILARITY:-0.5}"
-
-    # Extraction configuration (from signifiers)
-    extract_from_behavior_trees: true
-
-  # Timing Configuration
   timeouts:
     message_reception: "${ENV_MESSAGE_TIMEOUT:-5.0}"
-    event_processing_sleep: "${ENV_EVENT_SLEEP:-2.0}"
-
-  # Internal Processing
-  processing:
-    intent_types:
-      - "EXPLICIT"
-      - "IMPLICIT"
 
 # InteractionSolver Agent Configuration
 interaction_solver:
   jid: "interaction_solver@localhost"
   password: "${SPADE_INTERACTION_SOLVER_PASSWORD}"
 
-  # Planning
   planning:
-    # Context gathering
     context_gathering:
-      from_env_explorer: true
-      from_community: true  # Cross-environment signifier sharing
-      timeout: "${SIGNIFIER_MATCH_TIMEOUT:-10}"  # seconds
+      timeout: "${SIGNIFIER_MATCH_TIMEOUT:-10}"  # seconds — also used as env-ready timeout
 
-    # Community signifier API (cross-environment sharing)
     community:
       enabled: true
       api_url: null  # Set via COMMUNITY_API_URL env var or override here
-      timeout: "${COMMUNITY_API_TIMEOUT:-10.0}"  # seconds for community API requests
+      timeout: "${COMMUNITY_API_TIMEOUT:-10.0}"
 
-    # LLM-based planning (BT JSON IR generation)
     llm_planning:
-      model: "gpt-4o-mini"
-      temperature: 0.5
-      max_tokens: 2000
-
-      # Behavior Tree generation
-      output_format: "behavior_tree"
+      model: "gpt-5-mini"
+      reasoning_effort: "medium"
+      # max_completion_tokens: 8192
+      # model: "gpt-4o-mini"
+      # temperature: 0.0
+      # max_tokens: 8192
       max_planning_attempts: 3  # retries for BT generation
 
-      # Node template features
-      node_template_features:
-        - status_tracking  # running, done, failed
-        - expected_duration
-        - retry_policy
-        - error_handling
-
-  # Plan execution monitoring
-  execution_monitoring:
-    enabled: true
-    status_update_interval: 5  # seconds
+# Request-type taxonomy used across agents (NLU classification labels).
+# Reference list — keep in sync with UserAssistant prompts and EnvExplorer
+# behaviour routing.
+request_types:
+  - ENV_CAPABILITIES
+  - ENV_STATE
+  - GOAL_REQUEST
+  - PLAN_MANAGEMENT
+  - PREFERENCE_MANAGEMENT
 
 # LLM Configuration (shared across agents)
 llm:
-  default_provider: "openai"
+  default_model: "gpt-4o-mini"
+  default_temperature: 0.0
+  default_max_tokens: 8192
 
   providers:
     openai:
       api_key: null  # Set via environment variable OPENAI_API_KEY
-      model: "gpt-4o-mini"
-      temperature: 0.5
-      max_tokens: 1500
 
-    anthropic:
-      api_key: null  # Set via environment variable ANTHROPIC_API_KEY
-      model: "claude-3-opus-20240229"
-      temperature: 0.5
-      max_tokens: 1500
-
-  # Retry configuration
   retry:
-    max_attempts: 3
-    backoff_factor: 2
     timeout: "${LLM_TIMEOUT_DEFAULT:-30}"  # seconds
-
-# Memory Configuration (shared across agents)
-memory:
-  conversation_memory:
-    backend: "sqlite"
-    database_path: "data/conversations.db"
-    max_history_per_conversation: 100
-    summarization_enabled: true
-    summarization_threshold: 50  # messages
-
-  # Vector store for semantic search
-  vector_store:
-    enabled: true
-    backend: "chromadb"  # or "faiss", "pinecone"
-    embedding_model: "text-embedding-ada-002"
-    collection_name: "ami_memories"
 
 # Logging Configuration
 logging:
@@ -149,12 +114,7 @@ logging:
 # Demo environments configuration moved to environment.yaml
 # Community signifier API configuration moved to environment.yaml
 
-# Integration Engine Configuration
-integration_engine:
-  agent_webid_template: "${BASE_WS_URI}/agents/{agent_name}"
-  default_agent_name: "alex"
-
-# Centralized Timeouts Configuration
+# Centralized Timeouts Configuration (consumed by various agents/clients)
 timeouts:
   llm:
     default: "${LLM_TIMEOUT_DEFAULT:-30.0}"
@@ -176,9 +136,7 @@ bt_execution:
     default: "${BT_MAX_TICKS_DEFAULT:-10}"
     user_assistant: "${BT_MAX_TICKS_USER_ASSISTANT:-50}"
 
-# HTTP Client Configuration
+# HTTP Client Configuration (timeout only — retry/status-code policy is in code)
 http:
   client:
     timeout: "${HTTP_CLIENT_TIMEOUT:-30.0}"
-    max_retries: "${HTTP_MAX_RETRIES:-3}"
-    retry_status_codes: [408, 429, 500, 502, 503, 504]

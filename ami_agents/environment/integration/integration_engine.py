@@ -76,18 +76,16 @@ class NotificationListener:
         self.site = web.TCPSite(self.runner, '0.0.0.0', self.port)
         await self.site.start()
 
-        # Auto-detect local IP for the callback URL
-        import socket
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            s.connect(('10.255.255.255', 1))
-            ip = s.getsockname()[0]
-        except Exception:
-            ip = '127.0.0.1'
-        finally:
-            s.close()
+        # Determine callback URL for Yggdrasil webhooks.
+        # Default to localhost for dev/local deployments (Yggdrasil on localhost:8080
+        # cannot reach arbitrary network IPs from its namespace).
+        # Override with NOTIFICATION_CALLBACK_URL env var for production.
+        callback_url = os.getenv("NOTIFICATION_CALLBACK_URL")
+        if not callback_url:
+            # Default to localhost for local/dev deployments
+            callback_url = f"http://localhost:{self.port}/webhook"
 
-        self.base_url = f"http://{ip}:{self.port}/webhook"
+        self.base_url = callback_url
         logger.info(f"Notification listener started at {self.base_url}")
 
     async def stop(self):
@@ -285,8 +283,18 @@ class IIntegrationEngine(ABC):
         # Convert artifact ID to URIRef
         artifact_uri = URIRef(artifact.artifact_id)
 
+        # Try both the artifact URI with and without fragment
+        # (RDF may have been parsed from a URL that strips fragments)
+        artifact_uris_to_try = [artifact_uri]
+        if "#" in str(artifact_uri):
+            artifact_uris_to_try.append(URIRef(str(artifact_uri).split("#")[0]))
+
+        affordance_matches = []
+        for uri_variant in artifact_uris_to_try:
+            affordance_matches.extend(list(td_graph.objects(uri_variant, hasPropertyAffordance_IRI)))
+
         # Find all property affordances of the artifact
-        for affordance_uri in td_graph.objects(artifact_uri, hasPropertyAffordance_IRI):
+        for affordance_uri in affordance_matches:
             affordance_name = IIntegrationEngine.extract_name(td_graph, affordance_uri)
             affordance_semantic_types = [
                 str(typeURI) for typeURI in td_graph.objects(affordance_uri, RDF.type)
@@ -368,8 +376,20 @@ class IIntegrationEngine(ABC):
         # Convert artifact ID to URIRef
         artifact_uri = URIRef(artifact.artifact_id)
 
+        # Try both the artifact URI with and without fragment
+        # (RDF may have been parsed from a URL that strips fragments)
+        artifact_uris_to_try = [artifact_uri]
+        if "#" in str(artifact_uri):
+            artifact_uris_to_try.append(URIRef(str(artifact_uri).split("#")[0]))
+
+        affordance_matches = []
+        for uri_variant in artifact_uris_to_try:
+            affordance_matches.extend(list(td_graph.objects(uri_variant, hasActionAffordance_IRI)))
+
+        logger.debug(f"extract_action_affordances: found {len(affordance_matches)} action affordance URIs for artifact {artifact.artifact_id}")
+
         # Find all action affordances of the artifact
-        for affordance_uri in td_graph.objects(artifact_uri, hasActionAffordance_IRI):
+        for affordance_uri in affordance_matches:
             affordance_name = IIntegrationEngine.extract_name(td_graph, affordance_uri)
             affordance_semantic_types = [
                 str(typeURI) for typeURI in td_graph.objects(affordance_uri, RDF.type)
@@ -480,8 +500,18 @@ class IIntegrationEngine(ABC):
         # Convert artifact ID to URIRef
         artifact_uri = URIRef(artifact.artifact_id)
 
+        # Try both the artifact URI with and without fragment
+        # (RDF may have been parsed from a URL that strips fragments)
+        artifact_uris_to_try = [artifact_uri]
+        if "#" in str(artifact_uri):
+            artifact_uris_to_try.append(URIRef(str(artifact_uri).split("#")[0]))
+
+        affordance_matches = []
+        for uri_variant in artifact_uris_to_try:
+            affordance_matches.extend(list(td_graph.objects(uri_variant, hasEventAffordance_IRI)))
+
         # Find all event affordances of the artifact
-        for affordance_uri in td_graph.objects(artifact_uri, hasEventAffordance_IRI):
+        for affordance_uri in affordance_matches:
             affordance_name = IIntegrationEngine.extract_name(td_graph, affordance_uri)
             affordance_semantic_types = [
                 str(typeURI) for typeURI in td_graph.objects(affordance_uri, RDF.type)
@@ -1072,13 +1102,25 @@ class YggdrasilIntegration(IIntegrationEngine):
         sub_workspace_uris = list(workspace_graph.objects(workspace_uri, contains_iri))
         sub_workspace_ids = []
 
+        # Extract semantic types from workspace RDF (ex: namespace types)
+        semantic_types = []
+        try:
+            ex = Namespace("http://example.org/")
+            for subj in workspace_graph.subjects():
+                for obj in workspace_graph.objects(subj, RDF.type):
+                    if obj in ex:
+                        semantic_types.append(f"ex:{str(obj).split('/')[-1]}")
+        except Exception as e:
+            logger.warning(f"Failed to extract semantic types from workspace RDF for {workspace_id}: {e}")
+
         # Create the Workspace model instance
         workspace = Workspace(
             workspace_id=workspace_id,
             workspace_type=workspace_type,
             name=workspace_name,
             parent_workspace_id=parent_id,
-            rdf=workspace_rdf
+            rdf=workspace_rdf,
+            semantic_types=semantic_types
             # sub_workspaces will be populated after recursion
             # artifacts and metadata can be populated later
         )
@@ -1175,6 +1217,7 @@ class YggdrasilIntegration(IIntegrationEngine):
                 # Extract artifact properties
                 artifact_name = IIntegrationEngine.extract_name(artifact_graph, artifact_uri)
                 artifact_rdf = artifact_graph.serialize(format="turtle")
+                logger.debug(f"Artifact {artifact_id}: RDF length={len(artifact_rdf) if artifact_rdf else 0} bytes, graph size={len(artifact_graph)} triples")
 
                 # Create a basic ThingDescription for the artifact
                 # The full TD will be populated when we parse affordances
@@ -1189,13 +1232,30 @@ class YggdrasilIntegration(IIntegrationEngine):
                 # TODO: Extract actual artifact type from RDF annotations
                 artifact_type = ArtifactCategory.PHYSICAL_DEVICE
 
+                # Extract semantic types from Thing Description RDF
+                semantic_types = []
+                if thing_description and thing_description.rdf:
+                    try:
+                        artifact_graph = Graph()
+                        artifact_graph.parse(data=thing_description.rdf, format="turtle")
+
+                        # Find all RDF types (ex: namespace) for this artifact
+                        ex = Namespace("http://example.org/")
+                        for subj in artifact_graph.subjects():
+                            for obj in artifact_graph.objects(subj, RDF.type):
+                                if obj in ex:
+                                    semantic_types.append(f"ex:{str(obj).split('/')[-1]}")
+                    except Exception as e:
+                        logger.warning(f"Failed to extract semantic types from RDF for {artifact_name}: {e}")
+
                 # Create the Artifact model instance
                 artifact = Artifact(
                     artifact_id=artifact_id,
                     artifact_type=artifact_type,
                     name=artifact_name,
                     workspace_id=worspace_id,
-                    thing_description=thing_description
+                    thing_description=thing_description,
+                    semantic_types=semantic_types
                 )
                 artifact_map[artifact_id] = artifact
 
@@ -1215,7 +1275,8 @@ class YggdrasilIntegration(IIntegrationEngine):
         affordance_map: Dict[str, Affordance] = {}
 
         for artifact_id, artifact in self.artifact_map.items():
-            if artifact.thing_description.rdf is None:
+            if artifact.thing_description.rdf is None or artifact.thing_description.rdf.strip() == "":
+                logger.debug(f"Skipping artifact {artifact_id}: RDF is None or empty")
                 continue
 
             artifact_graph = Graph()
@@ -1225,12 +1286,31 @@ class YggdrasilIntegration(IIntegrationEngine):
                 logger.warning(f"Failed to parse RDF for artifact {artifact_id}: {e}")
                 continue
 
+            logger.debug(f"Processing affordances for artifact {artifact_id}: graph has {len(artifact_graph)} triples")
+
+            # Debug: count how many action affordances are in the graph
+            td_onto = get_td_ontology()
+            if td_onto:
+                hasActionAffordance_IRI = URIRef(td_onto.hasActionAffordance.iri)
+                artifact_uri = URIRef(artifact.artifact_id)
+                artifact_uris_to_try = [artifact_uri]
+                if "#" in str(artifact_uri):
+                    artifact_uris_to_try.append(URIRef(str(artifact_uri).split("#")[0]))
+                action_affordance_count = 0
+                for uri_variant in artifact_uris_to_try:
+                    action_affordance_count += len(list(artifact_graph.objects(uri_variant, hasActionAffordance_IRI)))
+                logger.debug(f"Graph query found {action_affordance_count} action affordances via hasActionAffordance")
+
             # Extract property, action and event affordances
             artifact_affordances = {}
-            artifact_affordances.update(IIntegrationEngine.extract_property_affordances(artifact_graph, artifact))
-            artifact_affordances.update(IIntegrationEngine.extract_action_affordances(artifact_graph, artifact))
-            artifact_affordances.update(IIntegrationEngine.extract_event_affordances(artifact_graph, artifact))
-            
+            props = IIntegrationEngine.extract_property_affordances(artifact_graph, artifact)
+            actions = IIntegrationEngine.extract_action_affordances(artifact_graph, artifact)
+            events = IIntegrationEngine.extract_event_affordances(artifact_graph, artifact)
+            artifact_affordances.update(props)
+            artifact_affordances.update(actions)
+            artifact_affordances.update(events)
+
+            logger.debug(f"Artifact {artifact.name}: extracted {len(props)} properties, {len(actions)} actions, {len(events)} events")
             affordance_map.update(artifact_affordances)
 
             artifact.thing_description.properties = [
@@ -1285,10 +1365,19 @@ class YggdrasilIntegration(IIntegrationEngine):
 
                             for key, value in raw_state.items():
                                 if isinstance(key, str) and key.startswith("http"):
-                                    mapped_state[key] = value
+                                    prop_uri = key
                                 else:
-                                    prop_uri = f"{props_prefix}{key}"
-                                    mapped_state[prop_uri] = value
+                                    # Use canonical /properties/ form instead of /props/
+                                    properties_prefix = f"{base}/properties/"
+                                    prop_uri = f"{properties_prefix}{key}"
+
+                                # Normalize any /props/ URIs to /properties/ for consistency
+                                if "/props/" in prop_uri and "/properties/" not in prop_uri:
+                                    suffix = prop_uri.split("/props/", 1)[-1]
+                                    if suffix:
+                                        prop_uri = f"{base}/properties/{suffix}"
+
+                                mapped_state[prop_uri] = value
                     except json.JSONDecodeError:
                         logger.warning(f"State response for {artifact.name} was not JSON.")
             except Exception as e:
@@ -1346,11 +1435,15 @@ class YggdrasilIntegration(IIntegrationEngine):
                                 value = text
 
                         property_uri = affordance.affordance_id or href
-                        values[property_uri] = value
 
-                        alias_uri = self._property_alias_uri(artifact.artifact_id, property_uri)
-                        if alias_uri and alias_uri not in values:
-                            values[alias_uri] = value
+                        # Normalize property URI: prefer /properties/ over /props/ for canonical storage
+                        if "/props/" in property_uri and "/properties/" not in property_uri:
+                            base = artifact.artifact_id.split("#")[0].rstrip("/")
+                            suffix = property_uri.split("/props/", 1)[-1]
+                            if suffix:
+                                property_uri = f"{base}/properties/{suffix}"
+
+                        values[property_uri] = value
                 except Exception as exc:
                     logger.debug(
                         "Property poll error for %s (%s): %s",

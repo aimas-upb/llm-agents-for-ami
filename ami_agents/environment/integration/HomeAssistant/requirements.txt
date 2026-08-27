@@ -5,6 +5,7 @@ websockets
 rdflib
 requests
 pydantic
+pyyaml
 pytest
 pytest-asyncio
 pytest-cov

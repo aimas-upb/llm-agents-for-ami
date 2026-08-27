@@ -21,6 +21,8 @@ from dotenv import load_dotenv
 from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
 
 from http import HTTPStatus
+import yaml
+
 from ha_utils import (HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST,
                       get_supported_service_fields)
 
@@ -50,6 +52,61 @@ JACAMO = Namespace("https://purl.org/hmas/jacamo/")
 TD     = Namespace("https://www.w3.org/2019/wot/td#")
 
 WEBHOOK_VERIFY_TIMEOUT = 5.0 # seconds for webhook verification requests
+
+# ---------------- Semantic config loader -----------------
+def _load_semantic_config() -> Dict[str, Any]:
+    """Load semantic type mappings from the YAML file pointed to by SEMANTIC_CONFIG env var."""
+    path = os.getenv("SEMANTIC_CONFIG", "").strip()
+    if not path:
+        return {}
+    # If path is relative, try relative to the HomeAssistant directory
+    if not os.path.isabs(path):
+        ha_dir = os.path.dirname(os.path.abspath(__file__))
+        resolved = os.path.join(ha_dir, os.path.basename(path))
+        if os.path.exists(resolved):
+            path = resolved
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path) as f:
+            data = yaml.safe_load(f)
+        return (data or {}).get("semantic", {})
+    except Exception as exc:
+        print(f"Warning: could not load SEMANTIC_CONFIG from {path!r}: {exc}")
+        return {}
+
+_SEMANTIC_CFG: Dict[str, Any] = _load_semantic_config()
+if _SEMANTIC_CFG:
+    print(f"✓ Loaded semantic config: workspace_type={_SEMANTIC_CFG.get('workspace_type')}, {len(_SEMANTIC_CFG.get('devices', {}))} devices")
+else:
+    cfg_env = os.getenv("SEMANTIC_CONFIG", "NOT SET")
+    print(f"⚠ Semantic config not loaded (SEMANTIC_CONFIG={cfg_env!r})")
+
+
+def _semantic_workspace_type() -> Optional[URIRef]:
+    """Return the ex: URIRef for the workspace type declared in the semantic config, or None."""
+    raw = _SEMANTIC_CFG.get("workspace_type", "")
+    if not raw or not raw.startswith("ex:"):
+        return None
+    return EX[raw[3:]]
+
+
+def _semantic_artifact_type(device_name: str) -> Optional[URIRef]:
+    """Return the ex: URIRef for the artifact type of the named device, or None."""
+    devices = _SEMANTIC_CFG.get("devices", {})
+    raw = (devices.get(device_name) or {}).get("artifact_type", "")
+    if not raw or not raw.startswith("ex:"):
+        return None
+    return EX[raw[3:]]
+
+
+def _semantic_action_type(device_name: str, svc_name: str) -> URIRef:
+    """Return the ex: URIRef for the action type of device+service, falling back to EX.StatusCommand."""
+    devices = _SEMANTIC_CFG.get("devices", {})
+    raw = (devices.get(device_name) or {}).get("service_types", {}).get(svc_name, "")
+    if raw and raw.startswith("ex:"):
+        return EX[raw[3:]]
+    return EX.StatusCommand
 
 # XSD value type URIs for event payloads
 XSD_BOOL   = "http://www.w3.org/2001/XMLSchema#boolean"
@@ -160,7 +217,12 @@ def _entity_display_name(entity: Optional[Dict[str, Any]], devices_by_id: Dict[s
     for key in ("name", "original_name"):
         val = entity.get(key)
         if isinstance(val, str) and val.strip():
-            return val.strip()
+            name = val.strip()
+            # Clean up duplicates like "lights_308.lights_308" -> "lights_308"
+            parts = name.split(".")
+            if len(parts) == 2 and parts[0] == parts[1]:
+                return parts[0]
+            return name
     object_id = ""
     ent_id = entity.get("entity_id", "")
     if isinstance(ent_id, str) and "." in ent_id:
@@ -168,6 +230,9 @@ def _entity_display_name(entity: Optional[Dict[str, Any]], devices_by_id: Dict[s
     device = devices_by_id.get(entity.get("device_id"))
     device_name = (device or {}).get("name") if isinstance(device, dict) else None
     if device_name and object_id:
+        # Don't duplicate if device_name already equals object_id
+        if device_name == object_id:
+            return device_name
         return f"{device_name}.{object_id}"
     if device_name:
         return device_name
@@ -359,7 +424,8 @@ async def get_platform(request: Request):
         else:
             filtered_areas = areas
 
-        rdf = HomeAssistantRDF(str(request.base_url))
+        # Use the BASE_WS_URI for the platform root
+        rdf = HomeAssistantRDF(BASE_WS_URI)
         rdf.platform_to_rdf(filtered_areas)
         return Response(rdf.serialize(), media_type="text/turtle")
     except Exception as exc:
@@ -370,7 +436,8 @@ async def get_platform(request: Request):
 async def list_workspaces(request: Request):
     try:
         areas = await ha_client.get_areas()
-        rdf = HomeAssistantRDF(str(request.base_url))
+        # Use the platform root as base (workspace_to_rdf expects this)
+        rdf = HomeAssistantRDF(BASE_WS_URI)
         for a in areas:
             rdf.workspace_to_rdf(a, [])
         return Response(rdf.serialize(), media_type="text/turtle")
@@ -586,8 +653,20 @@ async def workspace(workspace_id: str, request: Request):
         if area is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
         devices, _ = await _get_workspace_devices_and_entities(workspace_id)
-        rdf = HomeAssistantRDF(str(request.base_url))
+        # Use the platform root as base (workspace_to_rdf expects this)
+        rdf = HomeAssistantRDF(BASE_WS_URI)
         rdf.workspace_to_rdf(area, devices)
+        ws_type = _semantic_workspace_type()
+        if ws_type:
+            ws_uri = URIRef(f"{BASE_WS_URI.rstrip('/')}/workspaces/{workspace_id}#workspace")
+            rdf.g.add((ws_uri, RDF.type, ws_type))
+        for d in devices:
+            device_name = d.get("name", d.get("id"))
+            art_type = _semantic_artifact_type(device_name)
+            if art_type:
+                safe_name = urllib.parse.quote(device_name, safe="")
+                art_uri = URIRef(f"{BASE_WS_URI.rstrip('/')}/workspaces/{workspace_id}/artifacts/{safe_name}#artifact")
+                rdf.g.add((art_uri, RDF.type, art_type))
         return Response(rdf.serialize(), media_type="text/turtle")
     except HTTPException:
         raise
@@ -603,15 +682,19 @@ async def list_artifacts(workspace_id: str, request: Request):
         if area is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
         devices, entities = await _get_workspace_devices_and_entities(workspace_id)
-        rdf = HomeAssistantRDF(str(request.base_url))
+        # Use the platform root as base (for consistent namespace handling)
+        rdf = HomeAssistantRDF(BASE_WS_URI)
         aid = area["area_id"]
-        ws = URIRef(f"{rdf.base}workspaces/{aid}#workspace")
-        art_dir = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/")
+        ws = URIRef(f"{BASE_WS_URI.rstrip('/')}/workspaces/{aid}#workspace")
+        art_dir = URIRef(f"{BASE_WS_URI.rstrip('/')}/workspaces/{aid}/artifacts/")
         for ent in entities:
             label = ent.get("_artifact_label") or _entity_display_name(ent, {d["id"]: d for d in devices})
             safe_name = ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
             art = URIRef(f"{art_dir}{safe_name}#artifact")
             rdf.g.add((art, RDF.type, HMAS.Artifact))
+            art_type = _semantic_artifact_type(label)
+            if art_type:
+                rdf.g.add((art, RDF.type, art_type))
             rdf.g.add((ws, HMAS.contains, art))
             rdf.g.add((art, TD.title, Literal(label)))
         return Response(rdf.serialize(), media_type="text/turtle")
@@ -630,12 +713,15 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
         state_map = {s["entity_id"]: s for s in states}
 
         #print(states)
-        
-        rdf = HomeAssistantRDF(str(request.base_url))
-        aid = workspace_id
-        ws = URIRef(f"{rdf.base}workspaces/{aid}#workspace")
-        art_dir = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/")
+
+        # Construct the base URI for this artifact's RDF (artifact directory)
         safe_name = urllib.parse.quote(artifact_label, safe="")
+        artifact_base = f"{BASE_WS_URI.rstrip('/')}/workspaces/{workspace_id}/artifacts/{safe_name}/"
+
+        rdf = HomeAssistantRDF(artifact_base)
+        aid = workspace_id
+        ws = URIRef(f"{BASE_WS_URI.rstrip('/')}/workspaces/{aid}#workspace")
+        art_dir = URIRef(f"{BASE_WS_URI.rstrip('/')}/workspaces/{aid}/artifacts/")
         art = URIRef(f"{art_dir}{safe_name}#artifact")
 
         # Build RDF
@@ -643,8 +729,9 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
         rdf.g.add((art, RDF.type, HMAS.Artifact))
         rdf.g.add((art, TD.title, Literal(artifact_label)))
         domains = {e["entity_id"].split(".")[0] for e in device_entities}
-        if "light" in domains:
-            rdf.g.add((art, RDF.type, EX.HueLamp))
+        art_type = _semantic_artifact_type(artifact_label)
+        if art_type:
+            rdf.g.add((art, RDF.type, art_type))
         sec = BNode()
         rdf.g.add((art, TD.hasSecurityConfiguration, sec))
         rdf.g.add((sec, RDF.type, WOTSEC.NoSecurityScheme))
@@ -699,58 +786,16 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                 rdf._add_action(
                     art,
                     action_name,
-                    EX.StatusCommand,
+                    _semantic_action_type(artifact_label, svc_name),
                     "POST",
-                    URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/ha/{urllib.parse.quote(domain, safe='')}/{urllib.parse.quote(svc_name, safe='')}"),
+                    URIRef(f"{rdf.base}ha/{urllib.parse.quote(domain, safe='')}/{urllib.parse.quote(svc_name, safe='')}"),
                     "application/json",
                     input_schema=input_schema,
                     description=service_description,
                 )
 
-        # Sensor-specific value action
-        if "sensor" in domains:
-            sensor_ent = _pick_entity(device_entities, "sensor")
-            st = state_map.get(sensor_ent, {}) if sensor_ent else {}
-            attrs = st.get("attributes", {}) if isinstance(st, dict) else {}
-            device_class = attrs.get("device_class")
-            unit = attrs.get("unit_of_measurement")
-            action_names = _sensor_action_names(device_class, unit)
-            if action_names:
-                action_name = action_names[0]
-
-                # Build output schema
-                output_schema = rdf._build_sensor_output_schema(device_class, unit)
-
-                rdf._add_action(
-                    art,
-                    action_name,
-                    EX.StatusCommand,
-                    "POST",
-                    URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/{urllib.parse.quote(action_name, safe='')}"),
-                    "application/json",
-                    output_schema=output_schema,
-                )
-
-        if "binary_sensor" in domains:
-            binary_ent = _pick_entity(device_entities, "binary_sensor")
-            st = state_map.get(binary_ent, {}) if binary_ent else {}
-            attrs = st.get("attributes", {}) if isinstance(st, dict) else {}
-            action_names = _binary_sensor_action_names(attrs.get("device_class"))
-            if action_names:
-                action_name = action_names[0]
-
-                # Build output schema
-                output_schema = rdf._build_binary_sensor_output_schema()
-
-                rdf._add_action(
-                    art,
-                    action_name,
-                    EX.StatusCommand,
-                    "POST",
-                    URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/{urllib.parse.quote(action_name, safe='')}"),
-                    "application/json",
-                    output_schema=output_schema,
-                )
+        # Sensors and binary sensors are read-only; their state and attributes
+        # are exposed as PropertyAffordance above. No ActionAffordances.
 
         if "climate" in domains:
             climate_ent = _pick_entity(device_entities, "climate")
@@ -763,7 +808,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                     "getThermostatState",
                     EX.StatusCommand,
                     "POST",
-                    URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/getThermostatState"),
+                    URIRef(f"{rdf.base}getThermostatState"),
                     "application/json",
                     output_schema=output_schema,
                 )
@@ -803,7 +848,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                         # If parsing fails, keep as string
                         pass
 
-                property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/state")
+                property_uri = URIRef(f"{rdf.base}properties/state")
                 # Pass domain to schema builder for context-aware schema generation
                 schema = rdf._build_property_schema("state", schema_value, entity_attrs, entity_domain=entity_domain)
                 rdf._add_property(
@@ -827,7 +872,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                         continue
 
                     # Build property URI
-                    property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/{urllib.parse.quote(attr_name, safe='')}")
+                    property_uri = URIRef(f"{rdf.base}properties/{urllib.parse.quote(attr_name, safe='')}")
 
                     # Build schema for this property
                     schema = rdf._build_property_schema(attr_name, attr_value, entity_attrs)
@@ -851,7 +896,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
                         metadata_attrs[ts_field] = entity_state[ts_field]
 
                 if metadata_attrs:
-                    metadata_property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/metadata")
+                    metadata_property_uri = URIRef(f"{rdf.base}properties/metadata")
                     metadata_schema = rdf._build_metadata_schema(metadata_attrs)
                     rdf._add_property(
                         art,
@@ -864,13 +909,13 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
 
         # Generic Jacamo/WebSub affordances
         rdf._add_action(art, "getArtifactRepresentation", JACAMO.PerceiveArtifact, "GET",
-                        URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}"), "application/json")
+                        URIRef(f"{rdf.base}"), "application/json")
         rdf._add_action(art, "updateArtifactRepresentation", JACAMO.UpdateArtifact, "PUT",
-                        URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}"), "application/json")
+                        URIRef(f"{rdf.base}"), "application/json")
         rdf._add_action(art, "deleteArtifactRepresentation", JACAMO.DeleteArtifact, "DELETE",
-                        URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}"), "application/json")
+                        URIRef(f"{rdf.base}"), "application/json")
         rdf._add_action(art, "focusArtifact", JACAMO.Focus, "POST",
-                        URIRef(f"{rdf.base}workspaces/{aid}/focus"), "application/json")
+                        URIRef(f"{rdf.base}focus"), "application/json")
         rdf._add_action(art, "subscribeToArtifact", WEBSUB.subscribeToArtifact, "POST",
                         URIRef(f"{rdf.base}hub/"), "application/json", "websub")
         rdf._add_action(art, "unsubscribeFromArtifact", WEBSUB.unsubscribeFromArtifact, "POST",
@@ -882,7 +927,7 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
         if True:
             rdf.g.add((art, HMAS.isContainedIn, ws))
             rdf.g.add((ws, RDF.type, HMAS.Workspace))
-            profile = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}")
+            profile = URIRef(f"{rdf.base}")
             rdf.g.add((profile, RDF.type, HMAS.ResourceProfile))
             rdf.g.add((profile, HMAS.isProfileOf, art))
             return Response(rdf.serialize(), media_type="text/turtle")
@@ -1196,54 +1241,94 @@ async def update_artifact_representation(workspace_id: str, artifact_name: str, 
 async def delete_artifact_representation(workspace_id: str, artifact_name: str):
     return Response(content="Action succeeded:")
 
-# Dynamic sensor/binary sensor actions
-@app.api_route("/workspaces/{workspace_id}/artifacts/{artifact_name}/{action_name}", methods=["POST", "GET"])
-async def action_sensor_dynamic(workspace_id: str, artifact_name: str, action_name: str):
-    _, device_entities, _, _ = await _resolve_device_and_entities(workspace_id, artifact_name)
-    sensor_ent = _pick_entity(device_entities, "sensor")
-    binary_ent = _pick_entity(device_entities, "binary_sensor")
-    climate_ent = _pick_entity(device_entities, "climate")
+@app.api_route("/workspaces/{workspace_id}/artifacts/{artifact_name}/focus", methods=["POST", "GET"])
+async def focus_artifact(workspace_id: str, artifact_name: str, request: Request):
+    """
+    Handle Jacamo Focus action on a specific artifact by registering a WebSub subscription.
 
-    states = await ha_rest.get_states()
-    state_map = {s.get("entity_id"): s for s in states}
-    sensor_state = state_map.get(sensor_ent) if sensor_ent else None
-    binary_state = state_map.get(binary_ent) if binary_ent else None
-    climate_state = state_map.get(climate_ent) if climate_ent else None
+    Payload expected:
+    {
+        "callbackUrl": "required, where to send events"
+    }
+    """
+    if request.method == "GET":
+        body = dict(request.query_params)
+    else:
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
 
-    sensor_names = _sensor_action_names(
-        (sensor_state or {}).get("attributes", {}).get("device_class"),
-        (sensor_state or {}).get("attributes", {}).get("unit_of_measurement"),
-    ) if sensor_state else []
-    binary_names = _binary_sensor_action_names(
-        (binary_state or {}).get("attributes", {}).get("device_class")
-    ) if binary_state else []
+    callback_url = body.get("callbackUrl")
 
-    if action_name in sensor_names:
-        return PlainTextResponse(str((sensor_state or {}).get("state", "")))
-    if action_name in binary_names:
-        return PlainTextResponse(str((binary_state or {}).get("state", "")))
+    # Determine Topic URI using configured BASE_WS_URI
+    base = BASE_WS_URI.rstrip("/")
+    safe_name = urllib.parse.quote(artifact_name, safe="")
+    topic = f"{base}/workspaces/{workspace_id}/artifacts/{safe_name}#artifact"
 
-    if action_name == "getThermostatState":
-        if not climate_ent:
-            raise HTTPException(status_code=404, detail="No climate entity on artifact")
-        if not climate_state:
-            raise HTTPException(status_code=404, detail="Climate state not found")
-        return JSONResponse(_format_climate_state(climate_state))
+    if callback_url:
+        # Register subscription directly
+        subscription_id = f"{topic}-{callback_url}"
+        subscriptions[subscription_id] = {
+            "topic": topic,
+            "callback": callback_url,
+            "lease_seconds": None, # Infinite focus until explicit unfocus/unsubscribe
+            "timestamp": asyncio.get_event_loop().time(),
+            "type": "focus"
+        }
+        print(f"Agent focused on {topic} -> {callback_url}")
+    else:
+        print(f"Agent focused on {topic} (no callback)")
 
-    # Provide meaningful errors for known patterns
-    if action_name.startswith("get") and "In" in action_name[3:]:
-        if not sensor_ent:
-            raise HTTPException(status_code=404, detail="No sensor entity on artifact")
-        if not sensor_state:
-            raise HTTPException(status_code=404, detail="Sensor state not found")
-        raise HTTPException(status_code=404, detail="Action not applicable to this sensor")
+    return Response(content="Focus succeeded")
 
-    binary_like = action_name.startswith("get") and action_name.endswith("State")
-    if binary_like:
-        if not binary_ent:
-            raise HTTPException(status_code=404, detail="No binary sensor entity on artifact")
-        if not binary_state:
-            raise HTTPException(status_code=404, detail="Binary sensor state not found")
-        raise HTTPException(status_code=404, detail="Action not applicable to this binary sensor")
+@app.api_route("/workspaces/{workspace_id}/artifacts/{artifact_name}/subscribe", methods=["POST", "GET"])
+async def subscribe_artifact(workspace_id: str, artifact_name: str, request: Request):
+    """
+    Handle WebSub subscription to a specific artifact.
 
-    raise HTTPException(status_code=404, detail="Unknown action")
+    Payload expected:
+    {
+        "hub.mode": "subscribe",
+        "hub.topic": "artifact_uri",
+        "hub.callback": "callback_url"
+    }
+    """
+    if request.method == "GET":
+        body = dict(request.query_params)
+    else:
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    hub_mode = body.get("hub.mode")
+    hub_callback = body.get("hub.callback")
+
+    # Determine Topic URI using configured BASE_WS_URI
+    base = BASE_WS_URI.rstrip("/")
+    safe_name = urllib.parse.quote(artifact_name, safe="")
+    topic = f"{base}/workspaces/{workspace_id}/artifacts/{safe_name}#artifact"
+
+    if hub_mode == "subscribe" and hub_callback:
+        # Register subscription
+        subscription_id = f"{topic}-{hub_callback}"
+        subscriptions[subscription_id] = {
+            "topic": topic,
+            "callback": hub_callback,
+            "lease_seconds": None,
+            "timestamp": asyncio.get_event_loop().time(),
+            "type": "websub"
+        }
+        print(f"WebSub subscription registered: {topic} -> {hub_callback}")
+        return Response(status_code=202, content="Subscription succeeded")
+    elif hub_mode == "unsubscribe" and hub_callback:
+        # Remove subscription
+        subscription_id = f"{topic}-{hub_callback}"
+        if subscription_id in subscriptions:
+            del subscriptions[subscription_id]
+            print(f"WebSub subscription removed: {topic}")
+        return Response(status_code=200, content="Unsubscription succeeded")
+    else:
+        raise HTTPException(status_code=400, detail="Invalid subscription request")
+

@@ -71,9 +71,7 @@ async def ensure_experience_engine_ready(agent_instance) -> bool:
 
             agent_instance._experience_engine_ready = True
             agent_instance.logger.info(
-                demo("Experience engine ready (storage_dir=%s, matcher_default=%s)"),
-                agent_instance._experience_engine_storage_dir,
-                agent_instance._experience_engine_default_matcher_version,
+                demo(f"Experience engine ready (storage_dir={agent_instance._experience_engine_storage_dir}, matcher_default={agent_instance._experience_engine_default_matcher_version})")
             )
             return True
 
@@ -144,8 +142,10 @@ async def list_experience_engine_signifiers(agent_instance, experience_engine_de
         return {"ok": False, "error": "experience_engine_not_ready"}
 
     try:
+        signifier_limit_raw = agent_instance.config.get("experience_engine", {}).get("signifier_limit", experience_engine_defaults["signifier_limit"])
+        signifier_limit = int(signifier_limit_raw)
         signifiers_raw = agent_instance._experience_engine_registry.list_signifiers(
-            limit=agent_instance.config.get("experience_engine", {}).get("signifier_limit", experience_engine_defaults["signifier_limit"])
+            limit=signifier_limit
         )
         signifiers_out = []
         for s in signifiers_raw:

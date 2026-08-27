@@ -97,11 +97,18 @@ class InitialDiscoveryBehaviour(OneShotBehaviour):
             self.agent.discovery_complete = True
             self.agent.logger.info(f"Discovery Complete. Found {len(self.agent.artifacts)} artifacts.")
             self.agent.logger.info(
-                demo("Discovery summary: workspaces=%d artifacts=%d affordances=%d"),
-                len(self.agent.environment_map or {}),
-                len(self.agent.artifacts or {}),
-                len(self.agent.affordances or {}),
+                demo(f"Discovery summary: workspaces={len(self.agent.environment_map or {})} \
+                        artifacts={len(self.agent.artifacts or {})} \
+                        affordances={len(self.agent.affordances or {})}"),
             )
+
+            # Log hierarchical capabilities text for inspection (only if verbose)
+            import os
+            if os.getenv("VERBOSE_LOGGING"):
+                from ..utils.data_formatting import format_capabilities_hierarchical_text
+
+                hierarchical_text = format_capabilities_hierarchical_text(self.agent)
+                self.agent.logger.info(demo(f"=== HIERARCHICAL CAPABILITIES TEXT ===\n{hierarchical_text}"))
 
             await self.notify_discovery_complete()
 
@@ -118,9 +125,10 @@ class InitialDiscoveryBehaviour(OneShotBehaviour):
         3. Send to InteractionSolver
         4. Log notification sent
         """
-        # Hardcoded notification configuration (discovery config section removed per Requirement 2)
-        notify_on_discovery_complete = True
-        notify_agents = ["user_assistant@localhost", "interaction_solver@localhost"]
+        # Use configuration for discovery notification
+        discovery_config = self.agent.config.get("discovery", {})
+        notify_on_discovery_complete = discovery_config.get("notify_on_discovery_complete", True)
+        notify_agents = discovery_config.get("notify_agents", ["user_assistant@localhost", "interaction_solver@localhost"])
 
         if not notify_on_discovery_complete:
             return

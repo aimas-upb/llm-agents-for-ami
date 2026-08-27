@@ -13,6 +13,7 @@ _NO_COLOR = bool(os.getenv("AMI_NO_COLOR")) or bool(os.getenv("NO_COLOR"))
 
 _ANSI_RESET = "\x1b[0m"
 _ANSI_BOLD_CYAN = "\x1b[1;36m"
+_ANSI_BOLD_GREEN = "\x1b[1;32m"
 
 
 def demo_prefix() -> str:

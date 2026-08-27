@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 
 from src.matching.base import IntentMatcher, MatchResult
 from src.matching.embedding_matcher import EmbeddingMatcher
+from src.matching.env_var_matcher import EnvironmentVariableMatcher
 from src.matching.string_matcher import StringContainsMatcher
 from src.matching.structured_matcher import StructuredIntentMatcher
 
@@ -52,6 +53,10 @@ class IntentMatcherRegistry:
         # Register structured intent matcher (v2)
         self.register(StructuredIntentMatcher())
         logger.info("Registered StructuredIntentMatcher (v2)")
+
+        # Register environment variable matcher (v3)
+        self.register(EnvironmentVariableMatcher())
+        logger.info("Registered EnvironmentVariableMatcher (v3)")
 
     def register(self, matcher: IntentMatcher) -> None:
         """Register a new matcher version.

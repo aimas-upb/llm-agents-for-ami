@@ -60,7 +60,8 @@ class SignifierListBehaviour(CyclicBehaviour):
         try:
             # Get signifier limit from configuration
             experience_engine_config = self.agent.config.get("experience_engine", {})
-            signifier_limit = experience_engine_config.get("signifier_limit", 1000)  # Default from _EXPERIENCE_ENGINE_DEFAULTS
+            signifier_limit_raw = experience_engine_config.get("signifier_limit", 1000)  # Default from _EXPERIENCE_ENGINE_DEFAULTS
+            signifier_limit = int(signifier_limit_raw)
 
             self.agent.logger.debug(f"Listing signifiers with limit: {signifier_limit}")
 
@@ -88,7 +89,7 @@ class SignifierListBehaviour(CyclicBehaviour):
 
                 signifiers_out.append(signifier_data)
 
-            self.agent.logger.info(demo("Listed %d signifiers from registry"), len(signifiers_out))
+            self.agent.logger.info(demo(f"Listed {len(signifiers_out)} signifiers from registry"))
 
             return {
                 "total": len(signifiers_out),
