@@ -15,6 +15,7 @@ import pytest
 import pytest_asyncio
 
 from ami_agents.bt_planning.planning.bt_planner import AsyncBTPlanner
+from ami_agents.bt_planning.planning.bt_planner_direct import DirectCodeBTPlanner
 from ami_agents.bt_planning.planning.code_planner import AsyncCodeBTPlanner
 
 pytestmark = pytest.mark.skipif(
@@ -75,8 +76,8 @@ def _collect_action_urls(spec: dict) -> list[str]:
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-@pytest.mark.parametrize("planner_cls", [AsyncBTPlanner, AsyncCodeBTPlanner])
-async def test_both_modes_generate_resolved_tree(planner_cls, openai_client, test_model):
+@pytest.mark.parametrize("planner_cls", [AsyncBTPlanner, AsyncCodeBTPlanner, DirectCodeBTPlanner])
+async def test_all_modes_generate_a_plan(planner_cls, openai_client, test_model):
     planner = planner_cls(max_attempts=3)
     result = await planner.generate_bt(
         intents=["increase the brightness of the light to 80"],
@@ -88,11 +89,22 @@ async def test_both_modes_generate_resolved_tree(planner_cls, openai_client, tes
     )
 
     assert result["impossible"] is False, result["explanation"]
-    tree = result["tree"]
-    assert tree, f"empty tree: {result['explanation']}"
-    assert LIGHT_ACTION["target"] in _collect_action_urls(tree)
 
-    expected_mode = "python_code" if planner_cls is AsyncCodeBTPlanner else "behavior_tree"
-    assert result["plan_mode"] == expected_mode
-    if planner_cls is AsyncCodeBTPlanner:
-        assert result["generated_code"].strip()
+    if planner_cls is DirectCodeBTPlanner:
+        # py_trees_code mode: no IR tree; the payload is executable code that
+        # must reference the real action URL and define the tree contract.
+        assert result["plan_mode"] == "py_trees_code"
+        code = result["generated_code"]
+        assert code.strip(), f"empty code: {result['explanation']}"
+        assert LIGHT_ACTION["target"] in code
+        assert "tree" in code
+    else:
+        tree = result["tree"]
+        assert tree, f"empty tree: {result['explanation']}"
+        assert LIGHT_ACTION["target"] in _collect_action_urls(tree)
+        expected_mode = (
+            "python_code" if planner_cls is AsyncCodeBTPlanner else "behavior_tree"
+        )
+        assert result["plan_mode"] == expected_mode
+        if planner_cls is AsyncCodeBTPlanner:
+            assert result["generated_code"].strip()

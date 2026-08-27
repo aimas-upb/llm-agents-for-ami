@@ -77,7 +77,8 @@ interaction_solver:
       temperature: 0.5
       max_tokens: 2000
 
-      # Plan generation mode: behavior_tree (JSON IR tool call) | python_code (builder-DSL script)
+      # Plan generation mode: behavior_tree (JSON IR tool call) | python_code
+      # (builder-DSL script) | py_trees_code (free py_trees code, CodeBTExecutor)
       output_format: "${BT_PLAN_MODE:-behavior_tree}"
       max_planning_attempts: 3  # retries for BT generation
 
@@ -100,6 +101,8 @@ llm:
   providers:
     openai:
       api_key: null  # Set via environment variable OPENAI_API_KEY
+      # OpenAI-compatible endpoint (vLLM/Ollama) for local SLMs; empty falls back to api.openai.com
+      base_url: "${OPENAI_BASE_URL:-}"
       model: "gpt-4o-mini"
       temperature: 0.5
       max_tokens: 1500

@@ -2,7 +2,8 @@
 # JSON-IR vs direct-code generation-mode ablation over SimuHome scenarios.
 #
 # Compares plan-generation modes (behavior_tree = JSON IR tool call,
-# python_code = builder-DSL script) across SLMs served by Ollama and OpenAI
+# python_code = builder-DSL script, py_trees_code = free py_trees code
+# executed by CodeBTExecutor) across SLMs served by Ollama and OpenAI
 # reference models, on the same seeds/flavors machinery as the earlier
 # TD-SOSA ablations (run_ablation_chatgpt.sh / run_ablation_ollama.sh).
 #
@@ -17,7 +18,7 @@
 #
 # Grid dimensions (env-overridable; defaults = the decided experiment grid:
 # modes x models, TD-SOSA on, signifiers cleared every run):
-#   MODES        behavior_tree python_code
+#   MODES        behavior_tree python_code py_trees_code
 #   MODELS       qwen2.5-coder:3b codegemma:7b-instruct deepseek-coder:1.3b gpt-5-mini gpt-4o
 #   FLAVORS      tdsosa_clear   (also: notdsosa_clear tdsosa_signifiers notdsosa_signifiers)
 #   QUERY_TYPES  qt2            (also: qt1)
@@ -42,7 +43,7 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 RUNS="${RUNS:-10}"
 DRY_RUN="${DRY_RUN:-0}"
 
-MODES=(${MODES:-behavior_tree python_code})
+MODES=(${MODES:-behavior_tree python_code py_trees_code})
 MODELS=(${MODELS:-qwen2.5-coder:3b codegemma:7b-instruct deepseek-coder:1.3b gpt-5-mini gpt-4o})
 FLAVORS=(${FLAVORS:-tdsosa_clear})
 QUERY_TYPES=(${QUERY_TYPES:-qt2})

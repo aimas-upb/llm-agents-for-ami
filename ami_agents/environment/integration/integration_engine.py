@@ -1116,12 +1116,63 @@ class YggdrasilIntegration(IIntegrationEngine):
 
         artifact_map: Dict[str, Artifact] = {}
 
+        # Dereferencing each artifact is a blocking HTTP round-trip; run them
+        # concurrently (bounded) instead of one-at-a-time so a workspace crawl
+        # with dozens of artifacts doesn't pay N sequential round-trips.
+        concurrency = int(os.getenv("INTEGRATION_ENGINE_ARTIFACT_CONCURRENCY", "8"))
+        semaphore = asyncio.Semaphore(max(1, concurrency))
+
+        async def _dereference_artifact(artifact_uri: URIRef, worspace_id: str, workspace: Workspace) -> None:
+            artifact_id = str(artifact_uri)
+            logger.debug(f"Processing artifact: {artifact_id}")
+
+            # Derefernce the artifact URI to get its RDF representation
+            artifact_graph = Graph()
+            async with semaphore:
+                try:
+                    await asyncio.to_thread(artifact_graph.parse, str(artifact_uri))
+                except Exception as e:
+                    logger.warning(f"Failed to dereference artifact URI {artifact_uri}: {e}")
+                    return
+
+            # Extract artifact properties
+            artifact_name = IIntegrationEngine.extract_name(artifact_graph, artifact_uri)
+            artifact_rdf = artifact_graph.serialize(format="turtle")
+
+            # Create a basic ThingDescription for the artifact
+            # The full TD will be populated when we parse affordances
+            thing_description = ThingDescription(
+                id=artifact_id,
+                title=artifact_name,
+                description=f"Thing Description for {artifact_name}",
+                rdf=artifact_rdf
+            )
+
+            # Determine artifact type - default to PHYSICAL_DEVICE for now
+            # TODO: Extract actual artifact type from RDF annotations
+            artifact_type = ArtifactCategory.PHYSICAL_DEVICE
+
+            # Create the Artifact model instance
+            artifact = Artifact(
+                artifact_id=artifact_id,
+                artifact_type=artifact_type,
+                name=artifact_name,
+                workspace_id=worspace_id,
+                thing_description=thing_description
+            )
+            artifact_map[artifact_id] = artifact
+
+            # add the artifact to the workspace's artifact list
+            workspace.artifacts.append(artifact_id)
+
+            logger.info(f"Processed artifact '{artifact_name}' in workspace '{workspace.name}'")
+
         # Find all artifacts in the platform graph
         for worspace_id, workspace in self.workspace_map.items():
             if workspace.rdf is None:
                 logger.warning(f"Workspace {worspace_id} has no RDF representation, skipping artifact search")
                 continue
-            
+
             # Load the workspace RDF into a graph
             workspace_graph = Graph()
             try:
@@ -1137,55 +1188,12 @@ class YggdrasilIntegration(IIntegrationEngine):
             artifact_uris = [obj for obj in workspace_graph.objects(workspace_uri, contains_iri)
                              if (obj, RDF.type, Artifact_iri) in workspace_graph]
 
-            for artifact_uri in artifact_uris:
-                artifact_id = str(artifact_uri)
+            # Skip artifacts already processed (e.g. shared across workspaces)
+            pending_uris = [uri for uri in artifact_uris if str(uri) not in artifact_map]
 
-                # Skip if already processed
-                if artifact_id in artifact_map:
-                    logger.debug(f"Artifact {artifact_id} already processed, skipping")
-                    continue
-
-                logger.debug(f"Processing artifact: {artifact_id}")
-
-                # Derefernce the artifact URI to get its RDF representation
-                artifact_graph = Graph()
-                try:
-                    artifact_graph.parse(str(artifact_uri))
-                except Exception as e:
-                    logger.warning(f"Failed to dereference artifact URI {artifact_uri}: {e}")
-                    continue
-
-                # Extract artifact properties
-                artifact_name = IIntegrationEngine.extract_name(artifact_graph, artifact_uri)
-                artifact_rdf = artifact_graph.serialize(format="turtle")
-
-                # Create a basic ThingDescription for the artifact
-                # The full TD will be populated when we parse affordances
-                thing_description = ThingDescription(
-                    id=artifact_id,
-                    title=artifact_name,
-                    description=f"Thing Description for {artifact_name}",
-                    rdf=artifact_rdf
-                )
-
-                # Determine artifact type - default to PHYSICAL_DEVICE for now
-                # TODO: Extract actual artifact type from RDF annotations
-                artifact_type = ArtifactCategory.PHYSICAL_DEVICE
-
-                # Create the Artifact model instance
-                artifact = Artifact(
-                    artifact_id=artifact_id,
-                    artifact_type=artifact_type,
-                    name=artifact_name,
-                    workspace_id=worspace_id,
-                    thing_description=thing_description
-                )
-                artifact_map[artifact_id] = artifact
-
-                # add the artifact to the workspace's artifact list
-                workspace.artifacts.append(artifact_id)
-                
-                logger.info(f"Processed artifact '{artifact_name}' in workspace '{workspace.name}'")
+            await asyncio.gather(
+                *(_dereference_artifact(uri, worspace_id, workspace) for uri in pending_uris)
+            )
 
         logger.info(f"Total artifacts found: {len(artifact_map)}")
         return artifact_map

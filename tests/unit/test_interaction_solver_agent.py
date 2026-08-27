@@ -126,6 +126,13 @@ class TestPlanModeSelection:
         agent = self._agent(monkeypatch, "garbage")
         assert agent.plan_mode == "behavior_tree"
 
+    def test_py_trees_code_selects_direct_planner(self, monkeypatch):
+        from ami_agents.bt_planning.planning.bt_planner_direct import DirectCodeBTPlanner
+
+        agent = self._agent(monkeypatch, "py_trees_code")
+        assert agent.plan_mode == "py_trees_code"
+        assert isinstance(agent.bt_planner, DirectCodeBTPlanner)
+
 
 class TestGeneratePlanEnvelope:
     """The plan envelope must carry plan_mode/generated_code and keep the

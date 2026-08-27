@@ -1328,11 +1328,17 @@ class Lab308eHarness:
 
     async def _wait_for_yggdrasil(self, timeout_s: float = 20.0) -> None:
         healthcheck_url = self.healthcheck_target or self.yggdrasil_url
+        # Large workspaces (many HA entities) pay one TD build + turtle parse
+        # per entity on HASP's first graph-cache build, which can take well
+        # over a 5s/request budget; scale the per-attempt timeout with the
+        # overall budget so a slow-but-legitimate first build isn't mistaken
+        # for an unreachable server.
+        per_attempt_timeout = max(5.0, min(30.0, timeout_s / 4))
         deadline = asyncio.get_running_loop().time() + timeout_s
         last_error = ""
         while asyncio.get_running_loop().time() < deadline:
             try:
-                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5.0)) as session:
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=per_attempt_timeout)) as session:
                     async with session.get(healthcheck_url) as resp:
                         if resp.status < 400:
                             return
@@ -1807,13 +1813,14 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     parser.add_argument("--manage-simulator", action="store_true")
     parser.add_argument(
         "--generation-mode",
-        choices=["behavior_tree", "python_code"],
+        choices=["behavior_tree", "python_code", "py_trees_code"],
         default=os.getenv("BT_PLAN_MODE", "behavior_tree"),
         help="Plan generation mode for the InteractionSolver: behavior_tree "
-        "(JSON IR tool call, default) or python_code (builder-DSL script).",
+        "(JSON IR tool call, default), python_code (builder-DSL script) or "
+        "py_trees_code (free py_trees code executed by CodeBTExecutor).",
     )
     parser.add_argument("--hasp-host", default="0.0.0.0")
-    parser.add_argument("--service-start-timeout", type=float, default=30.0)
+    parser.add_argument("--service-start-timeout", type=float, default=180.0)
     parser.add_argument("--log-level", default="INFO")
     parser.add_argument("--write-results", action="store_true")
     parser.add_argument(

@@ -942,10 +942,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--clear-signifiers-per-case", action="store_true")
     parser.add_argument(
         "--generation-mode",
-        choices=["behavior_tree", "python_code"],
+        choices=["behavior_tree", "python_code", "py_trees_code"],
         default=os.getenv("BT_PLAN_MODE", "behavior_tree"),
         help="Plan generation mode forwarded to the runner: behavior_tree "
-        "(JSON IR tool call, default) or python_code (builder-DSL script).",
+        "(JSON IR tool call, default), python_code (builder-DSL script) or "
+        "py_trees_code (free py_trees code executed by CodeBTExecutor).",
     )
     parser.add_argument("--dump-prompts", action="store_true")
     parser.add_argument(

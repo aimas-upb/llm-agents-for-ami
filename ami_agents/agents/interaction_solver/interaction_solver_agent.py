@@ -30,6 +30,7 @@ from ...shared.utils.demo_log import demo
 from ...shared.utils.logger import LoggerFactory
 from ...shared.community.community_client import CommunitySignifierClient
 from ...bt_planning.planning.bt_planner import AsyncBTPlanner
+from ...bt_planning.planning.bt_planner_direct import DirectCodeBTPlanner
 from ...bt_planning.planning.code_planner import AsyncCodeBTPlanner
 from ...bt_planning.signifier_bridge import build_bt_from_signifiers
 
@@ -115,9 +116,14 @@ class InteractionSolverAgent(Agent, IAgent):
         )
         plan_mode = str(planning_llm.get("output_format") or "behavior_tree").strip().lower()
         self.plan_mode: str = (
-            plan_mode if plan_mode in ("behavior_tree", "python_code") else "behavior_tree"
+            plan_mode
+            if plan_mode in ("behavior_tree", "python_code", "py_trees_code")
+            else "behavior_tree"
         )
-        planner_cls = AsyncCodeBTPlanner if self.plan_mode == "python_code" else AsyncBTPlanner
+        planner_cls = {
+            "python_code": AsyncCodeBTPlanner,
+            "py_trees_code": DirectCodeBTPlanner,
+        }.get(self.plan_mode, AsyncBTPlanner)
         self.bt_planner = planner_cls(max_attempts=max_attempts)
 
         # ── Community signifier client (optional) ───────────────────

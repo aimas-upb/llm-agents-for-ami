@@ -20,6 +20,7 @@ from ....shared.models.messages import MessageType
 from ....shared.utils.spade_rpc import rpc_call, RpcTimeoutError
 from ....shared.utils.demo_log import demo
 from ....bt_planning.execution.ir_executor import IRExecutor
+from ....bt_planning.execution.code_executor import CodeBTExecutor
 from ....bt_planning.execution.base import ExecutionResult
 from ....bt_planning.signifier_bridge import extract_signifiers_from_bt
 from ....shared.community.community_client import CommunitySignifierClient
@@ -289,7 +290,13 @@ class UserMessageBehaviour(CyclicBehaviour):
             return
 
         tree = plan_obj.get("tree")
-        if not tree or not isinstance(tree, dict):
+        # py_trees_code plans carry executable code instead of a JSON IR tree.
+        is_code_plan = (
+            plan_obj.get("plan_mode") == "py_trees_code"
+            and isinstance(plan_obj.get("generated_code"), str)
+            and plan_obj["generated_code"].strip()
+        )
+        if not is_code_plan and (not tree or not isinstance(tree, dict)):
             error = plan_obj.get("error", "unknown")
             detail = plan_obj.get("detail") or plan_obj.get("explanation", "")
             await self._reply(msg, f"Planning failed: {error}. {detail}\nWhat would you like to change?")
@@ -300,9 +307,16 @@ class UserMessageBehaviour(CyclicBehaviour):
         conv.plan_json = canonical
         conv.plan_hash = plan_hash
 
-        node_count = count_bt_nodes(tree)
-        preview = bt_preview(tree)
-        self.logger.info(demo("Plan stored: hash=%s nodes=%d preview=%s"), plan_hash, node_count, preview)
+        if is_code_plan:
+            self.logger.info(
+                demo("Plan stored: hash=%s mode=py_trees_code code_chars=%d"),
+                plan_hash,
+                len(plan_obj["generated_code"]),
+            )
+        else:
+            node_count = count_bt_nodes(tree)
+            preview = bt_preview(tree)
+            self.logger.info(demo("Plan stored: hash=%s nodes=%d preview=%s"), plan_hash, node_count, preview)
 
         conv.phase = ConversationPhase.SUMMARIZING_PLAN
         summary = await self._summarize_plan(plan_body if isinstance(plan_body, str) else json.dumps(plan_obj))
@@ -388,6 +402,8 @@ class UserMessageBehaviour(CyclicBehaviour):
             return ExecutionResult(success=False, error="Invalid plan JSON")
 
         tree_spec = plan_obj.get("tree", {})
+        plan_code = plan_obj.get("generated_code")
+        is_code_plan = plan_obj.get("plan_mode") == "py_trees_code"
         raw_intents = plan_obj.get("intents", [])
         intents = [
             Intent.from_dict(d) if isinstance(d, dict)
@@ -399,21 +415,32 @@ class UserMessageBehaviour(CyclicBehaviour):
         workspace_id = plan_obj.get("workspace_id")
         td_sosa_supported = bool(plan_obj.get("td_sosa_supported", False))
 
-        if not tree_spec or not isinstance(tree_spec, dict):
+        if is_code_plan:
+            if not isinstance(plan_code, str) or not plan_code.strip():
+                return ExecutionResult(success=False, error="Plan has no code to execute")
+        elif not tree_spec or not isinstance(tree_spec, dict):
             return ExecutionResult(success=False, error="Plan has no behavior tree to execute")
 
         await self.agent.ensure_execution_engine_ready()
 
-        node_count = count_bt_nodes(tree_spec)
-        self.logger.info(demo("Executing BT: thread=%s nodes=%d signifier_reuse=%s intent_type=%s"), thread, node_count, is_signifier_reuse, intent_type)
+        if is_code_plan:
+            self.logger.info(
+                demo("Executing code BT: thread=%s intent_type=%s"), thread, intent_type
+            )
+            code_executor = CodeBTExecutor(max_ticks=self.agent.bt_max_ticks)
+            executor_fn, payload = code_executor.execute, plan_code
+        else:
+            node_count = count_bt_nodes(tree_spec)
+            self.logger.info(demo("Executing BT: thread=%s nodes=%d signifier_reuse=%s intent_type=%s"), thread, node_count, is_signifier_reuse, intent_type)
+            executor = IRExecutor(max_ticks=self.agent.bt_max_ticks)
+            executor_fn, payload = executor.execute_from_spec, tree_spec
 
-        executor = IRExecutor(max_ticks=self.agent.bt_max_ticks)
         loop = asyncio.get_event_loop()
         try:
             exec_result: ExecutionResult = await loop.run_in_executor(
                 None,
-                executor.execute_from_spec,
-                tree_spec,
+                executor_fn,
+                payload,
             )
         except Exception as exc:
             self.logger.warning(demo("BT execution failed: %s"), exc)
@@ -427,7 +454,8 @@ class UserMessageBehaviour(CyclicBehaviour):
         self.agent.state_memory.clear()
         self.logger.info(demo("State memory cache cleared after BT execution"))
 
-        if exec_result.success and not is_signifier_reuse:
+        # Signifier extraction reads the JSON IR tree; code plans have none.
+        if exec_result.success and not is_signifier_reuse and not is_code_plan:
             await self._record_signifiers(
                 tree_spec,
                 intents,
