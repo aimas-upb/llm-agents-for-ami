@@ -13,6 +13,7 @@ from typing import Any, Optional
 
 from openai import AsyncOpenAI
 
+from ..nodes.compute_node import COMPUTE_OPS
 from .schema import GENERATE_BT_TOOL
 from .prompts import (
     BT_PLANNING_SYSTEM_PROMPT,
@@ -721,7 +722,15 @@ class AsyncBTPlanner:
             errors.append(f"{path}: missing 'name'")
 
         node_type = spec.get("type")
-        valid_types = {"sequence", "selector", "parallel", "action", "condition", "wait_condition"}
+        valid_types = {
+            "sequence",
+            "selector",
+            "parallel",
+            "action",
+            "condition",
+            "wait_condition",
+            "compute",
+        }
         if node_type not in valid_types:
             errors.append(f"{path}: missing or invalid 'type'")
 
@@ -753,5 +762,18 @@ class AsyncBTPlanner:
                     not isinstance(poll_interval, (int, float)) or poll_interval < 0
                 ):
                     errors.append(f"{path}: wait_condition poll_interval_seconds must be >= 0")
+        elif node_type == "compute":
+            op = spec.get("op")
+            if not op or not isinstance(op, str):
+                errors.append(f"{path}: compute nodes require 'op'")
+            elif op not in COMPUTE_OPS:
+                errors.append(
+                    f"{path}: unknown compute op '{op}' (registered: {sorted(COMPUTE_OPS)})"
+                )
+            if not spec.get("output") or not isinstance(spec.get("output"), str):
+                errors.append(f"{path}: compute nodes require an 'output' blackboard key")
+            inputs = spec.get("inputs", [])
+            if not isinstance(inputs, list):
+                errors.append(f"{path}: compute 'inputs' must be a list of blackboard keys")
 
         return errors

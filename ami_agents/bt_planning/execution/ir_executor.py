@@ -16,27 +16,12 @@ from py_trees.common import Status
 
 from ..nodes.affordance_nodes import (
     ActionAffordanceNode,
-    PropertyConditionNode,
-    ComparisonPropertyConditionNode,
     WaitPropertyConditionNode,
-    ComparisonOperator,
 )
+from ..nodes.registry import OPERATOR_MAP, compile_node, validate_node
 from .base import ExecutionResult
 
 logger = logging.getLogger(__name__)
-
-
-OPERATOR_MAP = {
-    "==": ComparisonOperator.EQUAL,
-    "!=": ComparisonOperator.NOT_EQUAL,
-    ">": ComparisonOperator.GREATER_THAN,
-    ">=": ComparisonOperator.GREATER_THAN_OR_EQUAL,
-    "<": ComparisonOperator.LESS_THAN,
-    "<=": ComparisonOperator.LESS_THAN_OR_EQUAL,
-    "in": ComparisonOperator.IN,
-    "not_in": ComparisonOperator.NOT_IN,
-    "contains": ComparisonOperator.CONTAINS,
-}
 
 
 class IRExecutor:
@@ -98,74 +83,17 @@ class IRExecutor:
         """
         Compile a JSON specification to py_trees.
 
+        Dispatches through the node-type registry (``nodes/registry.py``),
+        passing ``self`` as the compile context so the action factory can
+        resolve TD-SOSA settling times from the env mapping.
+
         Args:
             spec: JSON tree specification
 
         Returns:
             py_trees behavior
         """
-        node_type = spec.get("type")
-        name = spec.get("name", "unnamed")
-
-        if node_type == "sequence":
-            children = [self._compile(child) for child in spec.get("children", [])]
-            return py_trees.composites.Sequence(name=name, memory=True, children=children)
-
-        elif node_type == "selector":
-            children = [self._compile(child) for child in spec.get("children", [])]
-            return py_trees.composites.Selector(name=name, memory=False, children=children)
-
-        elif node_type == "parallel":
-            children = [self._compile(child) for child in spec.get("children", [])]
-            policy_name = spec.get("policy", "success_on_all")
-            if policy_name == "success_on_one":
-                policy = py_trees.common.ParallelPolicy.SuccessOnOne()
-            else:
-                policy = py_trees.common.ParallelPolicy.SuccessOnAll()
-            return py_trees.composites.Parallel(name=name, policy=policy, children=children)
-
-        elif node_type == "action":
-            return ActionAffordanceNode(
-                name=name,
-                action_url=spec["action_url"],
-                parameters=spec.get("parameters", {}),
-                settling_time_seconds=self._settling_time_for_action(
-                    spec["action_url"],
-                    spec.get("settling_time_seconds"),
-                ),
-            )
-
-        elif node_type == "condition":
-            operator = spec.get("operator")
-            if operator and operator != "==":
-                return ComparisonPropertyConditionNode(
-                    name=name,
-                    property_url=spec["property_url"],
-                    expected_value=spec["expected_value"],
-                    operator=OPERATOR_MAP.get(operator, ComparisonOperator.EQUAL),
-                    value_path=spec.get("value_path"),
-                )
-            else:
-                return PropertyConditionNode(
-                    name=name,
-                    property_url=spec["property_url"],
-                    expected_value=spec["expected_value"],
-                    value_path=spec.get("value_path"),
-                )
-
-        elif node_type == "wait_condition":
-            return WaitPropertyConditionNode(
-                name=name,
-                property_url=spec["property_url"],
-                expected_value=spec["expected_value"],
-                operator=OPERATOR_MAP.get(spec.get("operator", "=="), ComparisonOperator.EQUAL),
-                value_path=spec.get("value_path"),
-                timeout_seconds=spec.get("timeout_seconds", 30.0),
-                poll_interval_seconds=spec.get("poll_interval_seconds", 1.0),
-            )
-
-        else:
-            raise ValueError(f"Unknown node type: {node_type}")
+        return compile_node(spec, self._compile, self)
 
     def _load_settling_times(self) -> dict[str, float]:
         """Load entity/action settling times from the lab TD-SOSA env mapping."""
@@ -301,57 +229,7 @@ class IRExecutor:
 
     def _validate_tree(self, spec: dict, path: str = "tree") -> list[str]:
         """Validate that the tree spec is non-empty and structurally sound."""
-        errors: list[str] = []
-
-        if not spec:
-            errors.append(f"{path}: tree is empty")
-            return errors
-
-        if not isinstance(spec, dict):
-            errors.append(f"{path}: expected object, got {type(spec).__name__}")
-            return errors
-
-        # 'name' is optional -- the compiler defaults to "unnamed" and the
-        # AsyncBTPlanner normalizer fills in sensible defaults.  We only warn
-        # (do NOT add to errors) so that trees without names still pass.
-        node_type = spec.get("type")
-        valid_types = {"sequence", "selector", "parallel", "action", "condition", "wait_condition"}
-        if node_type not in valid_types:
-            errors.append(f"{path}: missing or invalid 'type'")
-
-        # Composite nodes
-        if node_type in {"sequence", "selector", "parallel"}:
-            children = spec.get("children")
-            if not isinstance(children, list) or not children:
-                errors.append(f"{path}: composite nodes require non-empty 'children'")
-            else:
-                for idx, child in enumerate(children):
-                    errors.extend(
-                        self._validate_tree(child, path=f"{path}.children[{idx}]")
-                    )
-        # Action nodes
-        elif node_type == "action":
-            action_url = spec.get("action_url")
-            if not action_url or not isinstance(action_url, str):
-                errors.append(f"{path}: action nodes require 'action_url'")
-        # Condition nodes
-        elif node_type in {"condition", "wait_condition"}:
-            property_url = spec.get("property_url")
-            if not property_url or not isinstance(property_url, str):
-                errors.append(f"{path}: {node_type} nodes require 'property_url'")
-            if "expected_value" not in spec:
-                errors.append(f"{path}: {node_type} nodes require 'expected_value'")
-            if node_type == "wait_condition":
-                timeout_seconds = spec.get("timeout_seconds")
-                if timeout_seconds is not None and not isinstance(timeout_seconds, (int, float)):
-                    errors.append(f"{path}: wait_condition timeout_seconds must be numeric")
-                poll_interval = spec.get("poll_interval_seconds")
-                if poll_interval is not None and (
-                    not isinstance(poll_interval, (int, float)) or poll_interval < 0
-                ):
-                    errors.append(f"{path}: wait_condition poll_interval_seconds must be >= 0")
-
-        return errors
+        return validate_node(spec, path)
 
     def _min_poll_interval(self, tree: py_trees.behaviour.Behaviour) -> float:
         intervals = []

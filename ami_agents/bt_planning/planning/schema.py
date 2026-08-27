@@ -12,7 +12,15 @@ TREE_PARAMETER_SCHEMA = {
         "name": {"type": "string"},
         "type": {
             "type": "string",
-            "enum": ["sequence", "selector", "parallel", "action", "condition", "wait_condition"],
+            "enum": [
+                "sequence",
+                "selector",
+                "parallel",
+                "action",
+                "condition",
+                "wait_condition",
+                "compute",
+            ],
         },
         "children": {
             "type": "array",
@@ -59,6 +67,24 @@ TREE_PARAMETER_SCHEMA = {
             "exclusiveMinimum": 0,
             "description": "Seconds between property polls for wait_condition nodes.",
         },
+        "op": {
+            "type": "string",
+            "enum": ["all", "any", "not", "sum", "max", "min"],
+            "description": "Named operation for compute nodes.",
+        },
+        "inputs": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Blackboard keys the compute node reads.",
+        },
+        "output": {
+            "type": "string",
+            "description": "Blackboard key the compute node writes its result to.",
+        },
+        "args": {
+            "type": "object",
+            "description": "Optional extra arguments for the compute op.",
+        },
     },
     "required": ["name", "type"],
     "oneOf": [
@@ -91,6 +117,11 @@ TREE_PARAMETER_SCHEMA = {
             "title": "WaitCondition",
             "properties": {"type": {"const": "wait_condition"}},
             "required": ["affordance_id", "expected_value"],
+        },
+        {
+            "title": "Compute",
+            "properties": {"type": {"const": "compute"}},
+            "required": ["op", "output"],
         },
     ],
     "description": (

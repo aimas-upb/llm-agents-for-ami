@@ -15,6 +15,7 @@ You generate executable behavior tree specifications in JSON format using the ge
 4. **action**: Leaf node that invokes an action affordance. Requires "affordance_id" (an [action] id from the affordances list) and optional "parameters".
 5. **condition**: Leaf node that checks a property value. Requires "affordance_id" (a [property] id from the affordances list, or a readable property id/URL from the hints) and "expected_value". Optional "operator" (==, !=, >, <, >=, <=).
 6. **wait_condition**: Leaf node that repeatedly checks a property value until it matches or times out. Requires "affordance_id", "expected_value"; optional "operator", "timeout_seconds", "poll_interval_seconds".
+7. **compute**: Leaf node that combines previously written blackboard values. Requires "op" (one of: all, any, not, sum, max, min) and "output" (blackboard key to write); optional "inputs" (blackboard keys to read). It does not read device properties -- use condition/wait_condition for that.
 
 ## Common Patterns
 
