@@ -387,10 +387,11 @@ class IIntegrationEngine(ABC):
                 logger.warning(f"Failed to extract form for action affordance {affordance_uri}, skipping")
                 continue
 
-            # Skip infrastructure actions not meant for user-facing plans
-            if affordance_name in EXCLUDED_ACTION_NAMES:
-                logger.debug(f"Skipping infrastructure action affordance {affordance_name}")
-                continue
+            # Infrastructure actions (subscribe/unsubscribe, representation CRUD)
+            # are recorded but flagged, NOT dropped: `subscribe_to_artifact`
+            # needs to find the subscription affordance, while a planner must
+            # never see it. Dropping them here made the subscription undiscoverable.
+            is_infrastructure = affordance_name in EXCLUDED_ACTION_NAMES
 
             # Extract input schema if present
             input_schema_uri = td_graph.value(affordance_uri, hasInputSchema_IRI)
@@ -425,6 +426,22 @@ class IIntegrationEngine(ABC):
                 input_schema=input_schema,
                 output_schema=output_schema
             )
+            if is_infrastructure:
+                affordance.metadata["infrastructure"] = True
+                # In a WebSub environment every artifact's subscribe AND
+                # unsubscribe affordance share one form href (`/hub/`), and the
+                # map is keyed by href -- so a single entry would survive for the
+                # whole environment, and 21 of 22 artifacts would silently lose
+                # their subscription affordance.
+                #
+                # Give infrastructure affordances a synthetic key. It is NOT a
+                # dereferenceable URI, and deliberately does not look like one:
+                # `execute_affordance` posts to `form.href`, and these never
+                # appear in a ThingDescription's action/property/event lists, so
+                # nothing treats an id as a URL for them. Planner-facing and
+                # property affordances keep `affordance_id == form.href`.
+                affordance.affordance_id = (
+                    f"urn:hmas:infrastructure:{affordance_name}:{artifact.artifact_id}")
 
             affordance_map[affordance.affordance_id] = affordance
 
@@ -1220,9 +1237,12 @@ class YggdrasilIntegration(IIntegrationEngine):
                 aff.affordance_id for aff in artifact_affordances.values()
                 if aff.affordance_type == AffordanceType.PROPERTY
             ]
+            # Planner-facing actions only. Infrastructure affordances stay in
+            # `affordance_map` so subscription can find them by RDF type.
             artifact.thing_description.actions = [
                 aff.affordance_id for aff in artifact_affordances.values()
                 if aff.affordance_type == AffordanceType.ACTION
+                and not aff.metadata.get("infrastructure")
             ]
             artifact.thing_description.events = [
                 aff.affordance_id for aff in artifact_affordances.values()
@@ -1554,10 +1574,61 @@ class YggdrasilIntegration(IIntegrationEngine):
             raise RuntimeError("Notification listener not started")
         return self.notification_listener.event_queue
 
-    async def subscribe_to_artifact(self, artifact_id: str, callback_url: Optional[str] = None) -> bool:
+    # WebSub subscription affordance types, matched by RDF type rather than by
+    # name: the type is what the vocabulary guarantees, a name is convention.
+    WEBSUB_SUBSCRIBE_ARTIFACT = "https://purl.org/hmas/websub/subscribeToArtifact"
+    WEBSUB_SUBSCRIBE_WORKSPACE = "https://purl.org/hmas/websub/subscribeToWorkspace"
+
+    def _find_focus_affordance(self, artifact: "Artifact") -> Optional[str]:
+        """A JaCaMo/CArtAgO `focus` action, if this environment offers one."""
+        for action_aff_id in artifact.thing_description.actions:
+            aff = self.affordance_map.get(action_aff_id)
+            if aff and "focus" in aff.name.lower():
+                return action_aff_id
+        return None
+
+    def _find_websub_subscribe_affordance(self, artifact: "Artifact") -> Optional[str]:
+        """A `websub:subscribeToArtifact` typed `td:ActionAffordance`.
+
+        Matched on the RDF type, so an environment that names the affordance
+        differently still resolves. Infrastructure affordances are excluded from
+        `thing_description.actions` (a planner must not see them), so the search
+        is over `affordance_map` scoped to this artifact.
         """
-        Subscribes to changes for a specific artifact.
-        If callback_url is None, tries to use the internal listener's URL.
+        for aff in self.affordance_map.values():
+            if aff.artifact_id != artifact.artifact_id:
+                continue
+            if aff.affordance_type != AffordanceType.ACTION:
+                continue
+            if self.WEBSUB_SUBSCRIBE_ARTIFACT in (aff.semantic_types or []):
+                return aff.affordance_id
+        return None
+
+    def _find_legacy_subscribe_affordance(self, artifact: "Artifact") -> Optional[str]:
+        """Name-based lookup, for environments that predate the typed form."""
+        for event_aff_id in artifact.thing_description.events:
+            aff = self.affordance_map.get(event_aff_id)
+            if aff and ("subscribe" in aff.name.lower() or "observe" in aff.name.lower()):
+                return event_aff_id
+        for action_aff_id in artifact.thing_description.actions:
+            aff = self.affordance_map.get(action_aff_id)
+            if aff and "subscribe" in aff.name.lower():
+                return action_aff_id
+        return None
+
+    async def subscribe_to_artifact(self, artifact_id: str, callback_url: Optional[str] = None) -> bool:
+        """Subscribe to state changes of one artifact.
+
+        Two mechanisms, tried in order:
+
+        1. **CArtAgO focus** -- a JaCaMo environment exposes a `focus` action
+           taking `{artifactName, callbackUrl}`.
+        2. **WebSub** -- a web environment exposes an affordance typed
+           `websub:subscribeToArtifact`, and the subscription is a POST to that
+           affordance's `hctl:hasTarget` carrying hub mode, topic and callback.
+           The topic is the artifact's own IRI.
+
+        If `callback_url` is None the internal notification listener's URL is used.
         """
         if not callback_url:
             if self.notification_listener and self.notification_listener.base_url:
@@ -1571,61 +1642,47 @@ class YggdrasilIntegration(IIntegrationEngine):
             logger.error(f"Cannot subscribe: Artifact {artifact_id} not found.")
             return False
 
-        focus_affordance_id = None
-        for action_aff_id in artifact.thing_description.actions:
-            aff = self.affordance_map.get(action_aff_id)
-            if aff and ("focus" in aff.name.lower()):
-                focus_affordance_id = action_aff_id
-                break
-        
+        def _succeed() -> bool:
+            self.active_artifact_subscriptions.append(
+                {"artifact_id": artifact_id, "callback_url": callback_url}
+            )
+            return True
+
+        # 1. CArtAgO focus.
+        focus_affordance_id = self._find_focus_affordance(artifact)
         if focus_affordance_id:
             logger.info(f"Using CArtAgO Focus for {artifact.name}...")
-            payload = {
+            result = await self.execute_affordance(focus_affordance_id, {
                 "artifactName": artifact.name,
                 "callbackUrl": callback_url,
-            }
-            result = await self.execute_affordance(focus_affordance_id, payload)
+            })
             if result is not None:
                 logger.info(f"Successfully focused on {artifact.name}")
-                self.active_artifact_subscriptions.append(
-                    {"artifact_id": artifact_id, "callback_url": callback_url}
-                )
-                return True
-            else:
-                logger.warning(f"Focus failed for {artifact.name}, trying fallback...")
+                return _succeed()
+            logger.warning(f"Focus failed for {artifact.name}, trying WebSub...")
 
-        subscribe_affordance_id = None
-        
-        for event_aff_id in artifact.thing_description.events:
-            aff = self.affordance_map.get(event_aff_id)
-            if aff and ("subscribe" in aff.name.lower() or "observe" in aff.name.lower()):
-                subscribe_affordance_id = event_aff_id
-                break
-        
+        # 2. WebSub, by RDF type; then by name for older environments.
+        subscribe_affordance_id = self._find_websub_subscribe_affordance(artifact)
         if not subscribe_affordance_id:
-            for action_aff_id in artifact.thing_description.actions:
-                aff = self.affordance_map.get(action_aff_id)
-                if aff and "subscribe" in aff.name.lower():
-                    subscribe_affordance_id = action_aff_id
-                    break
+            subscribe_affordance_id = self._find_legacy_subscribe_affordance(artifact)
 
         if not subscribe_affordance_id:
             logger.warning(f"No subscription affordance found for {artifact.name}")
             return False
 
+        # The topic is the artifact's own IRI -- the same subject the Thing
+        # Description is about, which is what a hub validates against.
         payload = {
             "hub.mode": "subscribe",
             "hub.topic": artifact_id,
-            "hub.callback": callback_url
+            "hub.callback": callback_url,
         }
 
-        logger.info(f"Subscribing to {artifact.name} (WebSub) at {callback_url}...")
+        target = self.affordance_map[subscribe_affordance_id].form.href
+        logger.info(f"Subscribing to {artifact.name} (WebSub) at {target}...")
         result = await self.execute_affordance(subscribe_affordance_id, payload)
         if result is not None:
-            self.active_artifact_subscriptions.append(
-                {"artifact_id": artifact_id, "callback_url": callback_url}
-            )
-            return True
+            return _succeed()
         return False
 
     async def query_actions_affecting_observable_property(
