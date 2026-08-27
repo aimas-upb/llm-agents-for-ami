@@ -718,6 +718,7 @@ def run(args: argparse.Namespace) -> int:
             manifest["tdsosa_env_var_overrides_count"] = len(tdsosa_hints["TD_SOSA_ENV_VAR_OVERRIDES"])
             manifest["tdsosa_property_ranges_count"] = len(tdsosa_hints["TD_SOSA_PROPERTY_RANGES"])
         manifest["adapter_app"] = adapter_app
+        manifest["generation_mode"] = args.generation_mode
 
         print(f"[simuhome-e2e] Starting {adapter_app} on {args.hasp_port} for workspace {workspace_id}", flush=True)
         hasp_url = f"http://127.0.0.1:{args.hasp_port}"
@@ -841,6 +842,8 @@ def run(args: argparse.Namespace) -> int:
             str(args.settle_seconds),
             "--log-level",
             args.runner_log_level,
+            "--generation-mode",
+            args.generation_mode,
         ]
         if args.no_td_sosa:
             runner_cmd.append("--no-td-sosa")
@@ -937,6 +940,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Start ygg_ha_adapter.py instead of hasp.py (no TD-SOSA semantics) and skip semantic queries.",
     )
     parser.add_argument("--clear-signifiers-per-case", action="store_true")
+    parser.add_argument(
+        "--generation-mode",
+        choices=["behavior_tree", "python_code"],
+        default=os.getenv("BT_PLAN_MODE", "behavior_tree"),
+        help="Plan generation mode forwarded to the runner: behavior_tree "
+        "(JSON IR tool call, default) or python_code (builder-DSL script).",
+    )
     parser.add_argument("--dump-prompts", action="store_true")
     parser.add_argument(
         "--prompt-dump-dir",

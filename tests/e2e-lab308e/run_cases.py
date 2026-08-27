@@ -70,6 +70,8 @@ RESULT_COLUMNS = [
     "reused_signifier_id",
     "planning_path",
     *LLM_PHASE_COLUMNS,
+    "generation_mode",
+    "generated_code",
 ]
 SIGNIFIER_RESULT_COLUMNS = [
     "signifier_matches",
@@ -1265,6 +1267,14 @@ class Lab308eHarness:
             config["llm"]["providers"]["openai"]["reasoning_effort"] = reasoning_effort
         config.setdefault("planning", {})
         config["planning"]["timeout"] = float(os.getenv("AMI_PLANNING_TIMEOUT", "180"))
+        # The InteractionSolver reads the plan-generation mode from the
+        # top-level planning dict (it receives this full merged config);
+        # mirror into the interaction_solver subsection for the main.py-style
+        # config shape as defence in depth.
+        config["planning"].setdefault("llm_planning", {})["output_format"] = self.args.generation_mode
+        config.setdefault("interaction_solver", {}).setdefault("planning", {}).setdefault("llm_planning", {})[
+            "output_format"
+        ] = self.args.generation_mode
         bt_max_ticks = int(os.getenv("BT_MAX_TICKS_USER_ASSISTANT", "240"))
         config.setdefault("bt_execution", {}).setdefault("max_ticks", {})
         config["bt_execution"]["max_ticks"]["user_assistant"] = bt_max_ticks
@@ -1795,6 +1805,13 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
         help="When managing the adapter, start ygg_ha_adapter.py instead of hasp.py.",
     )
     parser.add_argument("--manage-simulator", action="store_true")
+    parser.add_argument(
+        "--generation-mode",
+        choices=["behavior_tree", "python_code"],
+        default=os.getenv("BT_PLAN_MODE", "behavior_tree"),
+        help="Plan generation mode for the InteractionSolver: behavior_tree "
+        "(JSON IR tool call, default) or python_code (builder-DSL script).",
+    )
     parser.add_argument("--hasp-host", default="0.0.0.0")
     parser.add_argument("--service-start-timeout", type=float, default=30.0)
     parser.add_argument("--log-level", default="INFO")
@@ -1904,12 +1921,30 @@ def _extract_signifier_result_fields(plan: Any) -> Dict[str, Any]:
     }
 
 
+def _extract_generation_fields(plan: Any, default_mode: str = "") -> Dict[str, Any]:
+    """Pull generation mode/code from the plan envelope the ISA emitted.
+
+    Reading the envelope (rather than only the harness flag) keeps
+    signifier-reuse rows attributable: they carry plan_mode but no
+    generated_code because no LLM ran.
+    """
+    plan_obj = _parse_plan_json(plan)
+    return {
+        "generation_mode": str(plan_obj.get("plan_mode") or default_mode or ""),
+        "generated_code": plan_obj.get("generated_code") or "",
+    }
+
+
 def _normalise_results_row(row: Dict[str, Any]) -> Dict[str, Any]:
     normalised = {column: row.get(column, "") for column in RESULT_COLUMNS}
     extracted = _extract_signifier_result_fields(row.get("plan"))
     for column in SIGNIFIER_RESULT_COLUMNS:
         if normalised.get(column) in (None, ""):
             normalised[column] = extracted[column]
+    generation = _extract_generation_fields(row.get("plan"))
+    for column in ("generation_mode", "generated_code"):
+        if normalised.get(column) in (None, ""):
+            normalised[column] = generation[column]
     return normalised
 
 
@@ -1932,7 +1967,11 @@ def _ensure_results_csv_header(out_path: Path) -> None:
             writer.writerow(_normalise_results_row(row))
 
 
-def _append_results_csv(results: List[CaseResult], out_path: Optional[Path] = None) -> Path:
+def _append_results_csv(
+    results: List[CaseResult],
+    out_path: Optional[Path] = None,
+    default_generation_mode: str = "",
+) -> Path:
     if out_path is None:
         results_prefix = os.getenv("E2E_RESULTS_PREFIX", "")
         out_path = Path(__file__).resolve().parent / f"{results_prefix}results.csv"
@@ -1961,6 +2000,9 @@ def _append_results_csv(results: List[CaseResult], out_path: Optional[Path] = No
             for column in LLM_PHASE_COLUMNS:
                 row[column] = details.get(column, 0)
             row.update(_extract_signifier_result_fields(details.get("plan")))
+            row.update(
+                _extract_generation_fields(details.get("plan"), default_generation_mode)
+            )
             writer.writerow(row)
     return out_path
 
@@ -1994,6 +2036,7 @@ async def _async_main(args: argparse.Namespace) -> int:
     csv_path = _append_results_csv(
         results,
         Path(args.results_csv).expanduser().resolve() if args.results_csv else None,
+        default_generation_mode=args.generation_mode,
     )
     print(f"Appended results to {csv_path}")
 
