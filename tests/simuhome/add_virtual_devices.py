@@ -291,7 +291,14 @@ async def main() -> None:
     dest_path = virtual_yaml_dir / yaml_file.name
     shutil.copy2(yaml_file, dest_path)
 
-    ha_yaml_path = f"/config/custom_components/virtual/{yaml_file.name}"
+    # Path AS SEEN BY HomeAssistant. In the docker deployment the host
+    # virtual_yaml_dir is mounted at /config/custom_components/virtual; for a
+    # venv HA Core the host path IS the HA path, so override the prefix:
+    #   export HA_VIRTUAL_CONFIG_PREFIX=~/ha_config/custom_components/virtual
+    ha_config_prefix = os.getenv(
+        "HA_VIRTUAL_CONFIG_PREFIX", "/config/custom_components/virtual"
+    ).rstrip("/")
+    ha_yaml_path = f"{ha_config_prefix}/{yaml_file.name}"
     group_name = yaml_file.stem
 
     headers = {"Authorization": f"Bearer {ha_token}", "Content-Type": "application/json"}
