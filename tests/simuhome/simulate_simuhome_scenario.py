@@ -744,7 +744,14 @@ async def _run(args: argparse.Namespace) -> None:
                 reason = await queue.get()
                 while not queue.empty():
                     reason = await queue.get()
-                results = await sim.tick_once(force_ha_sync=reason.startswith("event:") or reason == "startup")
+                try:
+                    results = await sim.tick_once(force_ha_sync=reason.startswith("event:") or reason == "startup")
+                except (httpx.TimeoutException, httpx.TransportError) as exc:
+                    # HA can stall for seconds under discovery/HASP load; one
+                    # slow response must not kill the whole e2e run. Skip this
+                    # sync and let the next tick reconcile the state.
+                    print(f"{scenario.name} reason={reason} HA sync skipped: {type(exc).__name__}: {exc}")
+                    continue
                 print(f"{scenario.name} reason={reason} {_format_summary(results)}")
         except KeyboardInterrupt:
             print("\nStopped.")
@@ -783,7 +790,7 @@ def main() -> int:
     parser.add_argument(
         "--http-timeout",
         type=float,
-        default=10.0,
+        default=30.0,
         help="Home Assistant HTTP timeout in seconds",
     )
     args = parser.parse_args()
