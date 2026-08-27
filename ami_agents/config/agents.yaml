@@ -77,6 +77,9 @@ interaction_solver:
       temperature: 0.5
       max_tokens: 2000
 
+      # Planner mode: "json_ir" (AsyncBTPlanner) or "direct_code" (DirectCodeBTPlanner)
+      planner_mode: "${PLANNER_MODE:-json_ir}"
+
       # Behavior Tree generation
       output_format: "behavior_tree"
       max_planning_attempts: 3  # retries for BT generation
@@ -100,6 +103,8 @@ llm:
   providers:
     openai:
       api_key: null  # Set via environment variable OPENAI_API_KEY
+      # OpenAI-compatible endpoint (vLLM/Ollama) for local SLMs; empty falls back to api.openai.com
+      base_url: "${OPENAI_BASE_URL:-}"
       model: "gpt-4o-mini"
       temperature: 0.5
       max_tokens: 1500

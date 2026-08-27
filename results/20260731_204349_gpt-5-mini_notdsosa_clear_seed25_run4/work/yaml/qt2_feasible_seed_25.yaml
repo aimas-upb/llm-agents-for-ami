@@ -1,0 +1,1808 @@
+version: 1
+devices:
+  qt2_feasible_seed_25_clock:
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Clock
+    class: timestamp
+    initial_value: '2025-08-23 15:49:59'
+    persistent: false
+  qt2_feasible_seed_25_simulator:
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Simulator.TickInterval
+    initial_value: 0.1
+    persistent: false
+  qt2_feasible_seed_25_bathroom_environment:
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Humidity
+    initial_value: 35.56
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Illuminance
+    initial_value: 305.57
+    class: illuminance
+    unit_of_measurement: lx
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Pm10
+    initial_value: 10.377
+    class: pm10
+    unit_of_measurement: ug/m3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Temperature
+    initial_value: 27.82
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_25_bathroom_bathroom_air_purifier_1:
+  - platform: fan
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1
+    initial_value: 'on'
+    speed_count: 100
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.BasicInformation.ProductID
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.BasicInformation.ProductName
+    initial_value: Air Purifier
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.Descriptor.TagList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.FanControl.FanMode
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.FanControl.PercentCurrent
+    initial_value: 24.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.FanControl.PercentSetting
+    initial_value: 24.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.Identify.ClusterRevision
+    initial_value: 5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.Identify.FeatureMap
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.Identify.IdentifyTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.Identify.IdentifyType
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.AirPurifier1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  qt2_feasible_seed_25_bathroom_bathroom_humidifier_1:
+  - platform: fan
+    name: Qt2FeasibleSeed25.Bathroom.Humidifier1
+    initial_value: 'on'
+    speed_count: 100
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Humidifier1.BasicInformation.ProductID
+    initial_value: 6
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Humidifier1.BasicInformation.ProductName
+    initial_value: Humidifier
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Humidifier1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Humidifier1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Humidifier1.FanControl.FanMode
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Humidifier1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Humidifier1.FanControl.PercentCurrent
+    initial_value: 47.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Humidifier1.FanControl.PercentSetting
+    initial_value: 47.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Humidifier1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Humidifier1.RelativeHumidityMeasurement.MaxMeasuredValue
+    initial_value: 95.0
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Humidifier1.RelativeHumidityMeasurement.MeasuredValue
+    initial_value: 35.55
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Humidifier1.RelativeHumidityMeasurement.MinMeasuredValue
+    initial_value: 10.0
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.Humidifier1.RelativeHumidityMeasurement.Tolerance
+    initial_value: unknown
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  qt2_feasible_seed_25_bathroom_bathroom_laundry_washer_1:
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.BasicInformation.ProductID
+    initial_value: 81
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.BasicInformation.ProductName
+    initial_value: Laundry Washer
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.BasicInformation.VendorName
+    initial_value: Samsung Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.LaundryWasherControls.NumberOfRinses
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.LaundryWasherControls.SpinSpeedCurrent
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.LaundryWasherControls.SpinSpeeds
+    initial_value: '[1, 2, 3]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.LaundryWasherControls.SupportedRinses
+    initial_value: '[1, 2, 3]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.LaundryWasherMode.CurrentMode
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.LaundryWasherMode.SupportedModes
+    initial_value: '[{"ModeTags": [16384], "label": "Normal", "mode": 0}, {"ModeTags": [16385], "label": "Delicate", "mode":
+      1}, {"ModeTags": [16386], "label": "Heavy", "mode": 2}, {"ModeTags": [16387], "label": "Whites", "mode": 3}, {"ModeTags":
+      [1, 16384], "label": "Quick Normal", "mode": 4}, {"ModeTags": [16386, 16387], "label": "Heavy Whites", "mode": 5}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.OperationalState.CountdownTime
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.OperationalState.CurrentPhase
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.OperationalState.OperationalError
+    initial_value: '{"error_state_id": 0}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.OperationalState.OperationalState
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.OperationalState.OperationalStateList
+    initial_value: '[{"operational_state_id": 0}, {"operational_state_id": 1}, {"operational_state_id": 2}, {"operational_state_id":
+      3}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.OperationalState.PhaseList
+    initial_value: '["Pre-wash", "Main wash", "Rinse", "Spin", "Complete"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.TemperatureControl.MaxTemperature
+    initial_value: 95.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.TemperatureControl.MinTemperature
+    initial_value: 5.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher1.TemperatureControl.TemperatureSetpoint
+    initial_value: 20.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_25_bathroom_bathroom_laundry_washer_2:
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.BasicInformation.ProductID
+    initial_value: 81
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.BasicInformation.ProductName
+    initial_value: Laundry Washer
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.BasicInformation.VendorName
+    initial_value: Samsung Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.LaundryWasherControls.NumberOfRinses
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.LaundryWasherControls.SpinSpeedCurrent
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.LaundryWasherControls.SpinSpeeds
+    initial_value: '[0, 1]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.LaundryWasherControls.SupportedRinses
+    initial_value: '[1, 2]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.LaundryWasherMode.CurrentMode
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.LaundryWasherMode.SupportedModes
+    initial_value: '[{"ModeTags": [16384], "label": "Normal", "mode": 0}, {"ModeTags": [16385], "label": "Delicate", "mode":
+      1}, {"ModeTags": [16386], "label": "Heavy", "mode": 2}, {"ModeTags": [16387], "label": "Whites", "mode": 3}, {"ModeTags":
+      [1, 16384], "label": "Quick Normal", "mode": 4}, {"ModeTags": [16386, 16387], "label": "Heavy Whites", "mode": 5}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.OperationalState.CountdownTime
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.OperationalState.CurrentPhase
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.OperationalState.OperationalError
+    initial_value: '{"error_state_id": 0}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.OperationalState.OperationalState
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.OperationalState.OperationalStateList
+    initial_value: '[{"operational_state_id": 0}, {"operational_state_id": 1}, {"operational_state_id": 2}, {"operational_state_id":
+      3}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.OperationalState.PhaseList
+    initial_value: '["Pre-wash", "Main wash", "Rinse", "Spin", "Complete"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.TemperatureControl.MaxTemperature
+    initial_value: 95.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.TemperatureControl.MinTemperature
+    initial_value: 5.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.LaundryWasher2.TemperatureControl.TemperatureSetpoint
+    initial_value: 20.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_25_bathroom_bathroom_on_off_light_1:
+  - platform: light
+    name: Qt2FeasibleSeed25.Bathroom.OnOffLight1
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.OnOffLight1.BasicInformation.ProductID
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.OnOffLight1.BasicInformation.ProductName
+    initial_value: On/Off Light
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.OnOffLight1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.OnOffLight1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Bathroom.OnOffLight1.OnOff.OnOff
+    initial_value: 'off'
+    persistent: false
+  qt2_feasible_seed_25_kids_room_environment:
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Humidity
+    initial_value: 36.12
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Illuminance
+    initial_value: 428.15
+    class: illuminance
+    unit_of_measurement: lx
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Pm10
+    initial_value: 18.519
+    class: pm10
+    unit_of_measurement: ug/m3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Temperature
+    initial_value: 27.5
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_25_kids_room_kids_room_air_purifier_1:
+  - platform: fan
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1
+    initial_value: 'on'
+    speed_count: 100
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.BasicInformation.ProductID
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.BasicInformation.ProductName
+    initial_value: Air Purifier
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.Descriptor.TagList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.FanControl.FanMode
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.FanControl.PercentCurrent
+    initial_value: 1.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.FanControl.PercentSetting
+    initial_value: 1.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.Identify.ClusterRevision
+    initial_value: 5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.Identify.FeatureMap
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.Identify.IdentifyTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.Identify.IdentifyType
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  qt2_feasible_seed_25_kids_room_kids_room_air_purifier_2:
+  - platform: fan
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2
+    initial_value: 'on'
+    speed_count: 100
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.BasicInformation.ProductID
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.BasicInformation.ProductName
+    initial_value: Air Purifier
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.Descriptor.TagList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.FanControl.FanMode
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.FanControl.PercentCurrent
+    initial_value: 33.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.FanControl.PercentSetting
+    initial_value: 33.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.Identify.ClusterRevision
+    initial_value: 5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.Identify.FeatureMap
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.Identify.IdentifyTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.Identify.IdentifyType
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.AirPurifier2.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  qt2_feasible_seed_25_kids_room_kids_room_dehumidifier_1:
+  - platform: fan
+    name: Qt2FeasibleSeed25.KidsRoom.Dehumidifier1
+    initial_value: 'on'
+    speed_count: 100
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Dehumidifier1.BasicInformation.ProductID
+    initial_value: 7
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Dehumidifier1.BasicInformation.ProductName
+    initial_value: Dehumidifier
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Dehumidifier1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Dehumidifier1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Dehumidifier1.FanControl.FanMode
+    initial_value: 3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Dehumidifier1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Dehumidifier1.FanControl.PercentCurrent
+    initial_value: 82.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Dehumidifier1.FanControl.PercentSetting
+    initial_value: 82.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Dehumidifier1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Dehumidifier1.RelativeHumidityMeasurement.MaxMeasuredValue
+    initial_value: 95.0
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Dehumidifier1.RelativeHumidityMeasurement.MeasuredValue
+    initial_value: 36.12
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Dehumidifier1.RelativeHumidityMeasurement.MinMeasuredValue
+    initial_value: 10.0
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.Dehumidifier1.RelativeHumidityMeasurement.Tolerance
+    initial_value: unknown
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  qt2_feasible_seed_25_kids_room_kids_room_on_off_light_1:
+  - platform: light
+    name: Qt2FeasibleSeed25.KidsRoom.OnOffLight1
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.OnOffLight1.BasicInformation.ProductID
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.OnOffLight1.BasicInformation.ProductName
+    initial_value: On/Off Light
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.OnOffLight1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.OnOffLight1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.KidsRoom.OnOffLight1.OnOff.OnOff
+    initial_value: 'off'
+    persistent: false
+  qt2_feasible_seed_25_kitchen_environment:
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Humidity
+    initial_value: 38.72
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Illuminance
+    initial_value: 624.84
+    class: illuminance
+    unit_of_measurement: lx
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Pm10
+    initial_value: 20.33
+    class: pm10
+    unit_of_measurement: ug/m3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Temperature
+    initial_value: 27.75
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_25_kitchen_kitchen_dishwasher_1:
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.BasicInformation.ProductID
+    initial_value: 117
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.BasicInformation.ProductName
+    initial_value: Dishwasher
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.DishwasherAlarm.Latch
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.DishwasherAlarm.Mask
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.DishwasherAlarm.State
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.DishwasherAlarm.Supported
+    initial_value: 63
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.DishwasherMode.CurrentMode
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.DishwasherMode.SupportedModes
+    initial_value: '[{"ModeTags": [16384], "label": "Normal", "mode": 0}, {"ModeTags": [16385], "label": "Heavy Duty", "mode":
+      1}, {"ModeTags": [16386], "label": "Light Wash", "mode": 2}, {"ModeTags": [1], "label": "Quick Wash", "mode": 3}, {"ModeTags":
+      [4], "label": "Low Energy", "mode": 4}, {"ModeTags": [2, 3], "label": "Silent", "mode": 5}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.OperationalState.CountdownTime
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.OperationalState.CurrentPhase
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.OperationalState.OperationalError
+    initial_value: '{"error_state_id": 0}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.OperationalState.OperationalState
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.OperationalState.OperationalStateList
+    initial_value: '[{"operational_state_id": 0}, {"operational_state_id": 1}, {"operational_state_id": 2}, {"operational_state_id":
+      3}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Dishwasher1.OperationalState.PhaseList
+    initial_value: '["Pre-wash", "Main wash", "Rinse", "Dry", "Complete"]'
+    persistent: false
+  qt2_feasible_seed_25_kitchen_kitchen_freezer_1:
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.BasicInformation.ProductID
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.BasicInformation.ProductName
+    initial_value: Freezer
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.Descriptor.TagList
+    initial_value: '["Freezer"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.RTCCMode.CurrentMode
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.RTCCMode.SupportedModes
+    initial_value: '[{"Label": "Normal", "Mode": 0, "ModeTags": [0]}, {"Label": "Energy Save", "Mode": 4, "ModeTags": [4]},
+      {"Label": "Rapid Cool", "Mode": 16384, "ModeTags": [16384]}, {"Label": "Rapid Freeze", "Mode": 16385, "ModeTags": [16385]}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.TemperatureControl.MaxTemperature
+    initial_value: -15.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.TemperatureControl.MinTemperature
+    initial_value: -23.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.TemperatureControl.TemperatureSetpoint
+    initial_value: -16.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.TemperatureMeasurement.MaxMeasuredValue
+    initial_value: 32766
+    class: temperature
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.TemperatureMeasurement.MeasuredValue
+    initial_value: -1500
+    class: temperature
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Freezer1.TemperatureMeasurement.MinMeasuredValue
+    initial_value: -27315
+    class: temperature
+    persistent: false
+  qt2_feasible_seed_25_kitchen_kitchen_on_off_light_1:
+  - platform: light
+    name: Qt2FeasibleSeed25.Kitchen.OnOffLight1
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.OnOffLight1.BasicInformation.ProductID
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.OnOffLight1.BasicInformation.ProductName
+    initial_value: On/Off Light
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.OnOffLight1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.OnOffLight1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.OnOffLight1.OnOff.OnOff
+    initial_value: 'off'
+    persistent: false
+  qt2_feasible_seed_25_kitchen_kitchen_refrigerator_1:
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.BasicInformation.ProductID
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.BasicInformation.ProductName
+    initial_value: Refrigerator
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.Descriptor.TagList
+    initial_value: '["Refrigerator"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.RTCCMode.CurrentMode
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.RTCCMode.SupportedModes
+    initial_value: '[{"Label": "Normal", "Mode": 0, "ModeTags": [0]}, {"Label": "Energy Save", "Mode": 4, "ModeTags": [4]},
+      {"Label": "Rapid Cool", "Mode": 16384, "ModeTags": [16384]}, {"Label": "Rapid Freeze", "Mode": 16385, "ModeTags": [16385]}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.TemperatureControl.MaxTemperature
+    initial_value: 7.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.TemperatureControl.MinTemperature
+    initial_value: 1.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.TemperatureControl.TemperatureSetpoint
+    initial_value: 6.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.TemperatureMeasurement.MaxMeasuredValue
+    initial_value: 32766
+    class: temperature
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.TemperatureMeasurement.MeasuredValue
+    initial_value: 700
+    class: temperature
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.Kitchen.Refrigerator1.TemperatureMeasurement.MinMeasuredValue
+    initial_value: -27315
+    class: temperature
+    persistent: false
+  qt2_feasible_seed_25_living_room_environment:
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Humidity
+    initial_value: 35.0
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Illuminance
+    initial_value: 528.29
+    class: illuminance
+    unit_of_measurement: lx
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Pm10
+    initial_value: 40.0
+    class: pm10
+    unit_of_measurement: ug/m3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Temperature
+    initial_value: 27.65
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_25_living_room_living_room_air_conditioner_1:
+  - platform: climate
+    name: Qt2FeasibleSeed25.LivingRoom.AirConditioner1
+    initial_hvac_mode: cool
+    initial_temperature: 20.0
+    min_temp: 12.0
+    max_temp: 36.0
+    target_temp_step: 0.5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.AirConditioner1.BasicInformation.ProductID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.AirConditioner1.BasicInformation.ProductName
+    initial_value: Air Conditioner
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.AirConditioner1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.AirConditioner1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.AirConditioner1.FanControl.FanMode
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.AirConditioner1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.AirConditioner1.FanControl.PercentCurrent
+    initial_value: 0.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.AirConditioner1.FanControl.PercentSetting
+    initial_value: 0.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.AirConditioner1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.AirConditioner1.Thermostat.ControlSequenceOfOperation
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.AirConditioner1.Thermostat.LocalTemperature
+    initial_value: 27.65
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.AirConditioner1.Thermostat.OccupiedCoolingSetpoint
+    initial_value: 20.0
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.AirConditioner1.Thermostat.OccupiedHeatingSetpoint
+    initial_value: 28.0
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.AirConditioner1.Thermostat.SystemMode
+    initial_value: 3
+    persistent: false
+  qt2_feasible_seed_25_living_room_living_room_dehumidifier_1:
+  - platform: fan
+    name: Qt2FeasibleSeed25.LivingRoom.Dehumidifier1
+    initial_value: 'on'
+    speed_count: 100
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Dehumidifier1.BasicInformation.ProductID
+    initial_value: 7
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Dehumidifier1.BasicInformation.ProductName
+    initial_value: Dehumidifier
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Dehumidifier1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Dehumidifier1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Dehumidifier1.FanControl.FanMode
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Dehumidifier1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Dehumidifier1.FanControl.PercentCurrent
+    initial_value: 57.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Dehumidifier1.FanControl.PercentSetting
+    initial_value: 57.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Dehumidifier1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Dehumidifier1.RelativeHumidityMeasurement.MaxMeasuredValue
+    initial_value: 95.0
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Dehumidifier1.RelativeHumidityMeasurement.MeasuredValue
+    initial_value: 34.69
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Dehumidifier1.RelativeHumidityMeasurement.MinMeasuredValue
+    initial_value: 10.0
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Dehumidifier1.RelativeHumidityMeasurement.Tolerance
+    initial_value: unknown
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  qt2_feasible_seed_25_living_room_living_room_fan_1:
+  - platform: fan
+    name: Qt2FeasibleSeed25.LivingRoom.Fan1
+    initial_value: 'on'
+    speed_count: 100
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan1.BasicInformation.ProductID
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan1.BasicInformation.ProductName
+    initial_value: Fan
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan1.FanControl.FanMode
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan1.FanControl.PercentCurrent
+    initial_value: 30.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan1.FanControl.PercentSetting
+    initial_value: 30.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  qt2_feasible_seed_25_living_room_living_room_fan_2:
+  - platform: fan
+    name: Qt2FeasibleSeed25.LivingRoom.Fan2
+    initial_value: 'on'
+    speed_count: 100
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan2.BasicInformation.ProductID
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan2.BasicInformation.ProductName
+    initial_value: Fan
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan2.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan2.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan2.FanControl.FanMode
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan2.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan2.FanControl.PercentCurrent
+    initial_value: 24.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan2.FanControl.PercentSetting
+    initial_value: 24.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.Fan2.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  qt2_feasible_seed_25_living_room_living_room_on_off_light_1:
+  - platform: light
+    name: Qt2FeasibleSeed25.LivingRoom.OnOffLight1
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.OnOffLight1.BasicInformation.ProductID
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.OnOffLight1.BasicInformation.ProductName
+    initial_value: On/Off Light
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.OnOffLight1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.OnOffLight1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.OnOffLight1.OnOff.OnOff
+    initial_value: 'off'
+    persistent: false
+  qt2_feasible_seed_25_living_room_living_room_window_covering_controller_1:
+  - platform: cover
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController1
+    initial_position: 32.96
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController1.BasicInformation.ProductID
+    initial_value: 10
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController1.BasicInformation.ProductName
+    initial_value: Window Covering Controller
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController1.WindowCovering.ConfigStatus
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController1.WindowCovering.CurrentPositionLiftPercent100ths
+    initial_value: 32.96
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController1.WindowCovering.EndProductType
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController1.WindowCovering.Mode
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController1.WindowCovering.NumberOfActuationsLift
+    initial_value: 20
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController1.WindowCovering.OperationalStatus
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController1.WindowCovering.SafetyStatus
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController1.WindowCovering.TargetPositionLiftPercent100ths
+    initial_value: 32.96
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController1.WindowCovering.Type
+    initial_value: 0
+    persistent: false
+  qt2_feasible_seed_25_living_room_living_room_window_covering_controller_2:
+  - platform: cover
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController2
+    initial_position: 0.0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController2.BasicInformation.ProductID
+    initial_value: 10
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController2.BasicInformation.ProductName
+    initial_value: Window Covering Controller
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController2.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController2.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController2.WindowCovering.ConfigStatus
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController2.WindowCovering.CurrentPositionLiftPercent100ths
+    initial_value: 0.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController2.WindowCovering.EndProductType
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController2.WindowCovering.Mode
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController2.WindowCovering.NumberOfActuationsLift
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController2.WindowCovering.OperationalStatus
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController2.WindowCovering.SafetyStatus
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController2.WindowCovering.TargetPositionLiftPercent100ths
+    initial_value: 0.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.LivingRoom.WindowCoveringController2.WindowCovering.Type
+    initial_value: 0
+    persistent: false
+  qt2_feasible_seed_25_utility_room_environment:
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.Humidity
+    initial_value: 35.0
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.Illuminance
+    initial_value: 493.15
+    class: illuminance
+    unit_of_measurement: lx
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.Pm10
+    initial_value: 33.0
+    class: pm10
+    unit_of_measurement: ug/m3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.Temperature
+    initial_value: 28.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_25_utility_room_utility_room_dimmable_light_1:
+  - platform: light
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1
+    initial_value: 'on'
+    support_brightness: true
+    initial_brightness: 81
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.BasicInformation.ProductID
+    initial_value: 3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.BasicInformation.ProductName
+    initial_value: Dimmable Light
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.LevelControl.CurrentFrequency
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.LevelControl.CurrentLevel
+    initial_value: 81
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.LevelControl.DefaultMoveRate
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.LevelControl.MaxFrequency
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.LevelControl.MaxLevel
+    initial_value: 254
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.LevelControl.MinFrequency
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.LevelControl.MinLevel
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.LevelControl.OffTransitionTime
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.LevelControl.OnLevel
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.LevelControl.OnOffTransitionTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.LevelControl.OnTransitionTime
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.LevelControl.Options
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.LevelControl.RemainingTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.LevelControl.StartUpCurrentLevel
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.OnOff.GlobalSceneControl
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.OnOff.OffWaitTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.OnOff.OnTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.DimmableLight1.OnOff.StartUpOnOff
+    initial_value: unknown
+    persistent: false
+  qt2_feasible_seed_25_utility_room_utility_room_laundry_dryer_1:
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryDryer1
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryDryer1.BasicInformation.ProductID
+    initial_value: 128
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryDryer1.BasicInformation.ProductName
+    initial_value: Laundry Dryer
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryDryer1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryDryer1.BasicInformation.VendorName
+    initial_value: Generic Vendor
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryDryer1.LaundryDryerControls.SelectedDrynessLevel
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryDryer1.LaundryDryerControls.SupportedDrynessLevels
+    initial_value: '[0, 1, 2, 3]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryDryer1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryDryer1.OperationalState.CountdownTime
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryDryer1.OperationalState.CurrentPhase
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryDryer1.OperationalState.OperationalError
+    initial_value: '{"error_state_id": 0}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryDryer1.OperationalState.OperationalState
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryDryer1.OperationalState.OperationalStateList
+    initial_value: '[{"operational_state_id": 0}, {"operational_state_id": 1}, {"operational_state_id": 2}, {"operational_state_id":
+      3}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryDryer1.OperationalState.PhaseList
+    initial_value: '["Heating", "Drying", "CoolDown", "Complete"]'
+    persistent: false
+  qt2_feasible_seed_25_utility_room_utility_room_laundry_washer_1:
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.BasicInformation.ProductID
+    initial_value: 81
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.BasicInformation.ProductName
+    initial_value: Laundry Washer
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.BasicInformation.VendorName
+    initial_value: Samsung Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.LaundryWasherControls.NumberOfRinses
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.LaundryWasherControls.SpinSpeedCurrent
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.LaundryWasherControls.SpinSpeeds
+    initial_value: '[0, 1]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.LaundryWasherControls.SupportedRinses
+    initial_value: '[1, 2]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.LaundryWasherMode.CurrentMode
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.LaundryWasherMode.SupportedModes
+    initial_value: '[{"ModeTags": [16384], "label": "Normal", "mode": 0}, {"ModeTags": [16385], "label": "Delicate", "mode":
+      1}, {"ModeTags": [16386], "label": "Heavy", "mode": 2}, {"ModeTags": [16387], "label": "Whites", "mode": 3}, {"ModeTags":
+      [1, 16384], "label": "Quick Normal", "mode": 4}, {"ModeTags": [16386, 16387], "label": "Heavy Whites", "mode": 5}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.OperationalState.CountdownTime
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.OperationalState.CurrentPhase
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.OperationalState.OperationalError
+    initial_value: '{"error_state_id": 0}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.OperationalState.OperationalState
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.OperationalState.OperationalStateList
+    initial_value: '[{"operational_state_id": 0}, {"operational_state_id": 1}, {"operational_state_id": 2}, {"operational_state_id":
+      3}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.OperationalState.PhaseList
+    initial_value: '["Pre-wash", "Main wash", "Rinse", "Spin", "Complete"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.TemperatureControl.MaxTemperature
+    initial_value: 95.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.TemperatureControl.MinTemperature
+    initial_value: 5.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.LaundryWasher1.TemperatureControl.TemperatureSetpoint
+    initial_value: 20.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_25_utility_room_utility_room_on_off_light_1:
+  - platform: light
+    name: Qt2FeasibleSeed25.UtilityRoom.OnOffLight1
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.OnOffLight1.BasicInformation.ProductID
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.OnOffLight1.BasicInformation.ProductName
+    initial_value: On/Off Light
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.OnOffLight1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.OnOffLight1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.OnOffLight1.OnOff.OnOff
+    initial_value: 'off'
+    persistent: false
+  qt2_feasible_seed_25_utility_room_utility_room_on_off_light_2:
+  - platform: light
+    name: Qt2FeasibleSeed25.UtilityRoom.OnOffLight2
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.OnOffLight2.BasicInformation.ProductID
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.OnOffLight2.BasicInformation.ProductName
+    initial_value: On/Off Light
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.OnOffLight2.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.OnOffLight2.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.OnOffLight2.OnOff.OnOff
+    initial_value: 'off'
+    persistent: false
+  qt2_feasible_seed_25_utility_room_utility_room_window_covering_controller_1:
+  - platform: cover
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController1
+    initial_position: 95.73
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController1.BasicInformation.ProductID
+    initial_value: 10
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController1.BasicInformation.ProductName
+    initial_value: Window Covering Controller
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController1.WindowCovering.ConfigStatus
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController1.WindowCovering.CurrentPositionLiftPercent100ths
+    initial_value: 95.73
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController1.WindowCovering.EndProductType
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController1.WindowCovering.Mode
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController1.WindowCovering.NumberOfActuationsLift
+    initial_value: 20
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController1.WindowCovering.OperationalStatus
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController1.WindowCovering.SafetyStatus
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController1.WindowCovering.TargetPositionLiftPercent100ths
+    initial_value: 95.73
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController1.WindowCovering.Type
+    initial_value: 0
+    persistent: false
+  qt2_feasible_seed_25_utility_room_utility_room_window_covering_controller_2:
+  - platform: cover
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController2
+    initial_position: 44.54
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController2.BasicInformation.ProductID
+    initial_value: 10
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController2.BasicInformation.ProductName
+    initial_value: Window Covering Controller
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController2.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController2.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController2.WindowCovering.ConfigStatus
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController2.WindowCovering.CurrentPositionLiftPercent100ths
+    initial_value: 44.54
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController2.WindowCovering.EndProductType
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController2.WindowCovering.Mode
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController2.WindowCovering.NumberOfActuationsLift
+    initial_value: 20
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController2.WindowCovering.OperationalStatus
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController2.WindowCovering.SafetyStatus
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController2.WindowCovering.TargetPositionLiftPercent100ths
+    initial_value: 44.54
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed25.UtilityRoom.WindowCoveringController2.WindowCovering.Type
+    initial_value: 0
+    persistent: false

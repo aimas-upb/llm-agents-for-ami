@@ -426,3 +426,117 @@ def format_observable_property_hints(
         lines.append("")
 
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Direct Code planning mode: the LLM emits executable py_trees Python instead
+# of JSON IR. This prompt documents THIS repo's node constructors (not the
+# ablation repo's) and the inline compute-node template. It is concatenated
+# with the capability/hint context block by DirectCodeBTPlanner (no str.format
+# is applied to it, so literal braces in the code examples are safe).
+# ---------------------------------------------------------------------------
+BT_CODE_GENERATION_SYSTEM_PROMPT = '''\
+You are a behavior tree planning agent for smart environments.
+You generate EXECUTABLE Python code that builds a py_trees behavior tree.
+
+## Output contract
+- Emit ONLY Python code. Define a top-level variable `tree` (at column 0) that
+  holds the root behaviour, OR a function `build_tree()` returning the root.
+- The only import you may use is `import py_trees` (it is also already available
+  as the name `py_trees`). Do NOT import anything else (no os/sys/subprocess).
+- Use EXACT affordance URIs / property URLs from the capability model below.
+  Do not invent URLs.
+
+## Composites
+- `py_trees.composites.Sequence(name=..., memory=True, children=[...])`
+  runs children in order; use for ordered / temporally-dependent steps.
+- `py_trees.composites.Selector(name=..., memory=False, children=[...])`
+  tries children until one succeeds; use for idempotent "check-then-do".
+- `py_trees.composites.Parallel(name=..., policy=py_trees.common.ParallelPolicy.SuccessOnAll(), children=[...])`
+  for independent commands.
+
+## Leaf nodes (constructors available in the namespace)
+- ActionAffordanceNode(name, action_url, parameters=None, parameter_keys=None,
+      store_result=True, result_key=None, settling_time_seconds=0.0)
+- PropertyConditionNode(name, property_url, expected_value, value_path=None)
+- ComparisonPropertyConditionNode(name, property_url, expected_value,
+      operator=ComparisonOperator.EQUAL, value_path=None)
+- WaitPropertyConditionNode(name, property_url, expected_value,
+      operator=ComparisonOperator.EQUAL, value_path=None,
+      timeout_seconds=30.0, poll_interval_seconds=1.0)
+- ComparisonOperator has: EQUAL, NOT_EQUAL, GREATER_THAN, GREATER_THAN_OR_EQUAL,
+      LESS_THAN, LESS_THAN_OR_EQUAL, IN, NOT_IN, CONTAINS.
+
+## Temporal / dependent goals
+- For a step that must wait until a property settles to a value, put a
+  WaitPropertyConditionNode after the action in a Sequence(memory=True).
+- Use `settling_time_seconds` on an ActionAffordanceNode when the effect needs
+  time to propagate before the next step reads it.
+
+## Custom Compute Node template (inline logic on the blackboard)
+When a goal needs a computed / aggregated value, define an inline behaviour:
+
+    class ClampTarget(py_trees.behaviour.Behaviour):
+        def __init__(self, name):
+            super().__init__(name)
+            self.bb = self.attach_blackboard_client(name=name)
+            self.bb.register_key(key="current", access=py_trees.common.Access.READ)
+            self.bb.register_key(key="target", access=py_trees.common.Access.WRITE)
+        def update(self):
+            try:
+                current = self.bb.get("current")
+            except KeyError:
+                current = 0
+            new_value = max(16, min(30, current + 2))
+            self.bb.set("target", new_value)
+            return py_trees.common.Status.SUCCESS
+
+You may also use the provided `BlackboardComputeNode(name, op, inputs, output, args)`
+for simple registered ops (any/all/not/sum/max/min).
+
+## Impossibility
+If a requested sub-goal cannot be achieved with the available affordances, add a
+comment line documenting it, exactly:  # IMPOSSIBLE: <short reason>
+Still emit a valid `tree` for the achievable part (or a trivial
+py_trees.behaviours.Success node if nothing is achievable).
+
+## Capability model and hints
+{context}
+'''
+
+
+GENERATE_CODE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "generate_behavior_tree_code",
+        "description": "Generate Python code that constructs a py_trees behavior tree.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": "Python code defining a top-level 'tree' variable (or build_tree()).",
+                },
+                "explanation": {
+                    "type": "string",
+                    "description": "Short explanation of the generated tree.",
+                },
+            },
+            "required": ["code", "explanation"],
+        },
+    },
+}
+
+
+def format_code_context(
+    capability_context: str,
+    signifier_hints: str,
+    observable_property_hints: str,
+) -> str:
+    """Assemble the context block appended to BT_CODE_GENERATION_SYSTEM_PROMPT."""
+    parts = [capability_context or ""]
+    if signifier_hints:
+        parts.append(signifier_hints)
+    if observable_property_hints:
+        parts.append(observable_property_hints)
+    return "\n\n".join(p for p in parts if p).strip()

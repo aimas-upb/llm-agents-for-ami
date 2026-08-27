@@ -1,0 +1,134 @@
+version: 1
+devices:
+  qt2_feasible_seed_1_smoketest_clock:
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.Clock
+    class: timestamp
+    initial_value: '2025-08-23 11:36:54'
+    persistent: false
+  qt2_feasible_seed_1_smoketest_simulator:
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.Simulator.TickInterval
+    initial_value: 0.1
+    persistent: false
+  qt2_feasible_seed_1_smoketest_bathroom_environment:
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.Bathroom.Humidity
+    initial_value: 42.15
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.Bathroom.Illuminance
+    initial_value: 100.0
+    class: illuminance
+    unit_of_measurement: lx
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.Bathroom.Pm10
+    initial_value: 5.0
+    class: pm10
+    unit_of_measurement: ug/m3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.Bathroom.Temperature
+    initial_value: 25.91
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_1_smoketest_utility_room_environment:
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.Humidity
+    initial_value: 35.0
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.Illuminance
+    initial_value: 557.14
+    class: illuminance
+    unit_of_measurement: lx
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.Pm10
+    initial_value: 5.0
+    class: pm10
+    unit_of_measurement: ug/m3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.Temperature
+    initial_value: 26.38
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_1_smoketest_utility_room_utility_room_air_conditioner_1:
+  - platform: climate
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.AirConditioner1
+    initial_hvac_mode: cool
+    initial_temperature: 20.0
+    min_temp: 12.0
+    max_temp: 36.0
+    target_temp_step: 0.5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.AirConditioner1.BasicInformation.ProductID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.AirConditioner1.BasicInformation.ProductName
+    initial_value: Air Conditioner
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.AirConditioner1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.AirConditioner1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.AirConditioner1.FanControl.FanMode
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.AirConditioner1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.AirConditioner1.FanControl.PercentCurrent
+    initial_value: 0.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.AirConditioner1.FanControl.PercentSetting
+    initial_value: 0.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.AirConditioner1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.AirConditioner1.Thermostat.ControlSequenceOfOperation
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.AirConditioner1.Thermostat.LocalTemperature
+    initial_value: 26.38
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.AirConditioner1.Thermostat.OccupiedCoolingSetpoint
+    initial_value: 20.0
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.AirConditioner1.Thermostat.OccupiedHeatingSetpoint
+    initial_value: 28.0
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed1Smoketest.UtilityRoom.AirConditioner1.Thermostat.SystemMode
+    initial_value: 3
+    persistent: false

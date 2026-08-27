@@ -1,0 +1,118 @@
+{
+  "passed": true,
+  "case": {
+    "name": "simuhome_qt2_feasible_seed_1_smoketest",
+    "hard_reset": false,
+    "initial_state": [
+      {
+        "type": "sleep",
+        "seconds": 2
+      }
+    ],
+    "query": "Ugh, the utility room must be too warm, I can feel a little sweat just thinking about going in there to grab the laundry, kind of makes me want to put it off",
+    "auto_confirm": true,
+    "dynamic_confirmation": true,
+    "confirmation_text": "yes",
+    "max_confirmation_turns": 3,
+    "settle_seconds": 15.0,
+    "pass_criteria": [
+      {
+        "type": "all_of",
+        "assertions": [
+          {
+            "type": "property_lte",
+            "path": "/workspaces/simuhome_qt2_feasible_seed_1_smoketest/artifacts/qt2feasibleseed1smoketest_utilityroom_temperature/properties/state",
+            "timeout_seconds": 90.0,
+            "poll_interval_seconds": 2.0,
+            "lte": 26.18
+          }
+        ]
+      },
+      {
+        "type": "final_reply_contains",
+        "value": "success"
+      }
+    ],
+    "simuhome": {
+      "source_json": "/mnt/c/Users/dragh/llm-agents-for-ami/tests/simuhome/qt2_feasible_seed_1_smoketest.json",
+      "workspace_id": "simuhome_qt2_feasible_seed_1_smoketest",
+      "meta": {
+        "seed": 1,
+        "query_type": "qt2",
+        "case": "feasible",
+        "num_rooms": 2,
+        "num_devices": 1,
+        "num_target_metrics": 1,
+        "feasibility": true
+      }
+    }
+  },
+  "transcript": [
+    {
+      "role": "assistant",
+      "phase": "proposal",
+      "text": "This plan checks whether the utility room temperature is at or below 26.18 C. If it already meets that target the plan ends immediately; if not, it opens the temperature sensor for inspection and then waits up to 120 seconds, checking every 5 seconds for the temperature to fall to 26.18 C or below. The plan cannot change heating or cooling settings automatically - it only focuses the sensor so you can inspect or manually adjust controls. Does this plan look good to you?"
+    },
+    {
+      "role": "assistant",
+      "phase": "confirmation_1",
+      "text": "Done! The plan was executed successfully."
+    }
+  ],
+  "assertions": [
+    {
+      "type": "all_of",
+      "passed": true,
+      "results": [
+        {
+          "type": "property_lte",
+          "passed": true,
+          "url": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_1_smoketest/artifacts/qt2feasibleseed1smoketest_utilityroom_temperature/properties/state",
+          "actual": 23.687,
+          "expected": 26.18
+        }
+      ]
+    },
+    {
+      "type": "final_reply_contains",
+      "passed": true,
+      "expected": "success",
+      "actual": "Done! The plan was executed successfully."
+    }
+  ],
+  "model_name": "gpt-5-mini|json_ir",
+  "first_reply": "This plan checks whether the utility room temperature is at or below 26.18 C. If it already meets that target the plan ends immediately; if not, it opens the temperature sensor for inspection and then waits up to 120 seconds, checking every 5 seconds for the temperature to fall to 26.18 C or below. The plan cannot change heating or cooling settings automatically - it only focuses the sensor so you can inspect or manually adjust controls. Does this plan look good to you?",
+  "plan": "{\"code\":null,\"explanation\":\"Checks whether the utility room temperature is within the recommended thermal comfort band (<= 26.18 \u00b0C). If it already meets the target the plan succeeds immediately. If not, it focuses the Temperature artifact (so you can inspect or manually change HVAC settings) and then waits up to 120 seconds for the temperature to drop to <= 26.18 \u00b0C, polling every 5 seconds. Note: there are no action affordances available in the provided list to directly change HVAC settings (only the Temperature artifact is readable and focusable), so the tree cannot autonomously lower the temperature. If you want me to change the AC setpoint or fan, provide devices/affordances that expose HVAC controls or ask me to suggest manual steps.\",\"format\":\"json_ir\",\"intent_type\":\"IMPLICIT\",\"intents\":[{\"action\":\"modify\",\"artifact\":\"thermostat\",\"intent_text\":\"the utility room must be too warm\",\"parameter\":\"temperature\"}],\"plan_type\":\"behavior_tree\",\"planning_path\":\"fresh_planning\",\"signifier_ids\":[],\"signifier_match_count\":0,\"signifier_reuse\":false,\"td_sosa_supported\":true,\"tree\":{\"children\":[{\"affordance_id\":\"Qt2FeasibleSeed1Smoketest.UtilityRoom.Temperature/state\",\"expected_value\":26.18,\"name\":\"CheckStateIs26.18\",\"operator\":\"<=\",\"property_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_1_smoketest/artifacts/qt2feasibleseed1smoketest_utilityroom_temperature/properties/state\",\"type\":\"condition\"},{\"children\":[{\"action_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_1_smoketest/focus\",\"affordance_id\":\"Qt2FeasibleSeed1Smoketest.UtilityRoom.Temperature/focusArtifact\",\"name\":\"Focusartifact\",\"type\":\"action\"},{\"affordance_id\":\"Qt2FeasibleSeed1Smoketest.UtilityRoom.Temperature/state\",\"expected_value\":26.18,\"name\":\"WaitForStateIs26.18\",\"operator\":\"<=\",\"poll_interval_seconds\":5,\"property_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_1_smoketest/artifacts/qt2feasibleseed1smoketest_utilityroom_temperature/properties/state\",\"timeout_seconds\":120,\"type\":\"wait_condition\"}],\"name\":\"Sequence_1\",\"type\":\"sequence\"}],\"name\":\"Verify or address utility room temperature\",\"type\":\"selector\"},\"workspace_id\":\"simuhome_qt2_feasible_seed_1_smoketest\"}",
+  "plan_summary": "This plan checks whether the utility room temperature is at or below 26.18 C. If it already meets that target the plan ends immediately; if not, it opens the temperature sensor for inspection and then waits up to 120 seconds, checking every 5 seconds for the temperature to fall to 26.18 C or below. The plan cannot change heating or cooling settings automatically - it only focuses the sensor so you can inspect or manually adjust controls. Does this plan look good to you?",
+  "plan_hash": "1fc31be2fd4351220056de3eed3cf3e21a9a8c17753f768f571c8518c1ac117b",
+  "confirmation_replies_used": [
+    {
+      "assistant": "This plan checks whether the utility room temperature is at or below 26.18 C. If it already meets that target the plan ends immediately; if not, it opens the temperature sensor for inspection and then waits up to 120 seconds, checking every 5 seconds for the temperature to fall to 26.18 C or below. The plan cannot change heating or cooling settings automatically - it only focuses the sensor so you can inspect or manually adjust controls. Does this plan look good to you?",
+      "reply": "yes",
+      "source": "dynamic",
+      "raw_dynamic_reply": "{\"reply\":\"yes\"}",
+      "dynamic_error": null
+    }
+  ],
+  "final_reply": "Done! The plan was executed successfully.",
+  "started_at": "2026-07-30T21:29:19.489254+03:00",
+  "duration_seconds": 84.325,
+  "llm_calls": 4,
+  "input_tokens": 6525,
+  "output_tokens": 3961,
+  "initial_prompt_llm_calls": 2,
+  "initial_prompt_input_tokens": 3341,
+  "initial_prompt_output_tokens": 2145,
+  "clarification_llm_calls": 0,
+  "clarification_input_tokens": 0,
+  "clarification_output_tokens": 0,
+  "confirmation_llm_calls": 1,
+  "confirmation_input_tokens": 265,
+  "confirmation_output_tokens": 78,
+  "plan_creation_llm_calls": 1,
+  "plan_creation_input_tokens": 2919,
+  "plan_creation_output_tokens": 1738,
+  "other_llm_calls": 0,
+  "other_input_tokens": 0,
+  "other_output_tokens": 0
+}

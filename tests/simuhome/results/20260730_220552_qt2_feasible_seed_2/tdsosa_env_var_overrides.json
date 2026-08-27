@@ -1,0 +1,13 @@
+{
+  "entity:sensor.qt2feasibleseed2_bathroom_pm10:state": "air_quality",
+  "entity:fan.qt2feasibleseed2_bathroom_airpurifier1:action:fan.turn_on": "air_quality:decrease",
+  "entity:fan.qt2feasibleseed2_bathroom_airpurifier1:action:fan.set_percentage": "air_quality:decrease",
+  "entity:fan.qt2feasibleseed2_bathroom_airpurifier1:action:fan.turn_off": "air_quality:increase",
+  "entity:sensor.qt2feasibleseed2_bathroom_illuminance:state": "luminosity",
+  "entity:light.qt2feasibleseed2_bathroom_dimmablelight1:action:light.turn_on": "luminosity",
+  "entity:light.qt2feasibleseed2_bathroom_dimmablelight1:action:light.turn_off": "luminosity",
+  "entity:light.qt2feasibleseed2_bathroom_onofflight1:action:light.turn_on": "luminosity",
+  "entity:light.qt2feasibleseed2_bathroom_onofflight1:action:light.turn_off": "luminosity",
+  "entity:light.qt2feasibleseed2_bathroom_onofflight2:action:light.turn_on": "luminosity",
+  "entity:light.qt2feasibleseed2_bathroom_onofflight2:action:light.turn_off": "luminosity"
+}

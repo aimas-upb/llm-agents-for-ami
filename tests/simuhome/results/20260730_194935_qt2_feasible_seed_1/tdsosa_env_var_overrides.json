@@ -1,0 +1,7 @@
+{
+  "entity:sensor.qt2feasibleseed1_utilityroom_temperature:state": "thermal_comfort",
+  "entity:climate.qt2feasibleseed1_utilityroom_airconditioner1:action:climate.set_temperature": "thermal_comfort",
+  "entity:climate.qt2feasibleseed1_utilityroom_airconditioner1:action:climate.set_hvac_mode": "thermal_comfort",
+  "entity:climate.qt2feasibleseed1_utilityroom_heatpump1:action:climate.set_temperature": "thermal_comfort",
+  "entity:climate.qt2feasibleseed1_utilityroom_heatpump1:action:climate.set_hvac_mode": "thermal_comfort"
+}

@@ -1,0 +1,151 @@
+{
+  "passed": false,
+  "case": {
+    "name": "simuhome_qt2_feasible_seed_5",
+    "hard_reset": false,
+    "initial_state": [
+      {
+        "type": "sleep",
+        "seconds": 2
+      }
+    ],
+    "query": "Ugh the utility room light is blinding, my eyes are starting to water and I keep squinting, and the living room is glaring through the doorway too, not very relaxing for the evening, makes me wince.",
+    "auto_confirm": true,
+    "dynamic_confirmation": true,
+    "confirmation_text": "yes",
+    "max_confirmation_turns": 3,
+    "settle_seconds": 15.0,
+    "pass_criteria": [
+      {
+        "type": "all_of",
+        "assertions": [
+          {
+            "type": "property_lte",
+            "path": "/workspaces/simuhome_qt2_feasible_seed_5/artifacts/qt2feasibleseed5_utilityroom_illuminance/properties/state",
+            "timeout_seconds": 90.0,
+            "poll_interval_seconds": 2.0,
+            "lte": 1150.0
+          },
+          {
+            "type": "property_lte",
+            "path": "/workspaces/simuhome_qt2_feasible_seed_5/artifacts/qt2feasibleseed5_livingroom_illuminance/properties/state",
+            "timeout_seconds": 90.0,
+            "poll_interval_seconds": 2.0,
+            "lte": 1104.094
+          }
+        ]
+      },
+      {
+        "type": "final_reply_contains",
+        "value": "success"
+      }
+    ],
+    "simuhome": {
+      "source_json": "/mnt/c/Users/dragh/SimuHome/data/benchmark/qt2_feasible_seed_5.json",
+      "workspace_id": "simuhome_qt2_feasible_seed_5",
+      "meta": {
+        "seed": 5,
+        "query_type": "qt2",
+        "case": "feasible",
+        "num_rooms": 5,
+        "num_devices": 27,
+        "num_target_metrics": 2,
+        "feasibility": true
+      }
+    }
+  },
+  "transcript": [
+    {
+      "role": "assistant",
+      "phase": "proposal",
+      "text": "This plan will dim both the utility-room and living-room lights at the same time to reduce glare. Each light will be set to 40% brightness (they are currently much brighter). If you'd prefer either light turned off or a different brightness, I can update the plan. Does this plan look good to you?"
+    },
+    {
+      "role": "assistant",
+      "phase": "confirmation_1",
+      "text": "Done! The plan was executed successfully."
+    }
+  ],
+  "assertions": [
+    {
+      "type": "all_of",
+      "passed": false,
+      "results": [
+        {
+          "type": "property_lte",
+          "passed": false,
+          "url": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_5/artifacts/qt2feasibleseed5_utilityroom_illuminance/properties/state",
+          "actual": 1400.0,
+          "expected": 1150.0,
+          "timeout_seconds": 90.0
+        },
+        {
+          "type": "property_lte",
+          "passed": false,
+          "url": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_5/artifacts/qt2feasibleseed5_livingroom_illuminance/properties/state",
+          "actual": 1354.094,
+          "expected": 1104.094,
+          "timeout_seconds": 90.0
+        }
+      ]
+    }
+  ],
+  "model_name": "gpt-5-mini|json_ir",
+  "first_reply": "This plan will dim both the utility-room and living-room lights at the same time to reduce glare. Each light will be set to 40% brightness (they are currently much brighter). If you'd prefer either light turned off or a different brightness, I can update the plan. Does this plan look good to you?",
+  "plan": "{\"code\":null,\"explanation\":\"Dim the utility-room and living-room dimmable lights concurrently to reduce blinding/glare. The utility room DimmableLight1 is currently on with brightness 201; the plan sets it to 40% brightness. The living room DimmableLight1 is currently on with brightness 171; the plan sets it to 40% brightness. If you prefer the utility light turned off entirely or a different brightness level, tell me and I will update the plan.\",\"format\":\"json_ir\",\"intent_type\":\"IMPLICIT\",\"intents\":[{\"action\":\"modify\",\"artifact\":\"light\",\"intent_text\":\"the utility room light is blinding\",\"parameter\":\"brightness\"},{\"action\":\"modify\",\"artifact\":\"light\",\"intent_text\":\"the living room is glaring through the doorway\",\"parameter\":\"brightness\"}],\"plan_type\":\"behavior_tree\",\"planning_path\":\"fresh_planning\",\"signifier_ids\":[],\"signifier_match_count\":0,\"signifier_reuse\":false,\"td_sosa_supported\":true,\"tree\":{\"children\":[{\"action_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_5/artifacts/qt2feasibleseed5_utilityroom_dimmablelight1/ha/light/turn_on\",\"affordance_id\":\"Qt2FeasibleSeed5.UtilityRoom.DimmableLight1/LightTurnOn\",\"name\":\"Lightturnon\",\"parameters\":{\"brightness_pct\":40,\"transition\":0},\"type\":\"action\"},{\"action_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_5/artifacts/qt2feasibleseed5_livingroom_dimmablelight1/ha/light/turn_on\",\"affordance_id\":\"Qt2FeasibleSeed5.LivingRoom.DimmableLight1/LightTurnOn\",\"name\":\"Lightturnon\",\"parameters\":{\"brightness_pct\":40,\"transition\":0},\"type\":\"action\"}],\"name\":\"Reduce utility and living room glare\",\"policy\":\"success_on_all\",\"type\":\"parallel\"},\"workspace_id\":\"simuhome_qt2_feasible_seed_5\"}",
+  "plan_summary": "This plan will dim both the utility-room and living-room lights at the same time to reduce glare. Each light will be set to 40% brightness (they are currently much brighter). If you'd prefer either light turned off or a different brightness, I can update the plan. Does this plan look good to you?",
+  "plan_hash": "992942d152851464284df3a2e1c2c360486fc63400c03377671d735ec87f711c",
+  "confirmation_replies_used": [
+    {
+      "assistant": "This plan will dim both the utility-room and living-room lights at the same time to reduce glare. Each light will be set to 40% brightness (they are currently much brighter). If you'd prefer either light turned off or a different brightness, I can update the plan. Does this plan look good to you?",
+      "reply": "yes",
+      "source": "dynamic",
+      "raw_dynamic_reply": "{\"reply\":\"yes\"}",
+      "dynamic_error": null
+    }
+  ],
+  "final_reply": "Done! The plan was executed successfully.",
+  "failed_assertion": {
+    "type": "all_of",
+    "passed": false,
+    "results": [
+      {
+        "type": "property_lte",
+        "passed": false,
+        "url": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_5/artifacts/qt2feasibleseed5_utilityroom_illuminance/properties/state",
+        "actual": 1400.0,
+        "expected": 1150.0,
+        "timeout_seconds": 90.0
+      },
+      {
+        "type": "property_lte",
+        "passed": false,
+        "url": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_5/artifacts/qt2feasibleseed5_livingroom_illuminance/properties/state",
+        "actual": 1354.094,
+        "expected": 1104.094,
+        "timeout_seconds": 90.0
+      }
+    ]
+  },
+  "failure_stage": "assertion",
+  "started_at": "2026-07-30T22:26:52.249574+03:00",
+  "duration_seconds": 275.154,
+  "llm_calls": 4,
+  "input_tokens": 40591,
+  "output_tokens": 3637,
+  "initial_prompt_llm_calls": 2,
+  "initial_prompt_input_tokens": 16775,
+  "initial_prompt_output_tokens": 1989,
+  "clarification_llm_calls": 0,
+  "clarification_input_tokens": 0,
+  "clarification_output_tokens": 0,
+  "confirmation_llm_calls": 1,
+  "confirmation_input_tokens": 237,
+  "confirmation_output_tokens": 78,
+  "plan_creation_llm_calls": 1,
+  "plan_creation_input_tokens": 23579,
+  "plan_creation_output_tokens": 1570,
+  "other_llm_calls": 0,
+  "other_input_tokens": 0,
+  "other_output_tokens": 0
+}

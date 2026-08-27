@@ -1,0 +1,129 @@
+{
+  "passed": false,
+  "case": {
+    "name": "simuhome_qt2_feasible_seed_25",
+    "hard_reset": false,
+    "initial_state": [
+      {
+        "type": "sleep",
+        "seconds": 2
+      }
+    ],
+    "query": "Man the bathroom air feels kinda dusty my throat is a bit scratchy and my eyes feel gritty, its annoying me a little",
+    "auto_confirm": true,
+    "dynamic_confirmation": true,
+    "confirmation_text": "yes",
+    "max_confirmation_turns": 3,
+    "settle_seconds": 15.0,
+    "pass_criteria": [
+      {
+        "type": "all_of",
+        "assertions": [
+          {
+            "type": "property_lte",
+            "path": "/workspaces/simuhome_qt2_feasible_seed_25/artifacts/qt2feasibleseed25_bathroom_pm10/properties/state",
+            "timeout_seconds": 90.0,
+            "poll_interval_seconds": 2.0,
+            "lte": 10.077
+          }
+        ]
+      },
+      {
+        "type": "final_reply_contains",
+        "value": "success"
+      }
+    ],
+    "simuhome": {
+      "source_json": "/mnt/c/Users/dragh/SimuHome/data/benchmark/qt2_feasible_seed_25.json",
+      "workspace_id": "simuhome_qt2_feasible_seed_25",
+      "meta": {
+        "seed": 25,
+        "query_type": "qt2",
+        "case": "feasible",
+        "num_rooms": 5,
+        "num_devices": 27,
+        "num_target_metrics": 1,
+        "feasibility": true
+      }
+    }
+  },
+  "transcript": [
+    {
+      "role": "assistant",
+      "phase": "proposal",
+      "text": "The system will check whether the bathroom air purifier is already on; if it is, nothing will be done. If it is off, it will turn the purifier on to high (100% fan), wait up to 15 seconds for it to come on, then enable oscillation so the air circulates. This should help reduce dust and relieve your throat and eye irritation. Does this plan look good to you?"
+    },
+    {
+      "role": "assistant",
+      "phase": "confirmation_1",
+      "text": "Execution failed: FAILURE"
+    }
+  ],
+  "assertions": [
+    {
+      "type": "all_of",
+      "passed": false,
+      "results": [
+        {
+          "type": "property_lte",
+          "passed": false,
+          "url": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_25/artifacts/qt2feasibleseed25_bathroom_pm10/properties/state",
+          "actual": 10.377,
+          "expected": 10.077,
+          "timeout_seconds": 90.0
+        }
+      ]
+    }
+  ],
+  "model_name": "gpt-5-mini|direct_code",
+  "first_reply": "The system will check whether the bathroom air purifier is already on; if it is, nothing will be done. If it is off, it will turn the purifier on to high (100% fan), wait up to 15 seconds for it to come on, then enable oscillation so the air circulates. This should help reduce dust and relieve your throat and eye irritation. Does this plan look good to you?",
+  "plan": "{\"code\":null,\"explanation\":\"If the bathroom purifier is already on, do nothing. Otherwise: 1) turn the bathroom air purifier on using a high preset and 100% fan percentage, 2) wait up to 15 seconds for its state to become 'on', and 3) enable oscillation so it circulates air. This should reduce dust and ease throat/eye irritation. The plan is executable with the available air purifier affordances.\",\"format\":\"json_ir\",\"intent_type\":\"IMPLICIT\",\"intents\":[{\"action\":\"modify\",\"artifact\":\"air_purifier\",\"intent_text\":\"Man the bathroom air feels kinda dusty my throat is a bit scratchy and my eyes feel gritty, its annoying me a little\",\"parameter\":\"percentage\"}],\"plan_type\":\"behavior_tree\",\"planning_path\":\"fresh_planning\",\"signifier_ids\":[],\"signifier_match_count\":0,\"signifier_reuse\":false,\"td_sosa_supported\":false,\"tree\":{\"children\":[{\"affordance_id\":\"qt2_feasible_seed_25_bathroom_bathroom_air_purifier_1/state\",\"expected_value\":\"on\",\"name\":\"CheckStateIson\",\"operator\":\"==\",\"property_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_25/artifacts/qt2_feasible_seed_25_bathroom_bathroom_air_purifier_1/properties/state\",\"type\":\"condition\"},{\"children\":[{\"action_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_25/artifacts/qt2_feasible_seed_25_bathroom_bathroom_air_purifier_1/ha/fan/turn_on\",\"affordance_id\":\"qt2_feasible_seed_25_bathroom_bathroom_air_purifier_1/FanTurnOn\",\"name\":\"Fanturnon\",\"parameters\":{\"percentage\":100,\"preset_mode\":\"high\"},\"type\":\"action\"},{\"affordance_id\":\"qt2_feasible_seed_25_bathroom_bathroom_air_purifier_1/state\",\"expected_value\":\"on\",\"name\":\"WaitForStateIson\",\"operator\":\"==\",\"poll_interval_seconds\":2,\"property_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_25/artifacts/qt2_feasible_seed_25_bathroom_bathroom_air_purifier_1/properties/state\",\"timeout_seconds\":15,\"type\":\"wait_condition\"},{\"action_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_25/artifacts/qt2_feasible_seed_25_bathroom_bathroom_air_purifier_1/ha/fan/oscillate\",\"affordance_id\":\"qt2_feasible_seed_25_bathroom_bathroom_air_purifier_1/FanOscillate\",\"name\":\"Fanoscillate\",\"parameters\":{\"oscillating\":true},\"type\":\"action\"}],\"name\":\"Sequence_1\",\"type\":\"sequence\"}],\"name\":\"turn_on_bathroom_purifier_if_needed\",\"type\":\"selector\"},\"workspace_id\":\"simuhome_qt2_feasible_seed_25\"}",
+  "plan_summary": "The system will check whether the bathroom air purifier is already on; if it is, nothing will be done. If it is off, it will turn the purifier on to high (100% fan), wait up to 15 seconds for it to come on, then enable oscillation so the air circulates. This should help reduce dust and relieve your throat and eye irritation. Does this plan look good to you?",
+  "plan_hash": "73217319c001161984abb0eba5a2d2522e20fc478942ff4a2e07c5f50e7f47fe",
+  "confirmation_replies_used": [
+    {
+      "assistant": "The system will check whether the bathroom air purifier is already on; if it is, nothing will be done. If it is off, it will turn the purifier on to high (100% fan), wait up to 15 seconds for it to come on, then enable oscillation so the air circulates. This should help reduce dust and relieve your throat and eye irritation. Does this plan look good to you?",
+      "reply": "yes",
+      "source": "dynamic",
+      "raw_dynamic_reply": "{\"reply\":\"yes\"}",
+      "dynamic_error": null
+    }
+  ],
+  "final_reply": "Execution failed: FAILURE",
+  "failed_assertion": {
+    "type": "all_of",
+    "passed": false,
+    "results": [
+      {
+        "type": "property_lte",
+        "passed": false,
+        "url": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_25/artifacts/qt2feasibleseed25_bathroom_pm10/properties/state",
+        "actual": 10.377,
+        "expected": 10.077,
+        "timeout_seconds": 90.0
+      }
+    ]
+  },
+  "failure_stage": "assertion",
+  "started_at": "2026-07-31T21:05:32.102558+03:00",
+  "duration_seconds": 157.033,
+  "llm_calls": 4,
+  "input_tokens": 7162,
+  "output_tokens": 3253,
+  "initial_prompt_llm_calls": 2,
+  "initial_prompt_input_tokens": 3432,
+  "initial_prompt_output_tokens": 1508,
+  "clarification_llm_calls": 0,
+  "clarification_input_tokens": 0,
+  "clarification_output_tokens": 0,
+  "confirmation_llm_calls": 1,
+  "confirmation_input_tokens": 237,
+  "confirmation_output_tokens": 78,
+  "plan_creation_llm_calls": 1,
+  "plan_creation_input_tokens": 3493,
+  "plan_creation_output_tokens": 1667,
+  "other_llm_calls": 0,
+  "other_input_tokens": 0,
+  "other_output_tokens": 0,
+  "prompt_dump_path": "/mnt/c/Users/dragh/llm-agents-for-ami/prompt_dumps/20260731_210417_gpt-5-mini_notdsosa_clear_seed25_run10/2026-07-31T21-05-32_simuhome_qt2_feasible_seed_25.txt"
+}

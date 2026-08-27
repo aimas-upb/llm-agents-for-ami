@@ -14,6 +14,12 @@ from .affordance_nodes import (
 )
 from .http_client import HTTPClient, HTTPClientConfig, HTTPError, HTTPResponse
 from .blackboard_keys import BlackboardKeys
+from .compute_node import (
+    BlackboardComputeNode,
+    COMPUTE_OPS,
+    register_compute_op,
+    registered_compute_ops,
+)
 
 __all__ = [
     "ActionAffordanceNode",
@@ -29,4 +35,8 @@ __all__ = [
     "HTTPError",
     "HTTPResponse",
     "BlackboardKeys",
+    "BlackboardComputeNode",
+    "COMPUTE_OPS",
+    "register_compute_op",
+    "registered_compute_ops",
 ]

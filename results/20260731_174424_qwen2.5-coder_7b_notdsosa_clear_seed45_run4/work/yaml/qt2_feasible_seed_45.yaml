@@ -1,0 +1,2439 @@
+version: 1
+devices:
+  qt2_feasible_seed_45_clock:
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Clock
+    class: timestamp
+    initial_value: '2025-08-23 13:26:31'
+    persistent: false
+  qt2_feasible_seed_45_simulator:
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Simulator.TickInterval
+    initial_value: 0.1
+    persistent: false
+  qt2_feasible_seed_45_bathroom_environment:
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Humidity
+    initial_value: 52.3
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Illuminance
+    initial_value: 866.92
+    class: illuminance
+    unit_of_measurement: lx
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Pm10
+    initial_value: 6.787
+    class: pm10
+    unit_of_measurement: ug/m3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Temperature
+    initial_value: 23.06
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_45_bathroom_bathroom_air_conditioner_1:
+  - platform: climate
+    name: Qt2FeasibleSeed45.Bathroom.AirConditioner1
+    initial_hvac_mode: cool
+    initial_temperature: 20.0
+    min_temp: 12.0
+    max_temp: 36.0
+    target_temp_step: 0.5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirConditioner1.BasicInformation.ProductID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirConditioner1.BasicInformation.ProductName
+    initial_value: Air Conditioner
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirConditioner1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirConditioner1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirConditioner1.FanControl.FanMode
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirConditioner1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirConditioner1.FanControl.PercentCurrent
+    initial_value: 0.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirConditioner1.FanControl.PercentSetting
+    initial_value: 0.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirConditioner1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirConditioner1.Thermostat.ControlSequenceOfOperation
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirConditioner1.Thermostat.LocalTemperature
+    initial_value: 23.06
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirConditioner1.Thermostat.OccupiedCoolingSetpoint
+    initial_value: 20.0
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirConditioner1.Thermostat.OccupiedHeatingSetpoint
+    initial_value: 28.0
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirConditioner1.Thermostat.SystemMode
+    initial_value: 3
+    persistent: false
+  qt2_feasible_seed_45_bathroom_bathroom_air_purifier_1:
+  - platform: fan
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1
+    initial_value: 'on'
+    speed_count: 100
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.BasicInformation.ProductID
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.BasicInformation.ProductName
+    initial_value: Air Purifier
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.Descriptor.TagList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.FanControl.FanMode
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.FanControl.PercentCurrent
+    initial_value: 48.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.FanControl.PercentSetting
+    initial_value: 48.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.Identify.ClusterRevision
+    initial_value: 5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.Identify.FeatureMap
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.Identify.IdentifyTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.Identify.IdentifyType
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.AirPurifier1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  qt2_feasible_seed_45_bathroom_bathroom_dehumidifier_1:
+  - platform: fan
+    name: Qt2FeasibleSeed45.Bathroom.Dehumidifier1
+    initial_value: 'on'
+    speed_count: 100
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Dehumidifier1.BasicInformation.ProductID
+    initial_value: 7
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Dehumidifier1.BasicInformation.ProductName
+    initial_value: Dehumidifier
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Dehumidifier1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Dehumidifier1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Dehumidifier1.FanControl.FanMode
+    initial_value: 3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Dehumidifier1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Dehumidifier1.FanControl.PercentCurrent
+    initial_value: 100.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Dehumidifier1.FanControl.PercentSetting
+    initial_value: 100.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Dehumidifier1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Dehumidifier1.RelativeHumidityMeasurement.MaxMeasuredValue
+    initial_value: 95.0
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Dehumidifier1.RelativeHumidityMeasurement.MeasuredValue
+    initial_value: 52.29
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Dehumidifier1.RelativeHumidityMeasurement.MinMeasuredValue
+    initial_value: 10.0
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.Dehumidifier1.RelativeHumidityMeasurement.Tolerance
+    initial_value: unknown
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  qt2_feasible_seed_45_bathroom_bathroom_dimmable_light_1:
+  - platform: light
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1
+    initial_value: 'on'
+    support_brightness: true
+    initial_brightness: 71
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.BasicInformation.ProductID
+    initial_value: 3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.BasicInformation.ProductName
+    initial_value: Dimmable Light
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.LevelControl.CurrentFrequency
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.LevelControl.CurrentLevel
+    initial_value: 71
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.LevelControl.DefaultMoveRate
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.LevelControl.MaxFrequency
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.LevelControl.MaxLevel
+    initial_value: 254
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.LevelControl.MinFrequency
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.LevelControl.MinLevel
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.LevelControl.OffTransitionTime
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.LevelControl.OnLevel
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.LevelControl.OnOffTransitionTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.LevelControl.OnTransitionTime
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.LevelControl.Options
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.LevelControl.RemainingTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.LevelControl.StartUpCurrentLevel
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.OnOff.GlobalSceneControl
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.OnOff.OffWaitTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.OnOff.OnTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.DimmableLight1.OnOff.StartUpOnOff
+    initial_value: unknown
+    persistent: false
+  qt2_feasible_seed_45_bathroom_bathroom_heat_pump_1:
+  - platform: climate
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1
+    initial_hvac_mode: heat
+    initial_temperature: 13.5
+    min_temp: 5.5
+    max_temp: 31.1
+    target_temp_step: 0.5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.BasicInformation.ProductID
+    initial_value: 777
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.BasicInformation.ProductName
+    initial_value: Heat Pump
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.BasicInformation.VendorName
+    initial_value: Heat Pump
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.TagList
+    initial_value: '["Grid"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerSource.ActiveWiredFaults
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerSource.ClusterRevision
+    initial_value: 3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerSource.Description
+    initial_value: AC Grid Connection
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerSource.EndpointList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerSource.FeatureMap
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerSource.Order
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerSource.Status
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerSource.WiredAssessedCurrent
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerSource.WiredAssessedInputFrequency
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerSource.WiredAssessedInputVoltage
+    initial_value: 220000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerSource.WiredCurrentType
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerSource.WiredMaximumCurrent
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerSource.WiredNominalVoltage
+    initial_value: 220000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerSource.WiredPresent
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.TagList
+    initial_value: '["ElectricalSensor"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalEnergyMeasurement.Accuracy
+    initial_value: '{"AccuracyRanges": [{"FixedMax": null, "FixedMin": null, "FixedTypical": null, "PercentMax": 500, "PercentMin":
+      100, "PercentTypical": 200, "RangeMax": 4611686018427387904, "RangeMin": 0}], "MaxMeasuredValue": 4611686018427387904,
+      "Measured": true, "MeasurementType": 0, "MinMeasuredValue": 0}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalEnergyMeasurement.ClusterRevision
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalEnergyMeasurement.CumulativeEnergyImported
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalEnergyMeasurement.FeatureMap
+    initial_value: 13
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalEnergyMeasurement.PeriodicEnergyImported
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalPowerMeasurement.Accuracy
+    initial_value: '[{"AccuracyRanges": [{"FixedMax": null, "FixedMin": null, "FixedTypical": null, "PercentMax": 500, "PercentMin":
+      100, "PercentTypical": 200, "RangeMax": 4611686018427387904, "RangeMin": -4611686018427387904}], "MaxMeasuredValue":
+      4611686018427387904, "Measured": true, "MeasurementType": 1, "MinMeasuredValue": -4611686018427387904}, {"AccuracyRanges":
+      [{"FixedMax": null, "FixedMin": null, "FixedTypical": null, "PercentMax": 500, "PercentMin": 100, "PercentTypical":
+      200, "RangeMax": 4611686018427387904, "RangeMin": -4611686018427387904}], "MaxMeasuredValue": 4611686018427387904, "Measured":
+      true, "MeasurementType": 2, "MinMeasuredValue": -4611686018427387904}, {"AccuracyRanges": [{"FixedMax": null, "FixedMin":
+      null, "FixedTypical": null, "PercentMax": 500, "PercentMin": 100, "PercentTypical": 200, "RangeMax": 4611686018427387904,
+      "RangeMin": -4611686018427387904}], "MaxMeasuredValue": 4611686018427387904, "Measured": true, "MeasurementType": 5,
+      "MinMeasuredValue": -4611686018427387904}, {"AccuracyRanges": [{"FixedMax": null, "FixedMin": null, "FixedTypical":
+      null, "PercentMax": 500, "PercentMin": 100, "PercentTypical": 200, "RangeMax": 4611686018427387904, "RangeMin": -4611686018427387904}],
+      "MaxMeasuredValue": 4611686018427387904, "Measured": true, "MeasurementType": 7, "MinMeasuredValue": -4611686018427387904},
+      {"AccuracyRanges": [{"FixedMax": null, "FixedMin": null, "FixedTypical": null, "PercentMax": 500, "PercentMin": 100,
+      "PercentTypical": 200, "RangeMax": 4611686018427387904, "RangeMin": -4611686018427387904}], "MaxMeasuredValue": 4611686018427387904,
+      "Measured": true, "MeasurementType": 8, "MinMeasuredValue": -4611686018427387904}, {"AccuracyRanges": [{"FixedMax":
+      null, "FixedMin": null, "FixedTypical": null, "PercentMax": 500, "PercentMin": 100, "PercentTypical": 200, "RangeMax":
+      4611686018427387904, "RangeMin": -4611686018427387904}], "MaxMeasuredValue": 4611686018427387904, "Measured": true,
+      "MeasurementType": 9, "MinMeasuredValue": -4611686018427387904}, {"AccuracyRanges": [{"FixedMax": null, "FixedMin":
+      null, "FixedTypical": null, "PercentMax": 500, "PercentMin": 100, "PercentTypical": 200, "RangeMax": 4611686018427387904,
+      "RangeMin": -4611686018427387904}], "MaxMeasuredValue": 4611686018427387904, "Measured": true, "MeasurementType": 10,
+      "MinMeasuredValue": -4611686018427387904}, {"AccuracyRanges": [{"FixedMax": null, "FixedMin": null, "FixedTypical":
+      null, "PercentMax": 500, "PercentMin": 100, "PercentTypical": 200, "RangeMax": 1000000, "RangeMin": 0}], "MaxMeasuredValue":
+      1000000, "Measured": true, "MeasurementType": 11, "MinMeasuredValue": 0}, {"AccuracyRanges": [{"FixedMax": null, "FixedMin":
+      null, "FixedTypical": null, "PercentMax": 500, "PercentMin": 100, "PercentTypical": 200, "RangeMax": 10000, "RangeMin":
+      -10000}], "MaxMeasuredValue": 10000, "Measured": true, "MeasurementType": 12, "MinMeasuredValue": -10000}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalPowerMeasurement.ActiveCurrent
+    initial_value: 15000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalPowerMeasurement.ActivePower
+    initial_value: 3450000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalPowerMeasurement.ApparentPower
+    initial_value: 3631580
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalPowerMeasurement.ClusterRevision
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalPowerMeasurement.FeatureMap
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalPowerMeasurement.Frequency
+    initial_value: 50000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalPowerMeasurement.NumberOfMeasurementTypes
+    initial_value: 9
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalPowerMeasurement.PowerFactor
+    initial_value: 9500
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalPowerMeasurement.PowerMode
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalPowerMeasurement.RMSCurrent
+    initial_value: 15000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalPowerMeasurement.RMSPower
+    initial_value: 3450000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalPowerMeasurement.RMSVoltage
+    initial_value: 230000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.ElectricalPowerMeasurement.Voltage
+    initial_value: 230000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerTopology.ClusterRevision
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.PowerTopology.FeatureMap
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.TagList
+    initial_value: '["EnergyManagement"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.DeviceEnergyManagement.AbsMaxPower
+    initial_value: 8000000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.DeviceEnergyManagement.AbsMinPower
+    initial_value: 1000000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.DeviceEnergyManagement.ESACanGenerate
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.DeviceEnergyManagement.ESAState
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.DeviceEnergyManagement.ESAType
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.DeviceEnergyManagement.PowerAdjustmentCapability
+    initial_value: '{"cause": 0, "power_adjust_capability": []}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Descriptor.TagList
+    initial_value: '["RoomThermostat"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Thermostat.ControlSequenceOfOperation
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Thermostat.LocalTemperature
+    initial_value: 23.06
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Thermostat.OccupiedCoolingSetpoint
+    initial_value: 20.0
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Thermostat.OccupiedHeatingSetpoint
+    initial_value: 13.5
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.HeatPump1.Thermostat.SystemMode
+    initial_value: 4
+    persistent: false
+  qt2_feasible_seed_45_bathroom_bathroom_laundry_dryer_1:
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.LaundryDryer1
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.LaundryDryer1.BasicInformation.ProductID
+    initial_value: 128
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.LaundryDryer1.BasicInformation.ProductName
+    initial_value: Laundry Dryer
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.LaundryDryer1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.LaundryDryer1.BasicInformation.VendorName
+    initial_value: Generic Vendor
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.LaundryDryer1.LaundryDryerControls.SelectedDrynessLevel
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.LaundryDryer1.LaundryDryerControls.SupportedDrynessLevels
+    initial_value: '[0, 1, 2, 3]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.LaundryDryer1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.LaundryDryer1.OperationalState.CountdownTime
+    initial_value: 2657
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.LaundryDryer1.OperationalState.CurrentPhase
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.LaundryDryer1.OperationalState.OperationalError
+    initial_value: '{"error_state_id": 0}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.LaundryDryer1.OperationalState.OperationalState
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.LaundryDryer1.OperationalState.OperationalStateList
+    initial_value: '[{"operational_state_id": 0}, {"operational_state_id": 1}, {"operational_state_id": 2}, {"operational_state_id":
+      3}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.LaundryDryer1.OperationalState.PhaseList
+    initial_value: '["Heating", "Drying", "CoolDown", "Complete"]'
+    persistent: false
+  qt2_feasible_seed_45_bathroom_bathroom_on_off_light_1:
+  - platform: light
+    name: Qt2FeasibleSeed45.Bathroom.OnOffLight1
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.OnOffLight1.BasicInformation.ProductID
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.OnOffLight1.BasicInformation.ProductName
+    initial_value: On/Off Light
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.OnOffLight1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.OnOffLight1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Bathroom.OnOffLight1.OnOff.OnOff
+    initial_value: 'off'
+    persistent: false
+  qt2_feasible_seed_45_kitchen_environment:
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Humidity
+    initial_value: 52.86
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Illuminance
+    initial_value: 492.3
+    class: illuminance
+    unit_of_measurement: lx
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Pm10
+    initial_value: 21.12
+    class: pm10
+    unit_of_measurement: ug/m3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Temperature
+    initial_value: 24.26
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_45_kitchen_kitchen_air_conditioner_1:
+  - platform: climate
+    name: Qt2FeasibleSeed45.Kitchen.AirConditioner1
+    initial_hvac_mode: cool
+    initial_temperature: 28.5
+    min_temp: 16.3
+    max_temp: 36.5
+    target_temp_step: 0.5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.AirConditioner1.BasicInformation.ProductID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.AirConditioner1.BasicInformation.ProductName
+    initial_value: Air Conditioner
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.AirConditioner1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.AirConditioner1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.AirConditioner1.FanControl.FanMode
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.AirConditioner1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.AirConditioner1.FanControl.PercentCurrent
+    initial_value: 0.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.AirConditioner1.FanControl.PercentSetting
+    initial_value: 0.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.AirConditioner1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.AirConditioner1.Thermostat.ControlSequenceOfOperation
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.AirConditioner1.Thermostat.LocalTemperature
+    initial_value: 24.26
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.AirConditioner1.Thermostat.OccupiedCoolingSetpoint
+    initial_value: 28.5
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.AirConditioner1.Thermostat.OccupiedHeatingSetpoint
+    initial_value: 28.0
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.AirConditioner1.Thermostat.SystemMode
+    initial_value: 3
+    persistent: false
+  qt2_feasible_seed_45_kitchen_kitchen_dishwasher_1:
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.BasicInformation.ProductID
+    initial_value: 117
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.BasicInformation.ProductName
+    initial_value: Dishwasher
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.DishwasherAlarm.Latch
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.DishwasherAlarm.Mask
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.DishwasherAlarm.State
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.DishwasherAlarm.Supported
+    initial_value: 63
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.DishwasherMode.CurrentMode
+    initial_value: 5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.DishwasherMode.SupportedModes
+    initial_value: '[{"ModeTags": [16384], "label": "Normal", "mode": 0}, {"ModeTags": [16385], "label": "Heavy Duty", "mode":
+      1}, {"ModeTags": [16386], "label": "Light Wash", "mode": 2}, {"ModeTags": [1], "label": "Quick Wash", "mode": 3}, {"ModeTags":
+      [4], "label": "Low Energy", "mode": 4}, {"ModeTags": [2, 3], "label": "Silent", "mode": 5}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.OperationalState.CountdownTime
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.OperationalState.CurrentPhase
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.OperationalState.OperationalError
+    initial_value: '{"error_state_id": 0}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.OperationalState.OperationalState
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.OperationalState.OperationalStateList
+    initial_value: '[{"operational_state_id": 0}, {"operational_state_id": 1}, {"operational_state_id": 2}, {"operational_state_id":
+      3}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Dishwasher1.OperationalState.PhaseList
+    initial_value: '["Pre-wash", "Main wash", "Rinse", "Dry", "Complete"]'
+    persistent: false
+  qt2_feasible_seed_45_kitchen_kitchen_freezer_1:
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.BasicInformation.ProductID
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.BasicInformation.ProductName
+    initial_value: Freezer
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.Descriptor.TagList
+    initial_value: '["Freezer"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.RTCCMode.CurrentMode
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.RTCCMode.SupportedModes
+    initial_value: '[{"Label": "Normal", "Mode": 0, "ModeTags": [0]}, {"Label": "Energy Save", "Mode": 4, "ModeTags": [4]},
+      {"Label": "Rapid Cool", "Mode": 16384, "ModeTags": [16384]}, {"Label": "Rapid Freeze", "Mode": 16385, "ModeTags": [16385]}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.TemperatureControl.MaxTemperature
+    initial_value: -15.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.TemperatureControl.MinTemperature
+    initial_value: -23.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.TemperatureControl.TemperatureSetpoint
+    initial_value: -21.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.TemperatureMeasurement.MaxMeasuredValue
+    initial_value: 32766
+    class: temperature
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.TemperatureMeasurement.MeasuredValue
+    initial_value: -1500
+    class: temperature
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Freezer1.TemperatureMeasurement.MinMeasuredValue
+    initial_value: -27315
+    class: temperature
+    persistent: false
+  qt2_feasible_seed_45_kitchen_kitchen_on_off_light_1:
+  - platform: light
+    name: Qt2FeasibleSeed45.Kitchen.OnOffLight1
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.OnOffLight1.BasicInformation.ProductID
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.OnOffLight1.BasicInformation.ProductName
+    initial_value: On/Off Light
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.OnOffLight1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.OnOffLight1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.OnOffLight1.OnOff.OnOff
+    initial_value: 'off'
+    persistent: false
+  qt2_feasible_seed_45_kitchen_kitchen_refrigerator_1:
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.BasicInformation.ProductID
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.BasicInformation.ProductName
+    initial_value: Refrigerator
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.Descriptor.TagList
+    initial_value: '["Refrigerator"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.RTCCMode.CurrentMode
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.RTCCMode.SupportedModes
+    initial_value: '[{"Label": "Normal", "Mode": 0, "ModeTags": [0]}, {"Label": "Energy Save", "Mode": 4, "ModeTags": [4]},
+      {"Label": "Rapid Cool", "Mode": 16384, "ModeTags": [16384]}, {"Label": "Rapid Freeze", "Mode": 16385, "ModeTags": [16385]}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.TemperatureControl.MaxTemperature
+    initial_value: 7.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.TemperatureControl.MinTemperature
+    initial_value: 1.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.TemperatureControl.TemperatureSetpoint
+    initial_value: 7.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.TemperatureMeasurement.MaxMeasuredValue
+    initial_value: 32766
+    class: temperature
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.TemperatureMeasurement.MeasuredValue
+    initial_value: 700
+    class: temperature
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.Refrigerator1.TemperatureMeasurement.MinMeasuredValue
+    initial_value: -27315
+    class: temperature
+    persistent: false
+  qt2_feasible_seed_45_kitchen_kitchen_window_covering_controller_1:
+  - platform: cover
+    name: Qt2FeasibleSeed45.Kitchen.WindowCoveringController1
+    initial_position: 100.0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.WindowCoveringController1.BasicInformation.ProductID
+    initial_value: 10
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.WindowCoveringController1.BasicInformation.ProductName
+    initial_value: Window Covering Controller
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.WindowCoveringController1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.WindowCoveringController1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.WindowCoveringController1.WindowCovering.ConfigStatus
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.WindowCoveringController1.WindowCovering.CurrentPositionLiftPercent100ths
+    initial_value: 100.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.WindowCoveringController1.WindowCovering.EndProductType
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.WindowCoveringController1.WindowCovering.Mode
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.WindowCoveringController1.WindowCovering.NumberOfActuationsLift
+    initial_value: 20
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.WindowCoveringController1.WindowCovering.OperationalStatus
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.WindowCoveringController1.WindowCovering.SafetyStatus
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.WindowCoveringController1.WindowCovering.TargetPositionLiftPercent100ths
+    initial_value: 100.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.Kitchen.WindowCoveringController1.WindowCovering.Type
+    initial_value: 0
+    persistent: false
+  qt2_feasible_seed_45_living_room_environment:
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Humidity
+    initial_value: 55.87
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Illuminance
+    initial_value: 700.97
+    class: illuminance
+    unit_of_measurement: lx
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Pm10
+    initial_value: 5.0
+    class: pm10
+    unit_of_measurement: ug/m3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Temperature
+    initial_value: 23.66
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_45_living_room_living_room_air_purifier_1:
+  - platform: fan
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1
+    initial_value: 'on'
+    speed_count: 100
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.BasicInformation.ProductID
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.BasicInformation.ProductName
+    initial_value: Air Purifier
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.Descriptor.TagList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.FanControl.FanMode
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.FanControl.PercentCurrent
+    initial_value: 55.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.FanControl.PercentSetting
+    initial_value: 55.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.Identify.ClusterRevision
+    initial_value: 5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.Identify.FeatureMap
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.Identify.IdentifyTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.Identify.IdentifyType
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.AirPurifier1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  qt2_feasible_seed_45_living_room_living_room_on_off_light_1:
+  - platform: light
+    name: Qt2FeasibleSeed45.LivingRoom.OnOffLight1
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.OnOffLight1.BasicInformation.ProductID
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.OnOffLight1.BasicInformation.ProductName
+    initial_value: On/Off Light
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.OnOffLight1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.OnOffLight1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.OnOffLight1.OnOff.OnOff
+    initial_value: 'off'
+    persistent: false
+  qt2_feasible_seed_45_living_room_living_room_tv_1:
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.BasicInformation.ProductID
+    initial_value: 5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.BasicInformation.ProductName
+    initial_value: TV
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.Channel.ChannelList
+    initial_value: '[{"AffiliateCallSign": "KBS1", "CallSign": "KBS1", "Identifier": "kbs1", "MajorNumber": 1, "MinorNumber":
+      0, "Name": "KBS1", "Type": 2}, {"AffiliateCallSign": "KBS2", "CallSign": "KBS2", "Identifier": "kbs2", "MajorNumber":
+      2, "MinorNumber": 0, "Name": "KBS2", "Type": 2}, {"AffiliateCallSign": "MBC", "CallSign": "MBC", "Identifier": "mbc",
+      "MajorNumber": 3, "MinorNumber": 0, "Name": "MBC", "Type": 2}, {"AffiliateCallSign": "SBS", "CallSign": "SBS", "Identifier":
+      "sbs", "MajorNumber": 4, "MinorNumber": 0, "Name": "SBS", "Type": 2}, {"AffiliateCallSign": "EBS", "CallSign": "EBS",
+      "Identifier": "ebs", "MajorNumber": 5, "MinorNumber": 0, "Name": "EBS", "Type": 2}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.Channel.CurrentChannel
+    initial_value: '{"AffiliateCallSign": "KBS2", "CallSign": "KBS2", "Identifier": "kbs2", "MajorNumber": 2, "MinorNumber":
+      0, "Name": "KBS2", "Type": 2}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.Channel.Lineup
+    initial_value: '{"LineupInfoType": 0, "LineupName": "Comcast King County", "OperatorName": "Comcast", "PostalCode": "98052"}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.KeypadInput.ClusterRevision
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.KeypadInput.FeatureMap
+    initial_value: 7
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.LevelControl.CurrentFrequency
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.LevelControl.CurrentLevel
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.LevelControl.DefaultMoveRate
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.LevelControl.MaxFrequency
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.LevelControl.MaxLevel
+    initial_value: 254
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.LevelControl.MinFrequency
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.LevelControl.MinLevel
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.LevelControl.OffTransitionTime
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.LevelControl.OnLevel
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.LevelControl.OnOffTransitionTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.LevelControl.OnTransitionTime
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.LevelControl.Options
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.LevelControl.RemainingTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.LevelControl.StartUpCurrentLevel
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.MediaPlayback.CurrentState
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.Tv1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  qt2_feasible_seed_45_living_room_living_room_window_covering_controller_1:
+  - platform: cover
+    name: Qt2FeasibleSeed45.LivingRoom.WindowCoveringController1
+    initial_position: 100.0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.WindowCoveringController1.BasicInformation.ProductID
+    initial_value: 10
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.WindowCoveringController1.BasicInformation.ProductName
+    initial_value: Window Covering Controller
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.WindowCoveringController1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.WindowCoveringController1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.WindowCoveringController1.WindowCovering.ConfigStatus
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.WindowCoveringController1.WindowCovering.CurrentPositionLiftPercent100ths
+    initial_value: 100.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.WindowCoveringController1.WindowCovering.EndProductType
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.WindowCoveringController1.WindowCovering.Mode
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.WindowCoveringController1.WindowCovering.NumberOfActuationsLift
+    initial_value: 20
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.WindowCoveringController1.WindowCovering.OperationalStatus
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.WindowCoveringController1.WindowCovering.SafetyStatus
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.WindowCoveringController1.WindowCovering.TargetPositionLiftPercent100ths
+    initial_value: 100.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.LivingRoom.WindowCoveringController1.WindowCovering.Type
+    initial_value: 0
+    persistent: false
+  qt2_feasible_seed_45_study_room_environment:
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Humidity
+    initial_value: 56.79
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Illuminance
+    initial_value: 329.4
+    class: illuminance
+    unit_of_measurement: lx
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Pm10
+    initial_value: 5.0
+    class: pm10
+    unit_of_measurement: ug/m3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Temperature
+    initial_value: 24.43
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_45_study_room_study_room_air_conditioner_1:
+  - platform: climate
+    name: Qt2FeasibleSeed45.StudyRoom.AirConditioner1
+    initial_hvac_mode: cool
+    initial_temperature: 20.0
+    min_temp: 12.0
+    max_temp: 36.0
+    target_temp_step: 0.5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirConditioner1.BasicInformation.ProductID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirConditioner1.BasicInformation.ProductName
+    initial_value: Air Conditioner
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirConditioner1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirConditioner1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirConditioner1.FanControl.FanMode
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirConditioner1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirConditioner1.FanControl.PercentCurrent
+    initial_value: 0.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirConditioner1.FanControl.PercentSetting
+    initial_value: 0.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirConditioner1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirConditioner1.Thermostat.ControlSequenceOfOperation
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirConditioner1.Thermostat.LocalTemperature
+    initial_value: 24.42
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirConditioner1.Thermostat.OccupiedCoolingSetpoint
+    initial_value: 20.0
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirConditioner1.Thermostat.OccupiedHeatingSetpoint
+    initial_value: 28.0
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirConditioner1.Thermostat.SystemMode
+    initial_value: 3
+    persistent: false
+  qt2_feasible_seed_45_study_room_study_room_air_purifier_1:
+  - platform: fan
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1
+    initial_value: 'on'
+    speed_count: 100
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.BasicInformation.ProductID
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.BasicInformation.ProductName
+    initial_value: Air Purifier
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.Descriptor.TagList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.FanControl.FanMode
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.FanControl.PercentCurrent
+    initial_value: 55.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.FanControl.PercentSetting
+    initial_value: 55.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.Identify.ClusterRevision
+    initial_value: 5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.Identify.FeatureMap
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.Identify.IdentifyTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.Identify.IdentifyType
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.AirPurifier1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  qt2_feasible_seed_45_study_room_study_room_fan_1:
+  - platform: fan
+    name: Qt2FeasibleSeed45.StudyRoom.Fan1
+    initial_value: 'on'
+    speed_count: 100
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Fan1.BasicInformation.ProductID
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Fan1.BasicInformation.ProductName
+    initial_value: Fan
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Fan1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Fan1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Fan1.FanControl.FanMode
+    initial_value: 3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Fan1.FanControl.FanModeSequence
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Fan1.FanControl.PercentCurrent
+    initial_value: 75.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Fan1.FanControl.PercentSetting
+    initial_value: 75.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Fan1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  qt2_feasible_seed_45_study_room_study_room_heat_pump_1:
+  - platform: climate
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1
+    initial_hvac_mode: heat
+    initial_temperature: 28.0
+    min_temp: 12.0
+    max_temp: 36.0
+    target_temp_step: 0.5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.BasicInformation.ProductID
+    initial_value: 777
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.BasicInformation.ProductName
+    initial_value: Heat Pump
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.BasicInformation.VendorName
+    initial_value: Heat Pump
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.TagList
+    initial_value: '["Grid"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerSource.ActiveWiredFaults
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerSource.ClusterRevision
+    initial_value: 3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerSource.Description
+    initial_value: AC Grid Connection
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerSource.EndpointList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerSource.FeatureMap
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerSource.Order
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerSource.Status
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerSource.WiredAssessedCurrent
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerSource.WiredAssessedInputFrequency
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerSource.WiredAssessedInputVoltage
+    initial_value: 220000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerSource.WiredCurrentType
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerSource.WiredMaximumCurrent
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerSource.WiredNominalVoltage
+    initial_value: 220000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerSource.WiredPresent
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.TagList
+    initial_value: '["ElectricalSensor"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalEnergyMeasurement.Accuracy
+    initial_value: '{"AccuracyRanges": [{"FixedMax": null, "FixedMin": null, "FixedTypical": null, "PercentMax": 500, "PercentMin":
+      100, "PercentTypical": 200, "RangeMax": 4611686018427387904, "RangeMin": 0}], "MaxMeasuredValue": 4611686018427387904,
+      "Measured": true, "MeasurementType": 0, "MinMeasuredValue": 0}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalEnergyMeasurement.ClusterRevision
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalEnergyMeasurement.CumulativeEnergyImported
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalEnergyMeasurement.FeatureMap
+    initial_value: 13
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalEnergyMeasurement.PeriodicEnergyImported
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalPowerMeasurement.Accuracy
+    initial_value: '[{"AccuracyRanges": [{"FixedMax": null, "FixedMin": null, "FixedTypical": null, "PercentMax": 500, "PercentMin":
+      100, "PercentTypical": 200, "RangeMax": 4611686018427387904, "RangeMin": -4611686018427387904}], "MaxMeasuredValue":
+      4611686018427387904, "Measured": true, "MeasurementType": 1, "MinMeasuredValue": -4611686018427387904}, {"AccuracyRanges":
+      [{"FixedMax": null, "FixedMin": null, "FixedTypical": null, "PercentMax": 500, "PercentMin": 100, "PercentTypical":
+      200, "RangeMax": 4611686018427387904, "RangeMin": -4611686018427387904}], "MaxMeasuredValue": 4611686018427387904, "Measured":
+      true, "MeasurementType": 2, "MinMeasuredValue": -4611686018427387904}, {"AccuracyRanges": [{"FixedMax": null, "FixedMin":
+      null, "FixedTypical": null, "PercentMax": 500, "PercentMin": 100, "PercentTypical": 200, "RangeMax": 4611686018427387904,
+      "RangeMin": -4611686018427387904}], "MaxMeasuredValue": 4611686018427387904, "Measured": true, "MeasurementType": 5,
+      "MinMeasuredValue": -4611686018427387904}, {"AccuracyRanges": [{"FixedMax": null, "FixedMin": null, "FixedTypical":
+      null, "PercentMax": 500, "PercentMin": 100, "PercentTypical": 200, "RangeMax": 4611686018427387904, "RangeMin": -4611686018427387904}],
+      "MaxMeasuredValue": 4611686018427387904, "Measured": true, "MeasurementType": 7, "MinMeasuredValue": -4611686018427387904},
+      {"AccuracyRanges": [{"FixedMax": null, "FixedMin": null, "FixedTypical": null, "PercentMax": 500, "PercentMin": 100,
+      "PercentTypical": 200, "RangeMax": 4611686018427387904, "RangeMin": -4611686018427387904}], "MaxMeasuredValue": 4611686018427387904,
+      "Measured": true, "MeasurementType": 8, "MinMeasuredValue": -4611686018427387904}, {"AccuracyRanges": [{"FixedMax":
+      null, "FixedMin": null, "FixedTypical": null, "PercentMax": 500, "PercentMin": 100, "PercentTypical": 200, "RangeMax":
+      4611686018427387904, "RangeMin": -4611686018427387904}], "MaxMeasuredValue": 4611686018427387904, "Measured": true,
+      "MeasurementType": 9, "MinMeasuredValue": -4611686018427387904}, {"AccuracyRanges": [{"FixedMax": null, "FixedMin":
+      null, "FixedTypical": null, "PercentMax": 500, "PercentMin": 100, "PercentTypical": 200, "RangeMax": 4611686018427387904,
+      "RangeMin": -4611686018427387904}], "MaxMeasuredValue": 4611686018427387904, "Measured": true, "MeasurementType": 10,
+      "MinMeasuredValue": -4611686018427387904}, {"AccuracyRanges": [{"FixedMax": null, "FixedMin": null, "FixedTypical":
+      null, "PercentMax": 500, "PercentMin": 100, "PercentTypical": 200, "RangeMax": 1000000, "RangeMin": 0}], "MaxMeasuredValue":
+      1000000, "Measured": true, "MeasurementType": 11, "MinMeasuredValue": 0}, {"AccuracyRanges": [{"FixedMax": null, "FixedMin":
+      null, "FixedTypical": null, "PercentMax": 500, "PercentMin": 100, "PercentTypical": 200, "RangeMax": 10000, "RangeMin":
+      -10000}], "MaxMeasuredValue": 10000, "Measured": true, "MeasurementType": 12, "MinMeasuredValue": -10000}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalPowerMeasurement.ActiveCurrent
+    initial_value: 15000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalPowerMeasurement.ActivePower
+    initial_value: 3450000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalPowerMeasurement.ApparentPower
+    initial_value: 3631580
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalPowerMeasurement.ClusterRevision
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalPowerMeasurement.FeatureMap
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalPowerMeasurement.Frequency
+    initial_value: 50000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalPowerMeasurement.NumberOfMeasurementTypes
+    initial_value: 9
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalPowerMeasurement.PowerFactor
+    initial_value: 9500
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalPowerMeasurement.PowerMode
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalPowerMeasurement.RMSCurrent
+    initial_value: 15000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalPowerMeasurement.RMSPower
+    initial_value: 3450000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalPowerMeasurement.RMSVoltage
+    initial_value: 230000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.ElectricalPowerMeasurement.Voltage
+    initial_value: 230000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerTopology.ClusterRevision
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.PowerTopology.FeatureMap
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.TagList
+    initial_value: '["EnergyManagement"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.DeviceEnergyManagement.AbsMaxPower
+    initial_value: 8000000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.DeviceEnergyManagement.AbsMinPower
+    initial_value: 1000000
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.DeviceEnergyManagement.ESACanGenerate
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.DeviceEnergyManagement.ESAState
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.DeviceEnergyManagement.ESAType
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.DeviceEnergyManagement.PowerAdjustmentCapability
+    initial_value: '{"cause": 0, "power_adjust_capability": []}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.ClientList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.DeviceTypeList
+    initial_value: '[{"DeviceType": 45, "Revision": 1}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.PartsList
+    initial_value: '[]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.ServerList
+    initial_value: '[29, 3, 514]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Descriptor.TagList
+    initial_value: '["RoomThermostat"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Thermostat.ControlSequenceOfOperation
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Thermostat.LocalTemperature
+    initial_value: 24.42
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Thermostat.OccupiedCoolingSetpoint
+    initial_value: 20.0
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Thermostat.OccupiedHeatingSetpoint
+    initial_value: 28.0
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.HeatPump1.Thermostat.SystemMode
+    initial_value: 4
+    persistent: false
+  qt2_feasible_seed_45_study_room_study_room_on_off_light_1:
+  - platform: light
+    name: Qt2FeasibleSeed45.StudyRoom.OnOffLight1
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.OnOffLight1.BasicInformation.ProductID
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.OnOffLight1.BasicInformation.ProductName
+    initial_value: On/Off Light
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.OnOffLight1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.OnOffLight1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.OnOffLight1.OnOff.OnOff
+    initial_value: 'off'
+    persistent: false
+  qt2_feasible_seed_45_study_room_study_room_tv_1:
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.BasicInformation.ProductID
+    initial_value: 5
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.BasicInformation.ProductName
+    initial_value: TV
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.Channel.ChannelList
+    initial_value: '[{"AffiliateCallSign": "KBS1", "CallSign": "KBS1", "Identifier": "kbs1", "MajorNumber": 1, "MinorNumber":
+      0, "Name": "KBS1", "Type": 2}, {"AffiliateCallSign": "KBS2", "CallSign": "KBS2", "Identifier": "kbs2", "MajorNumber":
+      2, "MinorNumber": 0, "Name": "KBS2", "Type": 2}, {"AffiliateCallSign": "MBC", "CallSign": "MBC", "Identifier": "mbc",
+      "MajorNumber": 3, "MinorNumber": 0, "Name": "MBC", "Type": 2}, {"AffiliateCallSign": "SBS", "CallSign": "SBS", "Identifier":
+      "sbs", "MajorNumber": 4, "MinorNumber": 0, "Name": "SBS", "Type": 2}, {"AffiliateCallSign": "EBS", "CallSign": "EBS",
+      "Identifier": "ebs", "MajorNumber": 5, "MinorNumber": 0, "Name": "EBS", "Type": 2}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.Channel.CurrentChannel
+    initial_value: '{"AffiliateCallSign": "EBS", "CallSign": "EBS", "Identifier": "ebs", "MajorNumber": 5, "MinorNumber":
+      0, "Name": "EBS", "Type": 2}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.Channel.Lineup
+    initial_value: '{"LineupInfoType": 0, "LineupName": "Comcast King County", "OperatorName": "Comcast", "PostalCode": "98052"}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.KeypadInput.ClusterRevision
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.KeypadInput.FeatureMap
+    initial_value: 7
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.LevelControl.CurrentFrequency
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.LevelControl.CurrentLevel
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.LevelControl.DefaultMoveRate
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.LevelControl.MaxFrequency
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.LevelControl.MaxLevel
+    initial_value: 254
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.LevelControl.MinFrequency
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.LevelControl.MinLevel
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.LevelControl.OffTransitionTime
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.LevelControl.OnLevel
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.LevelControl.OnOffTransitionTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.LevelControl.OnTransitionTime
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.LevelControl.Options
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.LevelControl.RemainingTime
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.LevelControl.StartUpCurrentLevel
+    initial_value: unknown
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.MediaPlayback.CurrentState
+    initial_value: 2
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.StudyRoom.Tv1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  qt2_feasible_seed_45_utility_room_environment:
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.Humidity
+    initial_value: 54.68
+    class: humidity
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.Illuminance
+    initial_value: 104.93
+    class: illuminance
+    unit_of_measurement: lx
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.Pm10
+    initial_value: 17.35
+    class: pm10
+    unit_of_measurement: ug/m3
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.Temperature
+    initial_value: 24.7
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_45_utility_room_utility_room_laundry_dryer_1:
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryDryer1
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryDryer1.BasicInformation.ProductID
+    initial_value: 128
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryDryer1.BasicInformation.ProductName
+    initial_value: Laundry Dryer
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryDryer1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryDryer1.BasicInformation.VendorName
+    initial_value: Generic Vendor
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryDryer1.LaundryDryerControls.SelectedDrynessLevel
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryDryer1.LaundryDryerControls.SupportedDrynessLevels
+    initial_value: '[0, 1, 2, 3]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryDryer1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryDryer1.OperationalState.CountdownTime
+    initial_value: 2657
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryDryer1.OperationalState.CurrentPhase
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryDryer1.OperationalState.OperationalError
+    initial_value: '{"error_state_id": 0}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryDryer1.OperationalState.OperationalState
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryDryer1.OperationalState.OperationalStateList
+    initial_value: '[{"operational_state_id": 0}, {"operational_state_id": 1}, {"operational_state_id": 2}, {"operational_state_id":
+      3}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryDryer1.OperationalState.PhaseList
+    initial_value: '["Heating", "Drying", "CoolDown", "Complete"]'
+    persistent: false
+  qt2_feasible_seed_45_utility_room_utility_room_laundry_washer_1:
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.BasicInformation.ProductID
+    initial_value: 81
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.BasicInformation.ProductName
+    initial_value: Laundry Washer
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.BasicInformation.VendorName
+    initial_value: Samsung Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.LaundryWasherControls.NumberOfRinses
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.LaundryWasherControls.SpinSpeedCurrent
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.LaundryWasherControls.SpinSpeeds
+    initial_value: '[0, 1, 2]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.LaundryWasherControls.SupportedRinses
+    initial_value: '[0, 1, 2]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.LaundryWasherMode.CurrentMode
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.LaundryWasherMode.SupportedModes
+    initial_value: '[{"ModeTags": [16384], "label": "Normal", "mode": 0}, {"ModeTags": [16385], "label": "Delicate", "mode":
+      1}, {"ModeTags": [16386], "label": "Heavy", "mode": 2}, {"ModeTags": [16387], "label": "Whites", "mode": 3}, {"ModeTags":
+      [1, 16384], "label": "Quick Normal", "mode": 4}, {"ModeTags": [16386, 16387], "label": "Heavy Whites", "mode": 5}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.OnOff.OnOff
+    initial_value: 'on'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.OperationalState.CountdownTime
+    initial_value: 3557
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.OperationalState.CurrentPhase
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.OperationalState.OperationalError
+    initial_value: '{"error_state_id": 0}'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.OperationalState.OperationalState
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.OperationalState.OperationalStateList
+    initial_value: '[{"operational_state_id": 0}, {"operational_state_id": 1}, {"operational_state_id": 2}, {"operational_state_id":
+      3}]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.OperationalState.PhaseList
+    initial_value: '["Pre-wash", "Main wash", "Rinse", "Spin", "Complete"]'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.TemperatureControl.MaxTemperature
+    initial_value: 95.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.TemperatureControl.MinTemperature
+    initial_value: 5.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.LaundryWasher1.TemperatureControl.TemperatureSetpoint
+    initial_value: 20.0
+    class: temperature
+    unit_of_measurement: "\xB0C"
+    persistent: false
+  qt2_feasible_seed_45_utility_room_utility_room_on_off_light_1:
+  - platform: light
+    name: Qt2FeasibleSeed45.UtilityRoom.OnOffLight1
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.OnOffLight1.BasicInformation.ProductID
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.OnOffLight1.BasicInformation.ProductName
+    initial_value: On/Off Light
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.OnOffLight1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.OnOffLight1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.OnOffLight1.OnOff.OnOff
+    initial_value: 'off'
+    persistent: false
+  qt2_feasible_seed_45_utility_room_utility_room_on_off_light_2:
+  - platform: light
+    name: Qt2FeasibleSeed45.UtilityRoom.OnOffLight2
+    initial_value: 'off'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.OnOffLight2.BasicInformation.ProductID
+    initial_value: 4
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.OnOffLight2.BasicInformation.ProductName
+    initial_value: On/Off Light
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.OnOffLight2.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.OnOffLight2.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.OnOffLight2.OnOff.OnOff
+    initial_value: 'off'
+    persistent: false
+  qt2_feasible_seed_45_utility_room_utility_room_window_covering_controller_1:
+  - platform: cover
+    name: Qt2FeasibleSeed45.UtilityRoom.WindowCoveringController1
+    initial_position: 100.0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.WindowCoveringController1.BasicInformation.ProductID
+    initial_value: 10
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.WindowCoveringController1.BasicInformation.ProductName
+    initial_value: Window Covering Controller
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.WindowCoveringController1.BasicInformation.VendorID
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.WindowCoveringController1.BasicInformation.VendorName
+    initial_value: LG Electronics
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.WindowCoveringController1.WindowCovering.ConfigStatus
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.WindowCoveringController1.WindowCovering.CurrentPositionLiftPercent100ths
+    initial_value: 100.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.WindowCoveringController1.WindowCovering.EndProductType
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.WindowCoveringController1.WindowCovering.Mode
+    initial_value: 1
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.WindowCoveringController1.WindowCovering.NumberOfActuationsLift
+    initial_value: 20
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.WindowCoveringController1.WindowCovering.OperationalStatus
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.WindowCoveringController1.WindowCovering.SafetyStatus
+    initial_value: 0
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.WindowCoveringController1.WindowCovering.TargetPositionLiftPercent100ths
+    initial_value: 100.0
+    unit_of_measurement: '%'
+    persistent: false
+  - platform: sensor
+    name: Qt2FeasibleSeed45.UtilityRoom.WindowCoveringController1.WindowCovering.Type
+    initial_value: 0
+    persistent: false

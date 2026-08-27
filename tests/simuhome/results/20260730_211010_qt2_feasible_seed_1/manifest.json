@@ -1,0 +1,9 @@
+{
+  "run_id": "20260730_211010_qt2_feasible_seed_1",
+  "scenario_json": "/mnt/c/Users/dragh/SimuHome/data/benchmark/qt2_feasible_seed_1.json",
+  "result_dir": "/mnt/c/Users/dragh/llm-agents-for-ami/tests/simuhome/results/20260730_211010_qt2_feasible_seed_1",
+  "area_name": "SimuHome qt2_feasible_seed_1",
+  "started_at": "2026-07-30T21:10:10.700621+03:00",
+  "yaml_path": "/mnt/c/Users/dragh/llm-agents-for-ami/tests/simuhome/results/20260730_211010_qt2_feasible_seed_1/work/yaml/qt2_feasible_seed_1.yaml",
+  "cleanup_finished_at": "2026-07-30T21:10:18.238667+03:00"
+}

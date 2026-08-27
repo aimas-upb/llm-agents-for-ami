@@ -1,0 +1,10 @@
+{
+  "thermal_comfort": {
+    "workspace_id": "simuhome_qt2_feasible_seed_1_smoketest",
+    "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_1_smoketest/environment/thermal_comfort",
+    "target_min": null,
+    "target_max": 26.18,
+    "target_unit": "\u00b0C",
+    "actions": []
+  }
+}

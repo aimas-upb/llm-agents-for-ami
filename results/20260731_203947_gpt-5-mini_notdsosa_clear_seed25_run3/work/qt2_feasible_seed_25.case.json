@@ -1,0 +1,47 @@
+{
+  "name": "simuhome_qt2_feasible_seed_25",
+  "hard_reset": false,
+  "initial_state": [
+    {
+      "type": "sleep",
+      "seconds": 2
+    }
+  ],
+  "query": "Man the bathroom air feels kinda dusty my throat is a bit scratchy and my eyes feel gritty, its annoying me a little",
+  "auto_confirm": true,
+  "dynamic_confirmation": true,
+  "confirmation_text": "yes",
+  "max_confirmation_turns": 3,
+  "settle_seconds": 15.0,
+  "pass_criteria": [
+    {
+      "type": "all_of",
+      "assertions": [
+        {
+          "type": "property_lte",
+          "path": "/workspaces/simuhome_qt2_feasible_seed_25/artifacts/qt2feasibleseed25_bathroom_pm10/properties/state",
+          "timeout_seconds": 90.0,
+          "poll_interval_seconds": 2.0,
+          "lte": 10.077
+        }
+      ]
+    },
+    {
+      "type": "final_reply_contains",
+      "value": "success"
+    }
+  ],
+  "simuhome": {
+    "source_json": "/mnt/c/Users/dragh/SimuHome/data/benchmark/qt2_feasible_seed_25.json",
+    "workspace_id": "simuhome_qt2_feasible_seed_25",
+    "meta": {
+      "seed": 25,
+      "query_type": "qt2",
+      "case": "feasible",
+      "num_rooms": 5,
+      "num_devices": 27,
+      "num_target_metrics": 1,
+      "feasibility": true
+    }
+  }
+}

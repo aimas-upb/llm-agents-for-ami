@@ -1,0 +1,10 @@
+{
+  "air_quality": {
+    "max": 31.685,
+    "unit": "ug/m3"
+  },
+  "luminosity": {
+    "min": 390.219,
+    "unit": "lx"
+  }
+}

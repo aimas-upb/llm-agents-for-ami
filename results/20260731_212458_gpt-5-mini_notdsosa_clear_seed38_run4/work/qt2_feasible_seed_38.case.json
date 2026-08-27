@@ -1,0 +1,54 @@
+{
+  "name": "simuhome_qt2_feasible_seed_38",
+  "hard_reset": false,
+  "initial_state": [
+    {
+      "type": "sleep",
+      "seconds": 2
+    }
+  ],
+  "query": "Ugh, the living room is so dim. Hard to read there. The bathroom feels really dry. My skin feels tight after washing and the mirror did not fog up like usual.",
+  "auto_confirm": true,
+  "dynamic_confirmation": true,
+  "confirmation_text": "yes",
+  "max_confirmation_turns": 3,
+  "settle_seconds": 15.0,
+  "pass_criteria": [
+    {
+      "type": "all_of",
+      "assertions": [
+        {
+          "type": "property_gte",
+          "path": "/workspaces/simuhome_qt2_feasible_seed_38/artifacts/qt2feasibleseed38_livingroom_illuminance/properties/state",
+          "timeout_seconds": 90.0,
+          "poll_interval_seconds": 2.0,
+          "gte": 150.0
+        },
+        {
+          "type": "property_gte",
+          "path": "/workspaces/simuhome_qt2_feasible_seed_38/artifacts/qt2feasibleseed38_bathroom_humidity/properties/state",
+          "timeout_seconds": 90.0,
+          "poll_interval_seconds": 2.0,
+          "gte": 62.319
+        }
+      ]
+    },
+    {
+      "type": "final_reply_contains",
+      "value": "success"
+    }
+  ],
+  "simuhome": {
+    "source_json": "/mnt/c/Users/dragh/SimuHome/data/benchmark/qt2_feasible_seed_38.json",
+    "workspace_id": "simuhome_qt2_feasible_seed_38",
+    "meta": {
+      "seed": 38,
+      "query_type": "qt2",
+      "case": "feasible",
+      "num_rooms": 5,
+      "num_devices": 29,
+      "num_target_metrics": 2,
+      "feasibility": true
+    }
+  }
+}

@@ -777,7 +777,13 @@ class Lab308eHarness:
             .split("/api/websocket")[0]
         ).strip().rstrip("/")
         self.response_timeout = float(args.response_timeout)
-        self.model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+        # Label CSV rows with both model and planner mode so JSON IR vs Direct Code
+        # runs are distinguishable in aggregated results (mode is applied via PLANNER_MODE
+        # -> agents.yaml -> InteractionSolverAgent; here we only tag the output).
+        _base_model = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+        _planner_mode = os.getenv("PLANNER_MODE", "json_ir").strip().lower() or "json_ir"
+        self.model_api = _base_model
+        self.model_name = f"{_base_model}|{_planner_mode}"
 
         self.explorer_jid = f"env_explorer@{self.xmpp_server}"
         self.assistant_jid = f"user_assistant@{self.xmpp_server}"
@@ -1226,7 +1232,7 @@ class Lab308eHarness:
             ConfigLoader.load_with_env_vars(str(PROJECT_ROOT / "ami_agents" / "config" / "environment.yaml")),
         )
 
-        model = self.model_name
+        model = self.model_api
         base_url = os.getenv("OPENAI_BASE_URL")
         if not base_url:
             base_url = "https://openrouter.ai/api/v1" if ":" in model or "/" in model else "https://api.openai.com/v1"
@@ -1318,11 +1324,17 @@ class Lab308eHarness:
 
     async def _wait_for_yggdrasil(self, timeout_s: float = 20.0) -> None:
         healthcheck_url = self.healthcheck_target or self.yggdrasil_url
+        # Large workspaces (many HA entities) pay one TD build + turtle parse
+        # per entity on HASP's first graph-cache build, which can take well
+        # over the old 5s/request budget; use a per-attempt timeout that scales
+        # with the overall budget so a slow-but-legitimate first build isn't
+        # mistaken for an unreachable server.
+        per_attempt_timeout = max(5.0, min(30.0, timeout_s / 4))
         deadline = asyncio.get_running_loop().time() + timeout_s
         last_error = ""
         while asyncio.get_running_loop().time() < deadline:
             try:
-                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5.0)) as session:
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=per_attempt_timeout)) as session:
                     async with session.get(healthcheck_url) as resp:
                         if resp.status < 400:
                             return
@@ -1796,7 +1808,7 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     )
     parser.add_argument("--manage-simulator", action="store_true")
     parser.add_argument("--hasp-host", default="0.0.0.0")
-    parser.add_argument("--service-start-timeout", type=float, default=30.0)
+    parser.add_argument("--service-start-timeout", type=float, default=180.0)
     parser.add_argument("--log-level", default="INFO")
     parser.add_argument("--write-results", action="store_true")
     parser.add_argument(

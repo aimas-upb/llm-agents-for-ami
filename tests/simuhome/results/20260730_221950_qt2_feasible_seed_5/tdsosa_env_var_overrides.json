@@ -1,0 +1,15 @@
+{
+  "entity:sensor.qt2feasibleseed5_utilityroom_illuminance:state": "luminosity",
+  "entity:light.qt2feasibleseed5_utilityroom_dimmablelight1:action:light.turn_on": "luminosity",
+  "entity:light.qt2feasibleseed5_utilityroom_dimmablelight1:action:light.turn_off": "luminosity",
+  "entity:light.qt2feasibleseed5_utilityroom_onofflight1:action:light.turn_on": "luminosity",
+  "entity:light.qt2feasibleseed5_utilityroom_onofflight1:action:light.turn_off": "luminosity",
+  "entity:sensor.qt2feasibleseed5_livingroom_illuminance:state": "luminosity",
+  "entity:light.qt2feasibleseed5_livingroom_dimmablelight1:action:light.turn_on": "luminosity",
+  "entity:light.qt2feasibleseed5_livingroom_dimmablelight1:action:light.turn_off": "luminosity",
+  "entity:light.qt2feasibleseed5_livingroom_onofflight1:action:light.turn_on": "luminosity",
+  "entity:light.qt2feasibleseed5_livingroom_onofflight1:action:light.turn_off": "luminosity",
+  "entity:cover.qt2feasibleseed5_livingroom_windowcoveringcontroller1:action:cover.open_cover": "luminosity",
+  "entity:cover.qt2feasibleseed5_livingroom_windowcoveringcontroller1:action:cover.close_cover": "luminosity",
+  "entity:cover.qt2feasibleseed5_livingroom_windowcoveringcontroller1:action:cover.set_cover_position": "luminosity"
+}

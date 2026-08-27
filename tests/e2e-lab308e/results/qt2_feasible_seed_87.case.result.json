@@ -1,0 +1,129 @@
+{
+  "passed": false,
+  "case": {
+    "name": "simuhome_qt2_feasible_seed_87",
+    "hard_reset": false,
+    "initial_state": [
+      {
+        "type": "sleep",
+        "seconds": 2
+      }
+    ],
+    "query": "Ugh the dining room is really dry today, the wooden table seams look like they are pulling apart and that makes me uneasy, my hands feel a bit rough when I touch the chairs",
+    "auto_confirm": true,
+    "dynamic_confirmation": true,
+    "confirmation_text": "yes",
+    "max_confirmation_turns": 3,
+    "settle_seconds": 15.0,
+    "pass_criteria": [
+      {
+        "type": "all_of",
+        "assertions": [
+          {
+            "type": "property_gte",
+            "path": "/workspaces/simuhome_qt2_feasible_seed_87/artifacts/qt2feasibleseed87_diningroom_humidity/properties/state",
+            "timeout_seconds": 90.0,
+            "poll_interval_seconds": 2.0,
+            "gte": 46.881
+          }
+        ]
+      },
+      {
+        "type": "final_reply_contains",
+        "value": "success"
+      }
+    ],
+    "simuhome": {
+      "source_json": "/mnt/c/Users/dragh/SimuHome/data/benchmark/qt2_feasible_seed_87.json",
+      "workspace_id": "simuhome_qt2_feasible_seed_87",
+      "meta": {
+        "seed": 87,
+        "query_type": "qt2",
+        "case": "feasible",
+        "num_rooms": 5,
+        "num_devices": 24,
+        "num_target_metrics": 1,
+        "feasibility": true
+      }
+    }
+  },
+  "transcript": [
+    {
+      "role": "assistant",
+      "phase": "proposal",
+      "text": "First the plan checks that the dining-room humidifier is available. If it is, the plan ensures the humidifier is on \u2014 leaving it if already on or turning it on to a medium preset at 50% output if not. Then it will wait up to 5 minutes, checking every 5 seconds, for the dining-room humidity to rise above 45.881%. Does this plan look good to you?"
+    },
+    {
+      "role": "assistant",
+      "phase": "confirmation_1",
+      "text": "Execution failed: FAILURE"
+    }
+  ],
+  "assertions": [
+    {
+      "type": "all_of",
+      "passed": false,
+      "results": [
+        {
+          "type": "property_gte",
+          "passed": false,
+          "url": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_87/artifacts/qt2feasibleseed87_diningroom_humidity/properties/state",
+          "actual": 45.881,
+          "expected": 46.881,
+          "timeout_seconds": 90.0
+        }
+      ]
+    }
+  ],
+  "model_name": "gpt-5-mini|direct_code",
+  "first_reply": "First the plan checks that the dining-room humidifier is available. If it is, the plan ensures the humidifier is on \u2014 leaving it if already on or turning it on to a medium preset at 50% output if not. Then it will wait up to 5 minutes, checking every 5 seconds, for the dining-room humidity to rise above 45.881%. Does this plan look good to you?",
+  "plan": "{\"code\":null,\"explanation\":\"1) Verify the dining-room humidifier is available. 2) If it is already on, do nothing; otherwise turn it on using FanTurnOn at medium preset and 50% output. 3) After turning on, wait up to 5 minutes, polling every 5 seconds, for the dining-room humidity reading (qt2_feasible_seed_87_dining_room_environment/state) to rise above the current value 45.881%.\",\"format\":\"json_ir\",\"intent_type\":\"IMPLICIT\",\"intents\":[{\"action\":\"modify\",\"artifact\":\"humidifier\",\"intent_text\":\"the dining room is really dry today\",\"parameter\":\"humidity\"}],\"plan_type\":\"behavior_tree\",\"planning_path\":\"fresh_planning\",\"signifier_ids\":[],\"signifier_match_count\":0,\"signifier_reuse\":false,\"td_sosa_supported\":false,\"tree\":{\"children\":[{\"affordance_id\":\"qt2_feasible_seed_87_dining_room_dining_room_humidifier_1/available\",\"expected_value\":true,\"name\":\"Check humidifier available\",\"operator\":\"==\",\"property_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_87/artifacts/qt2_feasible_seed_87_dining_room_dining_room_humidifier_1/properties/available\",\"type\":\"condition\"},{\"children\":[{\"affordance_id\":\"qt2_feasible_seed_87_dining_room_dining_room_humidifier_1/state\",\"expected_value\":\"on\",\"name\":\"Humidifier already on?\",\"operator\":\"==\",\"property_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_87/artifacts/qt2_feasible_seed_87_dining_room_dining_room_humidifier_1/properties/state\",\"type\":\"condition\"},{\"action_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_87/artifacts/qt2_feasible_seed_87_dining_room_dining_room_humidifier_1/ha/fan/turn_on\",\"affordance_id\":\"qt2_feasible_seed_87_dining_room_dining_room_humidifier_1/FanTurnOn\",\"name\":\"Turn on humidifier\",\"parameters\":{\"percentage\":50,\"preset_mode\":\"medium\"},\"type\":\"action\"}],\"name\":\"Ensure humidifier on\",\"type\":\"selector\"},{\"affordance_id\":\"qt2_feasible_seed_87_dining_room_environment/state\",\"expected_value\":45.881,\"name\":\"Wait for humidity to rise\",\"operator\":\">\",\"poll_interval_seconds\":5,\"property_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_87/artifacts/qt2_feasible_seed_87_dining_room_environment/properties/state\",\"timeout_seconds\":300,\"type\":\"wait_condition\"}],\"name\":\"Increase dining room humidity\",\"type\":\"sequence\"},\"workspace_id\":\"simuhome_qt2_feasible_seed_87\"}",
+  "plan_summary": "First the plan checks that the dining-room humidifier is available. If it is, the plan ensures the humidifier is on \u2014 leaving it if already on or turning it on to a medium preset at 50% output if not. Then it will wait up to 5 minutes, checking every 5 seconds, for the dining-room humidity to rise above 45.881%. Does this plan look good to you?",
+  "plan_hash": "21a878a951882109f7c4c0afc35abb08a7a7cec53be148c0b9f91d200cde58b0",
+  "confirmation_replies_used": [
+    {
+      "assistant": "First the plan checks that the dining-room humidifier is available. If it is, the plan ensures the humidifier is on \u2014 leaving it if already on or turning it on to a medium preset at 50% output if not. Then it will wait up to 5 minutes, checking every 5 seconds, for the dining-room humidity to rise above 45.881%. Does this plan look good to you?",
+      "reply": "yes",
+      "source": "dynamic",
+      "raw_dynamic_reply": "{\"reply\":\"yes\"}",
+      "dynamic_error": null
+    }
+  ],
+  "final_reply": "Execution failed: FAILURE",
+  "failed_assertion": {
+    "type": "all_of",
+    "passed": false,
+    "results": [
+      {
+        "type": "property_gte",
+        "passed": false,
+        "url": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_87/artifacts/qt2feasibleseed87_diningroom_humidity/properties/state",
+        "actual": 45.881,
+        "expected": 46.881,
+        "timeout_seconds": 90.0
+      }
+    ]
+  },
+  "failure_stage": "assertion",
+  "started_at": "2026-07-31T20:29:23.820194+03:00",
+  "duration_seconds": 161.749,
+  "llm_calls": 4,
+  "input_tokens": 7357,
+  "output_tokens": 3279,
+  "initial_prompt_llm_calls": 2,
+  "initial_prompt_input_tokens": 3450,
+  "initial_prompt_output_tokens": 1312,
+  "clarification_llm_calls": 0,
+  "clarification_input_tokens": 0,
+  "clarification_output_tokens": 0,
+  "confirmation_llm_calls": 1,
+  "confirmation_input_tokens": 253,
+  "confirmation_output_tokens": 142,
+  "plan_creation_llm_calls": 1,
+  "plan_creation_input_tokens": 3654,
+  "plan_creation_output_tokens": 1825,
+  "other_llm_calls": 0,
+  "other_input_tokens": 0,
+  "other_output_tokens": 0,
+  "prompt_dump_path": "/mnt/c/Users/dragh/llm-agents-for-ami/prompt_dumps/20260731_202813_gpt-5-mini_notdsosa_clear_seed87_run10/2026-07-31T20-29-23_simuhome_qt2_feasible_seed_87.txt"
+}

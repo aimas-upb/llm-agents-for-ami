@@ -21,6 +21,7 @@ from ..nodes.affordance_nodes import (
     WaitPropertyConditionNode,
     ComparisonOperator,
 )
+from ..nodes.compute_node import BlackboardComputeNode
 from .base import ExecutionResult
 
 logger = logging.getLogger(__name__)
@@ -162,6 +163,15 @@ class IRExecutor:
                 value_path=spec.get("value_path"),
                 timeout_seconds=spec.get("timeout_seconds", 30.0),
                 poll_interval_seconds=spec.get("poll_interval_seconds", 1.0),
+            )
+
+        elif node_type == "compute":
+            return BlackboardComputeNode(
+                name=name,
+                op=spec["op"],
+                inputs=spec.get("inputs", []),
+                output=spec.get("output"),
+                args=spec.get("args", {}),
             )
 
         else:
@@ -315,7 +325,7 @@ class IRExecutor:
         # AsyncBTPlanner normalizer fills in sensible defaults.  We only warn
         # (do NOT add to errors) so that trees without names still pass.
         node_type = spec.get("type")
-        valid_types = {"sequence", "selector", "parallel", "action", "condition", "wait_condition"}
+        valid_types = {"sequence", "selector", "parallel", "action", "condition", "wait_condition", "compute"}
         if node_type not in valid_types:
             errors.append(f"{path}: missing or invalid 'type'")
 
@@ -350,6 +360,14 @@ class IRExecutor:
                     not isinstance(poll_interval, (int, float)) or poll_interval < 0
                 ):
                     errors.append(f"{path}: wait_condition poll_interval_seconds must be >= 0")
+        # Compute nodes
+        elif node_type == "compute":
+            op = spec.get("op")
+            if not op or not isinstance(op, str):
+                errors.append(f"{path}: compute nodes require a string 'op'")
+            inputs = spec.get("inputs")
+            if inputs is not None and not isinstance(inputs, list):
+                errors.append(f"{path}: compute 'inputs' must be a list of blackboard keys")
 
         return errors
 

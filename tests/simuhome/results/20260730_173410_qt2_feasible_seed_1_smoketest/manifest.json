@@ -1,0 +1,119 @@
+{
+  "run_id": "20260730_173410_qt2_feasible_seed_1_smoketest",
+  "scenario_json": "/mnt/c/Users/dragh/llm-agents-for-ami/tests/simuhome/qt2_feasible_seed_1_smoketest.json",
+  "result_dir": "/mnt/c/Users/dragh/llm-agents-for-ami/tests/simuhome/results/20260730_173410_qt2_feasible_seed_1_smoketest",
+  "area_name": "SimuHome qt2_feasible_seed_1_smoketest",
+  "started_at": "2026-07-30T17:34:10.251066+03:00",
+  "yaml_path": "/mnt/c/Users/dragh/llm-agents-for-ami/tests/simuhome/results/20260730_173410_qt2_feasible_seed_1_smoketest/work/yaml/qt2_feasible_seed_1_smoketest.yaml",
+  "workspace_id": "simuhome_qt2_feasible_seed_1_smoketest",
+  "add_virtual_devices": {
+    "copied_yaml": "/mnt/c/Users/dragh/homeassistant-config/custom_components/virtual/qt2_feasible_seed_1_smoketest.yaml",
+    "ha_yaml_path": "/config/custom_components/virtual/qt2_feasible_seed_1_smoketest.yaml",
+    "area_name": "SimuHome qt2_feasible_seed_1_smoketest",
+    "area_id": "simuhome_qt2_feasible_seed_1_smoketest",
+    "hasp_areas_env": "simuhome_qt2_feasible_seed_1_smoketest",
+    "hasp_hint": "Set AREAS=simuhome_qt2_feasible_seed_1_smoketest for HASP",
+    "flow_result_type": "create_entry",
+    "flow_result": {
+      "type": "create_entry",
+      "flow_id": "01KYSQ533DSWTXHSSQPHPBWPJB",
+      "handler": "virtual",
+      "description": null,
+      "description_placeholders": null,
+      "title": "qt2_feasible_seed_1_smoketest - virtual",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+        "created_at": 1785422056.560213,
+        "entry_id": "01KYSQ533GQQC561QDM13HMQRH",
+        "domain": "virtual",
+        "modified_at": 1785422056.560214,
+        "title": "qt2_feasible_seed_1_smoketest - virtual",
+        "source": "user",
+        "state": "loaded",
+        "supports_options": false,
+        "supports_remove_device": false,
+        "supports_unload": true,
+        "supports_reconfigure": false,
+        "supported_subentry_types": {},
+        "pref_disable_new_entities": false,
+        "pref_disable_polling": false,
+        "disabled_by": null,
+        "reason": null,
+        "error_reason_translation_key": null,
+        "error_reason_translation_placeholders": null,
+        "num_subentries": 0
+      }
+    },
+    "updated_devices": [
+      "qt2_feasible_seed_1_smoketest_clock",
+      "qt2_feasible_seed_1_smoketest_simulator",
+      "qt2_feasible_seed_1_smoketest_bathroom_environment",
+      "qt2_feasible_seed_1_smoketest_utility_room_environment",
+      "qt2_feasible_seed_1_smoketest_utility_room_utility_room_air_conditioner_1"
+    ],
+    "updated_entities": []
+  },
+  "tdsosa_env_var_overrides_path": "/mnt/c/Users/dragh/llm-agents-for-ami/tests/simuhome/results/20260730_173410_qt2_feasible_seed_1_smoketest/tdsosa_env_var_overrides.json",
+  "tdsosa_property_ranges_path": "/mnt/c/Users/dragh/llm-agents-for-ami/tests/simuhome/results/20260730_173410_qt2_feasible_seed_1_smoketest/tdsosa_property_ranges.json",
+  "tdsosa_env_var_overrides_count": 3,
+  "tdsosa_property_ranges_count": 1,
+  "adapter_app": "hasp:app",
+  "hasp_url": "http://127.0.0.1:8080",
+  "pre_runner_semantic_queries_path": "/mnt/c/Users/dragh/llm-agents-for-ami/tests/simuhome/results/20260730_173410_qt2_feasible_seed_1_smoketest/pre_runner_semantic_queries.json",
+  "case_path": "/mnt/c/Users/dragh/llm-agents-for-ami/tests/simuhome/results/20260730_173410_qt2_feasible_seed_1_smoketest/work/qt2_feasible_seed_1_smoketest.case.json",
+  "case": {
+    "name": "simuhome_qt2_feasible_seed_1_smoketest",
+    "hard_reset": false,
+    "initial_state": [
+      {
+        "type": "sleep",
+        "seconds": 2
+      }
+    ],
+    "query": "Ugh, the utility room must be too warm, I can feel a little sweat just thinking about going in there to grab the laundry, kind of makes me want to put it off",
+    "auto_confirm": true,
+    "dynamic_confirmation": true,
+    "confirmation_text": "yes",
+    "max_confirmation_turns": 3,
+    "settle_seconds": 15.0,
+    "pass_criteria": [
+      {
+        "type": "all_of",
+        "assertions": [
+          {
+            "type": "property_lte",
+            "path": "/workspaces/simuhome_qt2_feasible_seed_1_smoketest/artifacts/qt2feasibleseed1smoketest_utilityroom_temperature/properties/state",
+            "timeout_seconds": 90.0,
+            "poll_interval_seconds": 2.0,
+            "lte": 26.18
+          }
+        ]
+      },
+      {
+        "type": "final_reply_contains",
+        "value": "success"
+      }
+    ],
+    "simuhome": {
+      "source_json": "/mnt/c/Users/dragh/llm-agents-for-ami/tests/simuhome/qt2_feasible_seed_1_smoketest.json",
+      "workspace_id": "simuhome_qt2_feasible_seed_1_smoketest",
+      "meta": {
+        "seed": 1,
+        "query_type": "qt2",
+        "case": "feasible",
+        "num_rooms": 2,
+        "num_devices": 1,
+        "num_target_metrics": 1,
+        "feasibility": true
+      }
+    }
+  },
+  "results_csv": "/mnt/c/Users/dragh/llm-agents-for-ami/tests/simuhome/results.csv",
+  "runner_returncode": 1,
+  "post_runner_semantic_queries_path": "/mnt/c/Users/dragh/llm-agents-for-ami/tests/simuhome/results/20260730_173410_qt2_feasible_seed_1_smoketest/post_runner_semantic_queries.json",
+  "finished_at": "2026-07-30T17:35:57.933725+03:00",
+  "cleanup_finished_at": "2026-07-30T17:36:02.275394+03:00"
+}

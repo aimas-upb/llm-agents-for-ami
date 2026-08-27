@@ -1,0 +1,227 @@
+{
+  "air_quality": {
+    "workspace_id": "simuhome_qt2_feasible_seed_2",
+    "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/air_quality",
+    "target_min": null,
+    "target_max": 31.685,
+    "target_unit": "ug/m3",
+    "actions": [
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_airpurifier1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Bathroom.AirPurifier1",
+        "action_name": "FanSetPercentage",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_airpurifier1/ha/fan/set_percentage",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_airpurifier1/actuations/fan_set_percentage_decrease",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/air_quality",
+        "direction": "decrease"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_airpurifier1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Bathroom.AirPurifier1",
+        "action_name": "FanTurnOff",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_airpurifier1/ha/fan/turn_off",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_airpurifier1/actuations/fan_turn_off_increase",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/air_quality",
+        "direction": "increase"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_airpurifier1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Bathroom.AirPurifier1",
+        "action_name": "FanTurnOn",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_airpurifier1/ha/fan/turn_on",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_airpurifier1/actuations/fan_turn_on_decrease",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/air_quality",
+        "direction": "decrease"
+      }
+    ]
+  },
+  "luminosity": {
+    "workspace_id": "simuhome_qt2_feasible_seed_2",
+    "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+    "target_min": 390.219,
+    "target_max": null,
+    "target_unit": "lx",
+    "actions": [
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_dimmablelight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Bathroom.DimmableLight1",
+        "action_name": "LightTurnOff",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_dimmablelight1/ha/light/turn_off",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_dimmablelight1/actuations/light_turn_off_decrease",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "decrease"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_dimmablelight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Bathroom.DimmableLight1",
+        "action_name": "LightTurnOn",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_dimmablelight1/ha/light/turn_on",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_dimmablelight1/actuations/light_turn_on_increase",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "increase"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_onofflight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Bathroom.OnOffLight1",
+        "action_name": "LightTurnOff",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_onofflight1/ha/light/turn_off",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_onofflight1/actuations/light_turn_off_decrease",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "decrease"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_onofflight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Bathroom.OnOffLight1",
+        "action_name": "LightTurnOn",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_onofflight1/ha/light/turn_on",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_onofflight1/actuations/light_turn_on_increase",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "increase"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_onofflight2#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Bathroom.OnOffLight2",
+        "action_name": "LightTurnOff",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_onofflight2/ha/light/turn_off",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_onofflight2/actuations/light_turn_off_decrease",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "decrease"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_onofflight2#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Bathroom.OnOffLight2",
+        "action_name": "LightTurnOn",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_onofflight2/ha/light/turn_on",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bathroom_onofflight2/actuations/light_turn_on_increase",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "increase"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_dimmablelight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Bedroom.DimmableLight1",
+        "action_name": "LightTurnOff",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_dimmablelight1/ha/light/turn_off",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_dimmablelight1/actuations/light_turn_off_decrease",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "decrease"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_dimmablelight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Bedroom.DimmableLight1",
+        "action_name": "LightTurnOn",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_dimmablelight1/ha/light/turn_on",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_dimmablelight1/actuations/light_turn_on_increase",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "increase"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_dimmablelight2#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Bedroom.DimmableLight2",
+        "action_name": "LightTurnOff",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_dimmablelight2/ha/light/turn_off",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_dimmablelight2/actuations/light_turn_off_decrease",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "decrease"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_dimmablelight2#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Bedroom.DimmableLight2",
+        "action_name": "LightTurnOn",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_dimmablelight2/ha/light/turn_on",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_dimmablelight2/actuations/light_turn_on_increase",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "increase"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_onofflight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Bedroom.OnOffLight1",
+        "action_name": "LightTurnOff",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_onofflight1/ha/light/turn_off",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_onofflight1/actuations/light_turn_off_decrease",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "decrease"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_onofflight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Bedroom.OnOffLight1",
+        "action_name": "LightTurnOn",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_onofflight1/ha/light/turn_on",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_bedroom_onofflight1/actuations/light_turn_on_increase",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "increase"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_kitchen_onofflight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Kitchen.OnOffLight1",
+        "action_name": "LightTurnOff",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_kitchen_onofflight1/ha/light/turn_off",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_kitchen_onofflight1/actuations/light_turn_off_decrease",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "decrease"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_kitchen_onofflight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.Kitchen.OnOffLight1",
+        "action_name": "LightTurnOn",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_kitchen_onofflight1/ha/light/turn_on",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_kitchen_onofflight1/actuations/light_turn_on_increase",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "increase"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_livingroom_dimmablelight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.LivingRoom.DimmableLight1",
+        "action_name": "LightTurnOff",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_livingroom_dimmablelight1/ha/light/turn_off",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_livingroom_dimmablelight1/actuations/light_turn_off_decrease",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "decrease"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_livingroom_dimmablelight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.LivingRoom.DimmableLight1",
+        "action_name": "LightTurnOn",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_livingroom_dimmablelight1/ha/light/turn_on",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_livingroom_dimmablelight1/actuations/light_turn_on_increase",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "increase"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_livingroom_onofflight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.LivingRoom.OnOffLight1",
+        "action_name": "LightTurnOff",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_livingroom_onofflight1/ha/light/turn_off",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_livingroom_onofflight1/actuations/light_turn_off_decrease",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "decrease"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_livingroom_onofflight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.LivingRoom.OnOffLight1",
+        "action_name": "LightTurnOn",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_livingroom_onofflight1/ha/light/turn_on",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_livingroom_onofflight1/actuations/light_turn_on_increase",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "increase"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_utilityroom_onofflight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.UtilityRoom.OnOffLight1",
+        "action_name": "LightTurnOff",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_utilityroom_onofflight1/ha/light/turn_off",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_utilityroom_onofflight1/actuations/light_turn_off_decrease",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "decrease"
+      },
+      {
+        "artifact_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_utilityroom_onofflight1#artifact",
+        "artifact_title": "Qt2FeasibleSeed2.UtilityRoom.OnOffLight1",
+        "action_name": "LightTurnOn",
+        "action_target": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_utilityroom_onofflight1/ha/light/turn_on",
+        "actuation_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/artifacts/qt2feasibleseed2_utilityroom_onofflight1/actuations/light_turn_on_increase",
+        "property_uri": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_2/environment/luminosity",
+        "direction": "increase"
+      }
+    ]
+  }
+}

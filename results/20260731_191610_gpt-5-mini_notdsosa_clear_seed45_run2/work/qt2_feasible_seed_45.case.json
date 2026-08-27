@@ -1,0 +1,47 @@
+{
+  "name": "simuhome_qt2_feasible_seed_45",
+  "hard_reset": false,
+  "initial_state": [
+    {
+      "type": "sleep",
+      "seconds": 2
+    }
+  ],
+  "query": "Ugh the kitchen is so dim, I was thinking about starting dinner and I can barely make out the recipe, my eyes are already straining and I feel kind of nervous about chopping anything over there",
+  "auto_confirm": true,
+  "dynamic_confirmation": true,
+  "confirmation_text": "yes",
+  "max_confirmation_turns": 3,
+  "settle_seconds": 15.0,
+  "pass_criteria": [
+    {
+      "type": "all_of",
+      "assertions": [
+        {
+          "type": "property_gte",
+          "path": "/workspaces/simuhome_qt2_feasible_seed_45/artifacts/qt2feasibleseed45_kitchen_illuminance/properties/state",
+          "timeout_seconds": 90.0,
+          "poll_interval_seconds": 2.0,
+          "gte": 542.3
+        }
+      ]
+    },
+    {
+      "type": "final_reply_contains",
+      "value": "success"
+    }
+  ],
+  "simuhome": {
+    "source_json": "/mnt/c/Users/dragh/SimuHome/data/benchmark/qt2_feasible_seed_45.json",
+    "workspace_id": "simuhome_qt2_feasible_seed_45",
+    "meta": {
+      "seed": 45,
+      "query_type": "qt2",
+      "case": "feasible",
+      "num_rooms": 5,
+      "num_devices": 28,
+      "num_target_metrics": 1,
+      "feasibility": true
+    }
+  }
+}

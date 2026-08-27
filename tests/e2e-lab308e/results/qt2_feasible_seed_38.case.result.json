@@ -1,0 +1,152 @@
+{
+  "passed": false,
+  "case": {
+    "name": "simuhome_qt2_feasible_seed_38",
+    "hard_reset": false,
+    "initial_state": [
+      {
+        "type": "sleep",
+        "seconds": 2
+      }
+    ],
+    "query": "Ugh, the living room is so dim. Hard to read there. The bathroom feels really dry. My skin feels tight after washing and the mirror did not fog up like usual.",
+    "auto_confirm": true,
+    "dynamic_confirmation": true,
+    "confirmation_text": "yes",
+    "max_confirmation_turns": 3,
+    "settle_seconds": 15.0,
+    "pass_criteria": [
+      {
+        "type": "all_of",
+        "assertions": [
+          {
+            "type": "property_gte",
+            "path": "/workspaces/simuhome_qt2_feasible_seed_38/artifacts/qt2feasibleseed38_livingroom_illuminance/properties/state",
+            "timeout_seconds": 90.0,
+            "poll_interval_seconds": 2.0,
+            "gte": 150.0
+          },
+          {
+            "type": "property_gte",
+            "path": "/workspaces/simuhome_qt2_feasible_seed_38/artifacts/qt2feasibleseed38_bathroom_humidity/properties/state",
+            "timeout_seconds": 90.0,
+            "poll_interval_seconds": 2.0,
+            "gte": 62.319
+          }
+        ]
+      },
+      {
+        "type": "final_reply_contains",
+        "value": "success"
+      }
+    ],
+    "simuhome": {
+      "source_json": "/mnt/c/Users/dragh/SimuHome/data/benchmark/qt2_feasible_seed_38.json",
+      "workspace_id": "simuhome_qt2_feasible_seed_38",
+      "meta": {
+        "seed": 38,
+        "query_type": "qt2",
+        "case": "feasible",
+        "num_rooms": 5,
+        "num_devices": 29,
+        "num_target_metrics": 2,
+        "feasibility": true
+      }
+    }
+  },
+  "transcript": [
+    {
+      "role": "assistant",
+      "phase": "proposal",
+      "text": "The plan will immediately set the available kids-room dimmable light to 100% brightness to help brighten nearby areas, and at the same time it will read the living room humidity to get a current measurement. It cannot directly control any living-room lights or change bathroom humidity because those devices are not available, so increasing bathroom humidity is not possible with this plan. Does this plan look good to you?"
+    },
+    {
+      "role": "assistant",
+      "phase": "confirmation_1",
+      "text": "Done! The plan was executed successfully."
+    }
+  ],
+  "assertions": [
+    {
+      "type": "all_of",
+      "passed": false,
+      "results": [
+        {
+          "type": "property_gte",
+          "passed": false,
+          "url": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_38/artifacts/qt2feasibleseed38_livingroom_illuminance/properties/state",
+          "actual": 100.0,
+          "expected": 150.0,
+          "timeout_seconds": 90.0
+        },
+        {
+          "type": "property_gte",
+          "passed": false,
+          "url": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_38/artifacts/qt2feasibleseed38_bathroom_humidity/properties/state",
+          "actual": 61.319,
+          "expected": 62.319,
+          "timeout_seconds": 90.0
+        }
+      ]
+    }
+  ],
+  "model_name": "gpt-5-mini|direct_code",
+  "first_reply": "The plan will immediately set the available kids-room dimmable light to 100% brightness to help brighten nearby areas, and at the same time it will read the living room humidity to get a current measurement. It cannot directly control any living-room lights or change bathroom humidity because those devices are not available, so increasing bathroom humidity is not possible with this plan. Does this plan look good to you?",
+  "plan": "{\"code\":null,\"explanation\":\"Plan: 1) Attempt to improve perceived brightness by setting the available kids-room dimmable light to 100% brightness (may help adjacent areas but is not a living-room light). 2) Read humidity (using the available living-room humidity affordance) to gather a humidity measurement. Limitations: there is no affordance for any living-room light in the provided device list, so I cannot directly raise the living room lights. There is also no bathroom humidity sensor or humidifier/vent control affordance available, so I cannot directly increase the bathroom humidity. The plan partially addresses the brightness issue by boosting an available nearby light and collects a humidity reading, but it cannot fully satisfy the bathroom-humidity request because of missing devices/affordances.\",\"format\":\"json_ir\",\"intent_type\":\"IMPLICIT\",\"intents\":[{\"action\":\"modify\",\"artifact\":\"light\",\"intent_text\":\"Ugh, the living room is so dim.\",\"parameter\":\"brightness\"},{\"action\":\"modify\",\"artifact\":\"humidifier\",\"intent_text\":\"The bathroom feels really dry.\",\"parameter\":\"humidity\"}],\"plan_type\":\"behavior_tree\",\"planning_path\":\"fresh_planning\",\"signifier_ids\":[],\"signifier_match_count\":0,\"signifier_reuse\":false,\"td_sosa_supported\":false,\"tree\":{\"children\":[{\"children\":[{\"action_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_38/artifacts/qt2_feasible_seed_38_kids_room_kids_room_dimmable_light_1/ha/light/turn_on\",\"affordance_id\":\"qt2_feasible_seed_38_kids_room_kids_room_dimmable_light_1/LightTurnOn\",\"name\":\"Lightturnon\",\"parameters\":{\"brightness_pct\":100,\"transition\":0},\"type\":\"action\"}],\"name\":\"Sequence_1\",\"type\":\"sequence\"},{\"children\":[{\"action_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_38/artifacts/qt2_feasible_seed_38_living_room_environment/getHumidityInPercent\",\"affordance_id\":\"qt2_feasible_seed_38_living_room_environment/getHumidityInPercent\",\"name\":\"Gethumidityinpercent\",\"type\":\"action\"}],\"name\":\"Sequence_2\",\"type\":\"sequence\"}],\"name\":\"Handle living room dim and bathroom dryness\",\"policy\":\"success_on_all\",\"type\":\"parallel\"},\"workspace_id\":\"simuhome_qt2_feasible_seed_38\"}",
+  "plan_summary": "The plan will immediately set the available kids-room dimmable light to 100% brightness to help brighten nearby areas, and at the same time it will read the living room humidity to get a current measurement. It cannot directly control any living-room lights or change bathroom humidity because those devices are not available, so increasing bathroom humidity is not possible with this plan. Does this plan look good to you?",
+  "plan_hash": "ed359ca552d698145db7fe049df951ac7772306671d7cd36d63e385cd29bace1",
+  "confirmation_replies_used": [
+    {
+      "assistant": "The plan will immediately set the available kids-room dimmable light to 100% brightness to help brighten nearby areas, and at the same time it will read the living room humidity to get a current measurement. It cannot directly control any living-room lights or change bathroom humidity because those devices are not available, so increasing bathroom humidity is not possible with this plan. Does this plan look good to you?",
+      "reply": "yes",
+      "source": "dynamic",
+      "raw_dynamic_reply": "{\"reply\":\"yes\"}",
+      "dynamic_error": null
+    }
+  ],
+  "final_reply": "Done! The plan was executed successfully.",
+  "failed_assertion": {
+    "type": "all_of",
+    "passed": false,
+    "results": [
+      {
+        "type": "property_gte",
+        "passed": false,
+        "url": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_38/artifacts/qt2feasibleseed38_livingroom_illuminance/properties/state",
+        "actual": 100.0,
+        "expected": 150.0,
+        "timeout_seconds": 90.0
+      },
+      {
+        "type": "property_gte",
+        "passed": false,
+        "url": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_38/artifacts/qt2feasibleseed38_bathroom_humidity/properties/state",
+        "actual": 61.319,
+        "expected": 62.319,
+        "timeout_seconds": 90.0
+      }
+    ]
+  },
+  "failure_stage": "assertion",
+  "started_at": "2026-07-31T21:57:59.995410+03:00",
+  "duration_seconds": 273.856,
+  "llm_calls": 4,
+  "input_tokens": 5788,
+  "output_tokens": 4972,
+  "initial_prompt_llm_calls": 2,
+  "initial_prompt_input_tokens": 3006,
+  "initial_prompt_output_tokens": 1465,
+  "clarification_llm_calls": 0,
+  "clarification_input_tokens": 0,
+  "clarification_output_tokens": 0,
+  "confirmation_llm_calls": 1,
+  "confirmation_input_tokens": 245,
+  "confirmation_output_tokens": 142,
+  "plan_creation_llm_calls": 1,
+  "plan_creation_input_tokens": 2537,
+  "plan_creation_output_tokens": 3365,
+  "other_llm_calls": 0,
+  "other_input_tokens": 0,
+  "other_output_tokens": 0,
+  "prompt_dump_path": "/mnt/c/Users/dragh/llm-agents-for-ami/prompt_dumps/20260731_215642_gpt-5-mini_notdsosa_clear_seed38_run10/2026-07-31T21-57-59_simuhome_qt2_feasible_seed_38.txt"
+}

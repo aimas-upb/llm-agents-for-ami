@@ -30,6 +30,7 @@ from ...shared.utils.demo_log import demo
 from ...shared.utils.logger import LoggerFactory
 from ...shared.community.community_client import CommunitySignifierClient
 from ...bt_planning.planning.bt_planner import AsyncBTPlanner
+from ...bt_planning.planning.bt_planner_direct import DirectCodeBTPlanner
 from ...bt_planning.signifier_bridge import build_bt_from_signifiers
 
 from .behaviours import EnvironmentReadyBehaviour, GoalRequestBehaviour
@@ -112,7 +113,11 @@ class InteractionSolverAgent(Agent, IAgent):
         max_attempts = int(
             planning_llm.get("max_planning_attempts", _DEFAULT_MAX_PLANNING_ATTEMPTS)
         )
-        self.bt_planner = AsyncBTPlanner(max_attempts=max_attempts)
+        self.planner_mode = str(planning_llm.get("planner_mode", "json_ir")).strip().lower()
+        if self.planner_mode == "direct_code":
+            self.bt_planner = DirectCodeBTPlanner(max_attempts=max_attempts)
+        else:
+            self.bt_planner = AsyncBTPlanner(max_attempts=max_attempts)
 
         # ── Community signifier client (optional) ───────────────────
         community_cfg = (self.config.get("planning", {}) or {}).get("community", {}) or {}
@@ -619,9 +624,12 @@ class InteractionSolverAgent(Agent, IAgent):
             )
 
         signifier_summary = self._summarise_signifier_matches(context.get("signifier_matches"))
+        plan_format = "python_code" if self.planner_mode == "direct_code" else "json_ir"
         output: Dict[str, Any] = {
             "plan_type": "behavior_tree",
+            "format": plan_format,
             "tree": result.get("tree") or None,
+            "code": result.get("code") or None,
             "explanation": result.get("explanation", ""),
             "intents": [i.to_dict() for i in intents],
             "workspace_id": workspace_id,

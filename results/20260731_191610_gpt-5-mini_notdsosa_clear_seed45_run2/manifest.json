@@ -1,0 +1,144 @@
+{
+  "run_id": "20260731_191610_qt2_feasible_seed_45",
+  "scenario_json": "/mnt/c/Users/dragh/SimuHome/data/benchmark/qt2_feasible_seed_45.json",
+  "result_dir": "/mnt/c/Users/dragh/llm-agents-for-ami/results/20260731_191610_gpt-5-mini_notdsosa_clear_seed45_run2",
+  "area_name": "SimuHome qt2_feasible_seed_45",
+  "started_at": "2026-07-31T19:16:10.419309+03:00",
+  "yaml_path": "/mnt/c/Users/dragh/llm-agents-for-ami/results/20260731_191610_gpt-5-mini_notdsosa_clear_seed45_run2/work/yaml/qt2_feasible_seed_45.yaml",
+  "workspace_id": "simuhome_qt2_feasible_seed_45",
+  "add_virtual_devices": {
+    "copied_yaml": "/mnt/c/Users/dragh/homeassistant-config/custom_components/virtual/qt2_feasible_seed_45.yaml",
+    "ha_yaml_path": "/config/custom_components/virtual/qt2_feasible_seed_45.yaml",
+    "area_name": "SimuHome qt2_feasible_seed_45",
+    "area_id": "simuhome_qt2_feasible_seed_45",
+    "hasp_areas_env": "simuhome_qt2_feasible_seed_45",
+    "hasp_hint": "Set AREAS=simuhome_qt2_feasible_seed_45 for HASP",
+    "flow_result_type": "create_entry",
+    "flow_result": {
+      "type": "create_entry",
+      "flow_id": "01KYWFCGRMPBVHQVV24FHNB8KQ",
+      "handler": "virtual",
+      "description": null,
+      "description_placeholders": null,
+      "title": "qt2_feasible_seed_45 - virtual",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+        "created_at": 1785514574.616178,
+        "entry_id": "01KYWFCGRRCVBMKY14B5PM27WN",
+        "domain": "virtual",
+        "modified_at": 1785514574.616179,
+        "title": "qt2_feasible_seed_45 - virtual",
+        "source": "user",
+        "state": "loaded",
+        "supports_options": false,
+        "supports_remove_device": false,
+        "supports_unload": true,
+        "supports_reconfigure": false,
+        "supported_subentry_types": {},
+        "pref_disable_new_entities": false,
+        "pref_disable_polling": false,
+        "disabled_by": null,
+        "reason": null,
+        "error_reason_translation_key": null,
+        "error_reason_translation_placeholders": null,
+        "num_subentries": 0
+      }
+    },
+    "updated_devices": [
+      "qt2_feasible_seed_45_clock",
+      "qt2_feasible_seed_45_simulator",
+      "qt2_feasible_seed_45_bathroom_environment",
+      "qt2_feasible_seed_45_bathroom_bathroom_air_conditioner_1",
+      "qt2_feasible_seed_45_bathroom_bathroom_air_purifier_1",
+      "qt2_feasible_seed_45_bathroom_bathroom_dehumidifier_1",
+      "qt2_feasible_seed_45_bathroom_bathroom_dimmable_light_1",
+      "qt2_feasible_seed_45_bathroom_bathroom_heat_pump_1",
+      "qt2_feasible_seed_45_bathroom_bathroom_laundry_dryer_1",
+      "qt2_feasible_seed_45_bathroom_bathroom_on_off_light_1",
+      "qt2_feasible_seed_45_kitchen_environment",
+      "qt2_feasible_seed_45_kitchen_kitchen_air_conditioner_1",
+      "qt2_feasible_seed_45_kitchen_kitchen_dishwasher_1",
+      "qt2_feasible_seed_45_kitchen_kitchen_freezer_1",
+      "qt2_feasible_seed_45_kitchen_kitchen_on_off_light_1",
+      "qt2_feasible_seed_45_kitchen_kitchen_refrigerator_1",
+      "qt2_feasible_seed_45_kitchen_kitchen_window_covering_controller_1",
+      "qt2_feasible_seed_45_living_room_environment",
+      "qt2_feasible_seed_45_living_room_living_room_air_purifier_1",
+      "qt2_feasible_seed_45_living_room_living_room_on_off_light_1",
+      "qt2_feasible_seed_45_living_room_living_room_tv_1",
+      "qt2_feasible_seed_45_living_room_living_room_window_covering_controller_1",
+      "qt2_feasible_seed_45_study_room_environment",
+      "qt2_feasible_seed_45_study_room_study_room_air_conditioner_1",
+      "qt2_feasible_seed_45_study_room_study_room_air_purifier_1",
+      "qt2_feasible_seed_45_study_room_study_room_fan_1",
+      "qt2_feasible_seed_45_study_room_study_room_heat_pump_1",
+      "qt2_feasible_seed_45_study_room_study_room_on_off_light_1",
+      "qt2_feasible_seed_45_study_room_study_room_tv_1",
+      "qt2_feasible_seed_45_utility_room_environment",
+      "qt2_feasible_seed_45_utility_room_utility_room_laundry_dryer_1",
+      "qt2_feasible_seed_45_utility_room_utility_room_laundry_washer_1",
+      "qt2_feasible_seed_45_utility_room_utility_room_on_off_light_1",
+      "qt2_feasible_seed_45_utility_room_utility_room_on_off_light_2",
+      "qt2_feasible_seed_45_utility_room_utility_room_window_covering_controller_1"
+    ],
+    "updated_entities": []
+  },
+  "adapter_app": "ygg_ha_adapter:app",
+  "hasp_url": "http://127.0.0.1:8080",
+  "case_path": "/mnt/c/Users/dragh/llm-agents-for-ami/results/20260731_191610_gpt-5-mini_notdsosa_clear_seed45_run2/work/qt2_feasible_seed_45.case.json",
+  "case": {
+    "name": "simuhome_qt2_feasible_seed_45",
+    "hard_reset": false,
+    "initial_state": [
+      {
+        "type": "sleep",
+        "seconds": 2
+      }
+    ],
+    "query": "Ugh the kitchen is so dim, I was thinking about starting dinner and I can barely make out the recipe, my eyes are already straining and I feel kind of nervous about chopping anything over there",
+    "auto_confirm": true,
+    "dynamic_confirmation": true,
+    "confirmation_text": "yes",
+    "max_confirmation_turns": 3,
+    "settle_seconds": 15.0,
+    "pass_criteria": [
+      {
+        "type": "all_of",
+        "assertions": [
+          {
+            "type": "property_gte",
+            "path": "/workspaces/simuhome_qt2_feasible_seed_45/artifacts/qt2feasibleseed45_kitchen_illuminance/properties/state",
+            "timeout_seconds": 90.0,
+            "poll_interval_seconds": 2.0,
+            "gte": 542.3
+          }
+        ]
+      },
+      {
+        "type": "final_reply_contains",
+        "value": "success"
+      }
+    ],
+    "simuhome": {
+      "source_json": "/mnt/c/Users/dragh/SimuHome/data/benchmark/qt2_feasible_seed_45.json",
+      "workspace_id": "simuhome_qt2_feasible_seed_45",
+      "meta": {
+        "seed": 45,
+        "query_type": "qt2",
+        "case": "feasible",
+        "num_rooms": 5,
+        "num_devices": 28,
+        "num_target_metrics": 1,
+        "feasibility": true
+      }
+    }
+  },
+  "results_csv": "/mnt/c/Users/dragh/llm-agents-for-ami/results_chatgpt_notdsosa_clear.csv",
+  "prompt_dump_dir": "/mnt/c/Users/dragh/llm-agents-for-ami/prompt_dumps/20260731_191610_gpt-5-mini_notdsosa_clear_seed45_run2",
+  "runner_returncode": 1,
+  "finished_at": "2026-07-31T19:19:54.621889+03:00",
+  "cleanup_finished_at": "2026-07-31T19:19:58.614946+03:00"
+}

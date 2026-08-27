@@ -1,0 +1,76 @@
+{
+  "meta": {
+    "seed": 1,
+    "query_type": "qt2",
+    "case": "feasible",
+    "num_rooms": 2,
+    "num_devices": 1,
+    "num_target_metrics": 1,
+    "feasibility": true
+  },
+  "query": "Ugh, the utility room must be too warm, I can feel a little sweat just thinking about going in there to grab the laundry, kind of makes me want to put it off",
+  "user_location": "bathroom",
+  "eval": {
+    "required_actions": [
+      {
+        "tool": "get_room_devices",
+        "params": {
+          "room_id": "utility_room"
+        }
+      }
+    ],
+    "goals": [
+      {
+        "room_id": "utility_room",
+        "room_state": "temperature",
+        "direction": "decrease",
+        "feasibility": true
+      }
+    ]
+  },
+  "initial_home_config": {
+    "tick_interval": 0.1,
+    "base_time": "2025-08-23 11:36:54",
+    "rooms": {
+      "bathroom": {
+        "state": {
+          "humidity": 4215.0,
+          "illuminance": 100.0,
+          "pm10": 5.0,
+          "temperature": 2590.6186887878043
+        },
+        "devices": []
+      },
+      "utility_room": {
+        "state": {
+          "humidity": 3500.0,
+          "illuminance": 557.14,
+          "pm10": 5.0,
+          "temperature": 2638.0
+        },
+        "devices": [
+          {
+            "device_id": "utility_room_air_conditioner_1",
+            "device_type": "air_conditioner",
+            "attributes": {
+              "0.BasicInformation.ProductID": 1,
+              "0.BasicInformation.ProductName": "Air Conditioner",
+              "0.BasicInformation.VendorID": 1,
+              "0.BasicInformation.VendorName": "LG Electronics",
+              "1.FanControl.FanMode": 0,
+              "1.FanControl.FanModeSequence": 1,
+              "1.FanControl.PercentCurrent": 0,
+              "1.FanControl.PercentSetting": 0,
+              "1.OnOff.OnOff": true,
+              "1.Thermostat.ControlSequenceOfOperation": 4,
+              "1.Thermostat.LocalTemperature": 2638,
+              "1.Thermostat.OccupiedCoolingSetpoint": 2000,
+              "1.Thermostat.OccupiedHeatingSetpoint": 2800,
+              "1.Thermostat.SystemMode": 3
+            }
+          }
+        ]
+      }
+    }
+  }
+}

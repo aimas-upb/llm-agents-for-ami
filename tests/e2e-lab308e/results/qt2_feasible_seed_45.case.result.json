@@ -1,0 +1,129 @@
+{
+  "passed": false,
+  "case": {
+    "name": "simuhome_qt2_feasible_seed_45",
+    "hard_reset": false,
+    "initial_state": [
+      {
+        "type": "sleep",
+        "seconds": 2
+      }
+    ],
+    "query": "Ugh the kitchen is so dim, I was thinking about starting dinner and I can barely make out the recipe, my eyes are already straining and I feel kind of nervous about chopping anything over there",
+    "auto_confirm": true,
+    "dynamic_confirmation": true,
+    "confirmation_text": "yes",
+    "max_confirmation_turns": 3,
+    "settle_seconds": 15.0,
+    "pass_criteria": [
+      {
+        "type": "all_of",
+        "assertions": [
+          {
+            "type": "property_gte",
+            "path": "/workspaces/simuhome_qt2_feasible_seed_45/artifacts/qt2feasibleseed45_kitchen_illuminance/properties/state",
+            "timeout_seconds": 90.0,
+            "poll_interval_seconds": 2.0,
+            "gte": 542.3
+          }
+        ]
+      },
+      {
+        "type": "final_reply_contains",
+        "value": "success"
+      }
+    ],
+    "simuhome": {
+      "source_json": "/mnt/c/Users/dragh/SimuHome/data/benchmark/qt2_feasible_seed_45.json",
+      "workspace_id": "simuhome_qt2_feasible_seed_45",
+      "meta": {
+        "seed": 45,
+        "query_type": "qt2",
+        "case": "feasible",
+        "num_rooms": 5,
+        "num_devices": 28,
+        "num_target_metrics": 1,
+        "feasibility": true
+      }
+    }
+  },
+  "transcript": [
+    {
+      "role": "assistant",
+      "phase": "proposal",
+      "text": "Because there is no controllable kitchen light available, the plan will try to brighten nearby rooms by turning on the bathroom and utility-room lights. For each light, if it is already on nothing changes; otherwise it will be set to 100% brightness and the system will wait up to 5 seconds to confirm it turned on. These other-room lights may or may not sufficiently improve visibility in the kitchen. Does this plan look good to you?"
+    },
+    {
+      "role": "assistant",
+      "phase": "confirmation_1",
+      "text": "Done! The plan was executed successfully."
+    }
+  ],
+  "assertions": [
+    {
+      "type": "all_of",
+      "passed": false,
+      "results": [
+        {
+          "type": "property_gte",
+          "passed": false,
+          "url": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_45/artifacts/qt2feasibleseed45_kitchen_illuminance/properties/state",
+          "actual": 492.3,
+          "expected": 542.3,
+          "timeout_seconds": 90.0
+        }
+      ]
+    }
+  ],
+  "model_name": "gpt-5-mini|direct_code",
+  "first_reply": "Because there is no controllable kitchen light available, the plan will try to brighten nearby rooms by turning on the bathroom and utility-room lights. For each light, if it is already on nothing changes; otherwise it will be set to 100% brightness and the system will wait up to 5 seconds to confirm it turned on. These other-room lights may or may not sufficiently improve visibility in the kitchen. Does this plan look good to you?",
+  "plan": "{\"code\":null,\"explanation\":\"There is no controllable kitchen light affordance available in the system, so I cannot directly brighten the kitchen. As a partial fallback I will try to turn on nearby lights that are available: the bathroom light and the utility-room light. Each light uses an idempotent selector pattern: if the light is already on nothing is done; otherwise the plan turns it on and waits up to 5 seconds to verify it became 'on'. These lights are in other rooms and may or may not sufficiently improve visibility in the kitchen. If you want me to proceed with these fallbacks, or if you can provide the kitchen light/device id, I can update the plan.\",\"format\":\"json_ir\",\"intent_type\":\"IMPLICIT\",\"intents\":[{\"action\":\"modify\",\"artifact\":\"light\",\"intent_text\":\"the kitchen is so dim, I can barely make out the recipe and my eyes are straining\",\"parameter\":\"brightness\"}],\"plan_type\":\"behavior_tree\",\"planning_path\":\"fresh_planning\",\"signifier_ids\":[],\"signifier_match_count\":0,\"signifier_reuse\":false,\"td_sosa_supported\":false,\"tree\":{\"children\":[{\"children\":[{\"affordance_id\":\"qt2_feasible_seed_45_bathroom_bathroom_on_off_light_1/state\",\"expected_value\":\"on\",\"name\":\"CheckStateIson\",\"operator\":\"==\",\"property_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_45/artifacts/qt2_feasible_seed_45_bathroom_bathroom_on_off_light_1/properties/state\",\"type\":\"condition\"},{\"children\":[{\"action_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_45/artifacts/qt2_feasible_seed_45_bathroom_bathroom_on_off_light_1/ha/light/turn_on\",\"affordance_id\":\"qt2_feasible_seed_45_bathroom_bathroom_on_off_light_1/LightTurnOn\",\"name\":\"Lightturnon\",\"parameters\":{\"brightness_pct\":100},\"type\":\"action\"},{\"affordance_id\":\"qt2_feasible_seed_45_bathroom_bathroom_on_off_light_1/state\",\"expected_value\":\"on\",\"name\":\"WaitForStateIson\",\"operator\":\"==\",\"poll_interval_seconds\":1,\"property_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_45/artifacts/qt2_feasible_seed_45_bathroom_bathroom_on_off_light_1/properties/state\",\"timeout_seconds\":5,\"type\":\"wait_condition\"}],\"name\":\"Sequence_2\",\"type\":\"sequence\"}],\"name\":\"Selector_1\",\"type\":\"selector\"},{\"children\":[{\"affordance_id\":\"qt2_feasible_seed_45_utility_room_utility_room_on_off_light_2/state\",\"expected_value\":\"on\",\"name\":\"CheckStateIson\",\"operator\":\"==\",\"property_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_45/artifacts/qt2_feasible_seed_45_utility_room_utility_room_on_off_light_2/properties/state\",\"type\":\"condition\"},{\"children\":[{\"action_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_45/artifacts/qt2_feasible_seed_45_utility_room_utility_room_on_off_light_2/ha/light/turn_on\",\"affordance_id\":\"qt2_feasible_seed_45_utility_room_utility_room_on_off_light_2/LightTurnOn\",\"name\":\"Lightturnon\",\"parameters\":{\"brightness_pct\":100},\"type\":\"action\"},{\"affordance_id\":\"qt2_feasible_seed_45_utility_room_utility_room_on_off_light_2/state\",\"expected_value\":\"on\",\"name\":\"WaitForStateIson\",\"operator\":\"==\",\"poll_interval_seconds\":1,\"property_url\":\"http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_45/artifacts/qt2_feasible_seed_45_utility_room_utility_room_on_off_light_2/properties/state\",\"timeout_seconds\":5,\"type\":\"wait_condition\"}],\"name\":\"Sequence_4\",\"type\":\"sequence\"}],\"name\":\"Selector_3\",\"type\":\"selector\"}],\"name\":\"brighten_kitchen_fallbacks\",\"policy\":\"success_on_all\",\"type\":\"parallel\"},\"workspace_id\":\"simuhome_qt2_feasible_seed_45\"}",
+  "plan_summary": "Because there is no controllable kitchen light available, the plan will try to brighten nearby rooms by turning on the bathroom and utility-room lights. For each light, if it is already on nothing changes; otherwise it will be set to 100% brightness and the system will wait up to 5 seconds to confirm it turned on. These other-room lights may or may not sufficiently improve visibility in the kitchen. Does this plan look good to you?",
+  "plan_hash": "9107cb85c0452bcd672f62c5b1e97ff2d070340e7c6ffc9a5979456673743496",
+  "confirmation_replies_used": [
+    {
+      "assistant": "Because there is no controllable kitchen light available, the plan will try to brighten nearby rooms by turning on the bathroom and utility-room lights. For each light, if it is already on nothing changes; otherwise it will be set to 100% brightness and the system will wait up to 5 seconds to confirm it turned on. These other-room lights may or may not sufficiently improve visibility in the kitchen. Does this plan look good to you?",
+      "reply": "yes",
+      "source": "dynamic",
+      "raw_dynamic_reply": "{\"reply\":\"yes\"}",
+      "dynamic_error": null
+    }
+  ],
+  "final_reply": "Done! The plan was executed successfully.",
+  "failed_assertion": {
+    "type": "all_of",
+    "passed": false,
+    "results": [
+      {
+        "type": "property_gte",
+        "passed": false,
+        "url": "http://127.0.0.1:8080/workspaces/simuhome_qt2_feasible_seed_45/artifacts/qt2feasibleseed45_kitchen_illuminance/properties/state",
+        "actual": 492.3,
+        "expected": 542.3,
+        "timeout_seconds": 90.0
+      }
+    ]
+  },
+  "failure_stage": "assertion",
+  "started_at": "2026-07-31T19:48:58.145492+03:00",
+  "duration_seconds": 156.988,
+  "llm_calls": 4,
+  "input_tokens": 6769,
+  "output_tokens": 3462,
+  "initial_prompt_llm_calls": 2,
+  "initial_prompt_input_tokens": 3630,
+  "initial_prompt_output_tokens": 1136,
+  "clarification_llm_calls": 0,
+  "clarification_input_tokens": 0,
+  "clarification_output_tokens": 0,
+  "confirmation_llm_calls": 1,
+  "confirmation_input_tokens": 258,
+  "confirmation_output_tokens": 78,
+  "plan_creation_llm_calls": 1,
+  "plan_creation_input_tokens": 2881,
+  "plan_creation_output_tokens": 2248,
+  "other_llm_calls": 0,
+  "other_input_tokens": 0,
+  "other_output_tokens": 0,
+  "prompt_dump_path": "/mnt/c/Users/dragh/llm-agents-for-ami/prompt_dumps/20260731_194745_gpt-5-mini_notdsosa_clear_seed45_run10/2026-07-31T19-48-58_simuhome_qt2_feasible_seed_45.txt"
+}

@@ -157,7 +157,7 @@ class HASPGraphCache:
         )
         async with self._lock:
             self._load_snapshot_unlocked(areas, devices, entities, states, services)
-            self._rebuild_documents_unlocked()
+            await self._rebuild_documents_unlocked()
 
     async def refresh_states(self) -> None:
         states = await self._call_or_default(self.rest_client, "get_states", [])
@@ -167,7 +167,7 @@ class HASPGraphCache:
                 for state in states
                 if isinstance(state, dict) and state.get("entity_id")
             }
-            self._rebuild_documents_unlocked()
+            await self._rebuild_documents_unlocked()
 
     @staticmethod
     async def _call_or_default(
@@ -214,12 +214,12 @@ class HASPGraphCache:
                 return
         await self.refresh_states()
 
-    def _ensure_documents_unlocked(self) -> None:
+    async def _ensure_documents_unlocked(self) -> None:
         if not self._documents_dirty:
             return
         if time.monotonic() - self._last_rebuild_monotonic < self.min_rebuild_interval_s:
             return
-        self._rebuild_documents_unlocked()
+        await self._rebuild_documents_unlocked()
 
     async def has_workspace(self, workspace_id: str) -> bool:
         async with self._lock:
@@ -227,12 +227,12 @@ class HASPGraphCache:
 
     async def get_platform_ttl(self) -> str:
         async with self._lock:
-            self._ensure_documents_unlocked()
+            await self._ensure_documents_unlocked()
             return self.platform_ttl
 
     async def serialize_full_graph(self, fmt: str = "turtle") -> str:
         async with self._lock:
-            self._ensure_documents_unlocked()
+            await self._ensure_documents_unlocked()
             return self.full_graph.serialize(format=fmt)
 
     async def query_actions_affecting_observable_property(
@@ -284,7 +284,7 @@ class HASPGraphCache:
         LIMIT 1
         """
         async with self._lock:
-            self._ensure_documents_unlocked()
+            await self._ensure_documents_unlocked()
             rows = list(self.full_graph.query(action_query))
             meta_rows = list(self.full_graph.query(property_meta_query))
 
@@ -374,7 +374,7 @@ class HASPGraphCache:
         ORDER BY ?property ?artifact ?actionName
         """
         async with self._lock:
-            self._ensure_documents_unlocked()
+            await self._ensure_documents_unlocked()
             rows = list(self.full_graph.query(action_query))
 
         effects: List[Dict[str, Any]] = []
@@ -412,24 +412,36 @@ class HASPGraphCache:
 
     async def get_workspaces_ttl(self) -> str:
         async with self._lock:
-            self._ensure_documents_unlocked()
+            await self._ensure_documents_unlocked()
             return self.workspaces_ttl
 
     async def get_workspace_ttl(self, workspace_id: str) -> str:
         async with self._lock:
-            self._ensure_documents_unlocked()
+            await self._ensure_documents_unlocked()
             return self.workspace_ttls[workspace_id]
 
     async def get_artifacts_ttl(self, workspace_id: str) -> str:
         async with self._lock:
-            self._ensure_documents_unlocked()
+            await self._ensure_documents_unlocked()
             return self.artifacts_ttls[workspace_id]
 
     async def get_artifact_ttl(self, workspace_id: str, artifact_name: str) -> Tuple[str, str]:
+        # A single artifact's TD only depends on that entity's own state, which
+        # is already kept live via apply_state_change/refresh_states. Building
+        # it here directly avoids the full-workspace rebuild (one TD build +
+        # turtle parse per *every* entity) that _ensure_documents_unlocked
+        # would otherwise trigger on almost every read, since sensors keep the
+        # cache "dirty" nearly all the time.
         async with self._lock:
-            self._ensure_documents_unlocked()
-            _, device_entities, device, artifact_label, safe_name = self._resolve_artifact_unlocked(workspace_id, artifact_name)
-            return self.artifact_ttls[(workspace_id, safe_name)], artifact_label
+            device, device_entities, _, artifact_label, safe_name = self._resolve_artifact_unlocked(workspace_id, artifact_name)
+            state_map = {
+                ent.get("entity_id"): dict(self.states_by_entity_id.get(ent.get("entity_id"), {}))
+                for ent in device_entities
+                if ent.get("entity_id")
+            }
+            ttl = self.artifact_builder(workspace_id, safe_name, artifact_label, device_entities, state_map, device)
+            self.artifact_ttls[(workspace_id, safe_name)] = ttl
+            return ttl, artifact_label
 
     async def get_service_definition(self, domain: str, service: str) -> Optional[Dict[str, Any]]:
         async with self._lock:
@@ -632,7 +644,12 @@ class HASPGraphCache:
             raise KeyError("artifact_entities")
         return device, device_entities, device, decoded_name, urllib.parse.quote(decoded_name, safe="")
 
-    def _rebuild_documents_unlocked(self) -> None:
+    async def _rebuild_documents_unlocked(self) -> None:
+        # Rebuilding is one TD build + turtle parse per entity via rdflib (pure
+        # Python, CPU-bound). For workspaces with hundreds of entities this can
+        # take tens of seconds; yielding to the event loop periodically keeps
+        # the HA websocket sync and other connections from starving while a
+        # large workspace rebuilds (the total wall time is unchanged).
         self._documents_dirty = False
         self._last_rebuild_monotonic = time.monotonic()
         self.platform_ttl = ""
@@ -653,6 +670,7 @@ class HASPGraphCache:
             workspaces_rdf.workspace_to_rdf(area, [])
         self.workspaces_ttl = workspaces_rdf.serialize()
         self.full_graph.parse(data=self.workspaces_ttl, format="turtle")
+        await asyncio.sleep(0)
 
         for workspace_id, area in self.areas_by_id.items():
             devices = self.workspace_devices.get(workspace_id, [])
@@ -668,6 +686,7 @@ class HASPGraphCache:
                 ttl = self.artifact_builder(workspace_id, safe_name, label, [ent], self.states_by_entity_id, device)
                 self.artifact_ttls[(workspace_id, safe_name)] = ttl
                 self.full_graph.parse(data=ttl, format="turtle")
+                await asyncio.sleep(0)
 
     def _build_workspace_ttl(
         self,

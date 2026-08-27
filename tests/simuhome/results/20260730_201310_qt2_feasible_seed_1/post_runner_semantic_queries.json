@@ -1,0 +1,6 @@
+{
+  "thermal_comfort": {
+    "error": "TimeoutError",
+    "detail": "timed out"
+  }
+}
