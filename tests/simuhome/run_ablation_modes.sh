@@ -42,6 +42,10 @@ OUT_DIR="$(pwd)"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 RUNS="${RUNS:-10}"
 DRY_RUN="${DRY_RUN:-0}"
+# Per-invocation HASP port so co-located shards on one node neither collide
+# on the bind nor kill each other's adapter in the pre-run sweep. Derived
+# from the SLURM job id when present; override with HASP_PORT.
+HASP_PORT="${HASP_PORT:-$(( 18000 + ${SLURM_JOB_ID:-0} % 1000 ))}"
 
 MODES=(${MODES:-behavior_tree python_code py_trees_code})
 MODELS=(${MODELS:-qwen2.5-coder:3b codegemma:7b-instruct deepseek-coder:1.3b gpt-5-mini gpt-4o})
@@ -122,6 +126,7 @@ for model in "${MODELS[@]}"; do
 
             cmd=("${PYTHON_BIN}" "${SCRIPT_DIR}/run_simuhome_e2e.py" "${scenario}"
               --virtual-yaml-dir "${VIRTUAL_YAML_DIR}"
+              --hasp-port "${HASP_PORT}"
               --generation-mode "${mode}"
               --results-dir "${OUT_DIR}/results/${run_tag}"
               --results-csv "${csv}"
@@ -136,12 +141,15 @@ for model in "${MODELS[@]}"; do
               continue
             fi
             # A run that aborted mid-flight can leak its HASP/adapter or
-            # sidecar; a leftover bound to port 8080 makes every later run
-            # die at startup ("HASP exited unexpectedly"). Sweep before
-            # starting. Patterns are narrow enough not to match this script.
-            pkill -f "uvicorn hasp:app" 2>/dev/null || true
-            pkill -f "uvicorn ygg_ha_adapter:app" 2>/dev/null || true
-            pkill -f "simulate_simuhome_scenario[.]py" 2>/dev/null || true
+            # sidecar; a leftover bound to the HASP port makes every later
+            # run die at startup ("HASP exited unexpectedly"). Sweep before
+            # starting — but scope the patterns to THIS invocation (the
+            # per-job HASP port and this script's repo path): unscoped
+            # pkills SIGTERM a co-located shard's services on shared nodes
+            # (observed: 71 runs, zero yield, sidecar killed with -15).
+            pkill -f "uvicorn hasp:app --host 127.0.0.1 --port ${HASP_PORT}" 2>/dev/null || true
+            pkill -f "uvicorn ygg_ha_adapter:app --host 127.0.0.1 --port ${HASP_PORT}" 2>/dev/null || true
+            pkill -f "${SCRIPT_DIR}/simulate_simuhome_scenario[.]py" 2>/dev/null || true
             sleep 1
             "${cmd[@]}" 2>&1 | tee "${log}"
             status="${PIPESTATUS[0]}"

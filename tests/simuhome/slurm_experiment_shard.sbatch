@@ -26,7 +26,14 @@
 #
 # The HA config dir is COPIED to node-local /tmp per job, so concurrent shards
 # never share HA state; the long-lived token stays valid because the auth
-# storage is copied with it. Grid env vars (MODES/MODELS/FLAVORS/QUERY_TYPES/
+# storage is copied with it.
+#
+# CAUTION — do NOT schedule two shards onto the SAME node: Ollama and HASP
+# ports are per-job now, but HomeAssistant (8123), SPADE XMPP (5222) and the
+# notification webhook (8086) still bind fixed ports, so the second shard
+# silently borrows the first one's services — and the stale-workspace sweep
+# can then delete the other shard's live workspace when seeds coincide.
+# Place concurrent shards on different partitions (or --exclude the busy node). Grid env vars (MODES/MODELS/FLAVORS/QUERY_TYPES/
 # SEEDS/RUNS) pass straight through to run_ablation_modes.sh. Results land in
 # ~/experiments/shard_${SLURM_JOB_ID} on shared home.
 set -euo pipefail
