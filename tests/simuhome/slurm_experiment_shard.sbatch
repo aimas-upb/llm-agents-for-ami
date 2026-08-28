@@ -61,16 +61,25 @@ cleanup() {
 trap cleanup EXIT
 
 # ---- Ollama (GPU) ----
+# Per-job port: with the fixed 11434, a second job on the same node fails to
+# bind and silently *borrows* the first job's server through the health check
+# — and loses its LLM endpoint mid-shard when that other job exits (observed:
+# 50 zero-llm-call rows). A unique port makes the health check prove OUR
+# server is alive, and the kill -0 check catches a dead serve process.
+OLLAMA_PORT=$(( 11500 + SLURM_JOB_ID % 1000 ))
 export OLLAMA_MODELS="$HOME/ollama_models"
-export OLLAMA_HOST="127.0.0.1:11434"
+export OLLAMA_HOST="127.0.0.1:${OLLAMA_PORT}"
 export OLLAMA_KEEP_ALIVE="30m"
 "$OLLAMA_DIR/bin/ollama" serve > "$OUT_DIR/ollama.log" 2>&1 &
+OLLAMA_PID=$!
 for i in $(seq 1 60); do
-  curl -s -m 2 "http://127.0.0.1:11434/api/version" >/dev/null && break
+  curl -s -m 2 "http://127.0.0.1:${OLLAMA_PORT}/api/version" >/dev/null && break
+  kill -0 "$OLLAMA_PID" 2>/dev/null || break
   sleep 1
 done
-curl -s -m 2 "http://127.0.0.1:11434/api/version" >/dev/null || { echo "ERROR: ollama did not start"; exit 1; }
-echo "ollama up"
+kill -0 "$OLLAMA_PID" 2>/dev/null || { echo "ERROR: ollama serve died (port ${OLLAMA_PORT} taken?)"; tail -5 "$OUT_DIR/ollama.log"; exit 1; }
+curl -s -m 2 "http://127.0.0.1:${OLLAMA_PORT}/api/version" >/dev/null || { echo "ERROR: ollama did not start"; exit 1; }
+echo "ollama up on port ${OLLAMA_PORT}"
 
 # ---- HomeAssistant Core (node-local copy of the onboarded config) ----
 rm -rf "$HA_RUN_CONFIG"
@@ -97,7 +106,7 @@ export HA_URL="ws://localhost:8123/api/websocket"
 export HA_TOKEN
 export HA_VIRTUAL_CONFIG_PREFIX="$HA_RUN_CONFIG/custom_components/virtual"
 export VIRTUAL_YAML_DIR="$HA_RUN_CONFIG/custom_components/virtual"
-export OLLAMA_BASE_URL="http://127.0.0.1:11434/v1"
+export OLLAMA_BASE_URL="http://127.0.0.1:${OLLAMA_PORT}/v1"
 export SPADE_SERVER=localhost
 export SPADE_PASSWORD=password
 export PYTHON_BIN="$HOME/venvs/ami/bin/python"
