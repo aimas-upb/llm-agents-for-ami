@@ -26,6 +26,7 @@ import time
 
 from .http_client import HTTPClient, HTTPClientConfig, HTTPError
 from .blackboard_keys import BlackboardKeys
+from .async_support import FuturePollingMixin
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ class PropertyValue:
     url: str = ""
 
 
-class ActionAffordanceNode(py_trees.behaviour.Behaviour):
+class ActionAffordanceNode(FuturePollingMixin, py_trees.behaviour.Behaviour):
     """
     Behavior tree node for invoking action affordances.
     
@@ -223,6 +224,11 @@ class ActionAffordanceNode(py_trees.behaviour.Behaviour):
     def initialise(self) -> None:
         """
         Reset state at the start of a new tick cycle.
+
+        Does NOT drop an in-flight or just-completed request: the result may
+        have landed between ticks, and discarding it here would throw the
+        answer away and re-issue forever. `update()` clears the slot once it
+        has consumed the result.
         """
         self._last_result = None
         logger.debug(f"[{self.name}] Initializing for new tick")
@@ -263,13 +269,22 @@ class ActionAffordanceNode(py_trees.behaviour.Behaviour):
             Status.FAILURE if the action failed
         """
         params = self._build_parameters()
-        
-        logger.info(f"[{self.name}] Invoking action: {self.action_url}")
-        logger.debug(f"[{self.name}] Parameters: {params}")
-        
+
+        if self._future is None:
+            logger.info(f"[{self.name}] Invoking action: {self.action_url}")
+            logger.debug(f"[{self.name}] Parameters: {params}")
+        # Submitted once per attempt; the tick returns immediately and asks
+        # again next time rather than holding the agent for a round trip.
+        self._start(self._http_client.post, self.action_url, payload=params)
+        done, response, error = self._poll()
+        if not done:
+            return Status.RUNNING
+        self._reset()
+
         try:
-            response = self._http_client.post(self.action_url, payload=params)
-            
+            if error is not None:
+                raise error
+
             self._last_result = ActionResult(
                 success=response.is_success,
                 status_code=response.status_code,
@@ -286,12 +301,9 @@ class ActionAffordanceNode(py_trees.behaviour.Behaviour):
 
                 self._executed_successfully = True
                 self._store_result()
-                if self.settling_time_seconds > 0:
-                    logger.info(
-                        f"[{self.name}] Waiting {self.settling_time_seconds:.1f}s "
-                        "for action effects to settle"
-                    )
-                    time.sleep(self.settling_time_seconds)
+                # Settling is a SettlingTimeWaitNode sibling, not a sleep here:
+                # blocking the tick would stall every other plan for as long as
+                # this one waits. `_compile_action` emits the pair.
                 return Status.SUCCESS
             else:
                 self._last_result.error_message = f"HTTP {response.status_code}"
@@ -346,7 +358,7 @@ class ActionAffordanceNode(py_trees.behaviour.Behaviour):
         return self._last_result
 
 
-class PropertyAffordanceNode(py_trees.behaviour.Behaviour):
+class PropertyAffordanceNode(FuturePollingMixin, py_trees.behaviour.Behaviour):
     """
     Behavior tree node for reading property affordances.
     
@@ -455,7 +467,13 @@ class PropertyAffordanceNode(py_trees.behaviour.Behaviour):
         logger.debug(f"[{self.name}] Setup complete, property URL: {self.property_url}")
     
     def initialise(self) -> None:
-        """Reset state at the start of a new tick cycle."""
+        """Reset state at the start of a new tick cycle.
+
+        Does NOT drop an in-flight or just-completed request: the result may
+        have landed between ticks, and discarding it here would throw the
+        answer away and re-issue forever. `update()` clears the slot once it
+        has consumed the result.
+        """
         self._last_value = None
         logger.debug(f"[{self.name}] Initializing for new tick")
     
@@ -469,11 +487,18 @@ class PropertyAffordanceNode(py_trees.behaviour.Behaviour):
             Status.SUCCESS if the property was read successfully
             Status.FAILURE if the read failed
         """
-        logger.info(f"[{self.name}] Reading property: {self.property_url}")
-        
+        if self._future is None:
+            logger.info(f"[{self.name}] Reading property: {self.property_url}")
+        self._start(self._http_client.get, self.property_url)
+        done, response, error = self._poll()
+        if not done:
+            return Status.RUNNING
+        self._reset()
+
         try:
-            response = self._http_client.get(self.property_url)
-            
+            if error is not None:
+                raise error
+
             self._last_value = PropertyValue(
                 success=response.is_success,
                 value=response.body,
@@ -542,7 +567,7 @@ class PropertyAffordanceNode(py_trees.behaviour.Behaviour):
         return self._last_value
 
 
-class PropertyConditionNode(py_trees.behaviour.Behaviour):
+class PropertyConditionNode(FuturePollingMixin, py_trees.behaviour.Behaviour):
     """
     Behavior tree condition node for checking property values.
     
@@ -633,7 +658,13 @@ class PropertyConditionNode(py_trees.behaviour.Behaviour):
             self._http_client = HTTPClient(config=HTTPClientConfig())
     
     def initialise(self) -> None:
-        """Reset state at the start of a new tick cycle."""
+        """Reset state at the start of a new tick cycle.
+
+        Deliberately does NOT drop an in-flight or just-completed read: the
+        result may have landed between ticks, and discarding it here would
+        throw the answer away and re-issue the request forever. `update()`
+        clears the slot once it has consumed the result.
+        """
         self._actual_value = None
         self._comparison_result = None
     
@@ -678,11 +709,18 @@ class PropertyConditionNode(py_trees.behaviour.Behaviour):
             Status.SUCCESS if the comparison matches (or doesn't match if negate=True)
             Status.FAILURE if the comparison fails or property cannot be read
         """
-        logger.debug(f"[{self.name}] Checking property: {self.property_url}")
-        
+        if self._future is None:
+            logger.debug(f"[{self.name}] Checking property: {self.property_url}")
+        self._start(self._http_client.get, self.property_url)
+        done, response, error = self._poll()
+        if not done:
+            return Status.RUNNING
+        self._reset()
+
         try:
-            response = self._http_client.get(self.property_url)
-            
+            if error is not None:
+                raise error
+
             if not response.is_success:
                 logger.warning(
                     f"[{self.name}] Failed to read property: HTTP {response.status_code}"
@@ -867,14 +905,21 @@ class ComparisonPropertyConditionNode(PropertyConditionNode):
             Status.SUCCESS if the comparison matches (or doesn't match if negate=True)
             Status.FAILURE if the comparison fails or property cannot be read
         """
-        logger.debug(
-            f"[{self.name}] Checking property with operator {self.operator.value}: "
-            f"{self.property_url}"
-        )
-        
+        if self._future is None:
+            logger.debug(
+                f"[{self.name}] Checking property with operator {self.operator.value}: "
+                f"{self.property_url}"
+            )
+        self._start(self._http_client.get, self.property_url)
+        done, response, error = self._poll()
+        if not done:
+            return Status.RUNNING
+        self._reset()
+
         try:
-            response = self._http_client.get(self.property_url)
-            
+            if error is not None:
+                raise error
+
             if not response.is_success:
                 logger.warning(
                     f"[{self.name}] Failed to read property: HTTP {response.status_code}"
@@ -941,13 +986,22 @@ class WaitPropertyConditionNode(ComparisonPropertyConditionNode):
         self._started_at = time.monotonic()
 
     def update(self) -> Status:
-        logger.debug(
-            f"[{self.name}] Waiting for property with operator {self.operator.value}: "
-            f"{self.property_url}"
-        )
+        if self._future is None:
+            logger.debug(
+                f"[{self.name}] Waiting for property with operator {self.operator.value}: "
+                f"{self.property_url}"
+            )
+        self._start(self._http_client.get, self.property_url)
+        done, response, error = self._poll()
+        if not done:
+            # The read itself is still out. Distinct from "read came back and
+            # the condition is not met yet" below, but RUNNING either way.
+            return Status.RUNNING
+        self._reset()
 
         try:
-            response = self._http_client.get(self.property_url)
+            if error is not None:
+                raise error
 
             if not response.is_success:
                 logger.warning(
@@ -980,3 +1034,65 @@ class WaitPropertyConditionNode(ComparisonPropertyConditionNode):
         except HTTPError as e:
             logger.error(f"[{self.name}] HTTP error while waiting: {e.message}")
             return Status.FAILURE
+
+
+class SettlingTimeWaitNode(py_trees.behaviour.Behaviour):
+    """Wait a fixed span for an action's effects to reach the world.
+
+    Actuating something and reading it back immediately often reports the old
+    value: the simulator has not ticked, the device has not moved, the sensor
+    has not been resampled. The old code slept inside
+    `ActionAffordanceNode.update()`, which blocks the tick and therefore every
+    other plan in the agent.
+
+    This waits the same span without blocking anything -- RUNNING until the
+    time has passed, then SUCCESS. It is pure time: no HTTP, no thread, nothing
+    to cancel. `_compile_action` emits it as a Sequence sibling after any
+    action carrying a settling annotation.
+    """
+
+    def __init__(self, name: str, settling_seconds: float):
+        super().__init__(name=name)
+        self.settling_seconds = max(0.0, float(settling_seconds or 0.0))
+        self._started_at: Optional[float] = None
+
+        self.blackboard = self.attach_blackboard_client(name=self.name)
+        self._elapsed_key = BlackboardKeys.settling_elapsed_key(self.name)
+        self.blackboard.register_key(
+            key=self._elapsed_key, access=py_trees.common.Access.WRITE)
+
+    def initialise(self) -> None:
+        self._started_at = None
+
+    def update(self) -> Status:
+        if self.settling_seconds <= 0:
+            return Status.SUCCESS
+
+        now = time.monotonic()
+        if self._started_at is None:
+            self._started_at = now
+            logger.info(
+                f"[{self.name}] Waiting {self.settling_seconds:.1f}s "
+                "for action effects to settle"
+            )
+
+        elapsed = now - self._started_at
+        try:
+            self.blackboard.set(self._elapsed_key, elapsed)
+        except (KeyError, AttributeError):  # pragma: no cover - defensive
+            pass
+
+        if elapsed >= self.settling_seconds:
+            logger.debug(f"[{self.name}] Settled after {elapsed:.2f}s")
+            return Status.SUCCESS
+        return Status.RUNNING
+
+    def terminate(self, new_status: Status) -> None:
+        self._started_at = None
+
+    @property
+    def elapsed_seconds(self) -> float:
+        """How long this node has been waiting, 0 before it starts."""
+        if self._started_at is None:
+            return 0.0
+        return time.monotonic() - self._started_at

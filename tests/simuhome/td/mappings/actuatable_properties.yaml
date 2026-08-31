@@ -8,7 +8,7 @@ generator:
   table: actuatable_properties
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-08-25T16:28:33.417659+00:00'
+  generated_at_utc: '2026-08-29T16:29:56.722023+00:00'
 rows:
 - key: AirConditioner:6.0
   family: AirConditioner
@@ -18,8 +18,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:AirConditionerOnOff
-  subClassOf: ex:OnOff
+  property_type: homeont:AirConditionerOnOff
+  subClassOf: homeont:OnOff
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -37,9 +37,10 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:OnOff, which generalises the Matter process cluster across families
-    status_source: inherited from approved ex:OnOff
+    hierarchy: family leaf under homeont:OnOff, which generalises the Matter process cluster across families
+    status_source: inherited from approved homeont:OnOff
   status: auto
+  action_class: homeont:SetOnOffCommand
 - key: AirPurifier:6.0
   family: AirPurifier
   yaml_path: OnOff.OnOff
@@ -48,8 +49,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:AirPurifierOnOff
-  subClassOf: ex:OnOff
+  property_type: homeont:AirPurifierOnOff
+  subClassOf: homeont:OnOff
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -60,9 +61,10 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:OnOff, which generalises the Matter process cluster across families
-    status_source: inherited from approved ex:OnOff
+    hierarchy: family leaf under homeont:OnOff, which generalises the Matter process cluster across families
+    status_source: inherited from approved homeont:OnOff
   status: auto
+  action_class: homeont:SetOnOffCommand
 - key: Dehumidifier:6.0
   family: Dehumidifier
   yaml_path: OnOff.OnOff
@@ -71,8 +73,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DehumidifierOnOff
-  subClassOf: ex:OnOff
+  property_type: homeont:DehumidifierOnOff
+  subClassOf: homeont:OnOff
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -83,9 +85,10 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:OnOff, which generalises the Matter process cluster across families
-    status_source: inherited from approved ex:OnOff
+    hierarchy: family leaf under homeont:OnOff, which generalises the Matter process cluster across families
+    status_source: inherited from approved homeont:OnOff
   status: auto
+  action_class: homeont:SetOnOffCommand
 - key: DimmableLight:6.0
   family: DimmableLight
   yaml_path: OnOff.OnOff
@@ -94,8 +97,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DimmableLightOnOff
-  subClassOf: ex:OnOff
+  property_type: homeont:DimmableLightOnOff
+  subClassOf: homeont:OnOff
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -106,9 +109,10 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:OnOff, which generalises the Matter process cluster across families
-    status_source: inherited from approved ex:OnOff
+    hierarchy: family leaf under homeont:OnOff, which generalises the Matter process cluster across families
+    status_source: inherited from approved homeont:OnOff
   status: auto
+  action_class: homeont:SetOnOffCommand
 - key: Dishwasher:6.0
   family: Dishwasher
   yaml_path: OnOff.OnOff
@@ -117,8 +121,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DishwasherOnOff
-  subClassOf: ex:OnOff
+  property_type: homeont:DishwasherOnOff
+  subClassOf: homeont:OnOff
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -129,9 +133,10 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:OnOff, which generalises the Matter process cluster across families
-    status_source: inherited from approved ex:OnOff
+    hierarchy: family leaf under homeont:OnOff, which generalises the Matter process cluster across families
+    status_source: inherited from approved homeont:OnOff
   status: auto
+  action_class: homeont:SetOnOffCommand
 - key: Fan:6.0
   family: Fan
   yaml_path: OnOff.OnOff
@@ -140,8 +145,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:FanOnOff
-  subClassOf: ex:OnOff
+  property_type: homeont:FanOnOff
+  subClassOf: homeont:OnOff
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -152,9 +157,10 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:OnOff, which generalises the Matter process cluster across families
-    status_source: inherited from approved ex:OnOff
+    hierarchy: family leaf under homeont:OnOff, which generalises the Matter process cluster across families
+    status_source: inherited from approved homeont:OnOff
   status: auto
+  action_class: homeont:SetOnOffCommand
 - key: Humidifier:6.0
   family: Humidifier
   yaml_path: OnOff.OnOff
@@ -163,8 +169,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:HumidifierOnOff
-  subClassOf: ex:OnOff
+  property_type: homeont:HumidifierOnOff
+  subClassOf: homeont:OnOff
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -175,9 +181,10 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:OnOff, which generalises the Matter process cluster across families
-    status_source: inherited from approved ex:OnOff
+    hierarchy: family leaf under homeont:OnOff, which generalises the Matter process cluster across families
+    status_source: inherited from approved homeont:OnOff
   status: auto
+  action_class: homeont:SetOnOffCommand
 - key: LaundryDryer:6.0
   family: LaundryDryer
   yaml_path: OnOff.OnOff
@@ -186,8 +193,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:LaundryDryerOnOff
-  subClassOf: ex:OnOff
+  property_type: homeont:LaundryDryerOnOff
+  subClassOf: homeont:OnOff
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -198,9 +205,10 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:OnOff, which generalises the Matter process cluster across families
-    status_source: inherited from approved ex:OnOff
+    hierarchy: family leaf under homeont:OnOff, which generalises the Matter process cluster across families
+    status_source: inherited from approved homeont:OnOff
   status: auto
+  action_class: homeont:SetOnOffCommand
 - key: LaundryWasher:6.0
   family: LaundryWasher
   yaml_path: OnOff.OnOff
@@ -209,8 +217,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:LaundryWasherOnOff
-  subClassOf: ex:OnOff
+  property_type: homeont:LaundryWasherOnOff
+  subClassOf: homeont:OnOff
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -221,9 +229,10 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:OnOff, which generalises the Matter process cluster across families
-    status_source: inherited from approved ex:OnOff
+    hierarchy: family leaf under homeont:OnOff, which generalises the Matter process cluster across families
+    status_source: inherited from approved homeont:OnOff
   status: auto
+  action_class: homeont:SetOnOffCommand
 - key: OnOffLight:6.0
   family: OnOffLight
   yaml_path: OnOff.OnOff
@@ -232,8 +241,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:OnOffLightOnOff
-  subClassOf: ex:OnOff
+  property_type: homeont:OnOffLightOnOff
+  subClassOf: homeont:OnOff
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -244,9 +253,10 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:OnOff, which generalises the Matter process cluster across families
-    status_source: inherited from approved ex:OnOff
+    hierarchy: family leaf under homeont:OnOff, which generalises the Matter process cluster across families
+    status_source: inherited from approved homeont:OnOff
   status: auto
+  action_class: homeont:SetOnOffCommand
 - key: Tv:6.0
   family: Tv
   yaml_path: OnOff.OnOff
@@ -255,8 +265,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:TvOnOff
-  subClassOf: ex:OnOff
+  property_type: homeont:TvOnOff
+  subClassOf: homeont:OnOff
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -267,9 +277,10 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:OnOff, which generalises the Matter process cluster across families
-    status_source: inherited from approved ex:OnOff
+    hierarchy: family leaf under homeont:OnOff, which generalises the Matter process cluster across families
+    status_source: inherited from approved homeont:OnOff
   status: auto
+  action_class: homeont:SetOnOffCommand
 - key: DimmableLight:6.16385
   family: DimmableLight
   yaml_path: OnOff.OnTime
@@ -278,8 +289,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DimmableLightOnTime
-  subClassOf: ex:OnOffOnTime
+  property_type: homeont:DimmableLightOnTime
+  subClassOf: homeont:OnOffOnTime
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: parameter
@@ -297,9 +308,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:OnOffOnTime, which generalises the Matter process cluster across families
+    hierarchy: family leaf under homeont:OnOffOnTime, which generalises the Matter process cluster across
+      families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: DimmableLight:6.16386
   family: DimmableLight
   yaml_path: OnOff.OffWaitTime
@@ -308,8 +321,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DimmableLightOffWaitTime
-  subClassOf: ex:OnOffOffWaitTime
+  property_type: homeont:DimmableLightOffWaitTime
+  subClassOf: homeont:OnOffOffWaitTime
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: parameter
@@ -327,10 +340,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:OnOffOffWaitTime, which generalises the Matter process cluster across
-      families
+    hierarchy: family leaf under homeont:OnOffOffWaitTime, which generalises the Matter process cluster
+      across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: DimmableLight:6.16387
   family: DimmableLight
   yaml_path: OnOff.StartUpOnOff
@@ -339,8 +353,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DimmableLightStartUpOnOff
-  subClassOf: ex:OnOffStartUpOnOff
+  property_type: homeont:DimmableLightStartUpOnOff
+  subClassOf: homeont:OnOffStartUpOnOff
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: startup
@@ -358,10 +372,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:OnOffStartUpOnOff, which generalises the Matter process cluster across
-      families
+    hierarchy: family leaf under homeont:OnOffStartUpOnOff, which generalises the Matter process cluster
+      across families
     status_source: own classification
   status: auto
+  action_class: homeont:SetOnOffCommand
 - key: DimmableLight:8.0
   family: DimmableLight
   yaml_path: LevelControl.CurrentLevel
@@ -370,8 +385,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DimmableLightBrightness
-  subClassOf: ex:LevelControlBrightness
+  property_type: homeont:DimmableLightBrightness
+  subClassOf: homeont:LevelControlBrightness
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -389,10 +404,11 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:LevelControlBrightness, which generalises the Matter process cluster
-      across families
-    status_source: inherited from approved ex:LevelControlBrightness
+    hierarchy: family leaf under homeont:LevelControlBrightness, which generalises the Matter process
+      cluster across families
+    status_source: inherited from approved homeont:LevelControlBrightness
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: Tv:8.0
   family: Tv
   yaml_path: LevelControl.CurrentLevel
@@ -401,8 +417,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:TvBrightness
-  subClassOf: ex:LevelControlBrightness
+  property_type: homeont:TvBrightness
+  subClassOf: homeont:LevelControlBrightness
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -413,10 +429,11 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:LevelControlBrightness, which generalises the Matter process cluster
-      across families
-    status_source: inherited from approved ex:LevelControlBrightness
+    hierarchy: family leaf under homeont:LevelControlBrightness, which generalises the Matter process
+      cluster across families
+    status_source: inherited from approved homeont:LevelControlBrightness
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: DimmableLight:8.15
   family: DimmableLight
   yaml_path: LevelControl.Options
@@ -425,8 +442,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DimmableLightOptions
-  subClassOf: ex:LevelControlOptions
+  property_type: homeont:DimmableLightOptions
+  subClassOf: homeont:LevelControlOptions
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: parameter
@@ -444,10 +461,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LevelControlOptions, which generalises the Matter process cluster
+    hierarchy: family leaf under homeont:LevelControlOptions, which generalises the Matter process cluster
       across families
     status_source: own classification
   status: auto
+  action_class: homeont:SetModeCommand
 - key: Tv:8.15
   family: Tv
   yaml_path: LevelControl.Options
@@ -456,8 +474,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:TvOptions
-  subClassOf: ex:LevelControlOptions
+  property_type: homeont:TvOptions
+  subClassOf: homeont:LevelControlOptions
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: parameter
@@ -468,10 +486,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LevelControlOptions, which generalises the Matter process cluster
+    hierarchy: family leaf under homeont:LevelControlOptions, which generalises the Matter process cluster
       across families
     status_source: own classification
   status: auto
+  action_class: homeont:SetModeCommand
 - key: DimmableLight:8.16
   family: DimmableLight
   yaml_path: LevelControl.OnOffTransitionTime
@@ -480,8 +499,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DimmableLightOnOffTransitionTime
-  subClassOf: ex:LevelControlOnOffTransitionTime
+  property_type: homeont:DimmableLightOnOffTransitionTime
+  subClassOf: homeont:LevelControlOnOffTransitionTime
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: parameter
@@ -499,10 +518,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LevelControlOnOffTransitionTime, which generalises the Matter process
-      cluster across families
+    hierarchy: family leaf under homeont:LevelControlOnOffTransitionTime, which generalises the Matter
+      process cluster across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: Tv:8.16
   family: Tv
   yaml_path: LevelControl.OnOffTransitionTime
@@ -511,8 +531,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:TvOnOffTransitionTime
-  subClassOf: ex:LevelControlOnOffTransitionTime
+  property_type: homeont:TvOnOffTransitionTime
+  subClassOf: homeont:LevelControlOnOffTransitionTime
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: parameter
@@ -523,10 +543,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LevelControlOnOffTransitionTime, which generalises the Matter process
-      cluster across families
+    hierarchy: family leaf under homeont:LevelControlOnOffTransitionTime, which generalises the Matter
+      process cluster across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: DimmableLight:8.17
   family: DimmableLight
   yaml_path: LevelControl.OnLevel
@@ -535,8 +556,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DimmableLightOnLevel
-  subClassOf: ex:LevelControlOnLevel
+  property_type: homeont:DimmableLightOnLevel
+  subClassOf: homeont:LevelControlOnLevel
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: parameter
@@ -554,10 +575,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LevelControlOnLevel, which generalises the Matter process cluster
+    hierarchy: family leaf under homeont:LevelControlOnLevel, which generalises the Matter process cluster
       across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: Tv:8.17
   family: Tv
   yaml_path: LevelControl.OnLevel
@@ -566,8 +588,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:TvOnLevel
-  subClassOf: ex:LevelControlOnLevel
+  property_type: homeont:TvOnLevel
+  subClassOf: homeont:LevelControlOnLevel
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: parameter
@@ -578,10 +600,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LevelControlOnLevel, which generalises the Matter process cluster
+    hierarchy: family leaf under homeont:LevelControlOnLevel, which generalises the Matter process cluster
       across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: DimmableLight:8.18
   family: DimmableLight
   yaml_path: LevelControl.OnTransitionTime
@@ -590,8 +613,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DimmableLightOnTransitionTime
-  subClassOf: ex:LevelControlOnTransitionTime
+  property_type: homeont:DimmableLightOnTransitionTime
+  subClassOf: homeont:LevelControlOnTransitionTime
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: parameter
@@ -609,10 +632,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LevelControlOnTransitionTime, which generalises the Matter process
+    hierarchy: family leaf under homeont:LevelControlOnTransitionTime, which generalises the Matter process
       cluster across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: Tv:8.18
   family: Tv
   yaml_path: LevelControl.OnTransitionTime
@@ -621,8 +645,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:TvOnTransitionTime
-  subClassOf: ex:LevelControlOnTransitionTime
+  property_type: homeont:TvOnTransitionTime
+  subClassOf: homeont:LevelControlOnTransitionTime
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: parameter
@@ -633,10 +657,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LevelControlOnTransitionTime, which generalises the Matter process
+    hierarchy: family leaf under homeont:LevelControlOnTransitionTime, which generalises the Matter process
       cluster across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: DimmableLight:8.19
   family: DimmableLight
   yaml_path: LevelControl.OffTransitionTime
@@ -645,8 +670,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DimmableLightOffTransitionTime
-  subClassOf: ex:LevelControlOffTransitionTime
+  property_type: homeont:DimmableLightOffTransitionTime
+  subClassOf: homeont:LevelControlOffTransitionTime
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: parameter
@@ -664,10 +689,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LevelControlOffTransitionTime, which generalises the Matter process
+    hierarchy: family leaf under homeont:LevelControlOffTransitionTime, which generalises the Matter process
       cluster across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: Tv:8.19
   family: Tv
   yaml_path: LevelControl.OffTransitionTime
@@ -676,8 +702,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:TvOffTransitionTime
-  subClassOf: ex:LevelControlOffTransitionTime
+  property_type: homeont:TvOffTransitionTime
+  subClassOf: homeont:LevelControlOffTransitionTime
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: parameter
@@ -688,10 +714,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LevelControlOffTransitionTime, which generalises the Matter process
+    hierarchy: family leaf under homeont:LevelControlOffTransitionTime, which generalises the Matter process
       cluster across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: DimmableLight:8.20
   family: DimmableLight
   yaml_path: LevelControl.DefaultMoveRate
@@ -700,8 +727,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DimmableLightDefaultMoveRate
-  subClassOf: ex:LevelControlDefaultMoveRate
+  property_type: homeont:DimmableLightDefaultMoveRate
+  subClassOf: homeont:LevelControlDefaultMoveRate
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: parameter
@@ -719,10 +746,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LevelControlDefaultMoveRate, which generalises the Matter process
+    hierarchy: family leaf under homeont:LevelControlDefaultMoveRate, which generalises the Matter process
       cluster across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: Tv:8.20
   family: Tv
   yaml_path: LevelControl.DefaultMoveRate
@@ -731,8 +759,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:TvDefaultMoveRate
-  subClassOf: ex:LevelControlDefaultMoveRate
+  property_type: homeont:TvDefaultMoveRate
+  subClassOf: homeont:LevelControlDefaultMoveRate
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: parameter
@@ -743,10 +771,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LevelControlDefaultMoveRate, which generalises the Matter process
+    hierarchy: family leaf under homeont:LevelControlDefaultMoveRate, which generalises the Matter process
       cluster across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: DimmableLight:8.16384
   family: DimmableLight
   yaml_path: LevelControl.StartUpCurrentLevel
@@ -755,8 +784,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DimmableLightStartUpCurrentLevel
-  subClassOf: ex:LevelControlStartUpCurrentLevel
+  property_type: homeont:DimmableLightStartUpCurrentLevel
+  subClassOf: homeont:LevelControlStartUpCurrentLevel
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: startup
@@ -774,10 +803,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LevelControlStartUpCurrentLevel, which generalises the Matter process
-      cluster across families
+    hierarchy: family leaf under homeont:LevelControlStartUpCurrentLevel, which generalises the Matter
+      process cluster across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: Tv:8.16384
   family: Tv
   yaml_path: LevelControl.StartUpCurrentLevel
@@ -786,8 +816,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:TvStartUpCurrentLevel
-  subClassOf: ex:LevelControlStartUpCurrentLevel
+  property_type: homeont:TvStartUpCurrentLevel
+  subClassOf: homeont:LevelControlStartUpCurrentLevel
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: startup
@@ -798,10 +828,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LevelControlStartUpCurrentLevel, which generalises the Matter process
-      cluster across families
+    hierarchy: family leaf under homeont:LevelControlStartUpCurrentLevel, which generalises the Matter
+      process cluster across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: LaundryDryer:74.1
   family: LaundryDryer
   yaml_path: LaundryDryerControls.SelectedDrynessLevel
@@ -810,8 +841,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:LaundryDryerSelectedDrynessLevel
-  subClassOf: ex:LaundryDryerControlsSelectedDrynessLevel
+  property_type: homeont:LaundryDryerSelectedDrynessLevel
+  subClassOf: homeont:LaundryDryerControlsSelectedDrynessLevel
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -829,10 +860,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LaundryDryerControlsSelectedDrynessLevel, which generalises the Matter
-      process cluster across families
+    hierarchy: family leaf under homeont:LaundryDryerControlsSelectedDrynessLevel, which generalises the
+      Matter process cluster across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: LaundryWasher:81.1
   family: LaundryWasher
   yaml_path: LaundryWasherMode.CurrentMode
@@ -841,8 +873,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:LaundryWasherCurrentMode
-  subClassOf: ex:LaundryWasherModeCurrentMode
+  property_type: homeont:LaundryWasherCurrentMode
+  subClassOf: homeont:LaundryWasherModeCurrentMode
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -860,10 +892,11 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:LaundryWasherModeCurrentMode, which generalises the Matter process
+    hierarchy: family leaf under homeont:LaundryWasherModeCurrentMode, which generalises the Matter process
       cluster across families
-    status_source: inherited from approved ex:LaundryWasherModeCurrentMode
+    status_source: inherited from approved homeont:LaundryWasherModeCurrentMode
   status: auto
+  action_class: homeont:SetModeCommand
 - key: Freezer:82.1
   family: Freezer
   yaml_path: RTCCMode.CurrentMode
@@ -872,8 +905,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:FreezerRefrigeratorAndTemperatureControlledCabinetModeCurrentMode
-  subClassOf: ex:RefrigeratorAndTemperatureControlledCabinetModeCurrentMode
+  property_type: homeont:FreezerRefrigeratorAndTemperatureControlledCabinetModeCurrentMode
+  subClassOf: homeont:RefrigeratorAndTemperatureControlledCabinetModeCurrentMode
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -891,10 +924,11 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:RefrigeratorAndTemperatureControlledCabinetModeCurrentMode, which
+    hierarchy: family leaf under homeont:RefrigeratorAndTemperatureControlledCabinetModeCurrentMode, which
       generalises the Matter process cluster across families
-    status_source: inherited from approved ex:RefrigeratorAndTemperatureControlledCabinetModeCurrentMode
+    status_source: inherited from approved homeont:RefrigeratorAndTemperatureControlledCabinetModeCurrentMode
   status: auto
+  action_class: homeont:SetModeCommand
 - key: Refrigerator:82.1
   family: Refrigerator
   yaml_path: RTCCMode.CurrentMode
@@ -903,8 +937,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:RefrigeratorRefrigeratorAndTemperatureControlledCabinetModeCurrentMode
-  subClassOf: ex:RefrigeratorAndTemperatureControlledCabinetModeCurrentMode
+  property_type: homeont:RefrigeratorRefrigeratorAndTemperatureControlledCabinetModeCurrentMode
+  subClassOf: homeont:RefrigeratorAndTemperatureControlledCabinetModeCurrentMode
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -915,10 +949,11 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:RefrigeratorAndTemperatureControlledCabinetModeCurrentMode, which
+    hierarchy: family leaf under homeont:RefrigeratorAndTemperatureControlledCabinetModeCurrentMode, which
       generalises the Matter process cluster across families
-    status_source: inherited from approved ex:RefrigeratorAndTemperatureControlledCabinetModeCurrentMode
+    status_source: inherited from approved homeont:RefrigeratorAndTemperatureControlledCabinetModeCurrentMode
   status: auto
+  action_class: homeont:SetModeCommand
 - key: LaundryWasher:83.1
   family: LaundryWasher
   yaml_path: LaundryWasherControls.SpinSpeedCurrent
@@ -927,8 +962,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:LaundryWasherSpinSpeedCurrent
-  subClassOf: ex:LaundryWasherControlsSpinSpeedCurrent
+  property_type: homeont:LaundryWasherSpinSpeedCurrent
+  subClassOf: homeont:LaundryWasherControlsSpinSpeedCurrent
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -946,10 +981,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LaundryWasherControlsSpinSpeedCurrent, which generalises the Matter
-      process cluster across families
+    hierarchy: family leaf under homeont:LaundryWasherControlsSpinSpeedCurrent, which generalises the
+      Matter process cluster across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: LaundryWasher:83.2
   family: LaundryWasher
   yaml_path: LaundryWasherControls.NumberOfRinses
@@ -958,8 +994,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:LaundryWasherNumberOfRinses
-  subClassOf: ex:LaundryWasherControlsNumberOfRinses
+  property_type: homeont:LaundryWasherNumberOfRinses
+  subClassOf: homeont:LaundryWasherControlsNumberOfRinses
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -977,10 +1013,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:LaundryWasherControlsNumberOfRinses, which generalises the Matter
+    hierarchy: family leaf under homeont:LaundryWasherControlsNumberOfRinses, which generalises the Matter
       process cluster across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: Rvc:84.1
   family: Rvc
   yaml_path: RVCRunMode.CurrentMode
@@ -989,8 +1026,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:RvcCurrentMode
-  subClassOf: ex:RVCRunModeCurrentMode
+  property_type: homeont:RvcCurrentMode
+  subClassOf: homeont:RVCRunModeCurrentMode
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1008,10 +1045,11 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:RVCRunModeRunCurrentMode, which generalises the Matter process cluster
-      across families
-    status_source: inherited from approved ex:RVCRunModeRunCurrentMode
+    hierarchy: family leaf under homeont:RVCRunModeRunCurrentMode, which generalises the Matter process
+      cluster across families
+    status_source: inherited from approved homeont:RVCRunModeRunCurrentMode
   status: auto
+  action_class: homeont:SetModeCommand
 - key: Rvc:85.1
   family: Rvc
   yaml_path: RVCCleanMode.CurrentMode
@@ -1020,8 +1058,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:RvcCurrentMode
-  subClassOf: ex:RVCCleanModeCurrentMode
+  property_type: homeont:RvcCurrentMode
+  subClassOf: homeont:RVCCleanModeCurrentMode
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1039,10 +1077,11 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:RVCCleanModeCleanCurrentMode, which generalises the Matter process
+    hierarchy: family leaf under homeont:RVCCleanModeCleanCurrentMode, which generalises the Matter process
       cluster across families
-    status_source: inherited from approved ex:RVCCleanModeCleanCurrentMode
+    status_source: inherited from approved homeont:RVCCleanModeCleanCurrentMode
   status: auto
+  action_class: homeont:SetModeCommand
 - key: Freezer:86.0
   family: Freezer
   yaml_path: TemperatureControl.TemperatureSetpoint
@@ -1051,8 +1090,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:FreezerTemperatureSetpoint
-  subClassOf: ex:TemperatureControlTemperatureSetpoint
+  property_type: homeont:FreezerTemperatureSetpoint
+  subClassOf: homeont:TemperatureControlTemperatureSetpoint
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1070,10 +1109,11 @@ rows:
   unit: °C
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:TemperatureControlTemperatureSetpoint, which generalises the Matter
-      process cluster across families
-    status_source: inherited from approved ex:TemperatureControlTemperatureSetpoint
+    hierarchy: family leaf under homeont:TemperatureControlTemperatureSetpoint, which generalises the
+      Matter process cluster across families
+    status_source: inherited from approved homeont:TemperatureControlTemperatureSetpoint
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: LaundryWasher:86.0
   family: LaundryWasher
   yaml_path: TemperatureControl.TemperatureSetpoint
@@ -1082,8 +1122,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:LaundryWasherTemperatureSetpoint
-  subClassOf: ex:TemperatureControlTemperatureSetpoint
+  property_type: homeont:LaundryWasherTemperatureSetpoint
+  subClassOf: homeont:TemperatureControlTemperatureSetpoint
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1094,10 +1134,11 @@ rows:
   unit: °C
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:TemperatureControlTemperatureSetpoint, which generalises the Matter
-      process cluster across families
-    status_source: inherited from approved ex:TemperatureControlTemperatureSetpoint
+    hierarchy: family leaf under homeont:TemperatureControlTemperatureSetpoint, which generalises the
+      Matter process cluster across families
+    status_source: inherited from approved homeont:TemperatureControlTemperatureSetpoint
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: Refrigerator:86.0
   family: Refrigerator
   yaml_path: TemperatureControl.TemperatureSetpoint
@@ -1106,8 +1147,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:RefrigeratorTemperatureSetpoint
-  subClassOf: ex:TemperatureControlTemperatureSetpoint
+  property_type: homeont:RefrigeratorTemperatureSetpoint
+  subClassOf: homeont:TemperatureControlTemperatureSetpoint
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1118,10 +1159,11 @@ rows:
   unit: °C
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:TemperatureControlTemperatureSetpoint, which generalises the Matter
-      process cluster across families
-    status_source: inherited from approved ex:TemperatureControlTemperatureSetpoint
+    hierarchy: family leaf under homeont:TemperatureControlTemperatureSetpoint, which generalises the
+      Matter process cluster across families
+    status_source: inherited from approved homeont:TemperatureControlTemperatureSetpoint
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: Dishwasher:89.1
   family: Dishwasher
   yaml_path: DishwasherMode.CurrentMode
@@ -1130,8 +1172,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DishwasherCurrentMode
-  subClassOf: ex:DishwasherModeCurrentMode
+  property_type: homeont:DishwasherCurrentMode
+  subClassOf: homeont:DishwasherModeCurrentMode
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1149,10 +1191,11 @@ rows:
   unit: null
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:DishwasherModeCurrentMode, which generalises the Matter process cluster
-      across families
-    status_source: inherited from approved ex:DishwasherModeCurrentMode
+    hierarchy: family leaf under homeont:DishwasherModeCurrentMode, which generalises the Matter process
+      cluster across families
+    status_source: inherited from approved homeont:DishwasherModeCurrentMode
   status: auto
+  action_class: homeont:SetModeCommand
 - key: WindowCoveringController:258.11
   family: WindowCoveringController
   yaml_path: WindowCovering.TargetPositionLiftPercent100ths
@@ -1161,8 +1204,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:WindowCoveringControllerTargetPosition
-  subClassOf: ex:WindowCoveringTargetPosition
+  property_type: homeont:WindowCoveringControllerTargetPosition
+  subClassOf: homeont:WindowCoveringTargetPosition
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1180,10 +1223,11 @@ rows:
   unit: '%'
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:WindowCoveringTargetPosition, which generalises the Matter process
+    hierarchy: family leaf under homeont:WindowCoveringTargetPosition, which generalises the Matter process
       cluster across families
-    status_source: inherited from approved ex:WindowCoveringTargetPosition
+    status_source: inherited from approved homeont:WindowCoveringTargetPosition
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: WindowCoveringController:258.14
   family: WindowCoveringController
   yaml_path: WindowCovering.CurrentPositionLiftPercent100ths
@@ -1192,8 +1236,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:WindowCoveringControllerPosition
-  subClassOf: ex:WindowCoveringPosition
+  property_type: homeont:WindowCoveringControllerPosition
+  subClassOf: homeont:WindowCoveringPosition
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1211,10 +1255,11 @@ rows:
   unit: '%'
   evidence:
     rationale: read-only in the spec but driven by cluster commands
-    hierarchy: family leaf under ex:WindowCoveringPosition, which generalises the Matter process cluster
-      across families
-    status_source: inherited from approved ex:WindowCoveringPosition
+    hierarchy: family leaf under homeont:WindowCoveringPosition, which generalises the Matter process
+      cluster across families
+    status_source: inherited from approved homeont:WindowCoveringPosition
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: WindowCoveringController:258.23
   family: WindowCoveringController
   yaml_path: WindowCovering.Mode
@@ -1223,8 +1268,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:WindowCoveringControllerMode
-  subClassOf: ex:WindowCoveringMode
+  property_type: homeont:WindowCoveringControllerMode
+  subClassOf: homeont:WindowCoveringMode
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: capability
@@ -1242,10 +1287,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:WindowCoveringMode, which generalises the Matter process cluster across
-      families
+    hierarchy: family leaf under homeont:WindowCoveringMode, which generalises the Matter process cluster
+      across families
     status_source: own classification
   status: auto
+  action_class: homeont:SetModeCommand
 - key: AirConditioner:513.17
   family: AirConditioner
   yaml_path: Thermostat.OccupiedCoolingSetpoint
@@ -1254,8 +1300,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: quantity_target
   property_node: anonymous
-  property_type: ex:AirTemperature
-  subClassOf: null
+  property_type: homeont:AirConditionerCoolingSetpoint
+  subClassOf: homeont:TemperatureSetpoint
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1276,6 +1322,7 @@ rows:
     hierarchy: shared environmental quantity; no family leaf
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: HeatPump:513.17
   family: HeatPump
   yaml_path: Thermostat.OccupiedCoolingSetpoint
@@ -1284,8 +1331,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: quantity_target
   property_node: anonymous
-  property_type: ex:AirTemperature
-  subClassOf: null
+  property_type: homeont:HeatPumpCoolingSetpoint
+  subClassOf: homeont:TemperatureSetpoint
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1299,6 +1346,7 @@ rows:
     hierarchy: shared environmental quantity; no family leaf
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: AirConditioner:513.18
   family: AirConditioner
   yaml_path: Thermostat.OccupiedHeatingSetpoint
@@ -1307,8 +1355,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: quantity_target
   property_node: anonymous
-  property_type: ex:AirTemperature
-  subClassOf: null
+  property_type: homeont:AirConditionerHeatingSetpoint
+  subClassOf: homeont:TemperatureSetpoint
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1329,6 +1377,7 @@ rows:
     hierarchy: shared environmental quantity; no family leaf
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: HeatPump:513.18
   family: HeatPump
   yaml_path: Thermostat.OccupiedHeatingSetpoint
@@ -1337,8 +1386,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: quantity_target
   property_node: anonymous
-  property_type: ex:AirTemperature
-  subClassOf: null
+  property_type: homeont:HeatPumpHeatingSetpoint
+  subClassOf: homeont:TemperatureSetpoint
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1352,6 +1401,7 @@ rows:
     hierarchy: shared environmental quantity; no family leaf
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: AirConditioner:513.27
   family: AirConditioner
   yaml_path: Thermostat.ControlSequenceOfOperation
@@ -1360,8 +1410,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:AirConditionerControlSequenceOfOperation
-  subClassOf: ex:ThermostatControlSequenceOfOperation
+  property_type: homeont:AirConditionerControlSequenceOfOperation
+  subClassOf: homeont:ThermostatControlSequenceOfOperation
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: capability
@@ -1379,10 +1429,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:ThermostatControlSequenceOfOperation, which generalises the Matter
+    hierarchy: family leaf under homeont:ThermostatControlSequenceOfOperation, which generalises the Matter
       process cluster across families
     status_source: own classification
   status: auto
+  action_class: homeont:SetModeCommand
 - key: HeatPump:513.27
   family: HeatPump
   yaml_path: Thermostat.ControlSequenceOfOperation
@@ -1391,8 +1442,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:HeatPumpControlSequenceOfOperation
-  subClassOf: ex:ThermostatControlSequenceOfOperation
+  property_type: homeont:HeatPumpControlSequenceOfOperation
+  subClassOf: homeont:ThermostatControlSequenceOfOperation
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: false
   no_effect_reason: capability
@@ -1403,10 +1454,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:ThermostatControlSequenceOfOperation, which generalises the Matter
+    hierarchy: family leaf under homeont:ThermostatControlSequenceOfOperation, which generalises the Matter
       process cluster across families
     status_source: own classification
   status: auto
+  action_class: homeont:SetModeCommand
 - key: AirConditioner:513.28
   family: AirConditioner
   yaml_path: Thermostat.SystemMode
@@ -1415,8 +1467,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:AirConditionerHvacMode
-  subClassOf: ex:ThermostatHvacMode
+  property_type: homeont:AirConditionerHvacMode
+  subClassOf: homeont:ThermostatHvacMode
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1434,10 +1486,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:ThermostatHvacMode, which generalises the Matter process cluster across
-      families
+    hierarchy: family leaf under homeont:ThermostatHvacMode, which generalises the Matter process cluster
+      across families
     status_source: own classification
   status: auto
+  action_class: homeont:SetModeCommand
 - key: HeatPump:513.28
   family: HeatPump
   yaml_path: Thermostat.SystemMode
@@ -1446,8 +1499,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:HeatPumpHvacMode
-  subClassOf: ex:ThermostatHvacMode
+  property_type: homeont:HeatPumpHvacMode
+  subClassOf: homeont:ThermostatHvacMode
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1458,10 +1511,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:ThermostatHvacMode, which generalises the Matter process cluster across
-      families
+    hierarchy: family leaf under homeont:ThermostatHvacMode, which generalises the Matter process cluster
+      across families
     status_source: own classification
   status: auto
+  action_class: homeont:SetModeCommand
 - key: AirConditioner:514.0
   family: AirConditioner
   yaml_path: FanControl.FanMode
@@ -1470,8 +1524,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:AirConditionerFanMode
-  subClassOf: ex:FanControlFanMode
+  property_type: homeont:AirConditionerFanMode
+  subClassOf: homeont:FanControlFanMode
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1489,10 +1543,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:FanControlFanMode, which generalises the Matter process cluster across
-      families
+    hierarchy: family leaf under homeont:FanControlFanMode, which generalises the Matter process cluster
+      across families
     status_source: own classification
   status: auto
+  action_class: homeont:SetModeCommand
 - key: AirPurifier:514.0
   family: AirPurifier
   yaml_path: FanControl.FanMode
@@ -1501,8 +1556,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:AirPurifierFanMode
-  subClassOf: ex:FanControlFanMode
+  property_type: homeont:AirPurifierFanMode
+  subClassOf: homeont:FanControlFanMode
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1513,10 +1568,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:FanControlFanMode, which generalises the Matter process cluster across
-      families
+    hierarchy: family leaf under homeont:FanControlFanMode, which generalises the Matter process cluster
+      across families
     status_source: own classification
   status: auto
+  action_class: homeont:SetModeCommand
 - key: Dehumidifier:514.0
   family: Dehumidifier
   yaml_path: FanControl.FanMode
@@ -1525,8 +1581,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DehumidifierFanMode
-  subClassOf: ex:FanControlFanMode
+  property_type: homeont:DehumidifierFanMode
+  subClassOf: homeont:FanControlFanMode
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1537,10 +1593,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:FanControlFanMode, which generalises the Matter process cluster across
-      families
+    hierarchy: family leaf under homeont:FanControlFanMode, which generalises the Matter process cluster
+      across families
     status_source: own classification
   status: auto
+  action_class: homeont:SetModeCommand
 - key: Fan:514.0
   family: Fan
   yaml_path: FanControl.FanMode
@@ -1549,8 +1606,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:FanFanMode
-  subClassOf: ex:FanControlFanMode
+  property_type: homeont:FanFanMode
+  subClassOf: homeont:FanControlFanMode
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1561,10 +1618,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:FanControlFanMode, which generalises the Matter process cluster across
-      families
+    hierarchy: family leaf under homeont:FanControlFanMode, which generalises the Matter process cluster
+      across families
     status_source: own classification
   status: auto
+  action_class: homeont:SetModeCommand
 - key: Humidifier:514.0
   family: Humidifier
   yaml_path: FanControl.FanMode
@@ -1573,8 +1631,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:HumidifierFanMode
-  subClassOf: ex:FanControlFanMode
+  property_type: homeont:HumidifierFanMode
+  subClassOf: homeont:FanControlFanMode
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1585,10 +1643,11 @@ rows:
   unit: null
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:FanControlFanMode, which generalises the Matter process cluster across
-      families
+    hierarchy: family leaf under homeont:FanControlFanMode, which generalises the Matter process cluster
+      across families
     status_source: own classification
   status: auto
+  action_class: homeont:SetModeCommand
 - key: AirConditioner:514.2
   family: AirConditioner
   yaml_path: FanControl.PercentSetting
@@ -1597,8 +1656,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:AirConditionerFanSpeed
-  subClassOf: ex:FanControlFanSpeed
+  property_type: homeont:AirConditionerFanSpeed
+  subClassOf: homeont:FanControlFanSpeed
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1616,10 +1675,11 @@ rows:
   unit: '%'
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:FanControlFanSpeed, which generalises the Matter process cluster across
-      families
+    hierarchy: family leaf under homeont:FanControlFanSpeed, which generalises the Matter process cluster
+      across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: AirPurifier:514.2
   family: AirPurifier
   yaml_path: FanControl.PercentSetting
@@ -1628,8 +1688,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:AirPurifierFanSpeed
-  subClassOf: ex:FanControlFanSpeed
+  property_type: homeont:AirPurifierFanSpeed
+  subClassOf: homeont:FanControlFanSpeed
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1640,10 +1700,11 @@ rows:
   unit: '%'
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:FanControlFanSpeed, which generalises the Matter process cluster across
-      families
+    hierarchy: family leaf under homeont:FanControlFanSpeed, which generalises the Matter process cluster
+      across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: Dehumidifier:514.2
   family: Dehumidifier
   yaml_path: FanControl.PercentSetting
@@ -1652,8 +1713,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:DehumidifierFanSpeed
-  subClassOf: ex:FanControlFanSpeed
+  property_type: homeont:DehumidifierFanSpeed
+  subClassOf: homeont:FanControlFanSpeed
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1664,10 +1725,11 @@ rows:
   unit: '%'
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:FanControlFanSpeed, which generalises the Matter process cluster across
-      families
+    hierarchy: family leaf under homeont:FanControlFanSpeed, which generalises the Matter process cluster
+      across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: Fan:514.2
   family: Fan
   yaml_path: FanControl.PercentSetting
@@ -1676,8 +1738,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:FanFanSpeed
-  subClassOf: ex:FanControlFanSpeed
+  property_type: homeont:FanFanSpeed
+  subClassOf: homeont:FanControlFanSpeed
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1688,10 +1750,11 @@ rows:
   unit: '%'
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:FanControlFanSpeed, which generalises the Matter process cluster across
-      families
+    hierarchy: family leaf under homeont:FanControlFanSpeed, which generalises the Matter process cluster
+      across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand
 - key: Humidifier:514.2
   family: Humidifier
   yaml_path: FanControl.PercentSetting
@@ -1700,8 +1763,8 @@ rows:
   sosa_type: sosa:ActuatableProperty
   sosa_role: device_state
   property_node: anonymous
-  property_type: ex:HumidifierFanSpeed
-  subClassOf: ex:FanControlFanSpeed
+  property_type: homeont:HumidifierFanSpeed
+  subClassOf: homeont:FanControlFanSpeed
   constraints_source: per-instance, from the device's HA entity
   has_immediate_effect: true
   no_effect_reason: null
@@ -1712,7 +1775,8 @@ rows:
   unit: '%'
   evidence:
     rationale: spec declares write access
-    hierarchy: family leaf under ex:FanControlFanSpeed, which generalises the Matter process cluster across
-      families
+    hierarchy: family leaf under homeont:FanControlFanSpeed, which generalises the Matter process cluster
+      across families
     status_source: own classification
   status: auto
+  action_class: saref:SetAbsoluteLevelCommand

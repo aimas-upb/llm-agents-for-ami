@@ -26,6 +26,8 @@ from .affordance_nodes import (
     ComparisonOperator,
     ComparisonPropertyConditionNode,
     PropertyConditionNode,
+    SettlingTimeWaitNode,
+    WaitPropertyConditionNode,
 )
 from .compute_node import BlackboardComputeNode, COMPUTE_OPS
 
@@ -126,10 +128,38 @@ def _compile_parallel(spec, compile_child):
 
 
 def _compile_action(spec, compile_child):
-    return ActionAffordanceNode(
+    """An action, plus a settling wait when the planner asked for one.
+
+    The planner already annotates actions with `settling_time_seconds` where an
+    effect takes time to appear. That used to be a `time.sleep` inside the
+    action node, blocking the tick; here it becomes a sibling that returns
+    RUNNING until the span has passed. The ISA emits the same IR either way --
+    the pairing is a compile-time detail.
+    """
+    action = ActionAffordanceNode(
         name=_name(spec),
         action_url=spec["action_url"],
         parameters=spec.get("parameters", {}),
+    )
+    settling = spec.get("settling_time_seconds")
+    if not isinstance(settling, (int, float)) or settling <= 0:
+        return action
+
+    sequence = py_trees.composites.Sequence(
+        name=f"{_name(spec)}+settle", memory=True)
+    sequence.add_children([
+        action,
+        SettlingTimeWaitNode(name=f"{_name(spec)}/settle",
+                             settling_seconds=float(settling)),
+    ])
+    return sequence
+
+
+def _compile_settle(spec, compile_child):
+    return SettlingTimeWaitNode(
+        name=_name(spec),
+        settling_seconds=spec.get("settling_seconds",
+                                  spec.get("settling_time_seconds", 0.0)),
     )
 
 
@@ -149,6 +179,27 @@ def _compile_condition(spec, compile_child):
         expected_value=spec["expected_value"],
         value_path=spec.get("value_path"),
     )
+
+
+def _compile_wait_condition(spec, compile_child):
+    """A condition that keeps looking rather than failing on the first read.
+
+    Same shape as `condition`, plus the two knobs that make it a wait: how long
+    to keep trying and how often. Both are optional -- the node's own defaults
+    (30s / 1s) apply when the IR omits them.
+    """
+    node = WaitPropertyConditionNode(
+        name=_name(spec),
+        property_url=spec["property_url"],
+        expected_value=spec["expected_value"],
+        operator=OPERATOR_MAP.get(spec.get("operator"), ComparisonOperator.EQUAL),
+        value_path=spec.get("value_path"),
+    )
+    if spec.get("timeout_seconds") is not None:
+        node.timeout_seconds = max(0.0, float(spec["timeout_seconds"]))
+    if spec.get("poll_interval_seconds") is not None:
+        node.poll_interval_seconds = max(0.0, float(spec["poll_interval_seconds"]))
+    return node
 
 
 def _compile_compute(spec, compile_child):
@@ -189,6 +240,29 @@ def _validate_condition(spec, path, validate_child):
     return errors
 
 
+def _validate_wait_condition(spec, path, validate_child):
+    """Mirrors bt_planner's own wait_condition validation (bt_planner.py:743-757)."""
+    errors = _validate_condition(spec, path, validate_child)
+    timeout_seconds = spec.get("timeout_seconds")
+    if timeout_seconds is not None and not isinstance(timeout_seconds, (int, float)):
+        errors.append(f"{path}: wait_condition timeout_seconds must be numeric")
+    poll_interval = spec.get("poll_interval_seconds")
+    if poll_interval is not None and (
+        not isinstance(poll_interval, (int, float)) or poll_interval < 0
+    ):
+        errors.append(f"{path}: wait_condition poll_interval_seconds must be >= 0")
+    return errors
+
+
+def _validate_settle(spec, path, validate_child):
+    seconds = spec.get("settling_seconds", spec.get("settling_time_seconds"))
+    if seconds is None:
+        return [f"{path}: settle nodes require 'settling_seconds'"]
+    if not isinstance(seconds, (int, float)) or seconds < 0:
+        return [f"{path}: settle 'settling_seconds' must be a number >= 0"]
+    return []
+
+
 def _validate_compute(spec, path, validate_child):
     errors: List[str] = []
     op = spec.get("op")
@@ -209,4 +283,7 @@ register_node_type("selector", compile=_compile_selector, validate=_validate_com
 register_node_type("parallel", compile=_compile_parallel, validate=_validate_composite)
 register_node_type("action", compile=_compile_action, validate=_validate_action)
 register_node_type("condition", compile=_compile_condition, validate=_validate_condition)
+register_node_type("wait_condition", compile=_compile_wait_condition,
+                   validate=_validate_wait_condition)
 register_node_type("compute", compile=_compile_compute, validate=_validate_compute)
+register_node_type("settle", compile=_compile_settle, validate=_validate_settle)

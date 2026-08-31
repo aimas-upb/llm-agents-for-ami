@@ -45,6 +45,16 @@ class BlackboardKeys:
     LAST_RESPONSE_HEADERS: str = "affordance/last_response_headers"
     
     @classmethod
+    def settling_elapsed_key(cls, node_name: str) -> str:
+        """How long a settling wait has been waiting, for introspection.
+
+        A plan explanation asks each leaf what it is doing; "waited 2.1s of 3s"
+        is a better answer than "RUNNING".
+        """
+        safe = node_name.replace("/", "_").replace(" ", "_")
+        return f"affordance/settling/{safe}/elapsed"
+
+    @classmethod
     def property_value_key(cls, property_name: str) -> str:
         """
         Generate a namespaced key for a specific property value.

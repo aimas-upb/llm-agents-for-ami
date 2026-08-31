@@ -24,11 +24,31 @@ from uuid import uuid4
 META_TYPE = "type"
 META_CORRELATION_ID = "correlation_id"
 META_CONVERSATION_ID = "conversation_id"
+# Routing keys. SPADE's `dispatch` hands a copy of a message to EVERY behaviour
+# whose Template matches, so a per-request or per-plan behaviour addresses
+# itself by carrying its own id in a Template rather than by claiming messages
+# from a shared queue. Both are plain strings so a registry can persist them.
+META_REQUEST_ID = "active_request_id"
+META_PLAN_ID = "ami_plan_id"
 
 
 def new_correlation_id() -> str:
     """Create a new correlation id for request/response pairs."""
     return str(uuid4())
+
+
+def new_request_id() -> str:
+    """Create a new id for one user utterance and everything it spawns."""
+    return f"req-{uuid4().hex[:12]}"
+
+
+def new_plan_id() -> str:
+    """Create a new id for one execution of one plan.
+
+    An instance key, not a content key: running the same plan text twice yields
+    two plan ids and one plan hash.
+    """
+    return f"plan-{uuid4().hex[:12]}"
 
 
 def ensure_correlation_id(metadata: Optional[Dict[str, Any]] = None) -> str:
@@ -104,6 +124,16 @@ class MessageType(Enum):
     AFFORDANCE_MATCH_RESPONSE = "affordance_match_response"
 
     # Plan management
+    # A confirmed plan is handed to plan management as a message rather than
+    # executed in place, so the behaviour that took the request is free to end
+    # and execution becomes independently addressable.
+    PLAN_EXECUTE_REQUEST = "plan_execute_request"
+    PLAN_STATUS_REQUEST = "plan_status_request"
+    PLAN_EXPLAIN_REQUEST = "plan_explain_request"
+    # Ask a maintenance plan to start a burst now instead of waiting out its
+    # interval. The condition that decides this lives outside the plan.
+    PLAN_TRIGGER_REQUEST = "plan_trigger_request"
+    PLAN_EXPLAIN_RESPONSE = "plan_explain_response"
     PLAN_CANCEL_REQUEST = "plan_cancel_request"
     PLAN_ALTER_REQUEST = "plan_alter_request"
     PLAN_REPEAT_REQUEST = "plan_repeat_request"

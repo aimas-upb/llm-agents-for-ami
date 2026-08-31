@@ -11,8 +11,14 @@ from typing import Any, Dict, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
-# Import goal intent types from shared models
-from ...shared.models.intents import ImplicitGoalIntent, ExplicitGoalIntent
+# Import intent types from shared models. `Intent` is re-exported here because
+# several modules still import it from this location; it lives in shared because
+# the InteractionSolver uses it too.
+from ...shared.models.intents import (  # noqa: F401
+    ExplicitGoalIntent,
+    ImplicitGoalIntent,
+    Intent,
+)
 
 
 class ConversationPhase(Enum):
@@ -39,21 +45,6 @@ class AtomicIntent:
     reason: str  # LLM justification for the categorization
 
 
-@dataclass
-class Intent:
-    """Generic intent representation carrying user's verbatim text.
-
-    Slim version used only when the full goal structure is not needed.
-    For goal requests, use ImplicitGoalIntent or ExplicitGoalIntent instead.
-    """
-
-    intent_text: str
-
-    def to_query_string(self) -> str:
-        """Return the verbatim user text as the query key."""
-        return self.intent_text
-
-
 # Tokens treated as user confirmation / rejection by the confirmation handler.
 CONFIRM_TOKENS = frozenset(
     {"yes", "ok", "okay", "proceed", "continue", "do it", "go ahead", "sure", "yep", "yeah"}
@@ -71,6 +62,11 @@ class ConversationState:
 
     phase: ConversationPhase = ConversationPhase.IDLE
     user_message: str = ""
+    # The request currently being handled on this thread. Carried here while
+    # request handling still lives in the receiver; it moves onto the per-request
+    # FSM once that lands, and the plans this request produces keep it as
+    # provenance either way.
+    request_id: Optional[str] = None
     intents: List[Union[ImplicitGoalIntent, ExplicitGoalIntent]] = field(default_factory=list)
     workspace_id: Optional[str] = None
     plan_json: Optional[str] = None

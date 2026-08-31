@@ -8,7 +8,7 @@ generator:
   table: command_targets
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-08-25T16:28:33.297261+00:00'
+  generated_at_utc: '2026-08-29T16:29:56.606036+00:00'
 rows:
 - key: '89.0'
   cluster: Dishwasher Mode
@@ -170,3 +170,18 @@ rows:
     note: the Matter XML states no command->attribute relation; this link is curated and the evidence
       derived
   status: approved
+- key: 258.5b
+  cluster: Window Covering
+  command: GoToLiftPercentage
+  writes_attribute: CurrentPositionLiftPercent100ths
+  attribute_type: percent100ths
+  attribute_writable: false
+  evidence:
+    why: the lift percentage a covering is AT, which GoToLiftPercentage drives to the requested value.
+      Matter models Target as the commanded value and Current as the read-back, but SimuHome moves both
+      and SHTD dispatches either through this command (shtd.py::_COMMAND_FOR)
+    note: 'added in phase 6: the row was missing while classify.py''s hardcoded COMMAND_TARGETS carried
+      it, so the table and the code disagreed. Without it this attribute classifies as observable and
+      every window covering loses its position control'
+  status: approved
+  _orphaned: true

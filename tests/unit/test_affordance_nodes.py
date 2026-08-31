@@ -2,6 +2,8 @@
 Unit tests for custom py_trees affordance nodes with mocked HTTP.
 """
 
+import time
+
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -17,6 +19,27 @@ from ami_agents.bt_planning.nodes.affordance_nodes import (
     PropertyValue,
 )
 from ami_agents.bt_planning.nodes.http_client import HTTPResponse, HTTPError
+
+
+def settle(node, limit=200):
+    """Tick past the ticks that are only waiting on in-flight I/O.
+
+    Node I/O is submitted to a thread pool and polled across ticks, so the
+    first `update()` after a fresh attempt reports RUNNING while the request is
+    out. That is an implementation detail of *when* the answer arrives, not of
+    what the node decides. This returns the first status that reflects a
+    decision: any terminal status, or a RUNNING the node chose after reading a
+    value (a wait condition that is still unsatisfied).
+    """
+    for _ in range(limit):
+        status = node.update()
+        if status != Status.RUNNING:
+            return status
+        # RUNNING with no pending future means the node itself decided to wait.
+        if not node._io_in_flight and node._future is None:
+            return status
+        time.sleep(0.001)
+    raise AssertionError(f"node never settled after {limit} ticks")
 
 
 def _make_http_response(status_code=200, body=None):
@@ -48,7 +71,7 @@ class TestActionAffordanceNode:
         node._http_client.post.return_value = _make_http_response(200)
         node.initialise()
 
-        status = node.update()
+        status = settle(node)
         assert status == Status.SUCCESS
         assert node.last_result is not None
         assert node.last_result.success is True
@@ -60,7 +83,7 @@ class TestActionAffordanceNode:
         node._http_client.post.return_value = _make_http_response(500, {"error": "fail"})
         node.initialise()
 
-        status = node.update()
+        status = settle(node)
         assert status == Status.FAILURE
 
     @patch.object(ActionAffordanceNode, "setup")
@@ -72,7 +95,7 @@ class TestActionAffordanceNode:
         )
         node.initialise()
 
-        status = node.update()
+        status = settle(node)
         assert status == Status.FAILURE
         assert node.last_result.error_message == "Server error"
 
@@ -83,7 +106,7 @@ class TestActionAffordanceNode:
         node._http_client.post.return_value = _make_http_response(200)
         node.initialise()
 
-        node.update()
+        settle(node)
         call_args = node._http_client.post.call_args
         assert call_args[1]["payload"]["brightness"] == 75
 
@@ -107,7 +130,7 @@ class TestPropertyConditionNode:
         node._http_client.get.return_value = _make_http_response(200, "on")
         node.initialise()
 
-        status = node.update()
+        status = settle(node)
         assert status == Status.SUCCESS
 
     @patch.object(PropertyConditionNode, "setup")
@@ -117,7 +140,7 @@ class TestPropertyConditionNode:
         node._http_client.get.return_value = _make_http_response(200, "off")
         node.initialise()
 
-        status = node.update()
+        status = settle(node)
         assert status == Status.FAILURE
 
     @patch.object(PropertyConditionNode, "setup")
@@ -129,7 +152,7 @@ class TestPropertyConditionNode:
         )
         node.initialise()
 
-        status = node.update()
+        status = settle(node)
         assert status == Status.FAILURE
 
     @patch.object(PropertyConditionNode, "setup")
@@ -144,7 +167,7 @@ class TestPropertyConditionNode:
         )
         node.initialise()
 
-        status = node.update()
+        status = settle(node)
         assert status == Status.SUCCESS
 
 
@@ -168,7 +191,7 @@ class TestComparisonPropertyConditionNode:
         node._http_client.get.return_value = _make_http_response(200, 30)
         node.initialise()
 
-        assert node.update() == Status.SUCCESS
+        assert settle(node) == Status.SUCCESS
 
     @patch.object(ComparisonPropertyConditionNode, "setup")
     def test_greater_than_false(self, mock_setup):
@@ -177,7 +200,7 @@ class TestComparisonPropertyConditionNode:
         node._http_client.get.return_value = _make_http_response(200, 20)
         node.initialise()
 
-        assert node.update() == Status.FAILURE
+        assert settle(node) == Status.FAILURE
 
     @patch.object(ComparisonPropertyConditionNode, "setup")
     def test_less_than(self, mock_setup):
@@ -186,7 +209,7 @@ class TestComparisonPropertyConditionNode:
         node._http_client.get.return_value = _make_http_response(200, 20)
         node.initialise()
 
-        assert node.update() == Status.SUCCESS
+        assert settle(node) == Status.SUCCESS
 
     @patch.object(ComparisonPropertyConditionNode, "setup")
     def test_not_equal(self, mock_setup):
@@ -195,7 +218,7 @@ class TestComparisonPropertyConditionNode:
         node._http_client.get.return_value = _make_http_response(200, "on")
         node.initialise()
 
-        assert node.update() == Status.SUCCESS
+        assert settle(node) == Status.SUCCESS
 
     @patch.object(ComparisonPropertyConditionNode, "setup")
     def test_in_operator(self, mock_setup):
@@ -207,7 +230,7 @@ class TestComparisonPropertyConditionNode:
         node._http_client.get.return_value = _make_http_response(200, "cool")
         node.initialise()
 
-        assert node.update() == Status.SUCCESS
+        assert settle(node) == Status.SUCCESS
 
     @patch.object(ComparisonPropertyConditionNode, "setup")
     def test_greater_equal(self, mock_setup):
@@ -216,7 +239,7 @@ class TestComparisonPropertyConditionNode:
         node._http_client.get.return_value = _make_http_response(200, 25)
         node.initialise()
 
-        assert node.update() == Status.SUCCESS
+        assert settle(node) == Status.SUCCESS
 
 
 class TestWaitPropertyConditionNode:
@@ -239,8 +262,8 @@ class TestWaitPropertyConditionNode:
         ]
         node.initialise()
 
-        assert node.update() == Status.RUNNING
-        assert node.update() == Status.SUCCESS
+        assert settle(node) == Status.RUNNING
+        assert settle(node) == Status.SUCCESS
 
     @patch.object(WaitPropertyConditionNode, "setup")
     def test_wait_condition_times_out(self, mock_setup):
@@ -256,4 +279,4 @@ class TestWaitPropertyConditionNode:
         node._http_client.get.return_value = _make_http_response(200, 26)
         node.initialise()
 
-        assert node.update() == Status.FAILURE
+        assert settle(node) == Status.FAILURE

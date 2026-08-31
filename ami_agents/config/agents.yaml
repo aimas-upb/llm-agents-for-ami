@@ -28,6 +28,11 @@ user_assistant:
       model: "gpt-5-mini"
       reasoning_effort: "medium"
 
+  planning:
+    # How long an action plan waits for a yes/no before assuming confirmation.
+    # Read-only plans auto-confirm and never wait.
+    confirmation_timeout: "${UA_CONFIRMATION_TIMEOUT:-5.0}"
+
 # EnvExplorer Agent Configuration
 env_explorer:
   jid: "env_explorer@localhost"
@@ -135,6 +140,19 @@ bt_execution:
   max_ticks:
     default: "${BT_MAX_TICKS_DEFAULT:-10}"
     user_assistant: "${BT_MAX_TICKS_USER_ASSISTANT:-50}"
+  # Shortest pause between ticks of a RUNNING tree. Node I/O runs on a thread
+  # pool, so a loop that never sleeps re-ticks faster than a request can come
+  # back and burns the tick budget before the first response lands. A node
+  # asking for a longer poll interval still gets it; this is only the floor.
+  min_tick_yield: "${BT_MIN_TICK_YIELD:-0.01}"
+  # A maintenance plan ticks in bursts: within a burst it uses the same budget
+  # and cadence as any other plan, then stands down for this long before
+  # looking again. A trigger message can start a burst sooner.
+  maintenance_interval: "${BT_MAINTENANCE_INTERVAL:-180.0}"
+  # How often a standing-down maintenance plan looks for a trigger. This is the
+  # resolution of an early wake-up, not the wait itself: a trigger is acted on
+  # within this long rather than instantly.
+  maintenance_trigger_poll: "${BT_MAINTENANCE_TRIGGER_POLL:-10.0}"
 
 # HTTP Client Configuration (timeout only — retry/status-code policy is in code)
 http:

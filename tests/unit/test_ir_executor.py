@@ -171,9 +171,13 @@ class TestExecution:
             "timeout_seconds": 5,
             "poll_interval_seconds": 0,
         }
-        result = IRExecutor(max_ticks=3).execute_from_spec(spec)
+        result = IRExecutor(max_ticks=10).execute_from_spec(spec)
 
         assert result.success is True
-        assert result.ticks == 2
-        assert result.tick_history == ["RUNNING", "SUCCESS"]
+        # Node I/O runs on a thread pool, so how many ticks pass before a
+        # response lands is timing, not behaviour. What matters: the condition
+        # was unsatisfied at first, the node kept waiting, it read again, and
+        # the second read satisfied it.
+        assert result.tick_history[-1] == "SUCCESS"
+        assert set(result.tick_history[:-1]) == {"RUNNING"}
         assert mock_client.get.call_count == 2

@@ -18,6 +18,7 @@ from spade.template import Template
 
 from ...bt_planning.planning.bt_planner import AsyncBTPlanner
 from ...shared.community.community_client import CommunitySignifierClient
+from ...shared.models.intents import Intent
 from ...shared.models.messages import (
     META_CONVERSATION_ID,
     META_CORRELATION_ID,
@@ -32,7 +33,7 @@ from ...shared.utils.demo_log import demo
 from ...shared.utils.logger import LoggerFactory
 from ...shared.utils.spade_rpc import RpcTimeoutError, rpc_call, send_via_router
 from .behaviours import EnvironmentReadyBehaviour, GoalRequestBehaviour
-from .utils import LLMClientConfig, build_llm_client
+from .utils import LLMClientConfig, build_llm_client, match_workspace, parse_or_empty
 
 
 # Fallback defaults used only when yaml is missing a key.
@@ -312,7 +313,6 @@ class InteractionSolverAgent(Agent, IAgent):
     async def receive_message(self, message: Message) -> None:
         # Behaviours route incoming messages via SPADE templates.
         return
-<<<<<<< HEAD
 
     # ── EnvExplorer RPC ────────────────────────────────────────────
 
@@ -948,5 +948,3 @@ class InteractionSolverAgent(Agent, IAgent):
                     community_count,
                     total if total is not None else "?",
                 )
-=======
->>>>>>> code_cleanup_alex

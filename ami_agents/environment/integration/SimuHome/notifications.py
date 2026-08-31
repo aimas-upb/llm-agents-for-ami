@@ -332,20 +332,48 @@ class StateWatcher:
         return changes
 
 
+# How many consecutive poll failures make an outage worth naming as one, and
+# how often to repeat the line thereafter (in polls, so ~1/min at a 1s interval).
+_PERSISTENT_FAILURES = 5
+_FAILURE_REPEAT_EVERY = 60
+
+
 async def poll_loop(
     watcher: StateWatcher,
     dispatch: Callable[[List[Dict[str, Any]]], Any],
     interval: float,
     stop: asyncio.Event,
 ) -> None:
-    """Poll until stopped. Never dies on a transient simulator error."""
+    """Poll until stopped. Never dies on a transient simulator error.
+
+    Surviving every error is what the loop is for, but surviving *quietly* is
+    how a dead simulator comes to look like a semantics bug: at a 1s interval an
+    unreachable backend prints the same line 3600 times an hour and nothing
+    tells you the failure is persistent rather than transient. So count
+    consecutive failures, say so when the run becomes one, then throttle the
+    repeats -- and announce the recovery, which is the line that says the
+    outage is over.
+    """
+    consecutive = 0
     while not stop.is_set():
         try:
             changes = await asyncio.to_thread(watcher.poll)
+            if consecutive >= _PERSISTENT_FAILURES:
+                print(f"[shtd] polling recovered after {consecutive} "
+                      f"consecutive failures", flush=True)
+            consecutive = 0
             if changes:
                 await dispatch(changes)
         except Exception as exc:  # noqa: BLE001 - the loop must survive
-            print(f"[shtd] poll failed: {exc}", flush=True)
+            consecutive += 1
+            if consecutive == _PERSISTENT_FAILURES:
+                print(f"[shtd] poll failing persistently ({consecutive} in a "
+                      f"row); no notification can be sent while this lasts: "
+                      f"{exc}", flush=True)
+            elif consecutive < _PERSISTENT_FAILURES or \
+                    consecutive % _FAILURE_REPEAT_EVERY == 0:
+                print(f"[shtd] poll failed ({consecutive} in a row): {exc}",
+                      flush=True)
         try:
             await asyncio.wait_for(stop.wait(), timeout=interval)
         except asyncio.TimeoutError:

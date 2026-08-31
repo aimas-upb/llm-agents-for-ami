@@ -190,6 +190,15 @@ class Plan:
     # Execution plan
     behavior_tree: BehaviorTreePlan
 
+    # Provenance: which user request produced this plan. `goal_description`
+    # holds the user's own phrasing, so a running plan can always be traced
+    # back to the utterance that asked for it, and explained in those words.
+    request_id: Optional[str] = None
+
+    # Content key, alongside `plan_id`'s instance key: the same plan text run
+    # twice gives two ids and one hash.
+    plan_hash: Optional[str] = None
+
     # Timestamps
     timestamp_created: datetime = field(default_factory=datetime.now)
     timestamp_last_executed: Optional[datetime] = None

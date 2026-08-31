@@ -7,7 +7,7 @@ tests, the demo dashboard) can rely on a stable contract.
 
 from typing import Any, Dict, List, Optional, Union
 
-from ...user_assistant.models import Intent
+from ....shared.models.intents import Intent
 from ....shared.models.intents import ImplicitGoalIntent, ExplicitGoalIntent
 
 

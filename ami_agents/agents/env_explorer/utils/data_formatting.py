@@ -9,7 +9,6 @@ from rdflib import Graph, Namespace, RDF, URIRef
 from ....shared.models.environment import AffordanceType
 
 
-<<<<<<< HEAD
 def _short_iri(value: Any) -> str:
     """Return the last path segment of an IRI (without a #fragment)."""
     text = str(value or "").split("#")[0].rstrip("/")
@@ -55,7 +54,12 @@ def _schema_param_summary(schema: Any) -> str:
         parts.append(label)
     return ", ".join(parts)
 
-=======
+# Semantic types are shortened with the shared namespace map so each term keeps
+# the vocabulary it came from. Previously every type was stamped with a
+# hardcoded `ex:`, which flattened homeont/saref/sosa/hmas/td onto one prefix.
+from ....shared.utils.namespaces import shorten as _shorten
+
+
 def _define_standard_namespaces(graph: Graph) -> dict:
     """Bind all standard RDF namespaces to a graph and return them as a dict."""
     ex = Namespace("http://example.org/")
@@ -82,7 +86,6 @@ def _define_standard_namespaces(graph: Graph) -> dict:
     }
 
 
->>>>>>> code_cleanup_alex
 
 def format_capabilities_summary(agent_instance) -> str:
     """
@@ -301,8 +304,6 @@ def format_capabilities_payload(agent_instance) -> Dict[str, Any]:
         "affordances": affordances_out,
         "semantic_capabilities": dict(getattr(agent_instance, "semantic_capabilities", {}) or {}),
     }
-<<<<<<< HEAD
-=======
 
 
 def _ensure_rdf_prefixes(rdf_str: str) -> str:
@@ -328,15 +329,6 @@ def _ensure_rdf_prefixes(rdf_str: str) -> str:
 
     # Prepend standard prefixes
     return prefix_block + rdf_str
-
-
-def _format_type_with_prefix(type_str: str) -> str:
-    """Convert a full URI to ex: prefixed format."""
-    if "#" in type_str:
-        local = type_str.split("#")[-1]
-    else:
-        local = type_str.split("/")[-1]
-    return f"ex:{local}"
 
 
 def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:
@@ -387,8 +379,7 @@ def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:
 
                 # Also collect any ex: semantic types on this artifact subject
                 for type_obj in g.objects(subj, RDF.type):
-                    if type_obj in ex:  # Check if type is in the ex: namespace
-                        semantic_types_set.add(f"ex:{str(type_obj).split('/')[-1]}")
+                    semantic_types_set.add(_shorten(str(type_obj)))
                 # Return all collected types for this artifact
                 if semantic_types_set:
                     return sorted(list(semantic_types_set))
@@ -396,8 +387,7 @@ def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:
             # If no Artifact found, try Workspace
             for subj in g.subjects(RDF.type, hmas.Workspace):
                 for type_obj in g.objects(subj, RDF.type):
-                    if type_obj in ex:  # Check if type is in the ex: namespace
-                        semantic_types_set.add(f"ex:{str(type_obj).split('/')[-1]}")
+                    semantic_types_set.add(_shorten(str(type_obj)))
                 # Return all collected types for this workspace
                 if semantic_types_set:
                     return sorted(list(semantic_types_set))
@@ -407,8 +397,7 @@ def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:
             from rdflib.term import BNode
             for subj in g.subjects():
                 for type_obj in g.objects(subj, RDF.type):
-                    if type_obj in ex:  # Check if type is in the ex: namespace
-                        semantic_types_set.add(f"ex:{str(type_obj).split('/')[-1]}")
+                    semantic_types_set.add(_shorten(str(type_obj)))
 
             if semantic_types_set:
                 return sorted(list(semantic_types_set))
@@ -473,8 +462,9 @@ def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:
 
                     # Also collect any ex: semantic types
                     for type_obj in g.objects(subj, RDF.type):
-                        if type_obj in ex:  # Check if type is in the ex: namespace
-                            ws_semantic_types.append(f"ex:{str(type_obj).split('/')[-1]}")
+                        curie = _shorten(str(type_obj))
+                        if curie not in ws_semantic_types:
+                            ws_semantic_types.append(curie)
                     # Extract description
                     comment = g.value(subj, RDFS.comment)
                     if comment:
@@ -537,13 +527,11 @@ def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:
 
                 # Always check semantic_types as fallback (affordance RDF may not include ex: types)
                 if aff.semantic_types:
-                    ex = Namespace("http://example.org/")
                     for st in aff.semantic_types:
-                        # Check if it's an ex: namespace URI
                         try:
                             type_uri = URIRef(st) if not isinstance(st, URIRef) else st
-                            if type_uri in ex:
-                                formatted = f"ex:{str(type_uri).split('/')[-1]}"
+                            formatted = _shorten(str(type_uri))
+                            if True:
                                 # Only add if not already present (avoid duplicates)
                                 if formatted not in aff_semantic_types:
                                     aff_semantic_types.append(formatted)
@@ -815,4 +803,3 @@ def format_capabilities_detailed_rdf(agent_instance) -> str:
     else:
         return prefix_block.rstrip()
 
->>>>>>> code_cleanup_alex

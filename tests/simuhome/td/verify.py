@@ -154,7 +154,8 @@ def main() -> int:
     # "Fan Control") violate this if pasted in raw.
     ncname = re.compile(r"^[A-Za-z_][A-Za-z0-9_.\-]*$")
     curie_fields = {
-        "ex", "subClassOf", "sosa_type", "quantityKind", "qudt_unit", "property_type",
+        "homeont_class", "subClassOf", "sosa_type", "quantityKind", "qudt_unit",
+        "property_type",
     }
     malformed: List[str] = []
     for name in convert.TABLE_ORDER:
@@ -171,15 +172,15 @@ def main() -> int:
     # Matter clusters name processes, so a cluster-level property generalises
     # across every family using that process. Constraints belong on the leaf.
     brightness = {r["family"]: r for r in actuatable if r["yaml_path"] == "LevelControl.CurrentLevel"}
-    check("a TV's brightness is its own property", "ex:TvBrightness",
+    check("a TV's brightness is its own property", "homeont:TvBrightness",
           brightness["Tv"]["property_type"])
-    check("a lamp's brightness is a different property", "ex:DimmableLightBrightness",
+    check("a lamp's brightness is a different property", "homeont:DimmableLightBrightness",
           brightness["DimmableLight"]["property_type"])
-    check("...both under one cluster-level superclass", {"ex:LevelControlBrightness"},
+    check("...both under one cluster-level superclass", {"homeont:LevelControlBrightness"},
           {r["subClassOf"] for r in brightness.values()})
-    # A family leaf must never collapse onto the bare family name: ex:AirPurifier
+    # A family leaf must never collapse onto the bare family name: homeont:AirPurifier
     # is the device class.
-    device_classes = {r["ex"] for r in _rows("device_type_map")}
+    device_classes = {r["homeont_class"] for r in _rows("device_type_map")}
     clashes = sorted({r["property_type"] for r in actuatable} & device_classes)
     check("no property IRI collides with a device class", [], clashes)
     # Appliance-internal setpoints are not the room's air temperature.
@@ -187,14 +188,22 @@ def main() -> int:
         r["family"]: r["property_type"] for r in actuatable
         if r["yaml_path"] == "TemperatureControl.TemperatureSetpoint"
     }
-    check("a freezer setpoint is not room air temperature", "ex:FreezerTemperatureSetpoint",
+    check("a freezer setpoint is not room air temperature", "homeont:FreezerTemperatureSetpoint",
           cabinet.get("Freezer"))
+    # A setpoint TARGETS air temperature; it is not that observable itself.
+    # These four rows used to carry `homeont:AirTemperature` directly, which
+    # typed an actuatable as the sosa:ObservableProperty it drives. Phase 6
+    # gave them their own classes under homeont:TemperatureSetpoint.
     thermostat = {
-        r["property_type"] for r in actuatable
+        r["subClassOf"] for r in actuatable
         if r["yaml_path"].startswith("Thermostat.Occupied")
     }
-    check("thermostat setpoints do target room air temperature", {"ex:AirTemperature"},
-          thermostat)
+    check("thermostat setpoints are setpoints, not the observable they target",
+          {"homeont:TemperatureSetpoint"}, thermostat)
+    check("...and no actuatable is typed as a room observable", [],
+          sorted({r["property_type"] for r in actuatable}
+                 & {"homeont:AirTemperature", "homeont:RelativeHumidity",
+                    "homeont:Illuminance", "homeont:Pm10MassConcentration"}))
     # Every family leaf declares its superclass; shared quantities do not.
     orphans = [
         r["key"] for r in actuatable
@@ -356,13 +365,13 @@ def main() -> int:
     missing_both = [
         r["key"] for r in device_rows
         if not r.get("td_types") or len(r["td_types"]) != 2
-        or r["td_types"][0] != r["ex"] or r["td_types"][1] != r["subClassOf"]
+        or r["td_types"][0] != r["homeont_class"] or r["td_types"][1] != r["subClassOf"]
     ]
-    check("every Thing declares both its ex: and saref: type", [], missing_both)
+    check("every Thing declares both its homeont: and saref: type", [], missing_both)
 
     print("\n-- 4d. no Matter field names leak into the ontology --")
     # `MeasuredValue` names a field in the Matter protocol. It is not a quantity
-    # and not an interaction: minting `ex:...MeasuredValue` would make a result
+    # and not an interaction: minting `homeont:...MeasuredValue` would make a result
     # masquerade as the property it results from.
     forbidden = ("MeasuredValue", "MinMeasured", "MaxMeasured", "Tolerance",
                  "Percent100ths", "Struct")

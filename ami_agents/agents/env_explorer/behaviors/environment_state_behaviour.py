@@ -4,6 +4,7 @@ from spade.behaviour import CyclicBehaviour
 
 from ....shared.models.messages import MessageType, META_CORRELATION_ID
 from ....shared.utils.demo_log import demo
+from ....shared.utils.namespaces import domain_types
 
 
 class EnvironmentStateBehaviour(CyclicBehaviour):
@@ -219,7 +220,7 @@ class EnvironmentStateBehaviour(CyclicBehaviour):
             if artifact_type and artifact_type != "NA":
                 artifact_semantic_types = getattr(artifact, "semantic_types", []) or []
                 # Filter to ex: types only
-                ex_types = [st for st in artifact_semantic_types if isinstance(st, str) and st.startswith("ex:")]
+                ex_types = domain_types(artifact_semantic_types)
                 if artifact_type not in ex_types:
                     self.agent.logger.debug(f"  ✗ Type mismatch: {artifact_type} not in {ex_types}")
                     continue
@@ -234,7 +235,7 @@ class EnvironmentStateBehaviour(CyclicBehaviour):
                     if ws:
                         ws_semantic_types = getattr(ws, "semantic_types", []) or []
                         # Filter to ex: types only
-                        ex_types = [st for st in ws_semantic_types if isinstance(st, str) and st.startswith("ex:")]
+                        ex_types = domain_types(ws_semantic_types)
                         if workspace_type in ex_types:
                             workspace_matches = True
                 if not workspace_matches:

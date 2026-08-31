@@ -8,7 +8,7 @@ generator:
   table: actuation_effects
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-08-25T16:28:33.636516+00:00'
+  generated_at_utc: '2026-08-29T16:29:56.918258+00:00'
 rows:
 - key: AirConditioner:513.0
   family: AirConditioner

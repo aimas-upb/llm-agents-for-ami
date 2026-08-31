@@ -250,3 +250,17 @@ agent_logs/
 *.rdf.tmp
 
 .claude/
+
+# HomeAssistant deployment
+**/HomeAssistant/.HA_VERSION
+**/HomeAssistant/.ha_run.lock
+**/HomeAssistant/.storage
+**/HomeAssistant/.cloud
+**/HomeAssistant/blueprints
+**/HomeAssistant/custom_components
+**/HomeAssistant/automations.yaml
+**/HomeAssistant/configuration.yaml
+**/HomeAssistant/home-assistant*
+**/HomeAssistant/scenes.yaml
+**/HomeAssistant/scripts.yaml
+**/HomeAssistant/secrets.yaml

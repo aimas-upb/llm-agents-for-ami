@@ -74,9 +74,53 @@ class Mappings:
             if key.startswith("room_state."):
                 self.room_state_properties[key.split(".", 1)[1]] = row
 
+        # Generic, cross-family property classes ("homeont:OnOff"), keyed by
+        # the class IRI itself.
         self.property_classes: Dict[str, Dict[str, Any]] = {
             str(r["key"]): r for r in _rows("property_classes")
         }
+        # The same table indexed by what the TD generator actually has in hand
+        # when it emits a property: the Matter path.
+        self.property_class_by_path: Dict[str, Dict[str, Any]] = {
+            str(r["yaml_path"]): r
+            for r in self.property_classes.values() if r.get("yaml_path")
+        }
+
+        # Per-family leaves ("homeont:AirConditionerOnOff"), keyed by
+        # (family, yaml_path) -- the leaf is what a device instantiates.
+        self.actuatable_leaves: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        for row in _rows("actuatable_properties"):
+            self.actuatable_leaves[
+                (str(row.get("family")), str(row.get("yaml_path")))] = row
+
+        # Observable classes, keyed by Matter path. Added in phase 6: until
+        # then every observable device property reached the TD untyped.
+        self.observable_classes: Dict[str, Dict[str, Any]] = {}
+        for row in _rows("observable_property_classes"):
+            if row.get("yaml_path"):
+                self.observable_classes[str(row["yaml_path"])] = row
+
+        # Which attribute each cluster's command writes. The Matter XML states
+        # no command->attribute relation, so this curated table is the only
+        # source -- `classify.py` reads it from here rather than keeping its
+        # own copy, which could drift.
+        # Keyed by CLUSTER ID, not by the display name. The table spells a
+        # cluster as the Matter registry does ("Refrigerator And Temperature
+        # Controlled Cabinet Mode") while the simulator uses a compact token
+        # ("RTCCMode"); stripping spaces does not bridge that, and silently
+        # missing the row would de-actuate every freezer's mode control.
+        # `command_targets_for` resolves a caller's spelling through the
+        # registry, which canonicalises both.
+        self.command_targets_by_cluster_id: Dict[int, set] = {}
+        for row in _rows("command_targets"):
+            try:
+                cluster_id = int(str(row.get("key", "")).split(".")[0])
+            except (TypeError, ValueError):
+                continue
+            attribute = row.get("writes_attribute")
+            if attribute:
+                self.command_targets_by_cluster_id.setdefault(
+                    cluster_id, set()).add(str(attribute))
 
         # Which device families act on a ROOM environmental variable, from the
         # approved actuation_effects table. This decides which devices link to
@@ -173,6 +217,60 @@ class Mappings:
         return self.effects_by_cluster.get(
             (str(family.get("key") or ""), cluster), [])
 
+    def command_targets_for(self, cluster: str) -> set:
+        """Which attributes this cluster's commands write.
+
+        Accepts either spelling of the cluster name -- the registry canonicalises
+        "RTCCMode" and "Refrigerator And Temperature Controlled Cabinet Mode" to
+        the same cluster.
+        """
+        from matter_model.registry import load_registry
+        record = load_registry().cluster_by_name(cluster)
+        if record is None:
+            return set()
+        return self.command_targets_by_cluster_id.get(int(record.get("id", -1)), set())
+
+    def property_class(self, device_type: str, cluster: str,
+                       attribute: str) -> Optional[str]:
+        """The most specific homeont class for one device property.
+
+        Leaf first (`homeont:AirConditionerOnOff`), then the generic
+        cross-family class (`homeont:OnOff`), then the observable table. Returns
+        None when no approved row covers the attribute, so an unclassed property
+        is visible as a gap rather than guessed at.
+        """
+        path = f"{cluster}.{attribute}"
+        family = (self.device_family(device_type) or {}).get("key")
+        if family:
+            leaf = self.actuatable_leaves.get((str(family), path))
+            if leaf and leaf.get("property_type"):
+                return str(leaf["property_type"])
+        generic = self.property_class_by_path.get(path)
+        if generic and generic.get("homeont_class"):
+            return str(generic["homeont_class"])
+        observable = self.observable_classes.get(path)
+        if observable and observable.get("homeont_class"):
+            return str(observable["homeont_class"])
+        return None
+
+    def action_class(self, device_type: str, cluster: str,
+                     attribute: str) -> Optional[str]:
+        """The saref:Command subclass for one action affordance.
+
+        Keyed by the ATTRIBUTE the action drives, matching how the affordance
+        itself is keyed -- `onOff(true|false)` stands for On/Off/Toggle.
+        """
+        path = f"{cluster}.{attribute}"
+        family = (self.device_family(device_type) or {}).get("key")
+        if family:
+            leaf = self.actuatable_leaves.get((str(family), path))
+            if leaf and leaf.get("action_class"):
+                return str(leaf["action_class"])
+        generic = self.property_class_by_path.get(path)
+        if generic and generic.get("action_class"):
+            return str(generic["action_class"])
+        return None
+
     def unsettled(self) -> Dict[str, int]:
         """Count rows per table that are still awaiting review.
 
@@ -182,6 +280,7 @@ class Mappings:
         for name in (
             "attribute_map", "device_type_map", "room_map",
             "observable_properties", "property_classes",
+            "observable_property_classes",
             "actuatable_properties", "internal_properties",
             "command_targets", "actuation_effects", "sensing",
         ):

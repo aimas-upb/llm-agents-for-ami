@@ -8,13 +8,13 @@ generator:
   table: observable_properties
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-08-25T16:28:33.287328+00:00'
+  generated_at_utc: '2026-08-29T16:29:56.596504+00:00'
 rows:
 - key: room_state.humidity
   room_state_token: Humidity
   sosa_property: relative_humidity
   sosa_type: sosa:ObservableProperty
-  ex: ex:RelativeHumidity
+  homeont_class: homeont:RelativeHumidity
   property_node: anonymous
   unit: '%'
   quantityKind: quantitykind:RelativeHumidity
@@ -33,7 +33,7 @@ rows:
   room_state_token: Illuminance
   sosa_property: illuminance
   sosa_type: sosa:ObservableProperty
-  ex: ex:Illuminance
+  homeont_class: homeont:Illuminance
   property_node: anonymous
   unit: lx
   quantityKind: quantitykind:Illuminance
@@ -52,7 +52,7 @@ rows:
   room_state_token: Pm10
   sosa_property: pm10_mass_concentration
   sosa_type: sosa:ObservableProperty
-  ex: ex:Pm10MassConcentration
+  homeont_class: homeont:Pm10MassConcentration
   property_node: anonymous
   unit: ug/m3
   quantityKind: quantitykind:MassConcentration
@@ -71,7 +71,7 @@ rows:
   room_state_token: Temperature
   sosa_property: air_temperature
   sosa_type: sosa:ObservableProperty
-  ex: ex:AirTemperature
+  homeont_class: homeont:AirTemperature
   property_node: anonymous
   unit: °C
   quantityKind: quantitykind:ThermodynamicTemperature

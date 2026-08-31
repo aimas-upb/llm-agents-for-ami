@@ -1,4 +1,9 @@
 @prefix : <http://example.org/homeont/> .
+# Same namespace under its conventional label. The file is authored with the
+# empty prefix, but this ontology is also injected verbatim into LLM prompts,
+# where terms are referred to as `homeont:Kitchen` -- declaring both keeps the
+# text the model reads and the text it is asked to produce in one vocabulary.
+@prefix homeont: <http://example.org/homeont/> .
 @prefix hmas: <https://purl.org/hmas/> .
 @prefix td: <https://www.w3.org/2019/wot/td#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -10,6 +15,7 @@
 @prefix unit: <http://qudt.org/vocab/unit/> .
 @prefix quantitykind: <http://qudt.org/vocab/quantitykind/> .
 @prefix saref: <https://saref.etsi.org/core/> .
+@prefix ssn-system: <http://www.w3.org/ns/ssn/systems/> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
@@ -235,18 +241,6 @@ an attribute as type "list" and puts the element type in a child <entry>, so
 	rdfs:domain js:ArraySchema ;
 	rdfs:range xsd:string .
 
-:matterScale a owl:DatatypeProperty ;
-	rdfs:label "Matter scale"@en ;
-	rdfs:comment """Declares that the simulator stores this quantity in a scaled
-integer unit while the Thing Description reports the human value. Currently only
-"centi": Matter carries temperature and relative humidity in hundredths, so a
-room at 23.62 °C is stored as 2362.
-
-Stated explicitly so nobody divides twice. This is static shape -- the read
-route always applies the same conversion -- which is why it belongs on the
-schema, unlike a reading."""@en ;
-	rdfs:domain js:DataSchema ;
-	rdfs:range xsd:string .
 
 # NOTE -- units are carried by `qudt:unit` alone.
 #
@@ -260,40 +254,18 @@ schema, unlike a reading."""@en ;
 # tag. Verified present for every unit this corpus uses.
 
 ################################################################################
-# Affordance annotations
+# Affordance annotations -- REMOVED in phase 6.
+#
+# `:mechanism` and `:sosaRole` were string stand-ins for facts the graph could
+# not otherwise state. Both are now carried by the affordance's CLASS:
+# saref:State vs sosa:ObservableProperty vs ssn-system:SystemCapability draws
+# the sosaRole distinction properly, and the dispatch mechanism was never a
+# fact about the device at all -- it described how one server reached one
+# simulator, which a vocabulary shared with Home Assistant and native Matter
+# cannot carry. `:matterScale` went the same way: a read already returns the
+# value in the unit `qudt:unit` names.
 ################################################################################
 
-:mechanism a owl:DatatypeProperty ;
-	rdfs:label "actuation mechanism"@en ;
-	rdfs:comment """How SHTD actuates this property against the simulator.
-
-Matter actuates two ways, and the split is invisible to the planner by design:
-SHTD dispatches to the right SimuHome endpoint either way.
-
-  "attribute_write" -- the spec declares the attribute writable; SHTD POSTs to
-                       /api/devices/{id}/attributes/write
-  "command"         -- the attribute is read-only but a cluster command drives
-                       it (OnOff.OnOff is read-only, yet On/Off/Toggle set it);
-                       SHTD POSTs to /api/devices/{id}/commands"""@en ;
-	rdfs:domain td:PropertyAffordance ;
-	rdfs:range xsd:string .
-
-:sosaRole a owl:DatatypeProperty ;
-	rdfs:label "SOSA role"@en ;
-	rdfs:comment """What kind of thing the value is, which decides how it relates
-to SOSA. Introduced because a Matter attribute name alone is misleading:
-`MeasuredValue` is not a property, it is the RESULT of observing one.
-
-  "quantity_result"  -- a measured value of an observable quantity
-  "quantity_target"  -- a setpoint or target for a quantity
-  "device_state"     -- internal device state (on/off, current mode)
-  "sensor_metadata"  -- declared capability rather than a reading
-
-Min/Max bounds do not appear as affordances at all: they constrain a sibling's
-value, so they are emitted as js:minimum/js:maximum on that sibling's schema
-rather than as readable properties of their own."""@en ;
-	rdfs:domain td:PropertyAffordance ;
-	rdfs:range xsd:string .
 
 ################################################################################
 # Matter BasicInformation is NOT represented here.
@@ -414,3 +386,1020 @@ it does not encode the particle-size cut-off, which is carried by this class."""
 	rdfs:subClassOf sosa:ObservableProperty ;
 	qudt:hasQuantityKind quantitykind:MassConcentration ;
 	qudt:unit unit:MicroGM-PER-M3 .
+
+################################################################################
+# Phase 6 -- what an affordance IS
+#
+# Every property and action affordance a Thing Description serves carries a
+# class from this block, so a planner reads a type rather than parsing a name.
+#
+# Parents come from published vocabularies -- sosa:ObservableProperty and
+# sosa:ActuatableProperty (both ssn:Property), saref:State, saref:Command and
+# ssn-system:SystemCapability -- because this vocabulary has to serve Home
+# Assistant and native-Matter deployments, not only SimuHome.
+#
+# Nothing here names a protocol. Where a local name still echoes a Matter
+# cluster it is a legacy of the curated mapping tables, not a statement about
+# the wire format; the meaning is carried by rdfs:label and rdfs:comment.
+#
+# Sections below, in order:
+#   1. Roots
+#   2. Commands -- what an action DOES
+#   3. Actuatable properties -- generic
+#   4. Actuatable properties -- per-family leaves
+#   5. Observable measurements
+#   6. Device state
+#   7. Device capabilities
+#   8. Sensor metadata
+################################################################################
+
+################################################################################
+# 1. Roots
+#
+# The three locally-defined parents. Everything below descends from one of
+# these, or directly from a published vocabulary.
+################################################################################
+
+:ActuatableDeviceProperty a owl:Class ;
+    rdfs:label "Actuatable Device Property"@en ;
+    rdfs:comment """A property of a device that can be changed by invoking an
+action. The root of the actuatable half of this vocabulary."""@en ;
+    rdfs:subClassOf sosa:ActuatableProperty .
+
+:DeviceStateProperty a owl:Class ;
+    rdfs:label "Device State Property"@en ;
+    rdfs:comment """A readable condition a device is in -- running, idle,
+faulted, docked. SAREF models these as States rather than as measured
+quantities, because they are categorical rather than numeric."""@en ;
+    rdfs:subClassOf saref:State .
+
+:DeviceCapabilityProperty a owl:Class ;
+    rdfs:label "Device Capability Property"@en ;
+    rdfs:comment """A declaration of what a device CAN do -- the modes it
+supports, the spin speeds it offers, the phases an operation passes through. A
+planner reads one of these to choose a legal value for a sibling actuatable
+property. It is not a reading and never changes as a result of acting."""@en ;
+    rdfs:subClassOf ssn-system:SystemCapability .
+
+################################################################################
+# 2. Commands -- what an action DOES  (saref:Command)
+#
+# Action affordances are typed with the operation they perform, not with how
+# this server dispatches it. SAREF's command taxonomy is flat and mostly
+# sufficient: level and setpoint writes use `saref:SetAbsoluteLevelCommand`
+# DIRECTLY, with no local class at all. Only these two need defining, and each
+# records why SAREF could not simply be reused.
+################################################################################
+
+:SetOnOffCommand a owl:Class ;
+    rdfs:label "Set On/Off Command"@en ;
+    rdfs:comment """Sets a device's on/off state to a supplied boolean.
+
+SAREF's OnCommand, OffCommand and ToggleCommand each FIX the value they write,
+so no single one of them describes this affordance: it is keyed by the attribute
+and carries the value as an argument, driving all three. It is therefore a
+specialisation of all three -- invoked with true it is an OnCommand, with false
+an OffCommand -- rather than falling back to a bare saref:Command, which would
+discard what SAREF already states."""@en ;
+    rdfs:subClassOf saref:OnCommand, saref:OffCommand, saref:ToggleCommand ;
+    saref:actsUpon :OnOff .
+
+:SetModeCommand a owl:Class ;
+    rdfs:label "Set Mode Command"@en ;
+    rdfs:comment """Selects one named alternative from a set the device
+declares -- a wash programme, an HVAC mode, a cleaning thoroughness.
+
+This is the one command class with no SAREF equivalent. SAREF covers switching
+(On/Off/Toggle), levels (SetAbsoluteLevel, SetRelativeLevel, StepUp/StepDown),
+apertures (Open/Close) and lifecycle (Start/Stop/Pause), but has no term for
+choosing among named alternatives, so it is defined here directly under
+saref:Command. The permitted values come from the device's matching capability
+property."""@en ;
+    rdfs:subClassOf saref:Command .
+
+################################################################################
+# 3. Actuatable properties -- generic  (sosa:ActuatableProperty)
+#
+# What a planner queries when it wants "anything that can be switched on",
+# independent of which device family provides it.
+#
+# 31 classes.
+################################################################################
+
+:DishwasherModeCurrentMode a owl:Class ;
+    rdfs:label "Dishwasher Mode Current Mode"@en ;
+    rdfs:comment """The selected wash programme of a dishwasher, chosen from the modes it supports."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:FanControlFanMode a owl:Class ;
+    rdfs:label "Fan Control Fan Mode"@en ;
+    rdfs:comment """The named speed setting of a fan (off, low, medium, high, auto). A coarser control than the percentage setting, and the one most device rules test."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:FanControlFanSpeed a owl:Class ;
+    rdfs:label "Fan Control Fan Speed"@en ;
+    rdfs:comment """How fast a fan runs, as a percentage of its maximum. Higher speeds move more air, which is how fans, purifiers and humidifiers reach their effect faster."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:LaundryDryerControlsSelectedDrynessLevel a owl:Class ;
+    rdfs:label "Laundry Dryer Controls Selected Dryness Level"@en ;
+    rdfs:comment """How dry the dryer should leave the load."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:LaundryWasherControlsNumberOfRinses a owl:Class ;
+    rdfs:label "Laundry Washer Controls Number Of Rinses"@en ;
+    rdfs:comment """How many rinse cycles the washer will run."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:LaundryWasherControlsSpinSpeedCurrent a owl:Class ;
+    rdfs:label "Laundry Washer Controls Spin Speed Current"@en ;
+    rdfs:comment """The selected spin speed of a washer, chosen from the speeds that washer supports."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:LaundryWasherModeCurrentMode a owl:Class ;
+    rdfs:label "Laundry Washer Mode Current Mode"@en ;
+    rdfs:comment """The selected wash programme of a washing machine, chosen from the modes it supports."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:LevelControlBrightness a owl:Class ;
+    rdfs:label "Level Control Brightness"@en ;
+    rdfs:comment """How brightly a lamp emits, as a level from its own minimum to maximum. Raising it increases the illuminance of the room the lamp is in."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:LevelControlDefaultMoveRate a owl:Class ;
+    rdfs:label "Level Control Default Move Rate"@en ;
+    rdfs:comment """How quickly the level ramps when moved without an explicit rate."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:LevelControlOffTransitionTime a owl:Class ;
+    rdfs:label "Level Control Off Transition Time"@en ;
+    rdfs:comment """How long the device takes to fade down when switched off."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:LevelControlOnLevel a owl:Class ;
+    rdfs:label "Level Control On Level"@en ;
+    rdfs:comment """The level the device returns to when switched on. A stored preference, not the present level -- writing it changes nothing until the next switch-on."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:LevelControlOnOffTransitionTime a owl:Class ;
+    rdfs:label "Level Control On/Off Transition Time"@en ;
+    rdfs:comment """How long the device takes to fade between on and off."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:LevelControlOnTransitionTime a owl:Class ;
+    rdfs:label "Level Control On Transition Time"@en ;
+    rdfs:comment """How long the device takes to fade up when switched on."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:LevelControlOptions a owl:Class ;
+    rdfs:label "Level Control Options"@en ;
+    rdfs:comment """Flags altering how level changes behave, such as whether a change applies while the device is off."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:LevelControlStartUpCurrentLevel a owl:Class ;
+    rdfs:label "Level Control Start Up Current Level"@en ;
+    rdfs:comment """The level the device adopts after a power interruption. A restoration default, with no present-tense effect."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:OnOff a owl:Class ;
+    rdfs:label "On/Off"@en ;
+    rdfs:comment """Whether the device is powered on. Most devices refuse other operations while off, so switching on is usually the first step of any plan involving them."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:OnOffOffWaitTime a owl:Class ;
+    rdfs:label "On/Off Off Wait Time"@en ;
+    rdfs:comment """How long the device must remain off before it will accept being switched on again."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:OnOffOnTime a owl:Class ;
+    rdfs:label "On/Off On Time"@en ;
+    rdfs:comment """How long the device stays on before switching itself off again."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:OnOffStartUpOnOff a owl:Class ;
+    rdfs:label "On/Off Start Up On/Off"@en ;
+    rdfs:comment """Whether the device powers up on, off, or in its previous state after an interruption. A restoration default, with no present-tense effect."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:RVCCleanModeCleanCurrentMode a owl:Class ;
+    rdfs:label "RVC Clean Mode Clean Current Mode"@en ;
+    rdfs:comment """How thoroughly a robot vacuum cleans, such as quick or deep."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:RVCRunModeRunCurrentMode a owl:Class ;
+    rdfs:label "RVC Run Mode Run Current Mode"@en ;
+    rdfs:comment """Whether a robot vacuum is idle, cleaning, or returning to its dock."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:RefrigeratorAndTemperatureControlledCabinetModeCurrentMode a owl:Class ;
+    rdfs:label "Refrigerator And Temperature Controlled Cabinet Mode Current Mode"@en ;
+    rdfs:comment """The selected operating mode of a refrigerator or freezer cabinet, such as normal or rapid-cool."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:TemperatureControlTemperatureSetpoint a owl:Class ;
+    rdfs:label "Temperature Control Temperature Setpoint"@en ;
+    rdfs:comment """The target temperature for an appliance's own compartment, such as a freezer or refrigerator interior."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:ThermostatControlSequenceOfOperation a owl:Class ;
+    rdfs:label "Thermostat Control Sequence Of Operation"@en ;
+    rdfs:comment """Which of heating and cooling this installation is wired for. Installed capability, not a runtime control."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:ThermostatHvacMode a owl:Class ;
+    rdfs:label "Thermostat Hvac Mode"@en ;
+    rdfs:comment """What the climate device is trying to do: off, heating, cooling, fan-only or automatic. Cooling or heating only happens in the matching mode, so this gates the setpoints."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:WindowCoveringMode a owl:Class ;
+    rdfs:label "Window Covering Mode"@en ;
+    rdfs:comment """Configuration flags for a covering, such as reversed motor direction or calibration mode."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:WindowCoveringPosition a owl:Class ;
+    rdfs:label "Window Covering Position"@en ;
+    rdfs:comment """How far a blind or shade is drawn, as a percentage. Opening a covering raises the room's daylight illuminance; closing it lowers it."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:WindowCoveringTargetPosition a owl:Class ;
+    rdfs:label "Window Covering Target Position"@en ;
+    rdfs:comment """The position a covering has been commanded to reach, which it approaches over several ticks. The current position is the read-back."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:RVCCleanModeCurrentMode a owl:Class ;
+    rdfs:label "RVC Clean Mode Current Mode"@en ;
+    rdfs:comment """How thoroughly a robot vacuum cleans, such as quick or deep."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:RVCRunModeCurrentMode a owl:Class ;
+    rdfs:label "RVC Run Mode Current Mode"@en ;
+    rdfs:comment """Whether a robot vacuum is idle, cleaning, or returning to its dock."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:TemperatureSetpoint a owl:Class ;
+    rdfs:label "Temperature Setpoint"@en ;
+    rdfs:comment """A target temperature the device is asked to reach. It is a goal, not a reading: the measured temperature approaches it over time, and only while the device is on and in a mode that acts."""@en ;
+    qudt:hasQuantityKind quantitykind:ThermodynamicTemperature ;
+    qudt:unit unit:DEG_C ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+################################################################################
+# 4. Actuatable properties -- per-family leaves
+#
+# What a device's Thing Description actually instantiates. Each specialises
+# exactly one generic class from the section above.
+#
+# 62 classes.
+################################################################################
+
+:AirConditionerOnOff a owl:Class ;
+    rdfs:label "Air Conditioner On/Off"@en ;
+    rdfs:comment """Whether the device is powered on, on a air conditioner."""@en ;
+    rdfs:subClassOf :OnOff .
+
+:AirPurifierOnOff a owl:Class ;
+    rdfs:label "Air Purifier On/Off"@en ;
+    rdfs:comment """Whether the device is powered on, on a air purifier."""@en ;
+    rdfs:subClassOf :OnOff .
+
+:DehumidifierOnOff a owl:Class ;
+    rdfs:label "Dehumidifier On/Off"@en ;
+    rdfs:comment """Whether the device is powered on, on a dehumidifier."""@en ;
+    rdfs:subClassOf :OnOff .
+
+:DimmableLightOnOff a owl:Class ;
+    rdfs:label "Dimmable Light On/Off"@en ;
+    rdfs:comment """Whether the device is powered on, on a dimmable light."""@en ;
+    rdfs:subClassOf :OnOff .
+
+:DishwasherOnOff a owl:Class ;
+    rdfs:label "Dishwasher On/Off"@en ;
+    rdfs:comment """Whether the device is powered on, on a dishwasher."""@en ;
+    rdfs:subClassOf :OnOff .
+
+:FanOnOff a owl:Class ;
+    rdfs:label "Fan On/Off"@en ;
+    rdfs:comment """Whether the device is powered on, on a fan."""@en ;
+    rdfs:subClassOf :OnOff .
+
+:HumidifierOnOff a owl:Class ;
+    rdfs:label "Humidifier On/Off"@en ;
+    rdfs:comment """Whether the device is powered on, on a humidifier."""@en ;
+    rdfs:subClassOf :OnOff .
+
+:LaundryDryerOnOff a owl:Class ;
+    rdfs:label "Laundry Dryer On/Off"@en ;
+    rdfs:comment """Whether the device is powered on, on a laundry dryer."""@en ;
+    rdfs:subClassOf :OnOff .
+
+:LaundryWasherOnOff a owl:Class ;
+    rdfs:label "Laundry Washer On/Off"@en ;
+    rdfs:comment """Whether the device is powered on, on a laundry washer."""@en ;
+    rdfs:subClassOf :OnOff .
+
+:OnOffLightOnOff a owl:Class ;
+    rdfs:label "On/Off Light On/Off"@en ;
+    rdfs:comment """Whether the device is powered on, on a on/off light."""@en ;
+    rdfs:subClassOf :OnOff .
+
+:TvOnOff a owl:Class ;
+    rdfs:label "Tv On/Off"@en ;
+    rdfs:comment """Whether the device is powered on, on a tv."""@en ;
+    rdfs:subClassOf :OnOff .
+
+:DimmableLightOnTime a owl:Class ;
+    rdfs:label "Dimmable Light On Time"@en ;
+    rdfs:comment """How long the device stays on before switching itself off again, on a dimmable light."""@en ;
+    rdfs:subClassOf :OnOffOnTime .
+
+:DimmableLightOffWaitTime a owl:Class ;
+    rdfs:label "Dimmable Light Off Wait Time"@en ;
+    rdfs:comment """How long the device must remain off before it will accept being switched on again, on a dimmable light."""@en ;
+    rdfs:subClassOf :OnOffOffWaitTime .
+
+:DimmableLightStartUpOnOff a owl:Class ;
+    rdfs:label "Dimmable Light Start Up On/Off"@en ;
+    rdfs:comment """Whether the device powers up on, off, or in its previous state after an interruption, on a dimmable light."""@en ;
+    rdfs:subClassOf :OnOffStartUpOnOff .
+
+:DimmableLightBrightness a owl:Class ;
+    rdfs:label "Dimmable Light Brightness"@en ;
+    rdfs:comment """How brightly a lamp emits, as a level from its own minimum to maximum, on a dimmable light."""@en ;
+    rdfs:subClassOf :LevelControlBrightness .
+
+:TvBrightness a owl:Class ;
+    rdfs:label "Tv Brightness"@en ;
+    rdfs:comment """How brightly a lamp emits, as a level from its own minimum to maximum, on a tv."""@en ;
+    rdfs:subClassOf :LevelControlBrightness .
+
+:DimmableLightOptions a owl:Class ;
+    rdfs:label "Dimmable Light Options"@en ;
+    rdfs:comment """Flags altering how level changes behave, such as whether a change applies while the device is off, on a dimmable light."""@en ;
+    rdfs:subClassOf :LevelControlOptions .
+
+:TvOptions a owl:Class ;
+    rdfs:label "Tv Options"@en ;
+    rdfs:comment """Flags altering how level changes behave, such as whether a change applies while the device is off, on a tv."""@en ;
+    rdfs:subClassOf :LevelControlOptions .
+
+:DimmableLightOnOffTransitionTime a owl:Class ;
+    rdfs:label "Dimmable Light On/Off Transition Time"@en ;
+    rdfs:comment """How long the device takes to fade between on and off, on a dimmable light."""@en ;
+    rdfs:subClassOf :LevelControlOnOffTransitionTime .
+
+:TvOnOffTransitionTime a owl:Class ;
+    rdfs:label "Tv On/Off Transition Time"@en ;
+    rdfs:comment """How long the device takes to fade between on and off, on a tv."""@en ;
+    rdfs:subClassOf :LevelControlOnOffTransitionTime .
+
+:DimmableLightOnLevel a owl:Class ;
+    rdfs:label "Dimmable Light On Level"@en ;
+    rdfs:comment """The level the device returns to when switched on, on a dimmable light."""@en ;
+    rdfs:subClassOf :LevelControlOnLevel .
+
+:TvOnLevel a owl:Class ;
+    rdfs:label "Tv On Level"@en ;
+    rdfs:comment """The level the device returns to when switched on, on a tv."""@en ;
+    rdfs:subClassOf :LevelControlOnLevel .
+
+:DimmableLightOnTransitionTime a owl:Class ;
+    rdfs:label "Dimmable Light On Transition Time"@en ;
+    rdfs:comment """How long the device takes to fade up when switched on, on a dimmable light."""@en ;
+    rdfs:subClassOf :LevelControlOnTransitionTime .
+
+:TvOnTransitionTime a owl:Class ;
+    rdfs:label "Tv On Transition Time"@en ;
+    rdfs:comment """How long the device takes to fade up when switched on, on a tv."""@en ;
+    rdfs:subClassOf :LevelControlOnTransitionTime .
+
+:DimmableLightOffTransitionTime a owl:Class ;
+    rdfs:label "Dimmable Light Off Transition Time"@en ;
+    rdfs:comment """How long the device takes to fade down when switched off, on a dimmable light."""@en ;
+    rdfs:subClassOf :LevelControlOffTransitionTime .
+
+:TvOffTransitionTime a owl:Class ;
+    rdfs:label "Tv Off Transition Time"@en ;
+    rdfs:comment """How long the device takes to fade down when switched off, on a tv."""@en ;
+    rdfs:subClassOf :LevelControlOffTransitionTime .
+
+:DimmableLightDefaultMoveRate a owl:Class ;
+    rdfs:label "Dimmable Light Default Move Rate"@en ;
+    rdfs:comment """How quickly the level ramps when moved without an explicit rate, on a dimmable light."""@en ;
+    rdfs:subClassOf :LevelControlDefaultMoveRate .
+
+:TvDefaultMoveRate a owl:Class ;
+    rdfs:label "Tv Default Move Rate"@en ;
+    rdfs:comment """How quickly the level ramps when moved without an explicit rate, on a tv."""@en ;
+    rdfs:subClassOf :LevelControlDefaultMoveRate .
+
+:DimmableLightStartUpCurrentLevel a owl:Class ;
+    rdfs:label "Dimmable Light Start Up Current Level"@en ;
+    rdfs:comment """The level the device adopts after a power interruption, on a dimmable light."""@en ;
+    rdfs:subClassOf :LevelControlStartUpCurrentLevel .
+
+:TvStartUpCurrentLevel a owl:Class ;
+    rdfs:label "Tv Start Up Current Level"@en ;
+    rdfs:comment """The level the device adopts after a power interruption, on a tv."""@en ;
+    rdfs:subClassOf :LevelControlStartUpCurrentLevel .
+
+:LaundryDryerSelectedDrynessLevel a owl:Class ;
+    rdfs:label "Laundry Dryer Selected Dryness Level"@en ;
+    rdfs:comment """How dry the dryer should leave the load, on a laundry dryer."""@en ;
+    rdfs:subClassOf :LaundryDryerControlsSelectedDrynessLevel .
+
+:LaundryWasherCurrentMode a owl:Class ;
+    rdfs:label "Laundry Washer Current Mode"@en ;
+    rdfs:comment """The selected wash programme of a washing machine, chosen from the modes it supports, on a laundry washer."""@en ;
+    rdfs:subClassOf :LaundryWasherModeCurrentMode .
+
+:FreezerRefrigeratorAndTemperatureControlledCabinetModeCurrentMode a owl:Class ;
+    rdfs:label "Freezer Refrigerator And Temperature Controlled Cabinet Mode Current Mode"@en ;
+    rdfs:comment """The selected operating mode of a refrigerator or freezer cabinet, such as normal or rapid-cool, on a freezer."""@en ;
+    rdfs:subClassOf :RefrigeratorAndTemperatureControlledCabinetModeCurrentMode .
+
+:RefrigeratorRefrigeratorAndTemperatureControlledCabinetModeCurrentMode a owl:Class ;
+    rdfs:label "Refrigerator Refrigerator And Temperature Controlled Cabinet Mode Current Mode"@en ;
+    rdfs:comment """The selected operating mode of a refrigerator or freezer cabinet, such as normal or rapid-cool, on a refrigerator."""@en ;
+    rdfs:subClassOf :RefrigeratorAndTemperatureControlledCabinetModeCurrentMode .
+
+:LaundryWasherSpinSpeedCurrent a owl:Class ;
+    rdfs:label "Laundry Washer Spin Speed Current"@en ;
+    rdfs:comment """The selected spin speed of a washer, chosen from the speeds that washer supports, on a laundry washer."""@en ;
+    rdfs:subClassOf :LaundryWasherControlsSpinSpeedCurrent .
+
+:LaundryWasherNumberOfRinses a owl:Class ;
+    rdfs:label "Laundry Washer Number Of Rinses"@en ;
+    rdfs:comment """How many rinse cycles the washer will run, on a laundry washer."""@en ;
+    rdfs:subClassOf :LaundryWasherControlsNumberOfRinses .
+
+:RvcCurrentMode a owl:Class ;
+    rdfs:label "Rvc Current Mode"@en ;
+    rdfs:comment """Whether a robot vacuum is idle, cleaning, or returning to its dock, on a rvc."""@en ;
+    rdfs:subClassOf :RVCRunModeCurrentMode .
+
+:FreezerTemperatureSetpoint a owl:Class ;
+    rdfs:label "Freezer Temperature Setpoint"@en ;
+    rdfs:comment """The target temperature for an appliance's own compartment, such as a freezer or refrigerator interior, on a freezer."""@en ;
+    rdfs:subClassOf :TemperatureControlTemperatureSetpoint .
+
+:LaundryWasherTemperatureSetpoint a owl:Class ;
+    rdfs:label "Laundry Washer Temperature Setpoint"@en ;
+    rdfs:comment """The target temperature for an appliance's own compartment, such as a freezer or refrigerator interior, on a laundry washer."""@en ;
+    rdfs:subClassOf :TemperatureControlTemperatureSetpoint .
+
+:RefrigeratorTemperatureSetpoint a owl:Class ;
+    rdfs:label "Refrigerator Temperature Setpoint"@en ;
+    rdfs:comment """The target temperature for an appliance's own compartment, such as a freezer or refrigerator interior, on a refrigerator."""@en ;
+    rdfs:subClassOf :TemperatureControlTemperatureSetpoint .
+
+:DishwasherCurrentMode a owl:Class ;
+    rdfs:label "Dishwasher Current Mode"@en ;
+    rdfs:comment """The selected wash programme of a dishwasher, chosen from the modes it supports, on a dishwasher."""@en ;
+    rdfs:subClassOf :DishwasherModeCurrentMode .
+
+:WindowCoveringControllerTargetPosition a owl:Class ;
+    rdfs:label "Window Covering Controller Target Position"@en ;
+    rdfs:comment """The position a covering has been commanded to reach, which it approaches over several ticks, on a window covering controller."""@en ;
+    rdfs:subClassOf :WindowCoveringTargetPosition .
+
+:WindowCoveringControllerPosition a owl:Class ;
+    rdfs:label "Window Covering Controller Position"@en ;
+    rdfs:comment """How far a blind or shade is drawn, as a percentage, on a window covering controller."""@en ;
+    rdfs:subClassOf :WindowCoveringPosition .
+
+:WindowCoveringControllerMode a owl:Class ;
+    rdfs:label "Window Covering Controller Mode"@en ;
+    rdfs:comment """Configuration flags for a covering, such as reversed motor direction or calibration mode, on a window covering controller."""@en ;
+    rdfs:subClassOf :WindowCoveringMode .
+
+:AirConditionerCoolingSetpoint a owl:Class ;
+    rdfs:label "Air Conditioner Cooling Setpoint"@en ;
+    rdfs:comment """A target temperature the device is asked to reach, on a air conditioner."""@en ;
+    rdfs:subClassOf :TemperatureSetpoint .
+
+:HeatPumpCoolingSetpoint a owl:Class ;
+    rdfs:label "Heat Pump Cooling Setpoint"@en ;
+    rdfs:comment """A target temperature the device is asked to reach, on a heat pump."""@en ;
+    rdfs:subClassOf :TemperatureSetpoint .
+
+:AirConditionerHeatingSetpoint a owl:Class ;
+    rdfs:label "Air Conditioner Heating Setpoint"@en ;
+    rdfs:comment """A target temperature the device is asked to reach, on a air conditioner."""@en ;
+    rdfs:subClassOf :TemperatureSetpoint .
+
+:HeatPumpHeatingSetpoint a owl:Class ;
+    rdfs:label "Heat Pump Heating Setpoint"@en ;
+    rdfs:comment """A target temperature the device is asked to reach, on a heat pump."""@en ;
+    rdfs:subClassOf :TemperatureSetpoint .
+
+:AirConditionerControlSequenceOfOperation a owl:Class ;
+    rdfs:label "Air Conditioner Control Sequence Of Operation"@en ;
+    rdfs:comment """Which of heating and cooling this installation is wired for, on a air conditioner."""@en ;
+    rdfs:subClassOf :ThermostatControlSequenceOfOperation .
+
+:HeatPumpControlSequenceOfOperation a owl:Class ;
+    rdfs:label "Heat Pump Control Sequence Of Operation"@en ;
+    rdfs:comment """Which of heating and cooling this installation is wired for, on a heat pump."""@en ;
+    rdfs:subClassOf :ThermostatControlSequenceOfOperation .
+
+:AirConditionerHvacMode a owl:Class ;
+    rdfs:label "Air Conditioner Hvac Mode"@en ;
+    rdfs:comment """What the climate device is trying to do: off, heating, cooling, fan-only or automatic, on a air conditioner."""@en ;
+    rdfs:subClassOf :ThermostatHvacMode .
+
+:HeatPumpHvacMode a owl:Class ;
+    rdfs:label "Heat Pump Hvac Mode"@en ;
+    rdfs:comment """What the climate device is trying to do: off, heating, cooling, fan-only or automatic, on a heat pump."""@en ;
+    rdfs:subClassOf :ThermostatHvacMode .
+
+:AirConditionerFanMode a owl:Class ;
+    rdfs:label "Air Conditioner Fan Mode"@en ;
+    rdfs:comment """The named speed setting of a fan (off, low, medium, high, auto), on a air conditioner."""@en ;
+    rdfs:subClassOf :FanControlFanMode .
+
+:AirPurifierFanMode a owl:Class ;
+    rdfs:label "Air Purifier Fan Mode"@en ;
+    rdfs:comment """The named speed setting of a fan (off, low, medium, high, auto), on a air purifier."""@en ;
+    rdfs:subClassOf :FanControlFanMode .
+
+:DehumidifierFanMode a owl:Class ;
+    rdfs:label "Dehumidifier Fan Mode"@en ;
+    rdfs:comment """The named speed setting of a fan (off, low, medium, high, auto), on a dehumidifier."""@en ;
+    rdfs:subClassOf :FanControlFanMode .
+
+:FanFanMode a owl:Class ;
+    rdfs:label "Fan Fan Mode"@en ;
+    rdfs:comment """The named speed setting of a fan (off, low, medium, high, auto), on a fan."""@en ;
+    rdfs:subClassOf :FanControlFanMode .
+
+:HumidifierFanMode a owl:Class ;
+    rdfs:label "Humidifier Fan Mode"@en ;
+    rdfs:comment """The named speed setting of a fan (off, low, medium, high, auto), on a humidifier."""@en ;
+    rdfs:subClassOf :FanControlFanMode .
+
+:AirConditionerFanSpeed a owl:Class ;
+    rdfs:label "Air Conditioner Fan Speed"@en ;
+    rdfs:comment """How fast a fan runs, as a percentage of its maximum, on a air conditioner."""@en ;
+    rdfs:subClassOf :FanControlFanSpeed .
+
+:AirPurifierFanSpeed a owl:Class ;
+    rdfs:label "Air Purifier Fan Speed"@en ;
+    rdfs:comment """How fast a fan runs, as a percentage of its maximum, on a air purifier."""@en ;
+    rdfs:subClassOf :FanControlFanSpeed .
+
+:DehumidifierFanSpeed a owl:Class ;
+    rdfs:label "Dehumidifier Fan Speed"@en ;
+    rdfs:comment """How fast a fan runs, as a percentage of its maximum, on a dehumidifier."""@en ;
+    rdfs:subClassOf :FanControlFanSpeed .
+
+:FanFanSpeed a owl:Class ;
+    rdfs:label "Fan Fan Speed"@en ;
+    rdfs:comment """How fast a fan runs, as a percentage of its maximum, on a fan."""@en ;
+    rdfs:subClassOf :FanControlFanSpeed .
+
+:HumidifierFanSpeed a owl:Class ;
+    rdfs:label "Humidifier Fan Speed"@en ;
+    rdfs:comment """How fast a fan runs, as a percentage of its maximum, on a humidifier."""@en ;
+    rdfs:subClassOf :FanControlFanSpeed .
+
+################################################################################
+# 5. Observable measurements  (sosa:ObservableProperty)
+#
+# Measured values of physical quantities, each carrying its QUDT quantity kind and
+# unit -- the same treatment the four room environmental variables get.
+#
+# 10 classes.
+################################################################################
+
+:EnergyImported a owl:Class ;
+    rdfs:label "Energy Imported"@en ;
+    rdfs:comment """Cumulative or periodic electrical energy the device has consumed."""@en ;
+    qudt:hasQuantityKind quantitykind:Energy ;
+    qudt:unit unit:MilliW-HR ;
+    rdfs:subClassOf sosa:ObservableProperty .
+
+:ElectricCurrent a owl:Class ;
+    rdfs:label "Electric Current"@en ;
+    rdfs:comment """The electrical current the device is drawing."""@en ;
+    qudt:hasQuantityKind quantitykind:ElectricCurrent ;
+    qudt:unit unit:MilliA ;
+    rdfs:subClassOf sosa:ObservableProperty .
+
+:ActivePower a owl:Class ;
+    rdfs:label "Active Power"@en ;
+    rdfs:comment """The real electrical power the device is drawing at this instant."""@en ;
+    qudt:hasQuantityKind quantitykind:ActivePower ;
+    qudt:unit unit:MilliW ;
+    rdfs:subClassOf sosa:ObservableProperty .
+
+:ApparentPower a owl:Class ;
+    rdfs:label "Apparent Power"@en ;
+    rdfs:comment """The apparent electrical power drawn, combining real and reactive components."""@en ;
+    qudt:hasQuantityKind quantitykind:ApparentPower ;
+    qudt:unit unit:MilliV-A ;
+    rdfs:subClassOf sosa:ObservableProperty .
+
+:Frequency a owl:Class ;
+    rdfs:label "Frequency"@en ;
+    rdfs:comment """The frequency of the electrical supply, or of the device's own drive."""@en ;
+    qudt:hasQuantityKind quantitykind:Frequency ;
+    qudt:unit unit:HZ ;
+    rdfs:subClassOf sosa:ObservableProperty .
+
+:PowerFactor a owl:Class ;
+    rdfs:label "Power Factor"@en ;
+    rdfs:comment """The ratio of real to apparent power, between 0 and 1."""@en ;
+    qudt:hasQuantityKind quantitykind:DimensionlessRatio ;
+    rdfs:subClassOf sosa:ObservableProperty .
+
+:Voltage a owl:Class ;
+    rdfs:label "Voltage"@en ;
+    rdfs:comment """The electrical supply voltage measured at the device."""@en ;
+    qudt:hasQuantityKind quantitykind:Voltage ;
+    qudt:unit unit:MilliV ;
+    rdfs:subClassOf sosa:ObservableProperty .
+
+:FanSpeed a owl:Class ;
+    rdfs:label "Fan Speed"@en ;
+    rdfs:comment """The speed the fan is actually running at, as a percentage. The read-back of the requested speed, which it approaches over time."""@en ;
+    qudt:hasQuantityKind quantitykind:DimensionlessRatio ;
+    qudt:unit unit:PERCENT ;
+    rdfs:subClassOf sosa:ObservableProperty .
+
+:RemainingTime a owl:Class ;
+    rdfs:label "Remaining Time"@en ;
+    rdfs:comment """How long the device expects the current operation or transition to take."""@en ;
+    qudt:hasQuantityKind quantitykind:Time ;
+    qudt:unit unit:SEC ;
+    rdfs:subClassOf sosa:ObservableProperty .
+
+:CompartmentTemperature a owl:Class ;
+    rdfs:label "Compartment Temperature"@en ;
+    rdfs:comment """The temperature inside an appliance's own compartment, such as a freezer or refrigerator interior. This is NOT the temperature of the room the appliance stands in -- a freezer reads well below freezing in a warm kitchen."""@en ;
+    qudt:hasQuantityKind quantitykind:ThermodynamicTemperature ;
+    qudt:unit unit:DEG_C ;
+    rdfs:subClassOf sosa:ObservableProperty .
+
+################################################################################
+# 6. Device state  (saref:State)
+#
+# Categorical conditions a device is in: running, idle, faulted, docked. SAREF
+# models these as States rather than as measured quantities, because they are
+# categorical rather than numeric.
+#
+# 47 classes.
+################################################################################
+
+:ChannelCurrentChannel a owl:Class ;
+    rdfs:label "Channel Current Channel"@en ;
+    rdfs:comment """The channel current channel reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:DeviceEnergyManagementESACanGenerate a owl:Class ;
+    rdfs:label "Device Energy Management ESA Can Generate"@en ;
+    rdfs:comment """The device energy management esa can generate reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:DeviceEnergyManagementESAState a owl:Class ;
+    rdfs:label "Device Energy Management ESA State"@en ;
+    rdfs:comment """The device energy management esa state reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:DeviceEnergyManagementESAType a owl:Class ;
+    rdfs:label "Device Energy Management ESA Type"@en ;
+    rdfs:comment """The device energy management esa type reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:DishwasherAlarmLatch a owl:Class ;
+    rdfs:label "Dishwasher Alarm Latch"@en ;
+    rdfs:comment """The dishwasher alarm latch reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:DishwasherAlarmMask a owl:Class ;
+    rdfs:label "Dishwasher Alarm Mask"@en ;
+    rdfs:comment """The dishwasher alarm mask reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:DishwasherAlarmState a owl:Class ;
+    rdfs:label "Dishwasher Alarm State"@en ;
+    rdfs:comment """The dishwasher alarm state reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:ElectricalEnergyMeasurementAccuracy a owl:Class ;
+    rdfs:label "Electrical Energy Measurement Accuracy"@en ;
+    rdfs:comment """The electrical energy measurement accuracy reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:ElectricalPowerMeasurementAccuracy a owl:Class ;
+    rdfs:label "Electrical Power Measurement Accuracy"@en ;
+    rdfs:comment """The electrical power measurement accuracy reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:ElectricalPowerMeasurementNumberOfMeasurementTypes a owl:Class ;
+    rdfs:label "Electrical Power Measurement Number Of Measurement Types"@en ;
+    rdfs:comment """The electrical power measurement number of measurement types reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:ElectricalPowerMeasurementPowerMode a owl:Class ;
+    rdfs:label "Electrical Power Measurement Power Mode"@en ;
+    rdfs:comment """The electrical power measurement power mode reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:LevelControlMaxFrequency a owl:Class ;
+    rdfs:label "Level Control Max Frequency"@en ;
+    rdfs:comment """The level control max frequency reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:LevelControlMaxLevel a owl:Class ;
+    rdfs:label "Level Control Max Level"@en ;
+    rdfs:comment """The level control max level reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:LevelControlMinFrequency a owl:Class ;
+    rdfs:label "Level Control Min Frequency"@en ;
+    rdfs:comment """The level control min frequency reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:LevelControlMinLevel a owl:Class ;
+    rdfs:label "Level Control Min Level"@en ;
+    rdfs:comment """The level control min level reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:MediaPlaybackCurrentState a owl:Class ;
+    rdfs:label "Media Playback Current State"@en ;
+    rdfs:comment """The media playback current state reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:OnOffGlobalSceneControl a owl:Class ;
+    rdfs:label "On/Off Global Scene Control"@en ;
+    rdfs:comment """The on/off global scene control reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:OperationalStateCurrentPhase a owl:Class ;
+    rdfs:label "Operational State Current Phase"@en ;
+    rdfs:comment """The operational state current phase reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:OperationalStateOperationalError a owl:Class ;
+    rdfs:label "Operational State Operational Error"@en ;
+    rdfs:comment """The operational state operational error reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:OperationalStateOperationalState a owl:Class ;
+    rdfs:label "Operational State Operational State"@en ;
+    rdfs:comment """The operational state operational state reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:PowerSourceActiveWiredFaults a owl:Class ;
+    rdfs:label "Power Source Active Wired Faults"@en ;
+    rdfs:comment """The power source active wired faults reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:PowerSourceDescription a owl:Class ;
+    rdfs:label "Power Source Description"@en ;
+    rdfs:comment """The power source description reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:PowerSourceEndpointList a owl:Class ;
+    rdfs:label "Power Source Endpoint List"@en ;
+    rdfs:comment """The power source endpoint list reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:PowerSourceOrder a owl:Class ;
+    rdfs:label "Power Source Order"@en ;
+    rdfs:comment """The power source order reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:PowerSourceStatus a owl:Class ;
+    rdfs:label "Power Source Status"@en ;
+    rdfs:comment """The power source status reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:PowerSourceWiredAssessedCurrent a owl:Class ;
+    rdfs:label "Power Source Wired Assessed Current"@en ;
+    rdfs:comment """The power source wired assessed current reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:PowerSourceWiredAssessedInputFrequency a owl:Class ;
+    rdfs:label "Power Source Wired Assessed Input Frequency"@en ;
+    rdfs:comment """The power source wired assessed input frequency reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:PowerSourceWiredAssessedInputVoltage a owl:Class ;
+    rdfs:label "Power Source Wired Assessed Input Voltage"@en ;
+    rdfs:comment """The power source wired assessed input voltage reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:PowerSourceWiredCurrentType a owl:Class ;
+    rdfs:label "Power Source Wired Current Type"@en ;
+    rdfs:comment """The power source wired current type reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:PowerSourceWiredMaximumCurrent a owl:Class ;
+    rdfs:label "Power Source Wired Maximum Current"@en ;
+    rdfs:comment """The power source wired maximum current reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:PowerSourceWiredNominalVoltage a owl:Class ;
+    rdfs:label "Power Source Wired Nominal Voltage"@en ;
+    rdfs:comment """The power source wired nominal voltage reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:PowerSourceWiredPresent a owl:Class ;
+    rdfs:label "Power Source Wired Present"@en ;
+    rdfs:comment """The power source wired present reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:RVCOperationalStateCurrentPhase a owl:Class ;
+    rdfs:label "RVC Operational State Current Phase"@en ;
+    rdfs:comment """The rvc operational state current phase reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:RVCOperationalStateOperationalError a owl:Class ;
+    rdfs:label "RVC Operational State Operational Error"@en ;
+    rdfs:comment """The rvc operational state operational error reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:RVCOperationalStateOperationalState a owl:Class ;
+    rdfs:label "RVC Operational State Operational State"@en ;
+    rdfs:comment """The rvc operational state operational state reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:RelativeHumidityMeasurementMaxMeasuredValue a owl:Class ;
+    rdfs:label "Relative Humidity Measurement Max Measured Value"@en ;
+    rdfs:comment """The relative humidity measurement max measured value reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:RelativeHumidityMeasurementMinMeasuredValue a owl:Class ;
+    rdfs:label "Relative Humidity Measurement Min Measured Value"@en ;
+    rdfs:comment """The relative humidity measurement min measured value reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:TemperatureControlMaxTemperature a owl:Class ;
+    rdfs:label "Temperature Control Max Temperature"@en ;
+    rdfs:comment """The temperature control max temperature reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:TemperatureControlMinTemperature a owl:Class ;
+    rdfs:label "Temperature Control Min Temperature"@en ;
+    rdfs:comment """The temperature control min temperature reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:TemperatureMeasurementMaxMeasuredValue a owl:Class ;
+    rdfs:label "Temperature Measurement Max Measured Value"@en ;
+    rdfs:comment """The temperature measurement max measured value reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:TemperatureMeasurementMinMeasuredValue a owl:Class ;
+    rdfs:label "Temperature Measurement Min Measured Value"@en ;
+    rdfs:comment """The temperature measurement min measured value reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:WindowCoveringConfigStatus a owl:Class ;
+    rdfs:label "Window Covering Config Status"@en ;
+    rdfs:comment """The window covering config status reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:WindowCoveringEndProductType a owl:Class ;
+    rdfs:label "Window Covering End Product Type"@en ;
+    rdfs:comment """The window covering end product type reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:WindowCoveringNumberOfActuationsLift a owl:Class ;
+    rdfs:label "Window Covering Number Of Actuations Lift"@en ;
+    rdfs:comment """The window covering number of actuations lift reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:WindowCoveringOperationalStatus a owl:Class ;
+    rdfs:label "Window Covering Operational Status"@en ;
+    rdfs:comment """The window covering operational status reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:WindowCoveringSafetyStatus a owl:Class ;
+    rdfs:label "Window Covering Safety Status"@en ;
+    rdfs:comment """The window covering safety status reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+:WindowCoveringType a owl:Class ;
+    rdfs:label "Window Covering Type"@en ;
+    rdfs:comment """The window covering type reported by the device."""@en ;
+    rdfs:subClassOf :DeviceStateProperty .
+
+################################################################################
+# 7. Device capabilities  (ssn-system:SystemCapability)
+#
+# Declarations of what a device CAN do -- the modes it supports, the spin speeds it
+# offers, the phases an operation passes through. A planner reads one of these to
+# choose a legal value for a sibling actuatable property. They are NOT readings and
+# never change as a result of acting.
+#
+# 19 classes.
+################################################################################
+
+:ChannelChannelList a owl:Class ;
+    rdfs:label "Channel Channel List"@en ;
+    rdfs:comment """The channel channel list reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:ChannelLineup a owl:Class ;
+    rdfs:label "Channel Lineup"@en ;
+    rdfs:comment """The channel lineup reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:DeviceEnergyManagementAbsMaxPower a owl:Class ;
+    rdfs:label "Device Energy Management Abs Max Power"@en ;
+    rdfs:comment """The device energy management abs max power reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:DeviceEnergyManagementAbsMinPower a owl:Class ;
+    rdfs:label "Device Energy Management Abs Min Power"@en ;
+    rdfs:comment """The device energy management abs min power reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:DeviceEnergyManagementPowerAdjustmentCapability a owl:Class ;
+    rdfs:label "Device Energy Management Power Adjustment Capability"@en ;
+    rdfs:comment """The device energy management power adjustment capability reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:DishwasherAlarmSupported a owl:Class ;
+    rdfs:label "Dishwasher Alarm Supported"@en ;
+    rdfs:comment """The dishwasher alarm supported reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:DishwasherModeSupportedModes a owl:Class ;
+    rdfs:label "Dishwasher Mode Supported Modes"@en ;
+    rdfs:comment """The dishwasher mode supported modes reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:FanControlFanModeSequence a owl:Class ;
+    rdfs:label "Fan Control Fan Mode Sequence"@en ;
+    rdfs:comment """The fan control fan mode sequence reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:LaundryDryerControlsSupportedDrynessLevels a owl:Class ;
+    rdfs:label "Laundry Dryer Controls Supported Dryness Levels"@en ;
+    rdfs:comment """The laundry dryer controls supported dryness levels reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:LaundryWasherControlsSpinSpeeds a owl:Class ;
+    rdfs:label "Laundry Washer Controls Spin Speeds"@en ;
+    rdfs:comment """The laundry washer controls spin speeds reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:LaundryWasherControlsSupportedRinses a owl:Class ;
+    rdfs:label "Laundry Washer Controls Supported Rinses"@en ;
+    rdfs:comment """The laundry washer controls supported rinses reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:LaundryWasherModeSupportedModes a owl:Class ;
+    rdfs:label "Laundry Washer Mode Supported Modes"@en ;
+    rdfs:comment """The laundry washer mode supported modes reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:OperationalStateOperationalStateList a owl:Class ;
+    rdfs:label "Operational State Operational State List"@en ;
+    rdfs:comment """The operational state operational state list reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:OperationalStatePhaseList a owl:Class ;
+    rdfs:label "Operational State Phase List"@en ;
+    rdfs:comment """The operational state phase list reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:RTCCModeSupportedModes a owl:Class ;
+    rdfs:label "RTCC Mode Supported Modes"@en ;
+    rdfs:comment """The rtcc mode supported modes reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:RVCCleanModeSupportedModes a owl:Class ;
+    rdfs:label "RVC Clean Mode Supported Modes"@en ;
+    rdfs:comment """The rvc clean mode supported modes reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:RVCOperationalStateOperationalStateList a owl:Class ;
+    rdfs:label "RVC Operational State Operational State List"@en ;
+    rdfs:comment """The rvc operational state operational state list reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:RVCOperationalStatePhaseList a owl:Class ;
+    rdfs:label "RVC Operational State Phase List"@en ;
+    rdfs:comment """The rvc operational state phase list reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+:RVCRunModeSupportedModes a owl:Class ;
+    rdfs:label "RVC Run Mode Supported Modes"@en ;
+    rdfs:comment """The rvc run mode supported modes reported by the device."""@en ;
+    rdfs:subClassOf :DeviceCapabilityProperty .
+
+################################################################################
+# 8. Sensor metadata  (ssn-system:*)
+#
+# Declared characteristics of a measurement rather than a measurement.
+#
+# 1 classes.
+################################################################################
+
+:RelativeHumidityMeasurementTolerance a owl:Class ;
+    rdfs:label "Relative Humidity Measurement Tolerance"@en ;
+    rdfs:comment """The relative humidity measurement tolerance reported by the device."""@en ;
+    rdfs:subClassOf ssn-system:Accuracy .

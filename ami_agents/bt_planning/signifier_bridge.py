@@ -625,48 +625,12 @@ def build_bt_from_signifiers(
                 "action_url": affordance_uri,
             }
 
-<<<<<<< HEAD
-            payload = m.get("payload_hint") or m.get("payload")
-
-            # Intent-aware payload selection
-            if intent.action == "set" and intent.value is not None and intent.parameter:
-=======
             # Intent-aware payload selection (only for ExplicitGoalIntent with value)
             if isinstance(intent, ExplicitGoalIntent) and intent.action.parameter and intent.action.value is not None:
->>>>>>> code_cleanup_alex
                 # Special case: 'on_off' is a semantic parameter, not an API parameter
                 # The action (turn_on vs turn_off) is already encoded in the affordance_uri
                 if intent.action.parameter == "on_off":
                     logger.info(demo("build_bt_from_signifiers: SET action with on_off parameter - skipping (encoded in affordance_uri)"))
-<<<<<<< HEAD
-                elif _action_accepts_intent_parameter(affordance_uri, intent.parameter):
-                    # Use the caller's actual target value when it matches the selected affordance.
-                    action_node["parameters"] = {intent.parameter: intent.value}
-                    logger.info(
-                        demo("build_bt_from_signifiers: SET action - overriding payload_hint with intent value: %s=%s"),
-                        intent.parameter,
-                        intent.value,
-                    )
-                elif payload and isinstance(payload, dict):
-                    action_node["parameters"] = payload
-                    logger.info(
-                        demo("build_bt_from_signifiers: SET parameter %r incompatible with action %r; using payload_hint: %s"),
-                        intent.parameter,
-                        _action_name_from_affordance_uri(affordance_uri),
-                        payload,
-                    )
-                else:
-                    logger.info(
-                        demo("build_bt_from_signifiers: SET parameter %r incompatible with action %r and no payload_hint available; bailing"),
-                        intent.parameter,
-                        _action_name_from_affordance_uri(affordance_uri),
-                    )
-                    return None
-            elif intent.action == "check":
-                logger.info(demo("build_bt_from_signifiers: CHECK action - no parameters needed"))
-            else:
-                # Fallback: reuse signifier's payload_hint as-is
-=======
                 else:
                     # Use the caller's actual target value, not the stale signifier hint
                     action_node["parameters"] = {intent.action.parameter: intent.action.value}
@@ -675,7 +639,6 @@ def build_bt_from_signifiers(
                 # ImplicitGoalIntent or ExplicitGoalIntent without explicit value:
                 # reuse signifier's payload_hint as-is
                 payload = m.get("payload_hint") or m.get("payload")
->>>>>>> code_cleanup_alex
                 if payload and isinstance(payload, dict):
                     action_node["parameters"] = payload
                     logger.info(demo(f"build_bt_from_signifiers: using payload_hint from signifier: {payload}"))

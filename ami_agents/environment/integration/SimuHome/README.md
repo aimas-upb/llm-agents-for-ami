@@ -3,10 +3,18 @@
 Serves a loaded SimuHome home as the HMAS/TD tree the AMI agents already crawl,
 talking native Matter to the simulator instead of routing through Home Assistant.
 
-**Status: phase 5 in progress** — Thing Descriptions, action affordances,
-state-change notification over WebSub, TD-SOSA semantics, and an isolated worker
-model scored by SimuHome's own evaluator. Remaining: the harness that assigns
-episodes to workers and runs the BT planner in each.
+**Status: phase 6 done; phase 5 in progress** — Thing Descriptions, action
+affordances, state-change notification over WebSub, TD-SOSA semantics, semantic
+classes on every affordance, and an isolated worker model scored by SimuHome's
+own evaluator. Remaining: the harness that assigns episodes to workers and runs
+the BT planner in each.
+
+Phase 6 (`PHASE6.md`) made every affordance say what it *is*, not just what it
+*affects*: all 174 property affordances and 53 action affordances on a 22-device
+home now carry a class rooted in `sosa:ObservableProperty`, `saref:State`,
+`ssn-system:SystemCapability` or `saref:Command`. The back-end-specific
+annotations (`mechanism`, `sosaRole`, `matterScale`) were removed, because this
+vocabulary has to serve Home Assistant and native-Matter deployments too.
 
 ## Why this exists
 
@@ -41,6 +49,7 @@ recovers everything the HA path dropped.
 | `verify_phase5.py` | worker isolation, episode lifecycle, and scoring with SimuHome's evaluator |
 | `verify_dispatch.py` | static: every actuatable attribute in the corpus is dispatchable, with the argument names SimuHome accepts |
 | `PHASE4.md` | what phase 4 must do, and the corpus evidence behind it |
+| `PHASE6.md` | phase 6: semantic classes for properties and commands, and the mapper/TD boundary |
 | `AGENT_UPDATES.md` | changes owed to the agent layer, found while pointing the agents at SHTD |
 
 ## Running
@@ -265,7 +274,7 @@ A room is **two** resources, and conflating them is a modelling error:
 
 | resource | is | who links to it |
 |---|---|---|
-| `…/{room}#place` | `ex:Kitchen`, `s4bldg:BuildingSpace` | **every** device, via `ex:locatedIn` |
+| `…/{room}#place` | `homeont:Kitchen`, `homeont:BuildingSpace` | **every** device, via `homeont:isLocatedIn` |
 | `…/{room}#environment` | `sosa:FeatureOfInterest` | only devices that perceive or affect one of its variables, via `sosa:hasFeatureOfInterest` |
 
 The environment is what carries air temperature, relative humidity, illuminance
@@ -347,8 +356,8 @@ for cooling, and without this an agent would have to recall from pretraining tha
 
 ```turtle
 td:hasOutputSchema [ a js:IntegerSchema ;
-    ex:matterType "temperature" ;
-    ex:unit "°C" ;
+    homeont:matterType "temperature" ;
+    qudt:unit unit:DEG_C ;
     js:minimum 5.0 ;
     js:maximum 95.0 ] ;
 ```
@@ -379,15 +388,19 @@ clusters the same way attributes do — `DishwasherMode` picks up Mode Base's
 
 ## Units
 
-Matter stores temperature and humidity in centi-units. The TD reports the human
-value and says so explicitly rather than leaving it implicit:
+Matter stores temperature and humidity in centi-units. **That conversion stops
+at the mapper.** A read returns the human value, and the schema names the unit
+in standard QUDT:
 
 ```turtle
-ex:currentValue 2.362e+01 ;
-ex:matterRawValue 2.362e+03 ;
-ex:matterScale "centi" ;
-ex:unit "°C" ;
+td:hasOutputSchema [ a js:NumberSchema ;
+    qudt:unit unit:DEG_C ] ;
 ```
+
+The earlier `ex:matterScale "centi"` / `ex:matterRawValue` annotations were
+removed in phase 6: they described SimuHome's wire format, not the quantity, and
+a Home Assistant or native-Matter deployment serving this vocabulary would have
+nothing to put in them. Anything a consumer needs is in the value and its unit.
 
 ## Mapping tables
 
@@ -396,6 +409,15 @@ code. `mappings.py` honours a row only when its `status` is `approved` or `auto`
 anything still under review is reported by `/_shtd/status` as
 `unsettledMappingRows` rather than silently used. Currently **zero** outstanding
 (`ha_binding.yaml` is skipped — SHTD replaces it with direct Matter calls).
+
+Phase 6 connected the last two tables that were curated but unread.
+`property_classes.yaml` was loaded and never queried, so no property affordance
+carried a class; `command_targets.yaml` was not loaded at all, and the
+hand-written `COMMAND_TARGETS` constant that "mirrored" it **had already
+drifted** — the copy carried four cluster entries the table lacked, and the
+table was missing a `WindowCovering` row the dispatcher relies on. Both are now
+read from the tables alone, and `observable_property_classes.yaml` (86 rows) was
+added for the observables, which had no class in any table.
 
 The Phase A mapping tables remain under `tests/simuhome/td/mappings/`, as does
 the Home Assistant YAML converter — that is the HA path, which SHTD replaces.

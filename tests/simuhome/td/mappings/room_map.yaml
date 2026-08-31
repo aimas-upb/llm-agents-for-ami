@@ -8,10 +8,10 @@ generator:
   table: room_map
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-08-25T16:28:33.280146+00:00'
+  generated_at_utc: '2026-08-29T16:29:56.590130+00:00'
 rows:
 - key: Bathroom
-  ex: ex:Bathroom
+  homeont_class: homeont:Bathroom
   subClassOf: s4bldg:BuildingSpace
   foi_iri: null
   foi_iri_reason: needs the deployment workspace base IRI; unknown at Phase A
@@ -26,7 +26,7 @@ rows:
   evidence:
     approved_because: referenced in 195 of 600 benchmark queries by name
 - key: Bedroom
-  ex: ex:Bedroom
+  homeont_class: homeont:Bedroom
   subClassOf: s4bldg:BuildingSpace
   foi_iri: null
   foi_iri_reason: needs the deployment workspace base IRI; unknown at Phase A
@@ -41,7 +41,7 @@ rows:
   evidence:
     approved_because: referenced in 30 of 600 benchmark queries by name
 - key: DiningRoom
-  ex: ex:DiningRoom
+  homeont_class: homeont:DiningRoom
   subClassOf: s4bldg:BuildingSpace
   foi_iri: null
   foi_iri_reason: needs the deployment workspace base IRI; unknown at Phase A
@@ -56,7 +56,7 @@ rows:
   evidence:
     approved_because: referenced in 33 of 600 benchmark queries by name
 - key: KidsRoom
-  ex: ex:KidsRoom
+  homeont_class: homeont:KidsRoom
   subClassOf: s4bldg:BuildingSpace
   foi_iri: null
   foi_iri_reason: needs the deployment workspace base IRI; unknown at Phase A
@@ -71,7 +71,7 @@ rows:
   evidence:
     approved_because: referenced in 39 of 600 benchmark queries by name
 - key: Kitchen
-  ex: ex:Kitchen
+  homeont_class: homeont:Kitchen
   subClassOf: s4bldg:BuildingSpace
   foi_iri: null
   foi_iri_reason: needs the deployment workspace base IRI; unknown at Phase A
@@ -86,7 +86,7 @@ rows:
   evidence:
     approved_because: referenced in 223 of 600 benchmark queries by name
 - key: LivingRoom
-  ex: ex:LivingRoom
+  homeont_class: homeont:LivingRoom
   subClassOf: s4bldg:BuildingSpace
   foi_iri: null
   foi_iri_reason: needs the deployment workspace base IRI; unknown at Phase A
@@ -101,7 +101,7 @@ rows:
   evidence:
     approved_because: referenced in 190 of 600 benchmark queries by name
 - key: Office
-  ex: ex:Office
+  homeont_class: homeont:Office
   subClassOf: s4bldg:BuildingSpace
   foi_iri: null
   foi_iri_reason: needs the deployment workspace base IRI; unknown at Phase A
@@ -116,7 +116,7 @@ rows:
   evidence:
     approved_because: referenced in 41 of 600 benchmark queries by name
 - key: StudyRoom
-  ex: ex:StudyRoom
+  homeont_class: homeont:StudyRoom
   subClassOf: s4bldg:BuildingSpace
   foi_iri: null
   foi_iri_reason: needs the deployment workspace base IRI; unknown at Phase A
@@ -131,7 +131,7 @@ rows:
   evidence:
     approved_because: referenced in 25 of 600 benchmark queries by name
 - key: UtilityRoom
-  ex: ex:UtilityRoom
+  homeont_class: homeont:UtilityRoom
   subClassOf: s4bldg:BuildingSpace
   foi_iri: null
   foi_iri_reason: needs the deployment workspace base IRI; unknown at Phase A

@@ -29,10 +29,13 @@ Phase B refuses to run while any `todo` remains.
 | `attribute_map.yaml` | 116 | decimal `cluster.attribute` | nothing — pure registry ∩ corpus |
 | `internal_properties.yaml` | 49 | decimal `cluster.attribute` | nothing — plumbing/metadata split |
 | `actuatable_properties.yaml` | 25 | decimal `cluster.attribute` | 5 command-driven rows |
-| `device_type_map.yaml` | 16 | device family token | the `ex:`/`saref:` classes |
-| `room_map.yaml` | 9 | room token | the `ex:` classes; `foi_iri` needs a workspace base |
+| `device_type_map.yaml` | 16 | device family token | the `homeont:`/`saref:` classes |
+| `room_map.yaml` | 9 | room token | the `homeont:` classes; `foi_iri` needs a workspace base |
 | `observable_properties.yaml` | 4 | room state | the environmental vocabulary + QUDT units |
 | `actuation_effects.yaml` | 96 | `family:clusterId.commandId` | **the highest-judgement table** |
+| `observable_property_classes.yaml` | 86 | decimal `cluster.attribute` | **phase 6** — which SAREF/SSN parent each observable takes |
+| `command_targets.yaml` | 15 | `clusterId.commandId` | which attribute a command writes; read by `classify.py` |
+| `property_classes.yaml` | 30 | homeont class IRI | the generic, cross-family actuatable classes |
 | `ha_binding.yaml` | 44 | `family:clusterId.commandId` | Matter command → HA service |
 
 ## What to scrutinise first
@@ -54,9 +57,9 @@ treats setpoint services (`hasp.py::_SETPOINT_SERVICES`).
 range per device type (the climate entities in this benchmark carry 42 distinct
 `min_temp` and 70 distinct `max_temp` values), so limits describe one deployed
 device, not a type. Two TVs with different brightness ranges are two instances
-of `ex:TvBrightness`.
+of `homeont:TvBrightness`.
 
-The class hierarchy (`ex:TvBrightness rdfs:subClassOf ex:LevelControlBrightness`)
+The class hierarchy (`homeont:TvBrightness rdfs:subClassOf homeont:LevelControlBrightness`)
 still stands on its own, in `out/vocab/ex.ttl` — as `rdf:type` targets only. Each
 TD stays self-contained: it references no node defined outside itself, and two
 devices affecting the same room say so by naming the same
@@ -74,7 +77,7 @@ devices affecting the same room say so by naming the same
    the `enum` in `ha_binding.yaml` while `FanModeSequence` is emitted alongside
    as a capability statement.
 2. *One type per node.* Emit only the most specific class —
-   `[ a ex:DimmableLightOnOff ]`, never `[ a ex:DimmableLightOnOff,
+   `[ a homeont:DimmableLightOnOff ]`, never `[ a homeont:DimmableLightOnOff,
    sosa:ActuatableProperty ]`. The parent is entailed by `ex.ttl` and,
    independently, by the v2 ontology's `someValuesFrom` restriction on
    `tdsosa:ActuatablePropertyAffordance`. The only exceptions are `td:Thing`

@@ -71,10 +71,14 @@ _PREFIXES = {
 }
 
 # CURIEs in the mapping tables resolve against these.
+#
+# There is no `ex:` alias. `homeont:` is the single prefix for this vocabulary,
+# in the tables and in every served document alike -- two spellings for one
+# namespace is how a normative term ends up reading as an example placeholder.
+# An unknown prefix returns None from `curie_to_uri`, so a stray `ex:` now
+# surfaces as a missing type rather than resolving silently.
 _NS_BY_PREFIX = {
-    # The reviewed mapping tables still write `ex:Kitchen`, `ex:Freezer`; those
-    # local names moved into homeont unchanged, so `ex:` resolves there.
-    "ex": HOME, "homeont": HOME, "saref": SAREF, "sosa": SOSA, "ssn": SSN,
+    "homeont": HOME, "saref": SAREF, "sosa": SOSA, "ssn": SSN,
     "quantitykind": QK, "unit": UNIT, "tdsosa": TDSOSA, "td": TD,
 }
 
@@ -317,7 +321,7 @@ class SimuHomeTD:
             g.add((room_ws, HMAS.isContainedIn, ws))
             g.add((room_ws, RDF.type, HMAS.Workspace))
             g.add((room_ws, TD.title, Literal(self._room_title(room_id))))
-            room_class = curie_to_uri((self.m.room(room_id) or {}).get("ex"))
+            room_class = curie_to_uri((self.m.room(room_id) or {}).get("homeont_class"))
             if room_class is not None:
                 g.add((room_ws, RDF.type, room_class))
 
@@ -347,7 +351,7 @@ class SimuHomeTD:
         _no_security(g, ws)
 
         # The PLACE: a physical building space. This is what a device is
-        # located in, and it carries the room's ex: type (ex:Kitchen).
+        # located in, and it carries the room's homeont: type (homeont:Kitchen).
         place = self.place_uri(room_id)
         room_class = self._room_class(room_id)
         if room_class is not None:
@@ -497,7 +501,7 @@ class SimuHomeTD:
                 prop_class = curie_to_uri(
                     (self.m.observable_properties.get(
                         f"room_state.{'temperature' if sensing['sosa_property'] == 'air_temperature' else 'humidity'}")
-                     or {}).get("ex"))
+                     or {}).get("homeont_class"))
                 if prop_class is not None:
                     g.add((interior_property, RDF.type, prop_class))
                 g.add((interior, SSN.hasProperty, interior_property))
@@ -561,24 +565,32 @@ class SimuHomeTD:
         # Actuatable attributes are typed as such now; their invocation forms
         # come in phase 3. `readOnly` stays true until then, so nothing claims
         # a write path that does not yet exist.
+        #
+        # The dispatch MECHANISM is deliberately not stated here. Whether SHTD
+        # reaches the simulator by cluster command or attribute write is this
+        # server's routing concern, not a fact about the device: a Home
+        # Assistant or native-Matter deployment serving the same vocabulary has
+        # no value to put in such a field. `classify.py` still returns it and
+        # `shtd.py` still routes on it -- it simply stops reaching the graph.
         actuatable = record.get("affordance") == "actuatable"
         if actuatable:
             g.add((prop, RDF.type, TDSOSA.ActuatablePropertyAffordance))
-            g.add((prop, HOME.mechanism, Literal(str(record.get("mechanism")))))
         else:
             g.add((prop, RDF.type, TDSOSA.ObservablePropertyAffordance))
 
-        sosa_role = row.get("sosa_role")
-        if sosa_role:
-            g.add((prop, HOME.sosaRole, Literal(str(sosa_role))))
+        # WHAT THE PROPERTY IS, as a class rather than a string. This is the
+        # channel the agent layer already reads: `integration_engine.py` treats
+        # every rdf:type but the td:PropertyAffordance marker as a semantic
+        # type, and the planner is instructed to match on those.
+        self._property_class(g, prop, record, row, device_type)
 
         # No Matter cluster/attribute triples: `td:name` is unique within a
         # Thing (enforced in attribute_map.yaml, which qualifies the three names
         # that would otherwise collide on one device), and SHTD resolves it back
         # to cluster/attribute/endpoint from the registry when it dispatches.
         # Restating them here would spend planner context on protocol plumbing.
-        # `ex:matterType` stays on the schema -- it distinguishes `power-mW`
-        # from `uint32`, which nothing else in the TD records.
+        # `homeont:matterType` stays on the schema -- it distinguishes
+        # `power-mW` from `uint32`, which nothing else in the TD records.
         schema = self._value_schema(g, record, row, siblings)
         g.add((prop, TD.hasOutputSchema, schema))
 
@@ -592,6 +604,35 @@ class SimuHomeTD:
         if actuatable:
             self._action_affordance(g, art, path, name, record, row, siblings,
                                     device_type, room_id)
+
+    def _property_class(self, g: Graph, prop: BNode, record: Dict[str, Any],
+                        row: Dict[str, Any], device_type: str) -> None:
+        """Type the affordance with what the property IS.
+
+        Leaf first (`homeont:AirConditionerOnOff`), else the generic class
+        (`homeont:OnOff`), else the observable class. Each closes on a standard
+        root -- sosa:ObservableProperty, sosa:ActuatableProperty, saref:State or
+        ssn-system:SystemCapability -- so a consumer that has never heard of
+        SimuHome can still tell a reading from a capability declaration.
+        """
+        curie = self.m.property_class(
+            device_type, str(record.get("cluster")), str(record.get("attribute")))
+        uri = curie_to_uri(curie)
+        if uri is not None:
+            g.add((prop, RDF.type, uri))
+
+    def _action_class(self, g: Graph, action: BNode, record: Dict[str, Any],
+                      row: Dict[str, Any], device_type: str) -> None:
+        """Type the action with the operation it performs, as a saref:Command.
+
+        Keyed by the attribute the action drives, matching how the affordance
+        is keyed: `onOff(true|false)` stands for On/Off/Toggle alike.
+        """
+        curie = self.m.action_class(
+            device_type, str(record.get("cluster")), str(record.get("attribute")))
+        uri = curie_to_uri(curie)
+        if uri is not None:
+            g.add((action, RDF.type, uri))
 
     def _action_affordance(self, g: Graph, art: URIRef, path: str, name: str,
                            record: Dict[str, Any], row: Dict[str, Any],
@@ -614,7 +655,13 @@ class SimuHomeTD:
         g.add((action, TD.isIdempotent, Literal(True, datatype=XSD.boolean)))
         # Not safe in the WoT sense: invoking it changes the world.
         g.add((action, TD.isSafe, Literal(False, datatype=XSD.boolean)))
-        g.add((action, HOME.mechanism, Literal(str(record.get("mechanism")))))
+
+        # The operation this action performs, as a saref:Command subclass. The
+        # dispatch mechanism is NOT stated -- see `_attribute_property`. The
+        # docstring above already says the command/attribute-write split "is
+        # invisible to the planner by design"; publishing it as a triple
+        # contradicted that.
+        self._action_class(g, action, record, row, device_type)
 
         # The input schema is the value the action accepts, so it carries the
         # same permitted values and bounds the read schema does -- that is what
@@ -832,10 +879,11 @@ class SimuHomeTD:
 
         if matter_type:
             g.add((schema, HOME.matterType, Literal(matter_type)))
-        if str(matter_type) in SCALED_TYPES:
-            # Same declaration the room environmental properties carry, so a
-            # consumer knows the reported value is already divided.
-            g.add((schema, HOME.matterScale, Literal("centi")))
+        # No scale declaration. The value a read returns is already converted
+        # to the human unit named by `qudt:unit`, so the centi-storage is
+        # SimuHome's wire format and stops at the mapper -- a Home Assistant or
+        # native-Matter deployment serving this vocabulary has nothing to put
+        # in such a field.
         unit = row.get("unit")
         if unit:
             _add_unit(g, schema, unit)
@@ -892,7 +940,7 @@ class SimuHomeTD:
         for token in sorted(state):
             row = self.m.room_state_property(token) or {}
             name = str(row.get("sosa_property") or token)
-            prop_class = curie_to_uri(row.get("ex"))
+            prop_class = curie_to_uri(row.get("homeont_class"))
 
             # A stable IRI, not a blank node: a sensor in another document has
             # to name the very property it observes, and an actuation the one it
@@ -924,12 +972,8 @@ class SimuHomeTD:
             g.add((schema, RDF.type, JS.NumberSchema))
             if row.get("unit"):
                 _add_unit(g, schema, row["unit"])
-            if token in CENTI_TOKENS:
-                # The scale IS static shape -- the simulator always stores these
-                # in centi-units and the read route always divides. Saying so
-                # here stops anyone dividing twice. The reading itself comes
-                # from the form, not from this schema.
-                g.add((schema, HOME.matterScale, Literal("centi")))
+            # No scale declaration here either: `scale_room_state` has already
+            # divided, and `qudt:unit` names the unit the value is in.
             g.add((prop, TD.hasOutputSchema, schema))
 
             form = BNode()
@@ -954,13 +998,12 @@ class SimuHomeTD:
     def _room_class(self, room_id: str) -> Optional[URIRef]:
         """The homeont class for a SimuHome room id.
 
-        The approved `room_map` names each room in the `ex:` namespace; homeont
-        is the spatial vocabulary, and its local names match one-for-one
-        (`ex:Kitchen` -> `home:Kitchen`). Mapping by local name here keeps the
-        reviewed table as the source of WHICH room a token is, while homeont
-        supplies the class.
+        The approved `room_map` names each room as a `homeont:` class, which is
+        the spatial vocabulary this server serves. Mapping by local name here
+        keeps the reviewed table as the source of WHICH room a token is, while
+        homeont supplies the class.
         """
-        curie = (self.m.room(room_id) or {}).get("ex")
+        curie = (self.m.room(room_id) or {}).get("homeont_class")
         if not curie or ":" not in str(curie):
             return None
         local = str(curie).split(":", 1)[1]

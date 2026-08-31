@@ -9,7 +9,7 @@ in the behaviours; this module is the reusable transformation.
 from typing import Any, Dict, List, Optional
 
 from ....bt_planning.signifier_bridge import build_bt_from_signifiers
-from ...user_assistant.models import Intent
+from ....shared.models.intents import Intent
 
 
 def collect_signifier_ids(

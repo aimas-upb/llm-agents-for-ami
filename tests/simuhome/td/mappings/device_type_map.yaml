@@ -8,13 +8,13 @@ generator:
   table: device_type_map
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-08-25T16:28:33.266759+00:00'
+  generated_at_utc: '2026-08-29T16:29:56.578131+00:00'
 rows:
 - key: AirConditioner
   ha_domain: climate
-  ex: ex:AirConditioner
+  homeont_class: homeont:AirConditioner
   td_types:
-  - ex:AirConditioner
+  - homeont:AirConditioner
   - saref:HVAC
   subClassOf: saref:HVAC
   title: Air Conditioner
@@ -40,9 +40,9 @@ rows:
   status: approved
 - key: AirPurifier
   ha_domain: fan
-  ex: ex:AirPurifier
+  homeont_class: homeont:AirPurifier
   td_types:
-  - ex:AirPurifier
+  - homeont:AirPurifier
   - saref:Appliance
   subClassOf: saref:Appliance
   title: Air Purifier
@@ -67,9 +67,9 @@ rows:
   status: approved
 - key: Dehumidifier
   ha_domain: fan
-  ex: ex:Dehumidifier
+  homeont_class: homeont:Dehumidifier
   td_types:
-  - ex:Dehumidifier
+  - homeont:Dehumidifier
   - saref:Appliance
   subClassOf: saref:Appliance
   title: Dehumidifier
@@ -95,9 +95,9 @@ rows:
   status: approved
 - key: DimmableLight
   ha_domain: light
-  ex: ex:DimmableLight
+  homeont_class: homeont:DimmableLight
   td_types:
-  - ex:DimmableLight
+  - homeont:DimmableLight
   - saref:Actuator
   subClassOf: saref:Actuator
   title: Dimmable Light
@@ -122,9 +122,9 @@ rows:
   status: approved
 - key: Dishwasher
   ha_domain: sensor
-  ex: ex:Dishwasher
+  homeont_class: homeont:Dishwasher
   td_types:
-  - ex:Dishwasher
+  - homeont:Dishwasher
   - saref:Appliance
   subClassOf: saref:Appliance
   title: Dishwasher
@@ -143,9 +143,9 @@ rows:
   status: approved
 - key: Fan
   ha_domain: fan
-  ex: ex:Fan
+  homeont_class: homeont:Fan
   td_types:
-  - ex:Fan
+  - homeont:Fan
   - saref:Appliance
   subClassOf: saref:Appliance
   title: Fan
@@ -170,9 +170,9 @@ rows:
   status: approved
 - key: Freezer
   ha_domain: sensor
-  ex: ex:Freezer
+  homeont_class: homeont:Freezer
   td_types:
-  - ex:Freezer
+  - homeont:Freezer
   - saref:Appliance
   subClassOf: saref:Appliance
   title: Freezer
@@ -190,9 +190,9 @@ rows:
   status: approved
 - key: HeatPump
   ha_domain: climate
-  ex: ex:HeatPump
+  homeont_class: homeont:HeatPump
   td_types:
-  - ex:HeatPump
+  - homeont:HeatPump
   - saref:HVAC
   subClassOf: saref:HVAC
   title: Heat Pump
@@ -220,9 +220,9 @@ rows:
   status: approved
 - key: Humidifier
   ha_domain: fan
-  ex: ex:Humidifier
+  homeont_class: homeont:Humidifier
   td_types:
-  - ex:Humidifier
+  - homeont:Humidifier
   - saref:Appliance
   subClassOf: saref:Appliance
   title: Humidifier
@@ -242,9 +242,9 @@ rows:
   status: approved
 - key: LaundryDryer
   ha_domain: sensor
-  ex: ex:LaundryDryer
+  homeont_class: homeont:LaundryDryer
   td_types:
-  - ex:LaundryDryer
+  - homeont:LaundryDryer
   - saref:Appliance
   subClassOf: saref:Appliance
   title: Laundry Dryer
@@ -263,9 +263,9 @@ rows:
   status: approved
 - key: LaundryWasher
   ha_domain: sensor
-  ex: ex:LaundryWasher
+  homeont_class: homeont:LaundryWasher
   td_types:
-  - ex:LaundryWasher
+  - homeont:LaundryWasher
   - saref:Appliance
   subClassOf: saref:Appliance
   title: Laundry Washer
@@ -286,9 +286,9 @@ rows:
   status: approved
 - key: OnOffLight
   ha_domain: light
-  ex: ex:OnOffLight
+  homeont_class: homeont:OnOffLight
   td_types:
-  - ex:OnOffLight
+  - homeont:OnOffLight
   - saref:Actuator
   subClassOf: saref:Actuator
   title: On/Off Light
@@ -312,9 +312,9 @@ rows:
   status: approved
 - key: Refrigerator
   ha_domain: sensor
-  ex: ex:Refrigerator
+  homeont_class: homeont:Refrigerator
   td_types:
-  - ex:Refrigerator
+  - homeont:Refrigerator
   - saref:Appliance
   subClassOf: saref:Appliance
   title: Refrigerator
@@ -332,9 +332,9 @@ rows:
   status: approved
 - key: Rvc
   ha_domain: sensor
-  ex: ex:Rvc
+  homeont_class: homeont:Rvc
   td_types:
-  - ex:Rvc
+  - homeont:Rvc
   - saref:Appliance
   subClassOf: saref:Appliance
   title: RVC
@@ -354,9 +354,9 @@ rows:
   status: approved
 - key: Tv
   ha_domain: sensor
-  ex: ex:Tv
+  homeont_class: homeont:Tv
   td_types:
-  - ex:Tv
+  - homeont:Tv
   - saref:Appliance
   subClassOf: saref:Appliance
   title: TV
@@ -379,9 +379,9 @@ rows:
   status: approved
 - key: WindowCoveringController
   ha_domain: cover
-  ex: ex:WindowCoveringController
+  homeont_class: homeont:WindowCoveringController
   td_types:
-  - ex:WindowCoveringController
+  - homeont:WindowCoveringController
   - saref:Actuator
   subClassOf: saref:Actuator
   title: Window Covering Controller

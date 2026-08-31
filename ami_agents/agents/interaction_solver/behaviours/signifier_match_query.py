@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 from spade.behaviour import OneShotBehaviour
 
 from ....shared.utils.logger import LoggerFactory
-from ...user_assistant.models import Intent
+from ....shared.models.intents import Intent
 from ..utils.signifier_matching import query_local_signifier_match
 
 

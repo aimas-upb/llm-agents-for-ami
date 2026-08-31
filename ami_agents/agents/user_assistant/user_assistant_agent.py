@@ -36,7 +36,12 @@ from ...shared.community.community_client import CommunitySignifierClient
 from ...environment.integration.integration_engine import YggdrasilIntegration
 
 from .models import ConversationState
-from .behaviours import UserMessageBehaviour, DemoRequestClassifierBehaviour
+from .registry import PlanRegistry, RequestRegistry
+from .behaviours import (
+    DemoRequestClassifierBehaviour,
+    PlanManagementBehaviour,
+    UserMessageBehaviour,
+)
 from .utils import build_llm_client, build_llm_call_kwargs, build_behaviour_llm_client, LLMClientConfig
 
 # Global logger will be replaced by per-instance loggers
@@ -49,6 +54,12 @@ _DEFAULT_GOAL_REQUEST_TIMEOUT_S = 60.0
 _DEFAULT_RPC_CALL_TIMEOUT_S = 15.0
 _DEFAULT_SIGNIFIER_MATCH_TIMEOUT_S = 10.0
 _DEFAULT_BT_MAX_TICKS = 50
+_DEFAULT_BT_MIN_TICK_YIELD_S = 0.01
+_DEFAULT_BT_MAINTENANCE_INTERVAL_S = 180.0
+_DEFAULT_BT_MAINTENANCE_TRIGGER_POLL_S = 5.0
+# How long an action plan waits for a yes/no before assuming confirmation.
+# Read-only plans do not wait at all.
+_DEFAULT_CONFIRMATION_TIMEOUT_S = 5.0
 
 
 class UserAssistantAgent(Agent, IAgent):
@@ -115,6 +126,19 @@ class UserAssistantAgent(Agent, IAgent):
             .get("max_ticks", {})
             .get("user_assistant", _DEFAULT_BT_MAX_TICKS)
         )
+        self.bt_min_tick_yield: float = float(
+            config.get("bt_execution", {})
+            .get("min_tick_yield", _DEFAULT_BT_MIN_TICK_YIELD_S)
+        )
+        self.bt_maintenance_interval: float = float(
+            config.get("bt_execution", {})
+            .get("maintenance_interval", _DEFAULT_BT_MAINTENANCE_INTERVAL_S)
+        )
+        self.bt_maintenance_trigger_poll: float = float(
+            config.get("bt_execution", {})
+            .get("maintenance_trigger_poll",
+                 _DEFAULT_BT_MAINTENANCE_TRIGGER_POLL_S)
+        )
 
         # ── Execution engine ────────────────────────────────────────
         self.yggdrasil_url = resolve_yggdrasil_url(config)
@@ -124,6 +148,17 @@ class UserAssistantAgent(Agent, IAgent):
 
         # ── Per-conversation state ──────────────────────────────────
         self._conversations: Dict[str, ConversationState] = {}
+
+        # ── Request and plan identity ───────────────────────────────
+        # Requests and the plans they produce are tracked by id rather than by
+        # thread alone, so a running plan stays addressable after the request
+        # that asked for it has finished.
+        self.requests = RequestRegistry()
+        self.plans = PlanRegistry()
+        self.confirmation_timeout: float = float(
+            (config.get("planning", {}) or {}).get(
+                "confirmation_timeout", _DEFAULT_CONFIRMATION_TIMEOUT_S)
+        )
 
         # ── State memory cache ──────────────────────────────────────
         self.state_memory = StateMemoryCache()
@@ -143,6 +178,26 @@ class UserAssistantAgent(Agent, IAgent):
         if thread not in self._conversations:
             self._conversations[thread] = ConversationState()
         return self._conversations[thread]
+
+    async def notify_conversation(self, thread: str, text: str) -> None:
+        """Say something on a thread without a message to reply to.
+
+        A plan finishing is not an answer to anything: the request that asked
+        for it ended at confirmation, possibly minutes ago. So the notice is
+        addressed to the user directly, on the thread the plan belongs to.
+        """
+        from spade.message import Message
+
+        user_jid = self.target_jids.get("user")
+        if not user_jid:
+            self.logger.debug(f"No user JID configured; dropping notice: {text}")
+            return
+        msg = Message(to=str(user_jid))
+        if thread and thread != "__default__":
+            msg.thread = thread
+        msg.set_metadata("message_type", "llm")
+        msg.body = text
+        await self.plan_manager.send(msg)
 
     # ── LLM clients and kwargs builders ─────────────────────────────
 
@@ -198,8 +253,13 @@ class UserAssistantAgent(Agent, IAgent):
     async def setup(self):
         await super().setup()
 
-        # Load ontology file for per-span intent parsing
-        ontology_path = Path(__file__).resolve().parents[3] / "ontologies" / "homeont.ttl"
+        # Load the home ontology for per-span intent parsing. This is the single
+        # authoritative copy -- the same file the environment layer serves its
+        # semantic types from (see SimuHome/td_builder.py), so the vocabulary the
+        # LLM is shown always matches the vocabulary it will be matched against.
+        ontology_path = (
+            Path(__file__).resolve().parents[2] / "shared" / "ontologies" / "homeont.ttl"
+        )
         try:
             self.ontology_ttl = ontology_path.read_text() if ontology_path.exists() else ""
             if not self.ontology_ttl:
@@ -216,11 +276,28 @@ class UserAssistantAgent(Agent, IAgent):
             )
         )
 
-        # Register behaviours with template routing
-        t = Template()
-        t.set_metadata("message_type", "llm")
-        self.add_behaviour(UserMessageBehaviour(self.logger), template=t)
-        self.add_behaviour(DemoRequestClassifierBehaviour(self.logger), template=t)
+        # Register behaviours with template routing.
+        #
+        # `dispatch` gives a copy to EVERY behaviour whose template matches, so
+        # these do not compete: the receiver takes fresh utterances, while a
+        # reply belonging to a request in progress carries `active_request_id`
+        # and is matched by that request's own FSM template instead.
+        fresh = Template()
+        fresh.set_metadata("message_type", "llm")
+        self.add_behaviour(UserMessageBehaviour(self.logger), template=fresh)
+        self.add_behaviour(DemoRequestClassifierBehaviour(self.logger), template=fresh)
+
+        # One manager for every confirmed plan. Execution is reached by message,
+        # never by call, so a plan outlives the request that asked for it.
+        plan_types = (
+            Template(metadata={"type": MessageType.PLAN_EXECUTE_REQUEST.value})
+            | Template(metadata={"type": MessageType.PLAN_STATUS_REQUEST.value})
+            | Template(metadata={"type": MessageType.PLAN_CANCEL_REQUEST.value})
+            | Template(metadata={"type": MessageType.PLAN_EXPLAIN_REQUEST.value})
+            | Template(metadata={"type": MessageType.PLAN_TRIGGER_REQUEST.value})
+        )
+        self.plan_manager = PlanManagementBehaviour(self.logger)
+        self.add_behaviour(self.plan_manager, template=plan_types)
 
         self.logger.info("UserAssistantAgent initialized (composable behaviours).")
 

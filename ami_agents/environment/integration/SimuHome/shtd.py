@@ -34,6 +34,7 @@ import argparse
 import asyncio
 import os
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse, urlunparse
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
@@ -352,6 +353,28 @@ def _artifact_topic(td: SimuHomeTD, room: str, device: str) -> str:
     return f"{td.artifact_path(room, device)}#artifact"
 
 
+def _canonical_topic(topic: str) -> str:
+    """Rewrite a topic's origin to this server's canonical base.
+
+    IRIs are minted from the incoming request (see `build`) so that whatever
+    host a client reached us on is dereferenceable for it. Subscriptions are
+    matched against topics the poller mints from `_base_url`, which is fixed at
+    startup -- so a client that subscribed via `localhost:8097` would never
+    match a notification about `127.0.0.1:8097`, and every push for it would be
+    dropped in silence. Canonicalising the origin on the way in makes the two
+    ends agree; the path is left untouched, so `_check_topic` still decides
+    what is actually served.
+    """
+    parsed = urlparse(topic)
+    if not parsed.scheme or not parsed.netloc:
+        return topic
+    base = urlparse(_base_url)
+    if (parsed.scheme, parsed.netloc) == (base.scheme, base.netloc):
+        return topic
+    return urlunparse((base.scheme, base.netloc, parsed.path,
+                       parsed.params, parsed.query, parsed.fragment))
+
+
 def _check_topic(td: SimuHomeTD, topic: str) -> None:
     """Reject a subscription to something we do not serve.
 
@@ -384,6 +407,8 @@ async def hub(request: Request) -> Response:
     # cannot register for a resource that will never produce a notification.
     if mode == "subscribe":
         _check_topic(build(request), topic)
+    # Store and look up under this server's own origin, never the caller's.
+    topic = _canonical_topic(topic)
     if mode == "subscribe":
         await notify.register_subscription(
             topic=topic, callback_url=callback, lease_seconds=lease_seconds,

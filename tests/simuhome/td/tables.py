@@ -172,13 +172,31 @@ NON_DIRECTIONAL_COMMANDS = {
     ("LevelControl", "StepWithOnOff"),
     ("LevelControl", "Stop"),
     ("LevelControl", "StopWithOnOff"),
-    # FanControl.Step omitted: no HA service can invoke it and no benchmark query
-    # asks for a relative fan change. See COMMAND_TARGETS for the full rationale.
+    # FanControl.Step omitted: see UNMODELLED_COMMANDS below.
     ("WindowCovering", "GoToLiftPercentage"),
     ("WindowCovering", "GoToLiftValue"),
     ("WindowCovering", "StopMotion"),
     ("Thermostat", "SetpointRaiseLower"),
     ("TemperatureControl", "SetTemperature"),
+}
+
+# Commands a simulator may implement but that carry no generic meaning, so no
+# command -> attribute link is curated for them and no effect is claimed.
+#
+# `FanControl.Step` is the case that named this set. SimuHome does implement it
+# (`fan_control.py:_step`), and it works by calling `_update_percent_setting` --
+# so in THIS simulator it writes PercentSetting. But that is an implementation
+# choice, not protocol: the Matter spec declares no command -> attribute relation
+# for it, and a different stack could implement Step against FanMode, or not at
+# all. Curating the row would encode one simulator's internals as though they
+# were Matter semantics.
+#
+# Nothing is lost by the omission. `control_rules` lists Step as *optional* for
+# air_purifier and dehumidifier -- only `OnOff.On` is required -- the real
+# actuation path is the PercentSetting/FanMode attributes, which are modelled,
+# and no benchmark query asks for a relative fan change.
+UNMODELLED_COMMANDS = {
+    ("FanControl", "Step"),
 }
 
 # Clusters that describe the protocol rather than the home.
@@ -189,7 +207,7 @@ PLUMBING_CLUSTERS = {"Descriptor", "Identify", "PowerTopology", "BasicInformatio
 # Matter attribute names label fields in the protocol, not concepts in the
 # world. `RelativeHumidityMeasurement.MeasuredValue` is not a property: the
 # property is *relative humidity*, and MeasuredValue is where a reading of it
-# arrives. Minting `ex:RelativeHumidityMeasurementMeasuredValue` would invert
+# arrives. Minting `homeont:RelativeHumidityMeasurementMeasuredValue` would invert
 # SOSA -- a result masquerading as the quantity it results from -- and would
 # also split one quantity across two nodes, since the room-level observation
 # already declares `relative_humidity`.
@@ -316,7 +334,7 @@ def _command_affordance_name(affordance_name: Optional[str], family: str) -> Opt
 def family_property_iri(family: str, cluster_property_iri: str) -> str:
     """The family-specific leaf under a cluster-level property.
 
-        ex:LevelControlBrightness + Tv -> ex:TvBrightness
+        homeont:LevelControlBrightness + Tv -> homeont:TvBrightness
 
     Matter clusters name *processes* -- `LevelControl` is "the numeric-knob
     process", `OnOff` is "the switching process" -- so a cluster-level property
@@ -332,14 +350,14 @@ def family_property_iri(family: str, cluster_property_iri: str) -> str:
             suffix = local[len(cluster):]
             # Keep the cluster term when nothing else remains, or the leaf would
             # collapse onto the bare family name and collide with the device
-            # class: ex:AirPurifier (a saref:Device) vs its on/off property.
-            return f"ex:{_camel(family)}{suffix or cluster}"
-    return f"ex:{_camel(family)}{local}"
+            # class: homeont:AirPurifier (a saref:Device) vs its on/off property.
+            return f"homeont:{_camel(family)}{suffix or cluster}"
+    return f"homeont:{_camel(family)}{local}"
 
 
 # Cluster-name prefixes stripped when building a family leaf, so
-# `ex:LevelControlBrightness` becomes `ex:TvBrightness`, not
-# `ex:TvLevelControlBrightness`.
+# `homeont:LevelControlBrightness` becomes `homeont:TvBrightness`, not
+# `homeont:TvLevelControlBrightness`.
 _CLUSTER_PREFIXES = {
     "LevelControl", "OnOff", "FanControl", "WindowCovering", "Thermostat",
     "TemperatureControl", "OperationalState", "RVCOperationalState",
@@ -365,7 +383,7 @@ def _device_property_iri(cluster_name: str, affordance_name: str) -> str:
     """
     cluster = _camel(cluster_name)
     local = _camel(affordance_name)
-    return f"ex:{local}" if cluster == local else f"ex:{cluster}{local}"
+    return f"homeont:{local}" if cluster == local else f"homeont:{cluster}{local}"
 
 
 # A TD property name must be unique WITHIN one Thing, because `td:name` is how
@@ -765,12 +783,12 @@ def build_device_type_map(corpus: Corpus) -> List[Dict[str, Any]]:
                 family,
                 REVIEW,
                 ha_domain=platform,
-                # A TD Thing carries BOTH: `ex:` names the exact device kind,
+                # A TD Thing carries BOTH: `homeont:` names the exact device kind,
                 # `saref:` places it in the standard taxonomy for consumers that
                 # do not load ex.ttl. This is a deliberate exception to the
                 # one-type-per-node rule, which applies to property nodes.
-                ex=f"ex:{_camel(family)}",
-                td_types=[f"ex:{_camel(family)}", FAMILY_SAREF_PARENT.get(family)],
+                homeont_class=f"homeont:{_camel(family)}",
+                td_types=[f"homeont:{_camel(family)}", FAMILY_SAREF_PARENT.get(family)],
                 subClassOf=FAMILY_SAREF_PARENT.get(family),
                 title=title,
                 clusters=sorted(record["clusters"]),
@@ -795,7 +813,7 @@ def build_room_map(corpus: Corpus) -> List[Dict[str, Any]]:
             _row(
                 room,
                 REVIEW,
-                ex=f"ex:{_camel(room)}",
+                homeont_class=f"homeont:{_camel(room)}",
                 subClassOf="s4bldg:BuildingSpace",
                 foi_iri=None,
                 foi_iri_reason="needs the deployment workspace base IRI; unknown at Phase A",
@@ -824,9 +842,9 @@ def build_observable_properties(corpus: Corpus) -> List[Dict[str, Any]]:
                 # property node is typed by inside each TD -- never a shared IRI
                 # that TDs point at from outside. Two TDs referring to the air
                 # temperature of the same room say so by both typing their own
-                # node `ex:AirTemperature` and naming the same feature of
+                # node `homeont:AirTemperature` and naming the same feature of
                 # interest, not by sharing a node.
-                ex=f"ex:{_camel(name)}",
+                homeont_class=f"homeont:{_camel(name)}",
                 property_node="anonymous",
                 unit=unit,
                 quantityKind=quantity_kind,
@@ -903,7 +921,7 @@ def build_property_classes(
             _row(
                 iri,
                 REVIEW if blocks_leaves else AUTO,
-                ex=iri,
+                homeont_class=iri,
                 subClassOf="sosa:ActuatableProperty",
                 affordance_name=entry["affordance_name"],
                 yaml_path=entry["yaml_path"],
@@ -937,7 +955,7 @@ def build_actuatable_properties(
     """Settable knobs, one leaf per family under a cluster-level class.
 
     A leaf inherits its superclass's approval: once you have decided what
-    `ex:LevelControlBrightness` means, "the Tv's version of it" follows
+    `homeont:LevelControlBrightness` means, "the Tv's version of it" follows
     mechanically and is marked `auto`.
     """
     approved_classes = approved_classes or set()
@@ -957,7 +975,7 @@ def build_actuatable_properties(
         # device-local state, and gets one leaf per family under a cluster-level
         # superclass.
         cluster_iri = (
-            f"ex:{_camel(quantity)}" if quantity
+            f"homeont:{_camel(quantity)}" if quantity
             else _device_property_iri(
                 row["matter"]["cluster_name"],
                 row["affordance_name"] or row["matter"]["attribute_name"],

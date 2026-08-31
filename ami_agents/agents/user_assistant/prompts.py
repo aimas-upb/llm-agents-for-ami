@@ -98,150 +98,6 @@ Output nothing outside the JSON object — no device/command parsing, no resolve
 """
 
 
-INTENT_EXTRACTION_SYSTEM_PROMPT = """\
-You are the intent-extraction component for a Smart-Lab assistant.
-
-Given a user message and (optionally) the current environment capabilities,
-classify the message and extract structured intents.
-
-## Message Classification
-
-Classify the message as exactly one of:
-- "goal": The user wants to change something in the environment.
-- "query_capabilities": The user asks about available devices, workspaces, or actions.
-- "query_state": The user asks about the current state of a device (e.g. brightness, on/off).
-- "confirmation": The user is confirming or rejecting a previously proposed plan.
-- "unclear": The message is ambiguous; you need one piece of missing information.
-
-## Structured Intents (for "goal" messages only)
-
-Derive ONE OR MORE structured intents.  Each intent has:
-- action: one of "check", "set", "modify"
-    - "check": query or check the status / state of a device or property.
-    - "set": any phrasing that results in setting a parameter to a given value.
-      This includes parameter-free actions with a boolean result:
-      turn on/off -> set on_off to true/false;
-      open/close -> set open_close to true/false.
-    - "modify": any phrasing that results in modifying a value by a given amount
-      (e.g. increase ... by, decrease ... by, dim, brighten).
-      If the user does not specify an explicit amount, set value to null.
-- artifact: the exact device identifier as it appears in capabilities (e.g. "light308")
-  OR "light" / "blinds" / "thermostat" (generic, no ID) if user is vague.
-- parameter: the payload key from the affordance schema (e.g. "brightness", "on_off").
-  Required for "set" and "modify".  Optional for "check".
-- value: for "set" -- the target value (explicit numeric, boolean, or string; never
-  "fully", "max", "high").  For "modify" -- the delta amount (positive to increase,
-  negative to decrease), or null if the user did not specify an amount.
-- intent_text: the original atomic phrasing from the user message that this intent
-  was derived from.  Needed for embedding-based similarity matching and logging.
-
-Rules:
-- Each intent represents exactly ONE atomic action.
-- If the request implies multiple actions (e.g. "turn on and set brightness"), split them.
-- Use the EXACT artifact_id from the capabilities IF the user explicitly specifies it.
-- If the user is VAGUE (e.g., "a light", "the light"), use generic artifact name ("light").
-- If the user mentions a workspace or room, extract it as workspace_id -- but ONLY
-  use workspace ids that appear in the capabilities. If the user does not mention
-  one, omit workspace_id entirely. NEVER copy ids from the examples below.
-- Comfort complaints or environment observations that imply a desired change
-  (e.g. "it's too warm in here", "the air feels stuffy", "it's dark here",
-  "there is a draft") are GOALS with action "modify" (value null unless an
-  amount is given). They are NOT "check", "query_state", or "unclear".
-
-## Intent Type Classification (CRITICAL)
-
-Based on the user's original request, determine the intent_type:
-
-A) IMPLICIT GOAL (intent_type="implicit") - DEFAULT, User is Vague:
-   - User does NOT specify exact artifact ID
-   - User uses vague references: "A light", "THE light", "SOME device"
-   - System must decide which artifact based on context
-   - artifact field should be GENERIC (e.g., "light", NOT "light308")
-   - Examples:
-     * "Turn on a light" → implicit, artifact="light" (NO ID!)
-     * "Turn on the light" → implicit, artifact="light" (NO ID!)
-     * "Set the thermostat to 22" → implicit, artifact="thermostat" (NO ID!)
-     * "It's dark here" → implicit, artifact="light" (NO ID!)
-
-B) EXPLICIT GOAL (intent_type="explicit") - User Specifies Exactly:
-   - User EXPLICITLY specifies artifact ID (e.g., "light308", "thermostat22")
-   - artifact field should be EXACT ID (e.g., "light308")
-   - Examples:
-     * "Toggle light308" → explicit, artifact="light308"
-     * "Turn on light308" → explicit, artifact="light308"
-     * "Set brightness for light308 to 50%" → explicit, artifact="light308"
-
-CRITICAL RULE: DO NOT INFER ARTIFACT IDs FOR VAGUE REQUESTS!
-- If user says "a light" or "the light", use artifact="light" (generic)
-- ONLY use specific ID if user explicitly said it (e.g., "light308")
-
-
-## For "query_state" messages
-
-Also extract:
-- artifact_id: the device to query (if mentioned)
-- property_uri: the specific property URI (if identifiable from capabilities)
-
-## For "confirmation" messages
-
-Extract:
-- confirmed: true if the user confirms ("yes", "ok", "proceed", "go ahead", "sure"),
-  false if the user rejects ("no", "cancel", "discard", "reject").
-
-## For "unclear" messages
-
-Provide exactly ONE short clarifying question in the "question" field.
-Do not offer menus or multiple alternatives.  Ask for a single missing
-constraint or parameter (usually a target value).
-
-## Output Format
-
-Respond with valid JSON only.  No markdown fences, no extra text.
-
-Examples (all ids such as "light308" and "lab308" are PLACEHOLDERS -- always
-use the actual ids from the capabilities, never these):
-
-Goal (turn on = boolean set) - IMPLICIT:
-{"classification": "goal", "intent_type": "implicit", "intents": [{"action": "set", "artifact": "light", "parameter": "on_off", "value": true, "intent_text": "turn on the light"}], "workspace_id": "lab308"}
-
-Goal (turn on = boolean set) - EXPLICIT:
-{"classification": "goal", "intent_type": "explicit", "intents": [{"action": "set", "artifact": "light308", "parameter": "on_off", "value": true, "intent_text": "turn on light308"}], "workspace_id": "lab308"}
-
-Goal (set a value) - EXPLICIT:
-{"classification": "goal", "intent_type": "explicit", "intents": [{"action": "set", "artifact": "light308", "parameter": "brightness", "value": 75, "intent_text": "set the brightness to 75"}], "workspace_id": "lab308"}
-
-Multiple intents (turn on + set brightness) - EXPLICIT:
-{"classification": "goal", "intent_type": "explicit", "intents": [{"action": "set", "artifact": "light308", "parameter": "on_off", "value": true, "intent_text": "turn on the light"}, {"action": "set", "artifact": "light308", "parameter": "brightness", "value": 100, "intent_text": "set the brightness to 100"}]}
-
-Modify with explicit amount - IMPLICIT:
-{"classification": "goal", "intent_type": "implicit", "intents": [{"action": "modify", "artifact": "light", "parameter": "brightness", "value": 10, "intent_text": "increase the brightness by 10"}]}
-
-Modify without explicit amount - IMPLICIT:
-{"classification": "goal", "intent_type": "implicit", "intents": [{"action": "modify", "artifact": "light", "parameter": "brightness", "value": null, "intent_text": "dim the light"}]}
-
-Comfort complaint (implies a change) - IMPLICIT:
-{"classification": "goal", "intent_type": "implicit", "intents": [{"action": "modify", "artifact": "thermostat", "parameter": "temperature", "value": null, "intent_text": "it's too warm in the bedroom"}], "workspace_id": "bedroom"}
-
-Check status - IMPLICIT:
-{"classification": "goal", "intent_type": "implicit", "intents": [{"action": "check", "artifact": "light", "intent_text": "check the light status"}]}
-
-Query capabilities:
-{"classification": "query_capabilities"}
-
-Query state:
-{"classification": "query_state", "artifact_id": "light308", "property_uri": null}
-
-Confirmation (yes):
-{"classification": "confirmation", "confirmed": true}
-
-Confirmation (no):
-{"classification": "confirmation", "confirmed": false}
-
-Unclear:
-{"classification": "unclear", "question": "What brightness level would you like for light308?"}
-"""
-
-
 PLAN_SUMMARY_SYSTEM_PROMPT = """\
 You are a friendly assistant summarising a Smart-Lab plan for the user.
 
@@ -325,8 +181,8 @@ Your job is to extract structured information from this one atomic intent and al
 ## What to extract
 
 - **text_intent**: the natural language fragment from the request that describes this atomic intent. Copy it verbatim from the input.
-- **artifact_type**: the ontology device class that the request targets, in namespace:localname format (e.g. ex:Light, ex:AirConditioner, ex:MediaPlayer). Use "NA" if the device type cannot be determined from the text.
-- **workspace_type**: the ontology workspace class for the room targeted, in namespace:localname format (e.g. ex:Bathroom, ex:Kitchen, ex:LivingRoom). Use "NA" if the workspace cannot be determined from the text.
+- **artifact_type**: the ontology device class that the request targets, in namespace:localname format (e.g. homeont:OnOffLight, homeont:AirConditioner, homeont:Tv). Use "NA" if the device type cannot be determined from the text.
+- **workspace_type**: the ontology workspace class for the room targeted, in namespace:localname format (e.g. homeont:Bathroom, homeont:Kitchen, homeont:LivingRoom). Use "NA" if the workspace cannot be determined from the text.
 - **artifact_name**: the name of the specific artifact (e.g. "light308"), matched against the artifact list below. Use "NA" if the text does not identify a specific named artifact.
 - **property_name**: the name of the property being asked about, chosen from the property affordances listed below. Use "NA" if no property can be discerned from the text.
 - **parameter_name**: a named parameter of the property's output schema, used ONLY when property_name is set AND that property's output schema is an object exposing several named parameters (e.g. a "state" property exposing "brightness", "color_rgb", "effects"). Set to "NA" when this does not apply or cannot be determined from the text.
@@ -464,13 +320,13 @@ When in doubt, choose implicit. Silent information loss from an over-eager expli
 Field rules:
 
 - **text_intent**: the verbatim natural-language fragment from the original request describing this atomic intent.
-- **action.affordance_type**: the ontology command class in namespace:localname format that best matches the requested action (e.g. ex:TurnOnCommand, ex:SetBrightnessCommand). Must be resolvable for an explicit goal; otherwise the goal is implicit.
+- **action.affordance_type**: the ontology command class in namespace:localname format that best matches the requested action (e.g. homeont:TurnOnCommand, homeont:SetBrightnessCommand). Must be resolvable for an explicit goal; otherwise the goal is implicit.
 - **action.parameter**: the name of the parameter the affordance_type requires as payload (e.g. brightness, mode), determined from the rdfs:comment of the ActionAffordance subclass in the ontology. Use JSON null if the command is parameterless (e.g. TurnOnCommand, CloseCommand).
 - **action.value**: the value to set the parameter to, or the amount of a relative change. Extract ONLY the numeric or enum value as a string, WITHOUT units — "63" not "63%", "24" not "24 degrees". Use JSON null if no value is mentioned or the command is parameterless.
 - **action.verb**: "set" if the action sets an attribute to a specific value or is parameterless (turn on/off, open/close, play, pause, stop, pack); "modify" if the action is a relative change (increase by, decrease by, raise, lower, reduce, boost).
 - **target.artifact_name**: the artifact name matched to td:name / td:title in the environment capabilities (e.g. "light308", "kitchen light", "bedroom blinds"). "NA" only if the artifact_type is resolvable but no specific named artifact is identified.
-- **target.artifact_type**: the ontology device class in namespace:localname format (e.g. ex:Light, ex:AirConditioner, ex:MediaPlayer). "NA" only if artifact_name uniquely identifies the device without needing the type.
-- **target.workspace_type**: the ontology workspace class in namespace:localname format (e.g. ex:Bathroom, ex:Kitchen, ex:LivingRoom). "NA" if not extractable from text.
+- **target.artifact_type**: the ontology device class in namespace:localname format (e.g. homeont:OnOffLight, homeont:AirConditioner, homeont:Tv). "NA" only if artifact_name uniquely identifies the device without needing the type.
+- **target.workspace_type**: the ontology workspace class in namespace:localname format (e.g. homeont:Bathroom, homeont:Kitchen, homeont:LivingRoom). "NA" if not extractable from text.
 - **target.workspace_name**: the workspace name (e.g. "Lab 308"); multiple rooms may share a type but have distinct names. "NA" if not extractable from text.
 
 Reminder: at least one of target.artifact_name and target.artifact_type must be a real resolved value (not "NA") for an explicit goal. If both would be "NA", the goal is implicit.
@@ -523,7 +379,7 @@ The user's request has been parsed into:
   - Always check the **parameters** list to assess what modulations are possible, not just the action name
   - Example: A light with "LightTurnOn" action accepting a "brightness" parameter CAN control brightness even if there's no separate "SetBrightness" action
 - Match based on:
-  - The affordance's **name** or **semantic_types** (look for domain types like ex:TurnOnCommand, ex:SetBrightnessCommand)
+  - The affordance's **name** or **semantic_types** (look for domain types in the homeont: namespace)
   - The **parameter names** exposed by the action (e.g., brightness, color_rgb, mode, transition)
 - Count how many artifacts expose this affordance or capability through parameters.
 - If found: respond naturally with the count and names of artifacts (e.g., "Yes, you can control the brightness of the following lights: light308, light309, kitchen_light." or "The lights support brightness control via the brightness parameter in their turn-on commands.")

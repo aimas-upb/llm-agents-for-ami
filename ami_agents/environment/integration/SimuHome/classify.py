@@ -37,26 +37,16 @@ if str(_HERE) not in sys.path:
 
 from matter_model.registry import load_registry  # noqa: E402
 
-# Which attribute each cluster's commands write. The Matter XML states no
-# command->attribute relation, so this mirrors the curated, evidence-backed
-# table in tests/simuhome/td/mappings/command_targets.yaml (all 14 approved).
-COMMAND_TARGETS: Dict[str, set] = {
-    "OnOff": {"OnOff"},
-    "LevelControl": {"CurrentLevel"},
-    "WindowCovering": {
-        "CurrentPositionLiftPercent100ths", "TargetPositionLiftPercent100ths",
-    },
-    "Thermostat": {
-        "OccupiedCoolingSetpoint", "OccupiedHeatingSetpoint", "SystemMode",
-    },
-    "TemperatureControl": {"TemperatureSetpoint"},
-    "FanControl": {"PercentSetting", "FanMode", "SpeedSetting"},
-    "DishwasherMode": {"CurrentMode"},
-    "LaundryWasherMode": {"CurrentMode"},
-    "RVCRunMode": {"CurrentMode"},
-    "RVCCleanMode": {"CurrentMode"},
-    "RTCCMode": {"CurrentMode"},
-}
+# Which attribute each cluster's commands write comes from the approved
+# `command_targets.yaml`, read through `mappings.py`. It used to be duplicated
+# here as a dict "mirroring" that table, and the two had already drifted: the
+# copy carried four cluster entries the table lacked. The table is now the only
+# source, so they cannot disagree again.
+def _command_targets(cluster: str) -> set:
+    from mappings import load_mappings
+    return load_mappings().command_targets_for(cluster)
+
+
 
 # Writable, but writing them has no present-tense effect on the world.
 NO_IMMEDIATE_EFFECT = {
@@ -149,7 +139,7 @@ def classify(cluster: str, attribute: str) -> Dict[str, Any]:
     else:
         role = "affordance"
 
-    command_driven = attribute in COMMAND_TARGETS.get(cluster, set())
+    command_driven = attribute in _command_targets(cluster)
     effectful = (cluster, attribute) not in NO_IMMEDIATE_EFFECT
 
     if role == "affordance" and effectful and (writable is True or command_driven):

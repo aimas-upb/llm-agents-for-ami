@@ -181,16 +181,10 @@ def format_capability_context(
     index: dict[str, dict] | None = None,
 ) -> str:
     """
-<<<<<<< HEAD
-    Format affordances and state into a compact context string for the
-    planning prompt: short affordance ids, names, descriptions, and parameter
-    names only (no URLs or full JSON Schemas).
-=======
     Format affordances and state into a context string for the planning prompt.
 
     Handles both BT-repo field names (affordance_uri, artifact_uri) and
     EnvExplorer field names (affordance_id, artifact_id, target, form).
->>>>>>> code_cleanup_alex
 
     Args:
         affordances: List of affordance dicts from EnvExplorer
@@ -202,47 +196,6 @@ def format_capability_context(
     """
     lines = []
 
-<<<<<<< HEAD
-    if index is None:
-        index = build_affordance_index(affordances)
-
-    # Only list property affordances of artifacts that also expose actions;
-    # sensor-only artifacts would flood the prompt (hundreds in large homes)
-    # and their readable properties arrive via observable-property hints.
-    # The full index still resolves every ref, listed or not.
-    actionable_artifacts = {
-        str(aff.get("artifact_id") or aff.get("artifact_uri") or "")
-        for aff in index.values()
-        if str(aff.get("affordance_type") or "action") == "action"
-    }
-
-    if index:
-        lines.append("### Affordances")
-        lines.append(
-            "Reference these by exact `affordance_id` in action, condition, and wait_condition nodes."
-        )
-        lines.append("")
-        for ref, aff in index.items():
-            aff_type = str(aff.get("affordance_type") or "action")
-            if aff_type != "action":
-                artifact = str(aff.get("artifact_id") or aff.get("artifact_uri") or "")
-                if artifact not in actionable_artifacts:
-                    continue
-            entry = f"- {ref} [{aff_type}]"
-            params = _schema_param_summary(aff.get("input_schema"))
-            if params:
-                entry += f" (params: {params})"
-            name = str(aff.get("action_name") or aff.get("name") or "")
-            description = str(aff.get("description") or "").strip()
-            generic = {
-                name.lower(),
-                f"property affordance: {name.lower()}",
-                f"action affordance: {name.lower()}",
-            }
-            if description and description.lower() not in generic:
-                entry += f" -- {description}"
-            lines.append(entry)
-=======
     if affordances:
         lines.append("### Affordances")
         lines.append("Use the target URL as action_url (for action nodes) or property_url (for condition nodes).")
@@ -275,7 +228,6 @@ def format_capability_context(
                 lines.append(f"  Description: {description}")
             if input_schema:
                 lines.append(f"  Input: {input_schema}")
->>>>>>> code_cleanup_alex
 
     if state:
         lines.append("")

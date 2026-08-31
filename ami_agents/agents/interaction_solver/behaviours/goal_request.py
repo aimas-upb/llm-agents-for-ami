@@ -15,7 +15,7 @@ from ....shared.models.messages import META_CORRELATION_ID, MessageType
 from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
 from ....shared.models.intents import ImplicitGoalIntent, ExplicitGoalIntent, goal_intent_from_dict
-from ...user_assistant.models import Intent
+from ....shared.models.intents import Intent
 from ..utils.plan_envelope import envelope_error
 from .planning_workflow import PlanningWorkflowBehaviour
 

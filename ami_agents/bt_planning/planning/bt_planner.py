@@ -63,11 +63,8 @@ class AsyncBTPlanner:
         affordances: list[dict],
         state: Optional[dict] = None,
         signifier_hints: Optional[dict] = None,
-<<<<<<< HEAD
         observable_property_hints: Optional[dict] = None,
-=======
         affected_env_vars: Optional[dict] = None,
->>>>>>> code_cleanup_alex
         client: Optional[AsyncOpenAI] = None,
         model: str = "gpt-4",
         temperature: Optional[float] = None,

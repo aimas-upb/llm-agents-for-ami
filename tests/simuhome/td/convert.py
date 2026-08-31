@@ -237,11 +237,11 @@ def phase_b(args: argparse.Namespace) -> int:
     Emit only the most specific class; never a superclass alongside it. RDF is
     not a place to restate what is already entailed:
 
-        [ a ex:DimmableLightOnOff ]                              # yes
-        [ a ex:DimmableLightOnOff, sosa:ActuatableProperty ]     # no, redundant
+        [ a homeont:DimmableLightOnOff ]                              # yes
+        [ a homeont:DimmableLightOnOff, sosa:ActuatableProperty ]     # no, redundant
 
     `sosa:ActuatableProperty` follows twice over -- from
-    `ex:DimmableLightOnOff rdfs:subClassOf ex:OnOff rdfs:subClassOf
+    `homeont:DimmableLightOnOff rdfs:subClassOf homeont:OnOff rdfs:subClassOf
     sosa:ActuatableProperty` in ex.ttl, and independently from the v2 ontology's
     restriction on tdsosa:ActuatablePropertyAffordance:
 
@@ -250,8 +250,8 @@ def phase_b(args: argparse.Namespace) -> int:
             owl:someValuesFrom sosa:ActuatableProperty ] .
 
     so a reasoner infers it from the affordance's own type without ex.ttl loaded.
-    The same applies to `a ex:Illuminance` (not `, sosa:ObservableProperty`) and
-    `a ex:Bathroom` (not `, sosa:FeatureOfInterest, s4bldg:BuildingSpace`) --
+    The same applies to `a homeont:Illuminance` (not `, sosa:ObservableProperty`) and
+    `a homeont:Bathroom` (not `, sosa:FeatureOfInterest, s4bldg:BuildingSpace`) --
     declare those parents once, in ex.ttl.
 
     WRITABLE IS NOT THE SAME AS EFFECTFUL
@@ -268,10 +268,10 @@ def phase_b(args: argparse.Namespace) -> int:
       * `td:Thing` -- required by the TD 1.1 spec for consumers that do not reason.
       * `sosa:Sensor` / `sosa:Actuator` -- a ROLE, not a superclass of the device
         class. One device can be both, and which it is depends on the affordances
-        it ended up with, so it is not derivable from `ex:DimmableLight`.
-      * the SAREF parent alongside the `ex:` class, i.e. emit BOTH
-        `ex:DimmableLight` and `saref:Actuator` from device_type_map's
-        `td_types`. The `ex:` class names the exact device kind; the `saref:`
+        it ended up with, so it is not derivable from `homeont:DimmableLight`.
+      * the SAREF parent alongside the `homeont:` class, i.e. emit BOTH
+        `homeont:DimmableLight` and `saref:Actuator` from device_type_map's
+        `td_types`. The `homeont:` class names the exact device kind; the `saref:`
         class places it in the standard taxonomy so a consumer that never loads
         ex.ttl still knows what it is looking at. Redundant under reasoning,
         deliberately so at the Thing level where interop matters most.

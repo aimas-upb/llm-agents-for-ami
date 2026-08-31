@@ -1105,11 +1105,14 @@ class YggdrasilIntegration(IIntegrationEngine):
         # Extract semantic types from workspace RDF (ex: namespace types)
         semantic_types = []
         try:
-            ex = Namespace("http://example.org/")
+            # Full IRIs: this is stored model state, and an IRI is unambiguous
+            # without carrying a prefix map alongside it. Shortening to CURIEs
+            # happens only when rendering for an LLM prompt.
             for subj in workspace_graph.subjects():
                 for obj in workspace_graph.objects(subj, RDF.type):
-                    if obj in ex:
-                        semantic_types.append(f"ex:{str(obj).split('/')[-1]}")
+                    iri = str(obj)
+                    if iri not in semantic_types:
+                        semantic_types.append(iri)
         except Exception as e:
             logger.warning(f"Failed to extract semantic types from workspace RDF for {workspace_id}: {e}")
 
@@ -1240,11 +1243,11 @@ class YggdrasilIntegration(IIntegrationEngine):
                         artifact_graph.parse(data=thing_description.rdf, format="turtle")
 
                         # Find all RDF types (ex: namespace) for this artifact
-                        ex = Namespace("http://example.org/")
                         for subj in artifact_graph.subjects():
                             for obj in artifact_graph.objects(subj, RDF.type):
-                                if obj in ex:
-                                    semantic_types.append(f"ex:{str(obj).split('/')[-1]}")
+                                iri = str(obj)
+                                if iri not in semantic_types:
+                                    semantic_types.append(iri)
                     except Exception as e:
                         logger.warning(f"Failed to extract semantic types from RDF for {artifact_name}: {e}")
 

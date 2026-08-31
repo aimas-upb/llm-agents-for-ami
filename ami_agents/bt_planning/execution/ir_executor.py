@@ -21,6 +21,11 @@ from .base import ExecutionResult
 logger = logging.getLogger(__name__)
 
 
+# Fallback when yaml is missing the key, per the repo convention of keeping
+# defaults as module constants so unit tests stay self-contained.
+_DEFAULT_MIN_TICK_YIELD_S = 0.01
+
+
 class IRExecutor:
     """
     Executor for JSON IR behavior trees.
@@ -28,7 +33,8 @@ class IRExecutor:
     Compiles JSON specification to py_trees objects and executes.
     """
 
-    def __init__(self, max_ticks: int = None, config: dict = None):
+    def __init__(self, max_ticks: int = None, config: dict = None,
+                 min_tick_yield: float = None):
         # Get max_ticks from config if not explicitly provided
         if max_ticks is None and config:
             max_ticks_raw = config.get("bt_execution", {}).get("max_ticks", {}).get("default", 10)
@@ -36,8 +42,35 @@ class IRExecutor:
         elif max_ticks is None:
             max_ticks = 10
 
+        if min_tick_yield is None:
+            min_tick_yield = float(
+                (config or {}).get("bt_execution", {}).get(
+                    "min_tick_yield", _DEFAULT_MIN_TICK_YIELD_S)
+            )
+
         self.max_ticks = max_ticks
+        self.min_tick_yield = max(0.0, float(min_tick_yield))
         self._settling_times = self._load_settling_times()
+
+    def _min_poll_interval(self, tree) -> float:
+        """How long this synchronous harness may sleep between ticks.
+
+        A RUNNING tree is waiting on something, and the only nodes that know how
+        long are the waiting nodes themselves. Take the smallest interval any of
+        them asks for, so the most impatient node still gets polled on time; a
+        tree with no waiting nodes (or one asking for 0) does not sleep at all.
+
+        This is the blocking-loop path only. Once execution moves into a SPADE
+        behaviour that ticks once per `run()`, the sleep belongs to the
+        behaviour's own cadence and this goes away with it.
+        """
+        intervals = [
+            float(interval)
+            for node in tree.iterate()
+            for interval in (getattr(node, "poll_interval_seconds", None),)
+            if isinstance(interval, (int, float))
+        ]
+        return min(intervals) if intervals else 0.0
 
     def execute_from_spec(self, tree_spec: dict) -> ExecutionResult:
         """
@@ -192,9 +225,12 @@ class IRExecutor:
                 result.success = False
                 break
             elif tree.status == Status.RUNNING:
-                poll_interval = self._min_poll_interval(tree)
-                if poll_interval > 0:
-                    time.sleep(poll_interval)
+                # Always yield a little. Node I/O runs on a thread pool, so a
+                # loop that never sleeps just re-ticks faster than the request
+                # can come back and burns the whole tick budget before the
+                # first response lands. A node asking for interval 0 means
+                # "poll as fast as sensible", not "spin".
+                time.sleep(max(self._min_poll_interval(tree), self.min_tick_yield))
         else:
             result.final_status = "RUNNING (max ticks reached)"
 
