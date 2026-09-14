@@ -12,6 +12,16 @@ from typing import Any, Dict, Optional
 from openai import AsyncOpenAI
 
 
+def is_reasoning_model(model: str) -> bool:
+    """True for models that take ``reasoning_effort`` instead of ``temperature``.
+
+    Covers the o-series and the gpt-5 family. Both client builders and
+    ``build_llm_call_kwargs`` must agree on this, or a model gets configured as
+    a reasoning model but called as a normal one (dropping reasoning_effort).
+    """
+    return model.startswith("o") or model.startswith("gpt-5")
+
+
 @dataclass
 class LLMClientConfig:
     """Resolved LLM configuration for the UserAssistant."""
@@ -59,7 +69,7 @@ def build_llm_client(config: Dict[str, Any]) -> LLMClientConfig:
         timeout = None
 
     # Reasoning-model adjustments (o-series and gpt-5 on OpenAI).
-    is_reasoning = model.startswith("o") or model.startswith("gpt-5")
+    is_reasoning = is_reasoning_model(model)
     if is_reasoning and "openai.com" in base_url.lower():
         temperature = 1.0
         reasoning_timeout = float(
@@ -105,7 +115,7 @@ def build_llm_call_kwargs(cfg: LLMClientConfig) -> Dict[str, Any]:
     ``max_completion_tokens`` instead.
     """
     kwargs: Dict[str, Any] = {}
-    if not cfg.model.startswith("o"):
+    if not is_reasoning_model(cfg.model):
         kwargs["temperature"] = cfg.temperature
     else:
         if cfg.reasoning_effort:
@@ -146,7 +156,7 @@ def build_behaviour_llm_client(
 
     # Reasoning effort for o-series and gpt-5 models
     reasoning_effort = behaviour_cfg.get("reasoning_effort") or os.getenv("OPENAI_REASONING_EFFORT")
-    is_reasoning = model.startswith("o") or model.startswith("gpt-5")
+    is_reasoning = is_reasoning_model(model)
     if is_reasoning and reasoning_effort is None:
         reasoning_effort = "high"
 
