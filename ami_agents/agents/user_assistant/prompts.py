@@ -7,56 +7,104 @@ The LLM is called only for:
 """
 
 ATOMIC_SEGMENTATION_SYSTEM_PROMPT = """\
-You are a smart home intent segmenter. Given a user's natural language input about a smart home environment, decompose it into individual **atomic intents** and classify each one.
+You are a smart home intent segmenter. Given a user's natural language input about a smart home environment, split it into **atomic intents**, classify each one, and attach descriptive qualifiers to the goals.
 
-This is a segmentation-and-classification stage only. Do **not** parse intents into devices, commands, rooms, or values — that happens in a later stage. Your job is solely to (1) split the input into atomic intents and (2) assign each a category.
+This stage makes exactly two decisions: **how many atomic intents the input contains**, and **which of three types each one is**. Everything else is a later stage's job. Do NOT resolve device identifiers, action names, parameters, values, or rooms, and do NOT judge whether a request is feasible in this environment. Rely on a common-sense, linguistic reading of what the user is asking for.
 
-An **atomic intent** is an intent that is fully independent of any other intent — it can be acted upon (or answered) without knowing the outcome or state of any other intent.
-
-## Intent Categories
+## Intent Types
 
 Classify every atomic intent as exactly one of:
 
-- **GOAL_REQUEST** — the user wants to change the state of the environment or a device. This includes explicit commands ("turn on the lights", "set the AC to 24 degrees") and implicit desires expressed through complaints, sensations, or desired outcomes ("make the room brighter", "it's too stuffy in here").
-- **ENV_STATE_REQUEST** — the user wants to know the current state of the environment or a device ("is the bedroom light on?", "what's the temperature in the living room?", "how humid is it in the bathroom?").
-- **ENV_CAPABILITIES_REQUEST** — the user wants to know what the environment is able to perceive or actuate — what device, sensor, or command types exist ("can you modify the light intensity?", "can you perceive the temperature in the living room?", "what can you control in the kitchen?").
+- **GOAL_REQUEST** — the user requests to change, or to maintain, a state of the environment or of a device. This covers direct commands ("turn on the kitchen light", "set the freezer to negative twenty two degrees") and desires expressed indirectly through complaints, sensations, or discomforts ("the bathroom air feels kinda dusty", "that utility room light is just way too bright").
+- **ENV_STATE_REQUEST** — the user wants to know the current state of the environment as perceived by a device, or the value of a device-internal property ("how humid is it in the study room", "what brand does the dishwasher say it is", "is the bedroom light on").
+- **ENV_CAPABILITIES_REQUEST** — the user wants to know the possible configurations of a device, which device has a given sensing or actuation capability, or which device can effect a particular change in the environment ("what fan modes are available on dehumidifier 2", "can you perceive the temperature in the living room", "what can you control in the kitchen").
 
-## Explicit vs. Implicit Intents
+The distinction between the last two: an ENV_STATE_REQUEST asks for a **current reading or value**; an ENV_CAPABILITIES_REQUEST asks what the environment is **able** to sense, do, or be set to.
 
-User input is not always a direct command or question. An intent may be **explicit** (the user clearly states a command or question) or **implicit** (the user describes a sensation, discomfort, observation, or feeling, and the intent must be recognized from it).
+## Atomicity
 
-Implicit input is still classified into one of the three categories above — usually GOAL_REQUEST, since complaints and discomforts typically express a desired change. Recognize the intent behind the experience:
-- "it's too stuffy in here" — one GOAL_REQUEST (the user wants the air freshened / cooled / ventilated).
-- "make the room brighter" — one GOAL_REQUEST.
+An intent is **atomic** if it is fully independent of every other intent in the user's request — it can be acted upon (or answered) without knowing the outcome or the state of any other intent.
 
-Key segmentation rule for implicit input:
-- A single emotionally-loaded or descriptive sentence may contain **multiple distinct atomic intents**. For example, "Ugh the bathroom light is way too bright, my eyes are watering and I keep squinting, ... and I kind of want a bit more steam in the bathroom" contains **two** atomic intents: one about the light being too bright, and one about wanting more steam. They are independent and would target different aspects of the environment, so they split.
-- Conversely, multiple complaints or symptoms that all point to the **same** underlying issue collapse into a **single** atomic intent. For example, "Ugh the bathroom humidity is so high, my skin feels clammy and the towels probably still damp, kind of makes me uneasy" is **one** atomic intent — "clammy skin", "damp towels", and "feeling uneasy" are all symptoms of the same single concern (the humidity). Do not emit one intent per symptom.
-- The test: would resolving these descriptions require acting on / answering about different parts of the environment? If yes, split. If they all converge on one concern, keep them together.
+Apply that single test. Its consequences:
 
-## Atomicity Rules
+- **Independent requests split.** Two requests concerning different rooms, different devices, or different properties of one device are separate atomic intents, however they are joined ("and", "also", "then", a new sentence). Types may mix freely within one input, and each segment is typed on its own.
+- **Related subgoals do not split.** When the user ties parts together with a conditional, causal, or temporal relation — "if", "when", "whenever", "once", "after", "until", "while", "wait for X to finish, then ...", "N minutes after the previous action", "at 4:47 PM" — the whole construction is **one** atomic intent. Splitting it would destroy the relation that makes it a single request. This holds even when the construction commands several devices in several rooms: a scheduled block is one intent.
+- **Symptoms converge.** Multiple complaints, sensations, or descriptions that all point at one underlying concern in one place collapse into a **single** intent. "Ugh, the bathroom is so damp, towels still heavy from the wash, my skin feels a bit sticky and I am worrying about mildew" is ONE goal — damp towels, sticky skin and mildew are all symptoms of the same concern. Do not emit one intent per symptom. But a second concern about a **different** place or aspect in the same breath is its own intent.
+- **Actions serving one outcome stay together.** Several actions issued as one instruction against one device, jointly realising one desired outcome, form ONE atomic intent with multiple actions. "Okay utility room dryer 2, turn on, set to max and start running now" is one goal with three actions. "It is getting warm with the morning sun, turn on living room fan 1 and set the fan to 30 percent" is one goal with two actions. Contrast a genuinely separate second outcome, which splits: "set office heat pump 1 to heating mode. The wash cycle is done, set bathroom washer 1 to stopped" is two goals.
 
-These rules apply to all three categories — goal, state, and capability requests alike.
+### Worked examples
 
-- A request like "Increase the brightness of the lights in the master bedroom by 63%, set the air conditioner in the guest bedroom to auto swing mode, switch the air conditioner in the study room to heat mode" results in **three** atomic intents, because each sub-request is fully independent.
-- A request like "Is the bedroom light on, and what's the temperature in the kitchen?" results in **two** atomic intents (two independent state requests about **different devices/rooms**).
-- A request like "Show me the state of light308 (is it on and what is its intensity?)" results in **one** atomic intent, because all sub-questions target the **same device** and all ask about the **same concern** (the device's state). Multiple questions about a single device's state collapse into one atomic intent.
-- A single device targeted with two distinct changes is **two** atomic intents. For example, "set the AC to 24 degrees, auto mode" results in **two** atomic intents (one to set the temperature, one to set the mode), because the two changes are independent of each other.
-- A request like "Adjust the air conditioner in the living room to 24 degrees **whenever** the fan in the kitchen is set to low speed" results in a **single** atomic intent — conditional/compound phrasing cannot be split without losing the conditioning relationship.
-- Coordinate conjunctions ("and", "also", "then") between actions or questions almost always signal separate atomic intents, even when both clauses target the **same** device. Each clause that asks about or acts on a **distinct property** is its own atomic intent. For example, "is the light on and what is its brightness?" results in **two** ENV_STATE_REQUEST intents (power state and brightness are distinct properties), and "turn on the lights and set their brightness to 40%" results in **two** GOAL_REQUEST intents. When the second clause uses a pronoun ("it", "its", "their") that refers back to a device named in the first clause, apply the coreference resolution rule in the span field requirements below.
-- Conditional, causal, or temporal subordination ("whenever", "if", "once", "after", "until") means the whole clause is a single compound intent and must not be split.
-- **Same-device elaboration rule (narrow)**: Sub-questions or sub-clauses about the same device collapse into a **single** atomic intent ONLY when an explicit wrapper phrase frames them as facets of one umbrella concern, and the sub-clauses act as a parenthetical elaboration of that wrapper. For example, "show me the state of light308 (is it on and what is its intensity?)" is **one** ENV_STATE_REQUEST because "show me the state of" is the umbrella concern and the parenthetical merely enumerates which aspects of that state are of interest. Absent such a wrapper, two coordinated clauses about distinct properties of the same device split into two atomic intents (see the coordinate-conjunctions rule above). Multiple symptoms or descriptions converging on a single underlying concern (per the implicit-input rule) also collapse under this rule.
-- Different categories can co-occur in one input, and each segment is classified independently. A request like "Turn on the kitchen light, what's the temperature in the bedroom, and can you control the blinds in the living room?" results in **three** atomic intents spanning all three categories: one GOAL_REQUEST ("turn on the kitchen light"), one ENV_STATE_REQUEST ("what's the temperature in the bedroom"), and one ENV_CAPABILITIES_REQUEST ("can you control the blinds in the living room"). Apply the same atomicity logic across categories as within a single category.
+- "What fan modes are available on dehumidifier 2 in the study room right now, and how is the humidity in the study room doing at the moment, is it still on the higher side?" → **2** intents: one ENV_CAPABILITIES_REQUEST (available fan modes) and one ENV_STATE_REQUEST (the current humidity; "is it still on the higher side" is the same question restated, not a second one).
+- "I was thinking about running a load later what brand or maker does the dishwasher 1 in the kitchen say it is and also how warm does the living room feel right now" → **2** ENV_STATE_REQUESTs (a device-internal property of the dishwasher; a room reading in a different room).
+- "Man the bathroom air feels kinda dusty my throat is a bit scratchy and my eyes feel gritty, its annoying me a little" → **1** GOAL_REQUEST (all symptoms converge on the bathroom air).
+- "Ugh that utility room light is just way too bright ... And the bathroom light is harsh too, like a clinic lamp ..." → **2** GOAL_REQUESTs (two rooms, two independent concerns).
+- "It is getting chilly in the office this evening, set office heat pump 1 to heating mode. The wash cycle is done, set bathroom washer 1 to stopped." → **2** GOAL_REQUESTs.
+- "I'm elbow deep in a pile of laundry by the washer so while I'm at the washer power on air purifier 1 in the bathroom at 17 minutes from now and set fan 80%, and 5 minutes after the previous action keep it powered on and set fan 30%. Also switch on light 1 in the utility room at 26 minutes from now so there is light for folding when I finish here." → **2** GOAL_REQUESTs: the purifier schedule is one intent (the second step is chained to the first by "5 minutes after the previous action", so it cannot be separated), and the independent light schedule is the other.
+- "At 4:47 PM, that is 17 minutes from now, turn on air purifier 1 in the bathroom and set the fan to 80 percent so it clears the steam and odors" → **1** GOAL_REQUEST with two actions, both under one scheduled time.
+- "I am folding laundry in the utility room. 30 minutes after the dryer 1 in the utility room finishes power on air purifier 1 in the bathroom and set fan to 60 percent and also power on light 1 in the utility room" → **2** GOAL_REQUESTs, both anchored on the same dryer condition but acting on independent devices in different rooms.
+- "Just realized we have a guest coming and I want towels ready on time. Wait for washer 1 in the utility room to finish. Then after 19 minutes start dryer 2 in the utility room and set it to Running state and Normal dryness level." → **1** GOAL_REQUEST: the wait, the delay and the dryer settings form one chained construction.
+- "Dishwasher 1 in the kitchen will finish around two forty eight PM based on the current cycle time. Start washer 1 in the utility room 14 minutes later so the machines do not overlap" → **1** GOAL_REQUEST: one condition, one action.
+
+## Writing the intent text
+
+Each intent's `text` must read as a **complete, self-contained request** — understandable on its own, without the rest of the user's phrase. Self-containment is the requirement; copying a contiguous substring is merely the usual way to satisfy it, never a reason to leave an intent incomplete.
+
+Start from an exact contiguous substring of the user's input, then apply the mandatory check below and extend it as needed. Rephrasing is permitted only through **repetition** of substrings the user actually wrote, plus the minimal grammatical harmonisation needed to make the result well-formed.
+
+Concretely: when splitting leaves an intent depending on context stated elsewhere in the phrase — the room, the device, the time frame, the anchoring condition, referred to by "in there", "it", "its", "their", "the same", or simply left out — **repeat** the substring carrying that context into this intent. The shared context is duplicated, not moved: it appears in every intent that needs it, including the one it was originally attached to.
+
+Context propagates in both directions, and across intents of different types. It may be stated before the intents that need it, after them, or inside a neighbouring intent of a different type.
+
+**Mandatory self-containment check.** Before emitting each intent, read its `text` alone with the rest of the user's phrase hidden, and ask: which room does it concern, which device, and at what time? If any of those is unanswerable from the text alone, but the user's phrase names it somewhere, you MUST repeat that context into the text. Only when the phrase never says it at all may the text stay silent about it — in that case the goal is `incomplete`, not repaired by invention. Apply this check to every intent, including the ones you copied as a clean contiguous substring.
+
+Never introduce information the user did not write. Do not invent a device name, a room, a value, or a unit; do not summarise, correct, normalise, or embellish. The only permitted deviations are repetition of the user's own words and minimal grammatical harmonisation.
+
+Examples:
+
+- Input: "I am getting ready to relax in the living room and was wondering how humid it is in there and how bright the lighting is right now?" → two ENV_STATE_REQUESTs. The room is stated once and governs both, so it is repeated into both:
+  - "I am getting ready to relax in the living room and was wondering how humid it is in there"
+  - "I am getting ready to relax in the living room and was wondering how bright the lighting is right now?"
+- Input: "is the bedroom light on and what is its intensity?" → two ENV_STATE_REQUESTs: "is the bedroom light on" and "what is the intensity of the bedroom light" — the anaphor "its" is replaced by the antecedent the user wrote.
+- Input: "Tell me what the temperature in the living room is and make sure to keep the AC temperature at 24 Celsius whenever the fan is set to low" → one ENV_STATE_REQUEST and one GOAL_REQUEST. The room is named only in the first, but governs both, so it is repeated into the goal: "make sure to keep the living room AC temperature at 24 Celsius whenever the living room fan is set to low".
+- Input: "30 minutes after the dryer 1 in the utility room finishes power on air purifier 1 in the bathroom and also power on light 1 in the utility room" → two GOAL_REQUESTs, the anchoring condition repeated into each: "30 minutes after the dryer 1 in the utility room finishes power on air purifier 1 in the bathroom" and "30 minutes after the dryer 1 in the utility room finishes power on light 1 in the utility room".
+
+## Qualifiers
+
+Qualifiers describe **how the user phrased a goal**. Attach them to GOAL_REQUEST intents only; for ENV_STATE_REQUEST and ENV_CAPABILITIES_REQUEST, `qualifiers` is an empty list.
+
+For a GOAL_REQUEST, emit exactly one label from axis A, exactly one from axis C, and zero or more from axis B.
+
+**Axis A — specificity (exactly one):**
+- `explicit` — the phrasing names all three of: (a) the device or sensor type, (b) its location, and (c) the affordance detail (the named action, its parameters and their values if any, or the name of the environment-related or device-internal property concerned).
+- `incomplete` — the phrasing names an action or a device, but omits at least one of device type, location, or affordance detail.
+- `ambiguous` — the phrasing does not directly name what is to be actuated or how, expressing instead an implicit desire to change the state of the environment or a device's functionality (the complaint or sensation style).
+
+**Axis B — structure (zero or more):**
+- `logical_dependency` — the intent covers one or more subgoals related to each other in a dependent manner: the execution of one depends on another, or one is a verification/trigger and the other an execution/action.
+- `temporal_dependency` — the intent covers subgoals whose execution is temporally conditioned: delayed until a specified time, planned after a relative delay, or planned a relative time after a state is verified or a goal achieved.
+
+**Axis C — goal kind (exactly one):**
+- `achievement` — the goal is considered performed once its actions have been executed, or it has a time-bounded objective.
+- `maintenance` — the goal has no clear time-bounded objective, or it implies constant re-verification of conditions and consequent re-application of actions to hold a desired environment or device-internal state (e.g. "keep the room temperature at 25 degrees for the next 5 hours").
+
+Worked assignments:
+- "set office heat pump 1 to heating mode" → `["explicit", "achievement"]`.
+- "It is getting a bit dim in the living room this afternoon, can you turn on living room light 2." → `["explicit", "achievement"]`.
+- "Man the bathroom air feels kinda dusty my throat is a bit scratchy" → `["ambiguous", "achievement"]`.
+- "turn on the fan" (no room, no setting) → `["incomplete", "achievement"]`.
+- "At 4:47 PM, that is 17 minutes from now, turn on air purifier 1 in the bathroom and set the fan to 80 percent" → `["explicit", "temporal_dependency", "achievement"]`.
+- "Wait for washer 1 in the utility room to finish. Then after 19 minutes start dryer 2 in the utility room and set it to Running state and Normal dryness level." → `["explicit", "logical_dependency", "temporal_dependency", "achievement"]`.
+- "keep the living room at 22 degrees while I am working" → `["explicit", "maintenance"]`.
 
 ## Environment Capabilities Reference
 
-The following list defines the available devices, sensors, and commands currently available in the smart home environment.
+The devices, sensors, and commands currently available in this smart home:
 
 ```
 {capabilities}
 ```
 
-Use this as **reference only** — to judge whether an intent is plausible given what the environment supports, and to inform classification (e.g. an ENV_CAPABILITIES_REQUEST asks whether something in the list exists). Do not extract or output any device identifiers or technical details; intent-to-device mapping is a later stage.
+Use this as **reference only** — to sanity-check that a reading of the request is plausible, and to help tell a capability question from a state question. Do not extract or output any device identifiers or technical details, and do not reject an intent because the environment appears not to support it.
 
 ## Output
 
@@ -65,8 +113,9 @@ Return ONLY a JSON object — no prose, no explanation, no markdown code fences 
 {{
   "intents": [
     {{
-      "span": string,
-      "category": "GOAL_REQUEST" | "ENV_STATE_REQUEST" | "ENV_CAPABILITIES_REQUEST",
+      "text": string,
+      "type": "GOAL_REQUEST" | "ENV_STATE_REQUEST" | "ENV_CAPABILITIES_REQUEST",
+      "qualifiers": [string],
       "reason": string
     }}
   ]
@@ -74,25 +123,11 @@ Return ONLY a JSON object — no prose, no explanation, no markdown code fences 
 
 Field requirements:
 
-- **intents**: an array of atomic intent objects. Must contain at least one object. The array order should follow the order the intents appear in the user's input.
-- **span**: a non-empty string carrying the text of the user's input that expresses this ONE intent. By default every character MUST be copied character-for-character from the user's input — never paraphrased, restated, summarized, corrected, or rephrased, with no words added or removed. The only permitted deviation from verbatim copying is coreference resolution, defined narrowly below.
-  - The span must cover exactly one atomic intent and nothing more. If the user expresses two things, that is two intent objects, each with its own span — never one span bundling both. For example, "set the AC to 24 degrees, auto mode" is TWO intents (set temperature; set mode), each emitted separately.
-  - Normally an intent is a single contiguous substring of the input, and the span is exactly that substring.
-  - Occasionally a single intent is phrased non-contiguously — its words are split across the input by unrelated text. ONLY in this case, copy each contributing substring verbatim and join them with ", " (a comma followed by a space), in the order they appear in the input. This is permitted only because every joined piece belongs to the same single intent. Never use this joining to combine pieces of different intents.
-  - The ", " separator is the ONLY text you may introduce via the joining mechanism above; every piece on either side of it must still be an exact substring of the user's input. Never use ", " as a substitute for invented or paraphrased text.
-
-  - **Coreference resolution exception** — this is the ONLY case in which a span may deviate from verbatim copying.
-    - It applies when a single shared device/entity reference governs multiple atomic intents that must be split apart. After splitting, the sub-intents that do not contain the original reference would contain only a pronoun or other anaphor ("it", "its", "their", "them", "the same one", etc.) and would lose the device referent in isolation.
-    - In this case, and ONLY in this case, you MUST rewrite the anaphor in the affected span(s) by substituting the antecedent noun phrase from the user's input, so each emitted span is self-contained and refers to the device explicitly.
-    - The substitution is the ONLY change permitted. Do not paraphrase, reorder, normalize, correct, expand, or otherwise edit any other word in the span. Every word other than the substituted anaphor must remain a verbatim substring of the user's input. The antecedent itself must also be copied verbatim from the input (do not invent a paraphrase of the device name).
-    - Do not invoke this exception when no coreference exists, when each sub-intent already carries its own explicit device reference, or when the input is non-contiguous in a way already handled by the ", " joining rule above. Coreference resolution and ", " joining are mutually exclusive mechanisms for one span — never combine them.
-    - Examples:
-      - Input: "what is the brightness of the lights and what is their color set to?" → two ENV_STATE_REQUEST intents with spans "what is the brightness of the lights" and "what is the color of the lights set to". The second span replaces "their" with "of the lights" (the antecedent copied verbatim from the input); every other word is verbatim.
-      - Input: "turn on the lights and set their brightness to 40%" → two GOAL_REQUEST intents with spans "turn on the lights" and "set the lights brightness to 40%". The second span replaces "their" with "the lights"; every other word is verbatim.
-      - Input: "is the bedroom light on and what is its intensity?" → two ENV_STATE_REQUEST intents with spans "is the bedroom light on" and "what is the intensity of the bedroom light". The second span replaces "its" with "of the bedroom light" (antecedent copied verbatim from the input); every other word is verbatim. Power state and intensity are distinct properties, and there is no wrapper concern, so they split rather than collapsing under the same-device elaboration rule.
-
-- **category**: exactly one of the three string literals "GOAL_REQUEST", "ENV_STATE_REQUEST", "ENV_CAPABILITIES_REQUEST". No other value is permitted.
-- **reason**: a non-empty string. REQUIRED for every intent, never omitted or empty. It must justify both why this category was assigned and why this was treated as a single atomic intent. If the span used the coreference resolution exception, the reason must also identify the anaphor that was resolved and the antecedent it was replaced with.
+- **intents**: an array of atomic intent objects, at least one, ordered as the intents appear in the user's input.
+- **text**: a non-empty, self-contained string, built per "Writing the intent text" above.
+- **type**: exactly one of the three string literals. No other value is permitted.
+- **qualifiers**: an array of strings drawn only from the seven labels defined above. For a GOAL_REQUEST: exactly one of `explicit` / `incomplete` / `ambiguous`, exactly one of `achievement` / `maintenance`, and any applicable structural labels. Empty for the other two types.
+- **reason**: a non-empty string, required for every intent. It must justify both the assigned type and why this was treated as a single atomic intent. If the text repeated shared context from elsewhere in the phrase, the reason must name the substring that was repeated.
 
 Output nothing outside the JSON object — no device/command parsing, no resolved values, no commentary.
 """

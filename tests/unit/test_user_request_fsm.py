@@ -203,8 +203,9 @@ class TestSegmenting:
     @pytest.mark.asyncio
     async def test_segmented_intents_are_recorded_and_advance(self):
         fsm, agent = make_fsm()
-        intent = MagicMock(span="turn on the light", category="GOAL_REQUEST",
-                           reason="asks for an action")
+        intent = MagicMock(text="turn on the light", type="GOAL_REQUEST",
+                           reason="asks for an action",
+                           qualifiers=["incomplete", "achievement"])
         state = fsm._states[SEGMENTING]
         with patch("ami_agents.agents.user_assistant.behaviours.user_request.pipeline") as pl:
             pl.fetch_capabilities = AsyncMock(return_value="{}")
@@ -214,6 +215,7 @@ class TestSegmenting:
 
         assert state.next_state == EXTRACTING
         recorded = agent.requests.get("req-1").atomic_intents
-        assert recorded == [{"span": "turn on the light",
-                             "category": "GOAL_REQUEST",
+        assert recorded == [{"text": "turn on the light",
+                             "type": "GOAL_REQUEST",
+                             "qualifiers": ["incomplete", "achievement"],
                              "reason": "asks for an action"}]

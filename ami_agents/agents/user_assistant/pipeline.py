@@ -241,11 +241,19 @@ async def segment_into_atomic_intents(agent, logger, user_text: str, capabilitie
         for item in intents_data:
             if not isinstance(item, dict):
                 continue
-            span = item.get("span", "").strip()
-            category = item.get("category", "").strip()
+            text = item.get("text", "").strip()
+            intent_type = item.get("type", "").strip()
             reason = item.get("reason", "").strip()
-            if span and category in ("GOAL_REQUEST", "ENV_STATE_REQUEST", "ENV_CAPABILITIES_REQUEST") and reason:
-                result.append(AtomicIntent(span=span, category=category, reason=reason))
+            # Qualifiers are descriptive only; tolerate a missing or malformed
+            # list rather than dropping an otherwise valid intent.
+            raw_qualifiers = item.get("qualifiers")
+            qualifiers = [
+                q.strip() for q in raw_qualifiers
+                if isinstance(q, str) and q.strip()
+            ] if isinstance(raw_qualifiers, list) else []
+            if text and intent_type in ("GOAL_REQUEST", "ENV_STATE_REQUEST", "ENV_CAPABILITIES_REQUEST") and reason:
+                result.append(AtomicIntent(
+                    text=text, type=intent_type, reason=reason, qualifiers=qualifiers))
         return result
     except Exception as exc:
         logger.error("LLM atomic segmentation failed: %s", exc)

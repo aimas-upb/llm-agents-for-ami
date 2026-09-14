@@ -8,7 +8,7 @@ from .plan_execution import (
     MaintenancePlanBehaviour,
     PlanExecutionBehaviour,
 )
-from .demo_request_classifier import DemoRequestClassifierBehaviour
+from .visual_request_logger import VisualRequestLoggerBehaviour
 
 __all__ = [
     "UserMessageBehaviour",
@@ -17,5 +17,5 @@ __all__ = [
     "PlanExecutionBehaviour",
     "AchievementPlanBehaviour",
     "MaintenancePlanBehaviour",
-    "DemoRequestClassifierBehaviour",
+    "VisualRequestLoggerBehaviour",
 ]

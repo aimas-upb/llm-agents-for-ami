@@ -27,7 +27,11 @@ env_path = PROJECT_ROOT / '.env'
 if env_path.exists():
     load_dotenv(env_path)
 
-from ami_agents.agents.user_assistant.utils import build_llm_client
+from ami_agents.agents.user_assistant.utils.llm_client import (
+    build_behaviour_llm_client,
+    build_llm_call_kwargs,
+)
+from ami_agents.shared.utils.config_loader import ConfigLoader
 from ami_agents.agents.user_assistant.prompts import ATOMIC_SEGMENTATION_SYSTEM_PROMPT
 from ami_agents.agents.user_assistant.models import AtomicIntent
 
@@ -35,35 +39,27 @@ from ami_agents.agents.user_assistant.models import AtomicIntent
 async def test_atomic_segmentation():
     """Test atomic segmentation with known inputs."""
 
-    # Build LLM client using existing pattern
-    config = {
-        "llm": {
-            "default_provider": "openai",
-            "providers": {
-                "openai": {
-                    "api_key": os.getenv("OPENAI_API_KEY"),
-                    "base_url": os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-                    "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-                }
-            },
-        },
-    }
-
-    llm_cfg = build_llm_client(config)
+    # Use the same agents.yaml settings the live UA reads, so this exercises the
+    # model the segmentation prompt is actually tuned for rather than a default.
+    agents_config = ConfigLoader.load_with_env_vars(
+        str(PROJECT_ROOT / "ami_agents" / "config" / "agents.yaml"))
+    ua_config = agents_config.get("user_assistant", {}) or {}
+    llm_cfg = build_behaviour_llm_client(ua_config, "atomic_segmentation")
     llm_client = llm_cfg.client
+    print(f"Model: {llm_cfg.model}")
 
     # Test cases: (description, input, expected_count, optional_check)
     # optional_check is a callable that validates specific spans
     def check_living_room_in_goal(intents):
         """Verify the goal intent includes 'living room' context."""
-        goal_intents = [i for i in intents if i.category == "GOAL_REQUEST"]
+        goal_intents = [i for i in intents if i.type == "GOAL_REQUEST"]
         if not goal_intents:
             return False, "No GOAL_REQUEST found"
-        goal_span = goal_intents[0].span.lower()
-        if "living room" in goal_span:
-            return True, f"Goal span includes 'living room': {goal_intents[0].span!r}"
+        goal_text = goal_intents[0].text.lower()
+        if "living room" in goal_text:
+            return True, f"Goal text includes 'living room': {goal_intents[0].text!r}"
         else:
-            return False, f"Goal span missing 'living room': {goal_intents[0].span!r}"
+            return False, f"Goal text missing 'living room': {goal_intents[0].text!r}"
 
     test_cases = [
         (
@@ -116,8 +112,7 @@ async def test_atomic_segmentation():
             response = await llm_client.chat.completions.create(
                 model=llm_cfg.model,
                 messages=messages,
-                temperature=0.7,
-                max_tokens=1000,
+                **build_llm_call_kwargs(llm_cfg),
             )
 
             raw_response = (response.choices[0].message.content or "").strip()
@@ -144,19 +139,26 @@ async def test_atomic_segmentation():
             for item in intents_data:
                 if not isinstance(item, dict):
                     continue
-                span = item.get("span", "").strip()
-                category = item.get("category", "").strip()
+                text = item.get("text", "").strip()
+                intent_type = item.get("type", "").strip()
                 reason = item.get("reason", "").strip()
+                raw_qualifiers = item.get("qualifiers")
+                qualifiers = [
+                    q.strip() for q in raw_qualifiers
+                    if isinstance(q, str) and q.strip()
+                ] if isinstance(raw_qualifiers, list) else []
 
-                if span and category in ("GOAL_REQUEST", "ENV_STATE_REQUEST", "ENV_CAPABILITIES_REQUEST") and reason:
-                    atomic_intents.append(AtomicIntent(span=span, category=category, reason=reason))
+                if text and intent_type in ("GOAL_REQUEST", "ENV_STATE_REQUEST", "ENV_CAPABILITIES_REQUEST") and reason:
+                    atomic_intents.append(AtomicIntent(
+                        text=text, type=intent_type, reason=reason,
+                        qualifiers=qualifiers))
 
             # Check result
             actual_count = len(atomic_intents)
             if actual_count == expected_count:
                 print(f"  ✓ PASS: Got {actual_count} intent(s) as expected")
                 for j, intent in enumerate(atomic_intents, 1):
-                    print(f"    [{j}] {intent.category}: {intent.span!r}")
+                    print(f"    [{j}] {intent.type}: {intent.text!r} {intent.qualifiers}")
 
                 # Run optional validation check
                 if optional_check:
@@ -169,7 +171,7 @@ async def test_atomic_segmentation():
             else:
                 print(f"  ✗ FAIL: Got {actual_count} intent(s), expected {expected_count}")
                 for j, intent in enumerate(atomic_intents, 1):
-                    print(f"    [{j}] {intent.category}: {intent.span!r}")
+                    print(f"    [{j}] {intent.type}: {intent.text!r} {intent.qualifiers}")
                 all_passed = False
 
         except Exception as e:

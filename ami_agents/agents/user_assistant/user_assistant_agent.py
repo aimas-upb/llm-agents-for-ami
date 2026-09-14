@@ -38,7 +38,7 @@ from ...environment.integration.integration_engine import YggdrasilIntegration
 from .models import ConversationState
 from .registry import PlanRegistry, RequestRegistry
 from .behaviours import (
-    DemoRequestClassifierBehaviour,
+    VisualRequestLoggerBehaviour,
     PlanManagementBehaviour,
     UserMessageBehaviour,
 )
@@ -285,7 +285,7 @@ class UserAssistantAgent(Agent, IAgent):
         fresh = Template()
         fresh.set_metadata("message_type", "llm")
         self.add_behaviour(UserMessageBehaviour(self.logger), template=fresh)
-        self.add_behaviour(DemoRequestClassifierBehaviour(self.logger), template=fresh)
+        self.add_behaviour(VisualRequestLoggerBehaviour(self.logger), template=fresh)
 
         # One manager for every confirmed plan. Execution is reached by message,
         # never by call, so a plan outlives the request that asked for it.

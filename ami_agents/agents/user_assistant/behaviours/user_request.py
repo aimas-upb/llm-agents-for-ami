@@ -131,17 +131,18 @@ class SegmentingState(_RequestState):
 
         summary: Dict[str, int] = {}
         for intent in atomic_intents:
-            summary[intent.category] = summary.get(intent.category, 0) + 1
+            summary[intent.type] = summary.get(intent.type, 0) + 1
         self.logger.info(demo(
             f"[SEGMENTATION] request={request.request_id} "
             f"{len(atomic_intents)} atomic intent(s): {summary}"))
         for intent in atomic_intents:
             self.logger.info(demo(
-                f"[SEGMENTATION] - {intent.category}: span={intent.span!r} "
-                f"reason={intent.reason}"))
+                f"[SEGMENTATION] - {intent.type}: text={intent.text!r} "
+                f"qualifiers={intent.qualifiers} reason={intent.reason}"))
 
         request.agent.requests.note_intents(request.request_id, [
-            {"span": i.span, "category": i.category, "reason": i.reason}
+            {"text": i.text, "type": i.type, "qualifiers": i.qualifiers,
+             "reason": i.reason}
             for i in atomic_intents
         ])
         request.atomic_intents = atomic_intents
@@ -156,11 +157,11 @@ class ExtractingState(_RequestState):
         self.conv.phase = ConversationPhase.EXTRACTING_INTENTS
 
         caps = [a for a in request.atomic_intents
-                if a.category == "ENV_CAPABILITIES_REQUEST"]
+                if a.type == "ENV_CAPABILITIES_REQUEST"]
         state = [a for a in request.atomic_intents
-                 if a.category == "ENV_STATE_REQUEST"]
+                 if a.type == "ENV_STATE_REQUEST"]
         goals = [a for a in request.atomic_intents
-                 if a.category == "GOAL_REQUEST"]
+                 if a.type == "GOAL_REQUEST"]
 
         hierarchical = pipeline.build_capabilities_hierarchical_text(
             request.caps_summary)
@@ -172,7 +173,7 @@ class ExtractingState(_RequestState):
 
         for intent in caps:
             extraction = await pipeline.parse_atomic_intent(
-                request.agent, self.logger, intent.span, intent.category,
+                request.agent, self.logger, intent.text, intent.type,
                 hierarchical)
             self.logger.info(demo(
                 f"{_label('ENV_CAPABILITIES_REQUEST')}:\n"
@@ -181,7 +182,7 @@ class ExtractingState(_RequestState):
 
         for intent in state:
             extraction = await pipeline.parse_atomic_intent(
-                request.agent, self.logger, intent.span, intent.category,
+                request.agent, self.logger, intent.text, intent.type,
                 hierarchical_state)
             self.logger.info(demo(
                 f"{_label('ENV_STATE_REQUEST')}:\n"
@@ -196,7 +197,7 @@ class ExtractingState(_RequestState):
 
         extractions = await asyncio.gather(
             *[pipeline.parse_atomic_intent(request.agent, self.logger,
-                                           intent.span, intent.category,
+                                           intent.text, intent.type,
                                            hierarchical)
               for intent in goals],
             return_exceptions=True,

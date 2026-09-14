@@ -1,7 +1,16 @@
-"""Demo-only request classifier behaviour.
+r"""A readable trace line for each incoming request.
 
-Logs a compact EXPLICIT / IMPLICIT / QUERY classification of user input
-so demos have a readable trace. Does not influence planning.
+Logs a quick keyword guess at what the user asked for, so a demo has something
+legible on screen before the real segmentation returns. It influences nothing:
+`dispatch` hands a copy of the message to every behaviour whose template
+matches, so this reads the same utterance the receiver does without competing
+for it, and nothing consumes what it logs.
+
+The heuristics are stale -- the vocabulary is hardcoded to the old lab
+environment (`light`/`blinds`, a `\w+\d{3}` room-code pattern) and the labels
+it prints are not the category set the rest of the system uses. To be reworked
+against the semantic model; until then, read its output as decoration rather
+than as classification.
 """
 
 import logging
@@ -13,8 +22,8 @@ from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
 
 
-class DemoRequestClassifierBehaviour(CyclicBehaviour):
-    """Demo-only logging helper: classify user requests as EXPLICIT vs IMPLICIT."""
+class VisualRequestLoggerBehaviour(CyclicBehaviour):
+    """Logging only: a fast guess at the request, printed for the demo trace."""
 
     def __init__(self, logger=None):
         """

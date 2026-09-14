@@ -40,9 +40,13 @@ class AtomicIntent:
     Represents one indivisible request as identified by the atomic segmenter.
     """
 
-    span: str  # verbatim text from user input for this intent
-    category: str  # "GOAL_REQUEST" | "ENV_STATE_REQUEST" | "ENV_CAPABILITIES_REQUEST"
-    reason: str  # LLM justification for the categorization
+    text: str  # self-contained text of this intent, drawn from the user input
+    type: str  # "GOAL_REQUEST" | "ENV_STATE_REQUEST" | "ENV_CAPABILITIES_REQUEST"
+    reason: str  # LLM justification for the typing
+    # Descriptive labels on a GOAL_REQUEST: one specificity label
+    # (explicit|incomplete|ambiguous), one goal kind (achievement|maintenance),
+    # and any of logical_dependency / temporal_dependency. Empty for queries.
+    qualifiers: List[str] = field(default_factory=list)
 
 
 # Tokens treated as user confirmation / rejection by the confirmation handler.
