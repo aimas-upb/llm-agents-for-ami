@@ -16,7 +16,9 @@ Neither is declared "correct" for qt4: the prompt deliberately keeps one
 independent scheduled block as one atomic intent, so it should track goals, and
 the target delta is reported as a diagnostic.
 
-This is NOT a pytest test: a full run makes 600 paid LLM calls.
+This is NOT a pytest test: the default cloud route makes paid LLM calls.
+Use --base-url with --model to select an explicit local Ollama endpoint;
+--repetitions repeats every selected episode independently (default: 1).
 
 Run with:
     conda run -n ami-agents python tests/simuhome/eval_atomic_segmentation.py --limit 3
@@ -28,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import os
 import statistics
@@ -37,6 +40,9 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+import httpx
+from openai import AsyncOpenAI
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -51,10 +57,10 @@ if env_path.exists():
 from ami_agents.agents.user_assistant.prompts import ATOMIC_SEGMENTATION_SYSTEM_PROMPT
 from ami_agents.agents.user_assistant.utils import loose_json_loads
 from ami_agents.agents.user_assistant.utils.llm_client import (
+    LLMClientConfig,
     build_behaviour_llm_client,
     build_llm_call_kwargs,
 )
-from ami_agents.shared.utils.config_loader import ConfigLoader
 
 # Mirrors ami_agents/environment/integration/SimuHome/worker.py's default.
 DEFAULT_BENCHMARK = PROJECT_ROOT.parent / "SimuHome" / "data" / "benchmark"
@@ -176,7 +182,7 @@ def parse_intents(raw: str) -> List[Dict[str, Any]]:
     return intents
 
 
-async def segment_one(llm_cfg, call_kwargs, prompt: str, query: str) -> List[Dict[str, Any]]:
+async def segment_one(llm_cfg, call_kwargs, prompt: str, query: str, capture=None) -> List[Dict[str, Any]]:
     response = await llm_cfg.client.chat.completions.create(
         model=llm_cfg.model,
         messages=[
@@ -185,6 +191,10 @@ async def segment_one(llm_cfg, call_kwargs, prompt: str, query: str) -> List[Dic
         ],
         **call_kwargs,
     )
+    if capture is not None:
+        capture["raw_response"] = response.model_dump(mode="json")
+    if response.choices[0].finish_reason == "length":
+        raise ValueError("Segmentation response truncated by the output token limit")
     return parse_intents((response.choices[0].message.content or "").strip())
 
 
@@ -195,6 +205,8 @@ async def run_episode(
     prompt: str,
     semaphore: asyncio.Semaphore,
     progress: Dict[str, int],
+    repetition: int = 1,
+    row_file=None,
 ) -> Dict[str, Any]:
     path: Path = entry["path"]
     episode: Dict[str, Any] = entry["episode"]
@@ -206,6 +218,7 @@ async def run_episode(
 
     row: Dict[str, Any] = {
         "file": path.name,
+        "repetition": repetition,
         "query_type": query_type,
         "case": case,
         "query": query,
@@ -222,9 +235,10 @@ async def run_episode(
     async with semaphore:
         last_error = None
         for _ in range(2):  # one retry, then record the episode as an error
+            row["attempts"] = _ + 1
             started = time.monotonic()
             try:
-                intents = await segment_one(llm_cfg, call_kwargs, prompt, query)
+                intents = await segment_one(llm_cfg, call_kwargs, prompt, query, row)
                 row["duration_s"] = round(time.monotonic() - started, 3)
                 row["intents"] = intents
                 row["n_intents"] = len(intents)
@@ -241,11 +255,14 @@ async def run_episode(
             row["error"] = last_error
 
     progress["done"] += 1
+    if row_file is not None:
+        row_file.write(json.dumps(row, ensure_ascii=False) + "\n")
+        row_file.flush()
     status = "ERR" if row["error"] else f"{row['n_intents']} intents"
     took = f" [{row['duration_s']:.1f}s]" if row["duration_s"] is not None else ""
     print(
         f"  [{progress['done']}/{progress['total']}] {path.name} "
-        f"({query_type}/{case}): {status} vs {n_goals} goals"
+        f"({query_type}/{case}, repetition={repetition}): {status} vs {n_goals} goals"
         + (f" / {n_targets} targets" if n_targets is not None else "")
         + took
     )
@@ -273,6 +290,7 @@ def summarize(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
 
         block: Dict[str, Any] = {
             "episodes": len(group),
+            "unique_scenarios": len({r["file"] for r in group}),
             "llm_errors": errors,
             "total_intents": sum(r["n_intents"] for r in ok),
             "total_goals": sum(r["n_goals"] for r in ok),
@@ -384,7 +402,23 @@ async def main() -> int:
                         help="Concurrent LLM calls (default: 8)")
     parser.add_argument("--out", type=Path, default=None,
                         help="Directory for rows.jsonl and summary.json")
+    parser.add_argument("--base-url", help="Explicit OpenAI-compatible URL, e.g. http://127.0.0.1:11434/v1")
+    parser.add_argument("--model", help="Model tag; required with --base-url")
+    parser.add_argument("--repetitions", type=int, default=1,
+                        help="Independent evaluations per selected scenario (default: 1)")
+    parser.add_argument("--temperature", type=float, default=0.0,
+                        help="Sampling temperature for --base-url (default: 0)")
+    parser.add_argument("--max-tokens", type=int, default=4096,
+                        help="Output token limit for --base-url (default: 4096)")
+    parser.add_argument("--request-timeout", type=float, default=180,
+                        help="Seconds per API attempt for --base-url (default: 180)")
     args = parser.parse_args()
+    if args.repetitions < 1 or args.concurrency < 1 or args.max_tokens < 1 or args.request_timeout <= 0:
+        parser.error("repetitions, concurrency, max-tokens and request-timeout must be positive")
+    if args.limit is not None and args.limit < 1:
+        parser.error("limit must be positive")
+    if bool(args.base_url) != bool(args.model):
+        parser.error("--base-url and --model must be supplied together")
 
     families = [f.strip() for f in args.families.split(",") if f.strip()]
     unknown = [f for f in families if f not in FAMILIES]
@@ -396,27 +430,52 @@ async def main() -> int:
     if not episodes:
         raise SystemExit("No episodes matched the given filters")
 
-    # Same config the live UA reads, so the run uses production model settings.
-    agents_config = ConfigLoader.load_with_env_vars(
-        str(PROJECT_ROOT / "ami_agents" / "config" / "agents.yaml"))
-    ua_config = agents_config.get("user_assistant", {}) or {}
-    llm_cfg = build_behaviour_llm_client(ua_config, "atomic_segmentation")
-    call_kwargs = build_llm_call_kwargs(llm_cfg)
+    if args.base_url:
+        # Explicit local route: never inherit a real API key or institutional proxy.
+        client = AsyncOpenAI(
+            api_key="ollama", base_url=args.base_url,
+            timeout=args.request_timeout, max_retries=0,
+            http_client=httpx.AsyncClient(trust_env=False),
+        )
+        llm_cfg = LLMClientConfig(client, args.model, args.base_url,
+                                  args.temperature, None, None)
+        call_kwargs = {"temperature": args.temperature, "max_tokens": args.max_tokens}
+    else:
+        # Preserve the live UA configuration for existing cloud evaluations.
+        from ami_agents.shared.utils.config_loader import ConfigLoader
+        agents_config = ConfigLoader.load_with_env_vars(
+            str(PROJECT_ROOT / "ami_agents" / "config" / "agents.yaml"))
+        ua_config = agents_config.get("user_assistant", {}) or {}
+        llm_cfg = build_behaviour_llm_client(ua_config, "atomic_segmentation")
+        call_kwargs = build_llm_call_kwargs(llm_cfg)
     prompt = ATOMIC_SEGMENTATION_SYSTEM_PROMPT.format(capabilities=CAPABILITIES_CTX)
 
     print(f"Benchmark : {args.benchmark_dir}")
     print(f"Episodes  : {len(episodes)}  "
           f"(families={families}, cases={cases}, limit={args.limit})")
     print(f"Model     : {llm_cfg.model}  kwargs={call_kwargs}")
-    print(f"Concurrency: {args.concurrency}\n")
+    print(f"Concurrency: {args.concurrency}; repetitions: {args.repetitions}; "
+          f"evaluations: {len(episodes) * args.repetitions}\n")
 
     semaphore = asyncio.Semaphore(args.concurrency)
-    progress = {"done": 0, "total": len(episodes)}
+    progress = {"done": 0, "total": len(episodes) * args.repetitions}
     wall_started = time.monotonic()
-    rows = await asyncio.gather(*[
-        run_episode(entry, llm_cfg, call_kwargs, prompt, semaphore, progress)
-        for entry in episodes
-    ])
+    row_file = None
+    try:
+        if args.out:
+            args.out.mkdir(parents=True, exist_ok=True)
+            row_file = (args.out / "rows.jsonl").open("x", encoding="utf-8")
+            (args.out / "segmentation_prompt.txt").write_text(prompt, encoding="utf-8")
+        rows = await asyncio.gather(*[
+            run_episode(entry, llm_cfg, call_kwargs, prompt, semaphore, progress,
+                        repetition, row_file)
+            for repetition in range(1, args.repetitions + 1)
+            for entry in episodes
+        ])
+    finally:
+        if row_file is not None:
+            row_file.close()
+        await llm_cfg.client.close()
     wall_seconds = round(time.monotonic() - wall_started, 1)
 
     summary = summarize(list(rows))
@@ -427,9 +486,6 @@ async def main() -> int:
     if args.out:
         args.out.mkdir(parents=True, exist_ok=True)
         rows_path = args.out / "rows.jsonl"
-        with rows_path.open("w", encoding="utf-8") as fh:
-            for row in rows:
-                fh.write(json.dumps(row, ensure_ascii=False) + "\n")
         summary_path = args.out / "summary.json"
         summary_path.write_text(json.dumps({
             "run": {
@@ -439,6 +495,10 @@ async def main() -> int:
                 "cases": cases,
                 "limit": args.limit,
                 "model": llm_cfg.model,
+                "base_url": llm_cfg.base_url,
+                "repetitions": args.repetitions,
+                "unique_scenarios": len(episodes),
+                "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
                 "call_kwargs": call_kwargs,
                 "concurrency": args.concurrency,
                 "wall_seconds": wall_seconds,
@@ -452,7 +512,4 @@ async def main() -> int:
 
 
 if __name__ == "__main__":
-    if not os.getenv("OPENAI_API_KEY"):
-        print("ERROR: OPENAI_API_KEY not set")
-        sys.exit(1)
     sys.exit(asyncio.run(main()))
