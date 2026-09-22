@@ -52,6 +52,7 @@ from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
 from ....shared.utils.spade_rpc import rpc_call, RpcTimeoutError
 from .. import pipeline, queries
+from .env_state_structuring import EnvStateStructuringBehaviour
 from ..models import (
     CONFIRM_TOKENS,
     ConversationPhase,
@@ -108,6 +109,8 @@ class SegmentingState(_RequestState):
         request = self.request
         self.conv.phase = ConversationPhase.SEGMENTING
 
+        # Fetched here for the EXTRACTING stage's parsers, not for segmentation:
+        # segmentation is purely linguistic and takes no capabilities.
         capabilities_ctx = await pipeline.fetch_capabilities(
             request.agent, self.logger, detail_level="summary")
         try:
@@ -118,9 +121,8 @@ class SegmentingState(_RequestState):
         request.capabilities_ctx = capabilities_ctx
         request.caps_summary = caps_summary
 
-        filtered = pipeline.filter_capabilities_json(caps_summary)
         atomic_intents = await pipeline.segment_into_atomic_intents(
-            request.agent, self.logger, request.user_text, json.dumps(filtered))
+            request.agent, self.logger, request.user_text)
 
         if not atomic_intents:
             await self.reply(
@@ -163,13 +165,10 @@ class ExtractingState(_RequestState):
         goals = [a for a in request.atomic_intents
                  if a.type == "GOAL_REQUEST"]
 
+        # Only the capabilities parser still takes the discovered environment;
+        # ENV_STATE structuring works from the ontology alone.
         hierarchical = pipeline.build_capabilities_hierarchical_text(
             request.caps_summary)
-        hierarchical_state = ""
-        if state:
-            hierarchical_state = json.dumps(
-                pipeline.filter_capabilities_json_for_state(request.caps_summary),
-                indent=2)
 
         for intent in caps:
             extraction = await pipeline.parse_atomic_intent(
@@ -180,14 +179,27 @@ class ExtractingState(_RequestState):
                 f"{json.dumps(extraction, indent=2)}"))
             await request.answer_capabilities_query(extraction)
 
-        for intent in state:
-            extraction = await pipeline.parse_atomic_intent(
-                request.agent, self.logger, intent.text, intent.type,
-                hierarchical_state)
+        # Structuring one state request is independent of structuring another,
+        # so spawn them all and then await: several questions in one utterance
+        # cost one round trip rather than N.
+        structuring = [
+            EnvStateStructuringBehaviour(intent.text, logger=self.logger)
+            for intent in state
+        ]
+        for behaviour in structuring:
+            request.agent.add_behaviour(behaviour)
+        for behaviour in structuring:
+            await behaviour.join()
+
+        for behaviour in structuring:
+            if behaviour.error:
+                self.logger.error(
+                    "ENV_STATE structuring failed for %r: %s",
+                    behaviour.intent_text, behaviour.error)
             self.logger.info(demo(
                 f"{_label('ENV_STATE_REQUEST')}:\n"
-                f"{json.dumps(extraction, indent=2)}"))
-            await request.answer_state_query(extraction)
+                f"{json.dumps(behaviour.result, indent=2)}"))
+            await request.answer_state_query(behaviour.result)
 
         if not goals:
             # A pure query: answered above, nothing to plan.

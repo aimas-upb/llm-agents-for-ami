@@ -41,6 +41,9 @@ QUDT   = Namespace("http://qudt.org/schema/qudt/")
 UNIT   = Namespace("http://qudt.org/vocab/unit/")
 TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
 TIME   = Namespace("http://www.w3.org/2006/time#")
+# Thing-level device metadata (manufacturer, product name). The TD spec mints no
+# vendor vocabulary of its own and points at schema.org for it.
+SCHEMA = Namespace("https://schema.org/")
 
 WEBHOOK_VERIFY_TIMEOUT = 5.0
 
@@ -1118,6 +1121,21 @@ def _build_cached_artifact_ttl(
     rdf.g.add((art, RDF.type, TD.Thing))
     rdf.g.add((art, RDF.type, HMAS.Artifact))
     rdf.g.add((art, TD.title, Literal(artifact_label)))
+
+    # Thing-level device metadata, straight from the Home Assistant device
+    # registry (`config/device_registry/list`). A fact about the device, not an
+    # interaction with it, so it annotates the Thing rather than joining its
+    # affordance set. A field the registry leaves unset stays absent from the
+    # graph -- in RDF a missing fact is the absence of a triple.
+    rdf.g.bind("schema", SCHEMA)
+    for field, predicate in (("manufacturer", SCHEMA.manufacturer),
+                             ("model", SCHEMA.model)):
+        value = (device or {}).get(field)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            rdf.g.add((art, predicate, Literal(text)))
     rdf.g.add((artifact_foi, RDF.type, SOSA.FeatureOfInterest))
     rdf.g.add((artifact_foi, TD.title, Literal(f"{artifact_label} environment")))
     domains = {e["entity_id"].split(".")[0] for e in device_entities if e.get("entity_id")}

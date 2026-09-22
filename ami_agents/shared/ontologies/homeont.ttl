@@ -15,8 +15,10 @@
 @prefix unit: <http://qudt.org/vocab/unit/> .
 @prefix quantitykind: <http://qudt.org/vocab/quantitykind/> .
 @prefix saref: <https://saref.etsi.org/core/> .
+@prefix ssn: <http://www.w3.org/ns/ssn/> .
 @prefix ssn-system: <http://www.w3.org/ns/ssn/systems/> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix schema: <https://schema.org/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://example.org/homeont/> a owl:Ontology ;
@@ -268,13 +270,39 @@ an attribute as type "list" and puts the element type in a child <entry>, so
 
 
 ################################################################################
-# Matter BasicInformation is NOT represented here.
+# Matter BasicInformation -- Thing-level metadata, not affordances.
 #
-# Vendor and product registration details are not something a planner acts on.
-# A device's human-readable type is its rdfs:label -- taken from the curated
-# family table, which matches Matter's ProductName on every device in the
-# corpus -- and its name is its td:title, the SimuHome device id
-# ("kitchen_freezer_1"), verbatim from the episode JSON and unique per home.
+# Manufacturer and product name ARE represented, as annotations on the td:Thing
+# itself, carried by schema.org terms:
+#
+#   schema:manufacturer  <- BasicInformation.VendorName   ("LG Electronics")
+#   schema:model         <- BasicInformation.ProductName  ("Tapo L530E")
+#
+# They are deliberately NOT td:hasPropertyAffordance. There is nothing to read
+# at runtime and nothing to actuate: a manufacturer is a fact about the thing,
+# not an interaction with it. An earlier revision reasoned from "not an
+# affordance" to "not represented at all" and dropped them; that lost the answer
+# to a question users actually ask ("who makes this?", "what model is it?").
+# schema.org is the vocabulary the W3C TD spec itself points to for
+# manufacturer -- TD mints no vendor term of its own.
+#
+# Three names on one device, three different facts -- do not conflate them:
+#   td:title     the instance   -- "kitchen_freezer_1", the SimuHome device id,
+#                                  verbatim from the episode JSON, unique per home
+#   rdfs:label   the type       -- "On/Off Light", the generic human-readable
+#                                  device family, from the curated family table
+#   schema:model the product    -- the manufacturer's product name
+#
+# In the SimuHome corpus rdfs:label and schema:model happen to coincide, because
+# every device reports its family label as ProductName. That is an artefact of
+# how the corpus was instantiated, not a reason to drop either term: in a real
+# home a "Dimmable Light" is a "Tapo L530E".
+#
+# The numeric registration ids (VendorID, ProductID) remain unrepresented. They
+# are Matter-registry internals with no user-facing meaning -- nobody asks their
+# home what vendor id a lamp uses. Should they ever be needed, the right
+# mechanism is a reverse lookup from vendor/product name to the ids in the
+# current Matter registry, not a triple on every artifact.
 ################################################################################
 
 ################################################################################
@@ -360,21 +388,39 @@ an attribute as type "list" and puts the element type in a child <entry>, so
 # that happens to report them. ("Illuminance", not "luminosity".)
 ################################################################################
 
+# The four variables BELOW are properties of a space's environment, not of any
+# device: `ssn:isPropertyOf :Environment` says so, and says it here rather than
+# in a side table. Nothing else distinguishes them structurally -- :AirTemperature
+# and :CompartmentTemperature share a parent and a quantity kind, and only the
+# feature of interest separates "how warm is the kitchen" from "how cold is the
+# freezer".
+#
+# Every OTHER sosa:ObservableProperty subclass in this file is a property of the
+# device that reports it. The absence of `ssn:isPropertyOf :Environment` is what
+# marks them, so the distinction is derivable from this file alone.
+#
+# `ssn:isPropertyOf` is the same predicate td_builder puts on each room property
+# instance -- sosa:isObservedBy would name the SENSOR, which is a different
+# relation and would make the environment its own observer.
+
 :AirTemperature a owl:Class ;
 	rdfs:label "Air Temperature"@en ;
 	rdfs:subClassOf sosa:ObservableProperty ;
+	ssn:isPropertyOf :Environment ;
 	qudt:hasQuantityKind quantitykind:ThermodynamicTemperature ;
 	qudt:unit unit:DEG_C .
 
 :RelativeHumidity a owl:Class ;
 	rdfs:label "Relative Humidity"@en ;
 	rdfs:subClassOf sosa:ObservableProperty ;
+	ssn:isPropertyOf :Environment ;
 	qudt:hasQuantityKind quantitykind:RelativeHumidity ;
 	qudt:unit unit:PERCENT .
 
 :Illuminance a owl:Class ;
 	rdfs:label "Illuminance"@en ;
 	rdfs:subClassOf sosa:ObservableProperty ;
+	ssn:isPropertyOf :Environment ;
 	qudt:hasQuantityKind quantitykind:Illuminance ;
 	qudt:unit unit:LUX .
 
@@ -384,6 +430,7 @@ an attribute as type "list" and puts the element type in a child <entry>, so
 concentration. quantitykind:MassConcentration is the closest QUDT quantity kind;
 it does not encode the particle-size cut-off, which is carried by this class."""@en ;
 	rdfs:subClassOf sosa:ObservableProperty ;
+	ssn:isPropertyOf :Environment ;
 	qudt:hasQuantityKind quantitykind:MassConcentration ;
 	qudt:unit unit:MicroGM-PER-M3 .
 

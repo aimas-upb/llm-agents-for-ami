@@ -43,7 +43,7 @@ def agent_with_minimal_env(mock_agent):
     # Create a root workspace
     root_ws = Workspace(
         workspace_id="lab308",
-        workspace_type=WorkspaceCategory.AREA,
+        workspace_category=WorkspaceCategory.AREA,
         name="Lab 308",
         parent_workspace_id=None,
         rdf='@prefix td: <https://www.w3.org/2019/wot/td#> .\n<http://example.org/ws/lab308> a td:Thing .',
@@ -65,7 +65,7 @@ def agent_with_minimal_env(mock_agent):
     )
     light_artifact = Artifact(
         artifact_id="light308",
-        artifact_type=ArtifactCategory.PHYSICAL_DEVICE,
+        artifact_category=ArtifactCategory.PHYSICAL_DEVICE,
         name="Light 308",
         workspace_id="lab308",
         thing_description=light_td,
@@ -185,7 +185,7 @@ class TestCapabilitiesSummaryHierarchical:
         # Create root workspace
         root = Workspace(
             workspace_id="home",
-            workspace_type=WorkspaceCategory.ROOT,
+            workspace_category=WorkspaceCategory.ROOT,
             name="Home",
             parent_workspace_id=None,
             rdf="",
@@ -197,7 +197,7 @@ class TestCapabilitiesSummaryHierarchical:
         # Create sub-workspace
         sub = Workspace(
             workspace_id="lab308",
-            workspace_type=WorkspaceCategory.AREA,
+            workspace_category=WorkspaceCategory.AREA,
             name="Lab 308",
             parent_workspace_id="home",
             rdf="",

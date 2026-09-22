@@ -27,6 +27,12 @@ user_assistant:
     capabilities_analysis:
       model: "gpt-5-mini"
       reasoning_effort: "medium"
+    # Phrasing one state answer: choosing a field out of a structured reading,
+    # or telling a collective question from a single-device one. Small job,
+    # small model.
+    state_answer:
+      model: "gpt-5-nano"
+      reasoning_effort: "low"
 
   planning:
     # How long an action plan waits for a yes/no before assuming confirmation.

@@ -24,15 +24,17 @@ from ...shared.utils.demo_log import demo
 from ...shared.utils.logger import LoggerFactory
 from ...shared.utils.namespaces import domain_types
 from .models import AtomicIntent
-from .prompts import (
-    ATOMIC_SEGMENTATION_SYSTEM_PROMPT,
+from .prompts.intent_parsing_prompts import (
     ENV_CAPABILITIES_REQUEST_PARSER_PROMPT,
-    ENV_CAPABILITIES_RESPONSE_PROMPT,
     ENV_STATE_REQUEST_PARSER_PROMPT,
     GOAL_REQUEST_PARSER_PROMPT,
+)
+from .prompts.intent_response_prompts import (
+    ENV_CAPABILITIES_RESPONSE_PROMPT,
     PLAN_SUMMARY_SYSTEM_PROMPT,
     QUERY_RESPONSE_SYSTEM_PROMPT,
 )
+from .prompts.intent_segmentation_prompts import ATOMIC_SEGMENTATION_SYSTEM_PROMPT
 from .utils import loose_json_loads
 from .utils.llm_client import build_behaviour_llm_client, build_llm_call_kwargs
 
@@ -212,12 +214,15 @@ def filter_capabilities_json_for_state(caps_dict: dict) -> dict:
 # ============================================================================
 
 
-async def segment_into_atomic_intents(agent, logger, user_text: str, capabilities_ctx: str = "") -> list[AtomicIntent]:
-    """Call LLM to segment user message into atomic intents with categories."""
+async def segment_into_atomic_intents(agent, logger, user_text: str) -> list[AtomicIntent]:
+    """Call LLM to segment user message into atomic intents with categories.
+
+    Segmentation is purely linguistic — it takes no environment capabilities.
+    Device/action resolution happens in the per-type parser stage.
+    """
     logger.info(demo(f"[LLM CALL] Calling ATOMIC_SEGMENTATION_SYSTEM_PROMPT for: {user_text[:100]!r}"))
-    prompt = ATOMIC_SEGMENTATION_SYSTEM_PROMPT.format(capabilities=capabilities_ctx)
     messages = [
-        {"role": "system", "content": prompt},
+        {"role": "system", "content": ATOMIC_SEGMENTATION_SYSTEM_PROMPT},
         {"role": "user", "content": user_text},
     ]
     try:

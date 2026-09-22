@@ -48,7 +48,9 @@ env_path = PROJECT_ROOT / ".env"
 if env_path.exists():
     load_dotenv(env_path)
 
-from ami_agents.agents.user_assistant.prompts import ATOMIC_SEGMENTATION_SYSTEM_PROMPT
+from ami_agents.agents.user_assistant.prompts.intent_segmentation_prompts import (
+    ATOMIC_SEGMENTATION_SYSTEM_PROMPT,
+)
 from ami_agents.agents.user_assistant.utils import loose_json_loads
 from ami_agents.agents.user_assistant.utils.llm_client import (
     build_behaviour_llm_client,
@@ -69,20 +71,6 @@ QUALIFIERS = [
     "logical_dependency", "temporal_dependency",
     "achievement", "maintenance",
 ]
-
-# No live EnvExplorer runs during the evaluation, so the {capabilities} slot gets
-# a fixed note instead of a discovered environment dump. Recorded in the run
-# metadata so a result set is reproducible.
-CAPABILITIES_CTX = (
-    "A SimuHome smart home with several rooms (kitchen, living room, bathroom, "
-    "bedroom, study room, utility room, office, dining room). Rooms contain "
-    "devices such as lights and dimmable lights, air conditioners, heat pumps, "
-    "fans, air purifiers, dehumidifiers, humidifiers, washers, dryers, "
-    "dishwashers, refrigerators and freezers. Devices can be powered on and off "
-    "and configured (mode, fan speed, brightness/level, temperature setpoint, "
-    "operational state), and rooms expose readings such as temperature, "
-    "humidity, illuminance and air quality."
-)
 
 
 # ---------------------------------------------------------------- episode I/O
@@ -402,7 +390,7 @@ async def main() -> int:
     ua_config = agents_config.get("user_assistant", {}) or {}
     llm_cfg = build_behaviour_llm_client(ua_config, "atomic_segmentation")
     call_kwargs = build_llm_call_kwargs(llm_cfg)
-    prompt = ATOMIC_SEGMENTATION_SYSTEM_PROMPT.format(capabilities=CAPABILITIES_CTX)
+    prompt = ATOMIC_SEGMENTATION_SYSTEM_PROMPT
 
     print(f"Benchmark : {args.benchmark_dir}")
     print(f"Episodes  : {len(episodes)}  "
@@ -442,7 +430,6 @@ async def main() -> int:
                 "call_kwargs": call_kwargs,
                 "concurrency": args.concurrency,
                 "wall_seconds": wall_seconds,
-                "capabilities_ctx": CAPABILITIES_CTX,
             },
             "summary": summary,
         }, indent=2, ensure_ascii=False), encoding="utf-8")

@@ -198,9 +198,9 @@ async def _query_state_snapshot(agent, explorer_jid, workspace_id,
         response = await rpc_call(
             agent,
             to_jid=str(explorer_jid),
-            request_type=MessageType.ENV_STATE_REQUEST.value,
+            request_type=MessageType.ENV_SNAPSHOT_REQUEST.value,
             body={},
-            expect_type=MessageType.ENV_STATE_RESPONSE.value,
+            expect_type=MessageType.ENV_SNAPSHOT_RESPONSE.value,
             timeout=agent.signifier_match_timeout,
         )
         if not (response and response.body):

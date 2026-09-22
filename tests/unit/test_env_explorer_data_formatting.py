@@ -62,7 +62,7 @@ def agent():
     workspace = SimpleNamespace(
         workspace_id="lab308",
         name="Lab 308",
-        workspace_type=SimpleNamespace(value="lab"),
+        workspace_category=SimpleNamespace(value="lab"),
         parent_workspace_id=None,
         sub_workspaces=[],
         artifacts=[artifact.artifact_id],

@@ -153,7 +153,7 @@ async def main():
                     print(f"[{timestamp}] STATE CHANGE DETECTED: {artifact.name}")
                     print(f"{'='*80}")
                     print(f"Artifact ID: {artifact_id}")
-                    print(f"Type: {artifact.artifact_type.value}")
+                    print(f"Type: {artifact.artifact_category.value}")
                     print(f"Workspace: {artifact.workspace_id}")
                     print(f"\nFull Current State ({len(current_state)} properties):")
                     for prop_uri, value in sorted(current_state.items()):

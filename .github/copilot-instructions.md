@@ -73,6 +73,31 @@ EMAS-demo semantic-modelling story.
 5. Force-push `master`, `emas2026`, or `aamas2026demo`.
 6. Use `--no-verify` on commits.
 7. Drop `intent_type` / `query_structured_intent` from the request chain.
+8. Launch a long-running or paid job yourself — hand over the command.
+
+## Long-running and paid jobs — hand over the command
+
+Never start, on your own initiative, anything that runs for minutes, bills
+an API, or drives the full stack: benchmark/evaluation sweeps (e.g.
+`tests/simuhome/eval_atomic_segmentation.py`, one paid LLM call per
+episode), `tests/integration`, `tests/e2e`, sequenced demo runs
+(`tests/manual_test_full_flow_plan.py`), or anything backgrounded to
+outlive a single step.
+
+Instead print the exact copy-pasteable command with the flags you would
+have used, say what it costs (call count / rough wall clock), then stop:
+
+```bash
+# 600 LLM calls, ~10 min at concurrency 12
+conda run -n ami-agents python tests/simuhome/eval_atomic_segmentation.py \
+    --concurrency 12 --out tests/simuhome/results/atomic_seg/
+```
+
+Fine without asking: unit tests, `--help`, a single-episode smoke run
+(`--limit 1`), parsing result files already on disk.
+
+Having just written or fixed the code is NOT a reason to run the full job
+"to verify". Approval for one run does not carry over to the next.
 
 ## Tests
 

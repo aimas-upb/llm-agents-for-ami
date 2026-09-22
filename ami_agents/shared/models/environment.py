@@ -63,7 +63,10 @@ class ThingDescription:
 class Artifact:
     """Represents an artifact in the HMAS environment."""
     artifact_id: str
-    artifact_type: ArtifactCategory
+    # Structural category, not a semantic type: everywhere else in the codebase
+    # `*_type` names an ontology class (`homeont:Freezer`). The device family
+    # lives in `semantic_types`.
+    artifact_category: ArtifactCategory
     name: str
     workspace_id: str
 
@@ -73,8 +76,17 @@ class Artifact:
     # Current state
     current_state: Dict[str, Any] = field(default_factory=dict)
 
-    # Semantic types extracted from RDF (e.g., "ex:Light", "ex:Blinds")
+    # Semantic types extracted from RDF (e.g., "homeont:OnOffLight")
     semantic_types: List[str] = field(default_factory=list)
+
+    # Thing-level device metadata: schema:manufacturer / schema:model on the TD.
+    # NOT interaction affordances -- there is nothing to read at runtime and
+    # nothing to actuate; they are facts about the device. `model` is the
+    # manufacturer's product name ("Tapo L530E"), distinct from `name` (the
+    # instance) and from the device family carried in `semantic_types`.
+    # None when the source TD does not state the fact.
+    manufacturer: Optional[str] = None
+    model: Optional[str] = None
 
     # Metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -86,7 +98,9 @@ class Artifact:
 class Workspace:
     """Represents a workspace in the HMAS environment."""
     workspace_id: str
-    workspace_type: WorkspaceCategory
+    # Structural category, not a semantic type -- see Artifact.artifact_category.
+    # The room class (`homeont:Kitchen`) lives in `semantic_types`.
+    workspace_category: WorkspaceCategory
     name: str
     parent_workspace_id: Optional[str] = None
 
@@ -94,7 +108,7 @@ class Workspace:
     # as obtained from the Integration Engine
     rdf: str = None
 
-    # Semantic types extracted from RDF (e.g., "ex:Kitchen", "ex:LivingRoom")
+    # Semantic types extracted from RDF (e.g., "homeont:Kitchen")
     semantic_types: List[str] = field(default_factory=list)
 
     # Contained artifacts

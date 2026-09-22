@@ -12,8 +12,16 @@ from .plan import (
     bt_preview,
 )
 from .llm_client import LLMClientConfig, build_llm_client, build_llm_call_kwargs, build_behaviour_llm_client
+from .ontology_context import (
+    build_capabilities_context,
+    get_capabilities_context,
+    get_capabilities_context_json,
+)
 
 __all__ = [
+    "build_capabilities_context",
+    "get_capabilities_context",
+    "get_capabilities_context_json",
     "strip_code_fences",
     "loose_json_loads",
     "coerce_plan_dict",

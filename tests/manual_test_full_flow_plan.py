@@ -458,9 +458,9 @@ class OrchestratorAgent(Agent):
                 res = await rpc_call(
                     self.agent,
                     to_jid=self.agent.explorer_jid,
-                    request_type=MessageType.ENV_STATE_REQUEST.value,
+                    request_type=MessageType.ENV_SNAPSHOT_REQUEST.value,
                     body={},
-                    expect_type=MessageType.ENV_STATE_RESPONSE.value,
+                    expect_type=MessageType.ENV_SNAPSHOT_RESPONSE.value,
                     timeout=15.0,
                     thread=self.agent.thread_id,
                 )

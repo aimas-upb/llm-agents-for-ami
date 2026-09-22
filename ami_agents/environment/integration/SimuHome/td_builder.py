@@ -62,12 +62,16 @@ UNIT = Namespace("http://qudt.org/vocab/unit/")
 QK = Namespace("http://qudt.org/vocab/quantitykind/")
 TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
 SAREF = Namespace("https://saref.etsi.org/core/")
+# Thing-level device metadata (manufacturer, product name). The TD spec mints no
+# vendor vocabulary of its own and points at schema.org for it.
+SCHEMA = Namespace("https://schema.org/")
 
 _PREFIXES = {
     "hctl": HCTL, "js": JS, "hmas": HMAS, "wotsec": WOTSEC,
     "htv": HTV, "jacamo": JACAMO, "websub": WEBSUB, "td": TD, "sosa": SOSA,
     "ssn": SSN, "qudt": QUDT, "unit": UNIT, "quantitykind": QK,
     "tdsosa": TDSOSA, "saref": SAREF, "rdfs": RDFS, "homeont": HOME,
+    "schema": SCHEMA,
 }
 
 # CURIEs in the mapping tables resolve against these.
@@ -526,16 +530,16 @@ class SimuHomeTD:
                 # never as readable properties of their own.
                 continue
             if record["role"] == "thing_metadata":
-                # BasicInformation contributes nothing to the served TD. The
-                # device's human-readable type is its rdfs:label (from the
-                # curated family table, identical to ProductName on every
-                # device in the corpus) and its name is its td:title, the
-                # SimuHome device id. Vendor and product registration details
-                # are not something a planner acts on.
+                # BasicInformation is a fact about the Thing, not an interaction
+                # with it -- nothing to read at runtime, nothing to actuate --
+                # so it is emitted as a Thing-level annotation below, never as a
+                # property affordance.
                 continue
             key = f"{record.get('endpoint')}.{record.get('cluster')}"
             self._attribute_property(g, art, path, attr_path, record,
                                      siblings.get(key), device_type, room_id)
+
+        self._device_metadata(g, art, siblings)
 
         self._subscribe_actions(g, art, f"{path}#artifact", artifact=True)
 
@@ -543,6 +547,44 @@ class SimuHomeTD:
         g.add((profile, RDF.type, HMAS.ResourceProfile))
         g.add((profile, HMAS.isProfileOf, art))
         return g
+
+    # -- Thing-level metadata ----------------------------------------------
+
+    def _device_metadata(self, g: Graph, art: URIRef,
+                         siblings: Dict[str, Dict[str, Any]]) -> None:
+        """Annotate the Thing with its manufacturer and product name.
+
+        Matter reports both on the BasicInformation cluster, which `classify`
+        roles as `thing_metadata`: a fact about the device rather than an
+        interaction with it. They belong on the td:Thing, not in its affordance
+        set -- there is no runtime read and nothing to actuate.
+
+        Distinct from the two names already on the artifact: `td:title` is the
+        instance ("kitchen_freezer_1") and `rdfs:label` the device family
+        ("On/Off Light"); `schema:model` is the manufacturer's product name. The
+        SimuHome corpus reports the family label as ProductName, so there the
+        last two coincide -- an artefact of that corpus, not of the model.
+
+        A value the device does not report stays absent: in RDF a missing fact
+        is expressed by the absence of a triple, never by an empty literal.
+        """
+        # Keyed "<endpoint>.<cluster>". BasicInformation sits on the root
+        # endpoint 0 throughout this corpus, but match on the cluster so a
+        # device that reports it elsewhere is not silently skipped.
+        basic: Dict[str, Any] = {}
+        for key, attributes in siblings.items():
+            if key.split(".", 1)[-1] == "BasicInformation":
+                basic.update(attributes)
+
+        for attribute, predicate in (("VendorName", SCHEMA.manufacturer),
+                                     ("ProductName", SCHEMA.model)):
+            value = basic.get(attribute)
+            if value is None:
+                continue
+            text = str(value).strip()
+            if text:
+                # Verbatim: what the device reports is what the graph states.
+                g.add((art, predicate, Literal(text)))
 
     # -- property emission -------------------------------------------------
 

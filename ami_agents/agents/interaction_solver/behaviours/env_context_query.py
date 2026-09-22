@@ -43,9 +43,9 @@ class EnvContextQueryBehaviour(OneShotBehaviour):
                     expect_type=MessageType.ENV_CAPABILITIES_RESPONSE.value,
                 ),
                 self.agent._query_env_explorer(
-                    message_type=MessageType.ENV_STATE_REQUEST.value,
+                    message_type=MessageType.ENV_SNAPSHOT_REQUEST.value,
                     body={},
-                    expect_type=MessageType.ENV_STATE_RESPONSE.value,
+                    expect_type=MessageType.ENV_SNAPSHOT_RESPONSE.value,
                 ),
             )
         except Exception as e:

@@ -243,6 +243,38 @@ conda run -n ami-agents python tests/manual_test_full_flow_plan.py --sequence 3 
 8. **Never drop `intent_type` / `query_structured_intent` from the
    GOAL_REQUEST → SIGNIFIER_MATCH_REQUEST chain.** It breaks the
    EMAS demo's semantic-modelling story (§3.7).
+9. **Never launch a long-running or paid job yourself.** Print the exact
+   command line and let the human run it. See §5.1.
+
+### 5.1 Long-running and paid jobs — hand over the command
+
+Do not start, on your own initiative, anything that runs for minutes,
+bills an API, or drives the full stack. This includes:
+
+- benchmark / evaluation sweeps (e.g.
+  `tests/simuhome/eval_atomic_segmentation.py`) — every episode is a paid
+  LLM call;
+- `tests/integration` and `tests/e2e` suites;
+- sequenced demo runs (`tests/manual_test_full_flow_plan.py`);
+- anything backgrounded to outlive a single tool call.
+
+**Instead**: print the exact command, copy-pasteable, with the flags you
+would have used, and say what it costs (call count / rough wall clock).
+Then stop and wait. Example:
+
+```bash
+# 600 LLM calls, ~10 min at concurrency 12
+conda run -n ami-agents python tests/simuhome/eval_atomic_segmentation.py \
+    --concurrency 12 --out tests/simuhome/results/atomic_seg/
+```
+
+Short read-only checks are fine without asking: unit tests, `--help`,
+a single-episode smoke run (`--limit 1`), parsing result files already
+on disk.
+
+Having just written or fixed the code is NOT a reason to run the full
+job "to verify" — that is exactly when to hand the command over.
+Approval for one run does not carry over to the next run.
 
 ## 6. Where to look first when …
 

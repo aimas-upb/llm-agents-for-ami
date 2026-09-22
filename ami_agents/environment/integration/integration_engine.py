@@ -6,7 +6,7 @@ deployments into ThingDescription-based HMAS environments.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import logging
 import asyncio
 import aiohttp
@@ -21,6 +21,12 @@ from ...shared.models.environment import Affordance, AffordanceType, AffordanceF
 from ...shared.models.environment import WorkspaceCategory, ArtifactCategory
 from ...shared.ontologies import get_hmas_ontology, get_td_ontology, get_hctl_ontology, get_http_ontology
 from ...shared.utils import parse_jsonschema_from_rdf, extract_subgraph
+from ...shared.utils.namespaces import HMAS, TD, shorten_all
+
+# Thing-level device metadata. Declared here rather than resolved through the
+# ontology loaders: those exist to pull TD/HMAS vocabulary via owlready2, and
+# schema.org is not loaded that way.
+SCHEMA = Namespace("https://schema.org/")
 
 EXCLUDED_ACTION_NAMES = {
     "getArtifactRepresentation",
@@ -206,7 +212,69 @@ class IIntegrationEngine(ABC):
             return str(resource_uri).split("/")[-1]
 
     @staticmethod
-    def extract_workspace_type(td_graph: Graph, workspace_uri: URIRef) -> WorkspaceCategory:
+    def extract_device_metadata(
+        td_graph: Graph, resource_uri: URIRef
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Extract Thing-level device metadata from the RDF graph.
+
+        These are annotations on the td:Thing itself -- schema:manufacturer and
+        schema:model -- not interaction affordances: a manufacturer is a fact
+        about the device, with nothing to read at runtime and nothing to
+        actuate. Both SHTD (from Matter BasicInformation) and HASP (from the
+        Home Assistant device registry) emit them under the same predicates.
+
+        Args:
+            td_graph: The RDF graph containing the Thing Description
+            resource_uri: The URI of the artifact
+
+        Returns:
+            (manufacturer, model); either is None when the TD does not state it.
+        """
+        def _literal(predicate) -> Optional[str]:
+            value = td_graph.value(resource_uri, predicate)
+            if value is None:
+                return None
+            text = str(value).strip()
+            return text or None
+
+        return _literal(SCHEMA.manufacturer), _literal(SCHEMA.model)
+
+    @staticmethod
+    def extract_thing_node(td_graph: Graph, artifact_uri: URIRef) -> URIRef:
+        """The node in an artifact's graph that carries the device's own types.
+
+        A served artifact graph describes several subjects: the resource profile
+        at the artifact's own URI, the Thing it profiles, and every affordance
+        and form beneath it. Only the Thing carries the device family
+        (`homeont:Freezer`, `saref:Appliance`), so an extraction that walks all
+        subjects collects the room, the properties and the commands as well.
+
+        The Thing is found by its type, not by appending a fragment to the
+        artifact URI: the fragment is a serialisation detail of the current TD
+        builder, while `td:Thing` / `hmas:Artifact` is what the TD actually
+        asserts. Falls back to `artifact_uri` when neither type is present.
+        """
+        for thing_type in (TD.Thing, HMAS.Artifact):
+            for subject in td_graph.subjects(RDF.type, thing_type):
+                if isinstance(subject, URIRef):
+                    return subject
+        return artifact_uri
+
+    @staticmethod
+    def extract_semantic_types(td_graph: Graph, artifact_uri: URIRef) -> List[str]:
+        """The artifact's own semantic types, as CURIEs.
+
+        Scoped to the Thing node, so the list describes the device and not the
+        room that contains it or the properties it exposes. Asserted ancestors
+        (`saref:HVAC`, `saref:Sensor`) are kept: they are stated in the TD, and
+        `domain_types()` filters them out for callers that want HomeOnt only.
+        """
+        thing_node = IIntegrationEngine.extract_thing_node(td_graph, artifact_uri)
+        return shorten_all(td_graph.objects(thing_node, RDF.type))
+
+    @staticmethod
+    def extract_workspace_category(td_graph: Graph, workspace_uri: URIRef) -> WorkspaceCategory:
         """
         Extract the workspace type from the RDF graph.
 
@@ -1095,7 +1163,7 @@ class YggdrasilIntegration(IIntegrationEngine):
 
         # Extract workspace properties
         workspace_name = IIntegrationEngine.extract_name(workspace_graph, workspace_uri)
-        workspace_type = IIntegrationEngine.extract_workspace_type(workspace_graph, workspace_uri)
+        workspace_category = IIntegrationEngine.extract_workspace_category(workspace_graph, workspace_uri)
         workspace_rdf = IIntegrationEngine.extract_workspace_rdf(workspace_uri)
 
         # Find sub-workspaces contained by this workspace
@@ -1119,7 +1187,7 @@ class YggdrasilIntegration(IIntegrationEngine):
         # Create the Workspace model instance
         workspace = Workspace(
             workspace_id=workspace_id,
-            workspace_type=workspace_type,
+            workspace_category=workspace_category,
             name=workspace_name,
             parent_workspace_id=parent_id,
             rdf=workspace_rdf,
@@ -1219,6 +1287,9 @@ class YggdrasilIntegration(IIntegrationEngine):
 
                 # Extract artifact properties
                 artifact_name = IIntegrationEngine.extract_name(artifact_graph, artifact_uri)
+                artifact_manufacturer, artifact_model = (
+                    IIntegrationEngine.extract_device_metadata(artifact_graph, artifact_uri)
+                )
                 artifact_rdf = artifact_graph.serialize(format="turtle")
                 logger.debug(f"Artifact {artifact_id}: RDF length={len(artifact_rdf) if artifact_rdf else 0} bytes, graph size={len(artifact_graph)} triples")
 
@@ -1231,34 +1302,31 @@ class YggdrasilIntegration(IIntegrationEngine):
                     rdf=artifact_rdf
                 )
 
-                # Determine artifact type - default to PHYSICAL_DEVICE for now
-                # TODO: Extract actual artifact type from RDF annotations
-                artifact_type = ArtifactCategory.PHYSICAL_DEVICE
+                # Structural category - default to PHYSICAL_DEVICE for now
+                # TODO: Detect VIRTUAL_DEVICE / SERVICE from RDF annotations
+                artifact_category = ArtifactCategory.PHYSICAL_DEVICE
 
-                # Extract semantic types from Thing Description RDF
+                # Extract the artifact's own semantic types from its TD RDF
                 semantic_types = []
                 if thing_description and thing_description.rdf:
                     try:
-                        artifact_graph = Graph()
-                        artifact_graph.parse(data=thing_description.rdf, format="turtle")
-
-                        # Find all RDF types (ex: namespace) for this artifact
-                        for subj in artifact_graph.subjects():
-                            for obj in artifact_graph.objects(subj, RDF.type):
-                                iri = str(obj)
-                                if iri not in semantic_types:
-                                    semantic_types.append(iri)
+                        typed_graph = Graph()
+                        typed_graph.parse(data=thing_description.rdf, format="turtle")
+                        semantic_types = IIntegrationEngine.extract_semantic_types(
+                            typed_graph, artifact_uri)
                     except Exception as e:
                         logger.warning(f"Failed to extract semantic types from RDF for {artifact_name}: {e}")
 
                 # Create the Artifact model instance
                 artifact = Artifact(
                     artifact_id=artifact_id,
-                    artifact_type=artifact_type,
+                    artifact_category=artifact_category,
                     name=artifact_name,
                     workspace_id=worspace_id,
                     thing_description=thing_description,
-                    semantic_types=semantic_types
+                    semantic_types=semantic_types,
+                    manufacturer=artifact_manufacturer,
+                    model=artifact_model
                 )
                 artifact_map[artifact_id] = artifact
 

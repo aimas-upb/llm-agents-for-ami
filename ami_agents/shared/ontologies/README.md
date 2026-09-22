@@ -18,6 +18,29 @@ The **CASHMERE** ontology provides the semantic model for signifier representati
 - Affordance representations
 - Agent-environment interaction patterns
 
+### 3. saref.rdf
+**SAREF core v3.2.1** — ETSI's Smart Applications REFerence ontology, the
+vocabulary `homeont.ttl` builds its device taxonomy on:
+- `saref:Device` and its five subclasses (`Actuator`, `Appliance`, `HVAC`,
+  `Meter`, `Sensor`) — every homeont device family subclasses one of these
+- `saref:State`, `saref:Command` and the command subclasses
+
+Vendored because homeont *references* SAREF but does not *define* it: without
+this file every `saref:` term is a dangling identifier, readable but inert, and
+a query such as `?devClass rdfs:subClassOf* saref:Device` closes no path and
+returns nothing. Loaded alongside `homeont.ttl` by the ENV_STATE resolver so
+subclass questions are answered by the ontology rather than by string tests on
+IRIs.
+
+- Source: `https://saref.etsi.org/core/v3.2.1/saref.rdf`
+- Retrieved: 2026-09-22 · 220 KB · 1,746 triples
+- Refresh with:
+  ```bash
+  curl -sSL -H "Accept: application/rdf+xml" \
+    -o ami_agents/shared/ontologies/saref.rdf \
+    https://saref.etsi.org/core/v3.2.1/saref.rdf
+  ```
+
 ## Supported Formats
 
 **IMPORTANT**: owlready2 only supports the following RDF serialization formats:

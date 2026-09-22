@@ -106,6 +106,17 @@ class MessageType(Enum):
     ENV_CHANGE_NOTIFICATION = "env_change_notification"
     ENV_STATE_REQUEST = "env_state_request"
     ENV_STATE_RESPONSE = "env_state_response"
+    # "What can answer this?", asked on its own. ENV_STATE resolves and then
+    # reads; this resolves and stops, for a caller that wants to know which
+    # affordances exist without dereferencing them.
+    ENV_RESOLVE_REQUEST = "env_resolve_request"
+    ENV_RESOLVE_RESPONSE = "env_resolve_response"
+    # Every artifact's last known state, unfiltered. A different question from
+    # ENV_STATE, which asks about one property of one kind of device: this is
+    # the bulk read a planner or matcher wants as background, and it names
+    # nothing.
+    ENV_SNAPSHOT_REQUEST = "env_snapshot_request"
+    ENV_SNAPSHOT_RESPONSE = "env_snapshot_response"
     ENV_CAPABILITIES_REQUEST = "env_capabilities_request"
     ENV_CAPABILITIES_RESPONSE = "env_capabilities_response"
     ENV_SEMANTIC_QUERY_REQUEST = "env_semantic_query_request"

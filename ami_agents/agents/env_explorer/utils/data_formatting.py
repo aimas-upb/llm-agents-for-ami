@@ -234,7 +234,9 @@ def format_capabilities_payload(agent_instance) -> Dict[str, Any]:
                 {
                     "workspace_id": ws.workspace_id,
                     "name": ws.name,
-                    "workspace_type": getattr(ws.workspace_type, "value", str(ws.workspace_type)),
+                    # The structural category (AREA, FLOOR, ...), not a room class.
+                    "workspace_category": getattr(
+                        ws.workspace_category, "value", str(ws.workspace_category)),
                     "parent_workspace_id": getattr(ws, "parent_workspace_id", None),
                     "sub_workspaces": list(getattr(ws, "sub_workspaces", []) or []),
                     "artifacts": list(getattr(ws, "artifacts", []) or []),

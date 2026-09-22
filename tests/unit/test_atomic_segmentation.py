@@ -32,7 +32,9 @@ from ami_agents.agents.user_assistant.utils.llm_client import (
     build_llm_call_kwargs,
 )
 from ami_agents.shared.utils.config_loader import ConfigLoader
-from ami_agents.agents.user_assistant.prompts import ATOMIC_SEGMENTATION_SYSTEM_PROMPT
+from ami_agents.agents.user_assistant.prompts.intent_segmentation_prompts import (
+    ATOMIC_SEGMENTATION_SYSTEM_PROMPT,
+)
 from ami_agents.agents.user_assistant.models import AtomicIntent
 
 
@@ -88,7 +90,6 @@ async def test_atomic_segmentation():
         ),
     ]
 
-    capabilities_ctx = "(empty capabilities for testing)"
 
     print("\n" + "=" * 70)
     print("ATOMIC INTENT SEGMENTATION SMOKE TEST")
@@ -102,7 +103,7 @@ async def test_atomic_segmentation():
         print(f"  Expected intent count: {expected_count}")
 
         # Call segmentation
-        prompt = ATOMIC_SEGMENTATION_SYSTEM_PROMPT.format(capabilities=capabilities_ctx)
+        prompt = ATOMIC_SEGMENTATION_SYSTEM_PROMPT
         messages = [
             {"role": "system", "content": prompt},
             {"role": "user", "content": user_input},

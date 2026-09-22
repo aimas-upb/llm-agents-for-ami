@@ -169,7 +169,7 @@ class TestYggdrasilIntegration:
 
         artifact = Artifact(
             artifact_id=artifact_id,
-            artifact_type=ArtifactCategory.PHYSICAL_DEVICE,
+            artifact_category=ArtifactCategory.PHYSICAL_DEVICE,
             name="clock_308",
             workspace_id="http://localhost:8080/workspaces/lab308#workspace",
             thing_description=ThingDescription(
@@ -264,7 +264,7 @@ class TestYggdrasilIntegration:
             print(f"\n{'-' * 80}")
             print(f"Workspace ID: {workspace_id}")
             print(f"  Name: {workspace.name}")
-            print(f"  Type: {workspace.workspace_type.value}")
+            print(f"  Type: {workspace.workspace_category.value}")
             print(f"  Parent: {workspace.parent_workspace_id or '(root)'}")
             print(f"  Sub-workspaces: {len(workspace.sub_workspaces)}")
 
@@ -296,7 +296,7 @@ class TestYggdrasilIntegration:
         def print_hierarchy(workspace, workspaces_dict, indent=0):
             """Recursively print workspace hierarchy."""
             prefix = "  " * indent + "└─ " if indent > 0 else ""
-            print(f"{prefix}{workspace.name} ({workspace.workspace_type.value})")
+            print(f"{prefix}{workspace.name} ({workspace.workspace_category.value})")
 
             for sub_id in workspace.sub_workspaces:
                 sub_ws = workspaces_dict.get(sub_id)
@@ -317,7 +317,7 @@ class TestYggdrasilIntegration:
             for workspace_id, workspace in workspaces.items():
                 assert workspace.workspace_id == workspace_id, f"Workspace ID mismatch for {workspace_id}"
                 assert workspace.name, f"Workspace {workspace_id} must have a name"
-                assert workspace.workspace_type is not None, f"Workspace {workspace_id} must have a type"
+                assert workspace.workspace_category is not None, f"Workspace {workspace_id} must have a type"
         else:
             print("\n⚠ No workspaces found - this may indicate:")
             print("  - The platform doesn't host any workspaces")
@@ -364,7 +364,7 @@ class TestYggdrasilIntegration:
 
         for workspace_id, workspace in integration.workspace_map.items():
             print(f"\n{'-' * 80}")
-            print(f"Workspace: {workspace.name} ({workspace.workspace_type.value})")
+            print(f"Workspace: {workspace.name} ({workspace.workspace_category.value})")
             print(f"  URI: {workspace_id}")
             print(f"  Artifacts: {len(workspace.artifacts)}")
 
@@ -377,8 +377,8 @@ class TestYggdrasilIntegration:
                         print(f"    URI: {artifact_id}")
                         print(f"    Workspace: {artifact.workspace_id}")
 
-                        if hasattr(artifact, 'artifact_type') and artifact.artifact_type:
-                            print(f"    Type: {artifact.artifact_type.value}")
+                        if hasattr(artifact, 'artifact_category') and artifact.artifact_category:
+                            print(f"    Type: {artifact.artifact_category.value}")
 
                         if hasattr(artifact, 'thing_description') and artifact.thing_description:
                             td = artifact.thing_description
@@ -416,8 +416,8 @@ class TestYggdrasilIntegration:
             print(f"  Name: {artifact.name}")
             print(f"  Workspace: {workspace_name} ({artifact.workspace_id})")
 
-            if hasattr(artifact, 'artifact_type') and artifact.artifact_type:
-                print(f"  Type: {artifact.artifact_type.value}")
+            if hasattr(artifact, 'artifact_category') and artifact.artifact_category:
+                print(f"  Type: {artifact.artifact_category.value}")
 
             if hasattr(artifact, 'current_state') and artifact.current_state:
                 print(f"  Current State: {artifact.current_state}")
@@ -508,7 +508,7 @@ class TestYggdrasilIntegration:
 
         for workspace_id, workspace in integration.workspace_map.items():
             print(f"\n{'-' * 80}")
-            print(f"Workspace: {workspace.name} ({workspace.workspace_type.value})")
+            print(f"Workspace: {workspace.name} ({workspace.workspace_category.value})")
             print(f"  URI: {workspace_id}")
 
             if workspace.artifacts:

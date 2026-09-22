@@ -34,6 +34,8 @@ from .behaviors import (
     SignifierListBehaviour,
     EnvironmentCapabilitiesBehaviour,
     EnvironmentStateBehaviour,
+    PropertyResolutionBehaviour,
+    EnvironmentSnapshotBehaviour,
 )
 
 
@@ -120,6 +122,12 @@ class EnvExplorerAgent(Agent, IAgent):
         env_state_template = Template()
         env_state_template.set_metadata("type", MessageType.ENV_STATE_REQUEST.value)
 
+        env_resolve_template = Template()
+        env_resolve_template.set_metadata("type", MessageType.ENV_RESOLVE_REQUEST.value)
+
+        env_snapshot_template = Template()
+        env_snapshot_template.set_metadata("type", MessageType.ENV_SNAPSHOT_REQUEST.value)
+
         # Signifier engine requests (need separate templates for each type)
         sign_match_template = Template()
         sign_match_template.set_metadata("type", MessageType.SIGNIFIER_MATCH_REQUEST.value)
@@ -138,6 +146,8 @@ class EnvExplorerAgent(Agent, IAgent):
         self.add_behaviour(InitialDiscoveryBehaviour())
         self.add_behaviour(EnvironmentCapabilitiesBehaviour(), template=env_cap_template)
         self.add_behaviour(EnvironmentStateBehaviour(), template=env_state_template)
+        self.add_behaviour(PropertyResolutionBehaviour(), template=env_resolve_template)
+        self.add_behaviour(EnvironmentSnapshotBehaviour(), template=env_snapshot_template)
         self.add_behaviour(SignifierMatchBehaviour(), template=sign_match_template)
         self.add_behaviour(SignifierRecordBehaviour(), template=sign_record_template)
         self.add_behaviour(SignifierListBehaviour(), template=sign_list_template)
