@@ -66,6 +66,12 @@ class Mappings:
         self.observable_properties: Dict[str, Dict[str, Any]] = {
             str(r["key"]): r for r in _rows("observable_properties")
         }
+        # Virtual ambient sensors, keyed by the same room-state token. Hand
+        # written: these devices do not exist in SimuHome, so no scan finds
+        # them.
+        self.ambient_sensors: Dict[str, Dict[str, Any]] = {
+            str(r["key"]): r for r in _rows("ambient_sensors")
+        }
         # Environmental properties, keyed by the room-state token SimuHome uses
         # ("temperature", "humidity", ...) rather than by table key.
         self.room_state_properties: Dict[str, Dict[str, Any]] = {}
@@ -269,6 +275,16 @@ class Mappings:
         generic = self.property_class_by_path.get(path)
         if generic and generic.get("action_class"):
             return str(generic["action_class"])
+        return None
+
+    def ambient_sensor(self, token: str) -> Optional[Dict[str, Any]]:
+        """The virtual sensor family for a room-state token, if one is defined."""
+        row = self.ambient_sensors.get(token)
+        if row is not None:
+            return row
+        for candidate in self.ambient_sensors.values():
+            if token in (candidate.get("legacy_aliases") or []):
+                return candidate
         return None
 
     def unsettled(self) -> Dict[str, int]:

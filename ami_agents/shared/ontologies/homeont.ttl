@@ -380,6 +380,35 @@ an attribute as type "list" and puts the element type in a child <entry>, so
 	rdfs:label "TV"@en ;
 	rdfs:subClassOf saref:Appliance .
 
+# Ambient sensors: instruments that observe a room's environment rather than
+# change it. SimuHome has no such device -- it computes each room variable from
+# the appliances that affect it -- so these are modelled by the SHTD adapter,
+# which serves the simulator's own room state through them. A deployable home
+# has the instruments; the simulator has only the physics.
+#
+# saref:Sensor is the fifth and last of SAREF's device subclasses, unused here
+# until now.
+
+:TemperatureSensor a owl:Class ;
+	rdfs:label "Temperature Sensor"@en ;
+	rdfs:comment "An instrument that measures the air temperature of the space it is in."@en ;
+	rdfs:subClassOf saref:Sensor .
+
+:HumiditySensor a owl:Class ;
+	rdfs:label "Humidity Sensor"@en ;
+	rdfs:comment "An instrument that measures the relative humidity of the space it is in."@en ;
+	rdfs:subClassOf saref:Sensor .
+
+:LightSensor a owl:Class ;
+	rdfs:label "Light Sensor"@en ;
+	rdfs:comment "An instrument that measures the illuminance of the space it is in."@en ;
+	rdfs:subClassOf saref:Sensor .
+
+:AirQualitySensor a owl:Class ;
+	rdfs:label "Air Quality Sensor"@en ;
+	rdfs:comment "An instrument that measures the particulate concentration of the air in the space it is in."@en ;
+	rdfs:subClassOf saref:Sensor .
+
 ################################################################################
 # Environmental properties
 #

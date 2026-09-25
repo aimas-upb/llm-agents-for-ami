@@ -41,12 +41,21 @@ def readings_for_prompt(affordances: List[Dict[str, Any]]) -> List[Dict[str, Any
         reading = {
             "device": label_for(affordance.get("artifact_type"))
                       or affordance.get("artifact_name"),
-            "property": label_for(affordance.get("affordance_type")),
-            "value": affordance.get("value"),
         }
         room = affordance.get("workspace_name")
         if room:
             reading["room"] = room
+        # Facts about the device itself, present whether or not a property was
+        # read: "what make is the freezer" is answered from these.
+        for key in ("manufacturer", "model"):
+            if affordance.get(key):
+                reading[key] = affordance[key]
+        # Absent when the device was found but no affordance reports what was
+        # asked; the model is told so by the outcome.
+        if affordance.get("affordance_type"):
+            reading["property"] = label_for(affordance["affordance_type"])
+        if "value" in affordance:
+            reading["value"] = affordance["value"]
         if affordance.get("detail"):
             reading["note"] = affordance["detail"]
         readings.append(reading)

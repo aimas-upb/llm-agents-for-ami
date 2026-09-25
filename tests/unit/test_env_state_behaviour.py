@@ -220,7 +220,7 @@ async def _run(behaviour, session):
     """Drive the read loop without a SPADE runtime."""
     await asyncio.gather(*[
         behaviour._read(session, affordance)
-        for affordance in behaviour.affordances
+        for affordance in behaviour.affordances if affordance.is_readable
     ])
     behaviour.result = behaviour.affordances
 
@@ -279,6 +279,31 @@ class TestValueRetrieval:
         asyncio.run(beh.run())
         assert beh.result == []
         assert beh.error is None
+
+    def test_an_artifact_only_entry_is_not_dereferenced(self):
+        """It has no target; attempting a GET on None would raise."""
+        artifact = ResolvedAffordance(
+            artifact="u", artifact_name="freezer_1",
+            artifact_type="homeont:Freezer",
+            manufacturer="LG Electronics", model="Freezer")
+        assert artifact.is_readable is False
+
+        beh = ValueRetrievalBehaviour([artifact], logger=_Logger())
+        asyncio.run(beh.run())
+        assert beh.error is None
+        assert beh.result == [artifact]
+        assert artifact.has_value is False
+
+    def test_readable_entries_are_read_even_beside_unreadable_ones(self):
+        readable = _affordance("http://x/onOff")
+        artifact = ResolvedAffordance(
+            artifact="u", artifact_name="freezer_1",
+            artifact_type="homeont:Freezer")
+        beh = ValueRetrievalBehaviour([artifact, readable], logger=_Logger())
+        session = _Session({"http://x/onOff": _Response(True)})
+        asyncio.run(_run(beh, session))
+        assert readable.value is True
+        assert artifact.has_value is False
 
 
 class TestMismatchIsReadToo:

@@ -20,13 +20,18 @@ from ....shared.utils.class_labels import label_for
 def needs_interpretation(response: Dict[str, Any]) -> bool:
     """Does answering this require reading the user's phrasing?
 
-    True for a mismatch -- several unrelated properties matched, and only the
-    phrasing says whether that is an answer or an ambiguity -- and for a value
-    that is a dictionary, where one of its fields has to be chosen. A list is
-    not a dictionary: it is a value in its own right and is stated whole.
+    True in three cases:
+
+    - a *mismatch*, where several unrelated properties matched and only the
+      phrasing says whether that is an answer or an ambiguity;
+    - a *resolved artifact*, where the device was found but no affordance
+      reports what was asked -- the question decides whether its make and model
+      answer it or whether the property is simply unavailable;
+    - a value that is a *dictionary*, where one of its fields has to be chosen.
+      A list is not a dictionary: it is a value in its own right, stated whole.
     """
     outcome = response.get("outcome")
-    if outcome == "mismatched_affordance":
+    if outcome in ("mismatched_affordance", "resolved_artifact"):
         return True
     if outcome != "resolved_affordance":
         return False
@@ -37,19 +42,25 @@ def needs_interpretation(response: Dict[str, Any]) -> bool:
 # -- the three deterministic outcomes -----------------------------------
 
 def no_affordance(response: Dict[str, Any]) -> str:
-    """Nothing in scope can answer the question; say what was missing."""
+    """Nothing in scope matched at all; say what was missing.
+
+    When a device kind was named, nothing of that kind is there -- which is a
+    statement about the device, not about a property it fails to report. Saying
+    "there is no Refrigerator in the Kitchen that reports Product Name" would
+    imply a refrigerator exists.
+    """
     query = response.get("query") or {}
     where = label_for(query.get("location_class"))
     prop = label_for(query.get("property_class"))
     device = label_for(query.get("device_class"))
-
-    subject = f"no {device}" if device else "no device"
     place = f" in the {where}" if where else ""
 
-    if prop:
-        sentence = f"There is {subject}{place} that reports {prop}."
+    if device:
+        sentence = f"There is no {device}{place}."
+    elif prop:
+        sentence = f"There is no device{place} that reports {prop}."
     else:
-        sentence = f"There is {subject}{place} that can answer that."
+        sentence = f"There is no device{place} that can answer that."
     return f"{sentence} Is there something else you would like to check?"
 
 
@@ -102,12 +113,25 @@ def fallback(response: Dict[str, Any]) -> str:
     if not affordances:
         return "I could not read that."
 
-    if response.get("outcome") == "mismatched_affordance":
+    outcome = response.get("outcome")
+
+    if outcome == "mismatched_affordance":
         where = affordances[0].get("workspace_name")
         place = f" in the {where}" if where else ""
-        names = _join([f"the {_device(a)}" for a in affordances])
+        names = _join([f"the {_describe(a)}" for a in affordances])
         return (f"Several devices{place} match that: {names}. "
                 "Which one did you mean?")
+
+    if outcome == "resolved_artifact":
+        # The device is there; what was asked about it is not. Report the
+        # device itself, which is what the caller has to work with.
+        asked = label_for((response.get("query") or {}).get("property_class"))
+        found = _join([f"the {_describe(a)}" for a in affordances])
+        where = affordances[0].get("workspace_name")
+        place = f" in the {where}" if where else ""
+        if asked:
+            return f"I found {found}{place}, but nothing there reports {asked}."
+        return f"I found {found}{place}."
 
     # `.capitalize()` would lowercase the rest, turning "TV" into "Tv" and
     # "BBC One" into "bbc one". Only the first character is ours to change.
@@ -123,6 +147,18 @@ def _device(affordance: Dict[str, Any]) -> str:
     """How to name one device: its kind, falling back to its instance name."""
     return (label_for(affordance.get("artifact_type"))
             or affordance.get("artifact_name") or "device")
+
+
+def _describe(affordance: Dict[str, Any]) -> str:
+    """The device, with its make where the graph states one.
+
+    "LG Electronics Freezer" rather than "Freezer": when several devices are
+    being told apart, or when the question is about the device itself, the make
+    is often the distinguishing fact.
+    """
+    device = _device(affordance)
+    manufacturer = affordance.get("manufacturer")
+    return f"{manufacturer} {device}" if manufacturer else device
 
 
 def _one(affordance: Dict[str, Any]) -> str:

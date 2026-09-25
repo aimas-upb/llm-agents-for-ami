@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import dataclasses
 import hashlib
 import json
 import os
@@ -400,6 +401,9 @@ async def main() -> int:
                         help="Output token limit for --base-url (default: 4096)")
     parser.add_argument("--request-timeout", type=float, default=180,
                         help="Seconds per API attempt for --base-url (default: 180)")
+    parser.add_argument("--reasoning-effort", choices=["minimal", "low", "medium", "high"],
+                        help="Override the reasoning effort agents.yaml sets for "
+                             "atomic_segmentation. Not valid with --base-url.")
     args = parser.parse_args()
     if args.repetitions < 1 or args.concurrency < 1 or args.max_tokens < 1 or args.request_timeout <= 0:
         parser.error("repetitions, concurrency, max-tokens and request-timeout must be positive")
@@ -407,6 +411,11 @@ async def main() -> int:
         parser.error("limit must be positive")
     if bool(args.base_url) != bool(args.model):
         parser.error("--base-url and --model must be supplied together")
+    if args.reasoning_effort and args.base_url:
+        # Refused rather than ignored: a silently dropped model setting is how
+        # the previous sweep ended up measuring a configuration nobody chose.
+        parser.error("--reasoning-effort applies to the agents.yaml route; "
+                     "it cannot be combined with --base-url")
 
     families = [f.strip() for f in args.families.split(",") if f.strip()]
     unknown = [f for f in families if f not in FAMILIES]
@@ -435,6 +444,13 @@ async def main() -> int:
             str(PROJECT_ROOT / "ami_agents" / "config" / "agents.yaml"))
         ua_config = agents_config.get("user_assistant", {}) or {}
         llm_cfg = build_behaviour_llm_client(ua_config, "atomic_segmentation")
+        if args.reasoning_effort:
+            # agents.yaml wins over the OPENAI_REASONING_EFFORT env var, so an
+            # override has to be applied to the resolved config rather than to
+            # the environment. Sweeping effort is an evaluation question, not a
+            # reason to edit the production default.
+            llm_cfg = dataclasses.replace(
+                llm_cfg, reasoning_effort=args.reasoning_effort)
         call_kwargs = build_llm_call_kwargs(llm_cfg)
     prompt = ATOMIC_SEGMENTATION_SYSTEM_PROMPT
 

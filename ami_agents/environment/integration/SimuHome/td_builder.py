@@ -25,8 +25,9 @@ Subjects follow HASP's convention: the RDF subject is `<path>#workspace` /
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
 from rdflib.namespace import RDFS, XSD
@@ -65,6 +66,13 @@ SAREF = Namespace("https://saref.etsi.org/core/")
 # Thing-level device metadata (manufacturer, product name). The TD spec mints no
 # vendor vocabulary of its own and points at schema.org for it.
 SCHEMA = Namespace("https://schema.org/")
+
+# Ambient sensors are an addition SHTD makes to what SimuHome models. Off, and
+# the graph is exactly what it was before them -- which is how the "no sensor,
+# no answer" measurement stays reproducible from one build.
+AMBIENT_SENSORS_ENABLED = os.getenv("SHTD_AMBIENT_SENSORS", "1") not in (
+    "0", "false", "False", "no",
+)
 
 _PREFIXES = {
     "hctl": HCTL, "js": JS, "hmas": HMAS, "wotsec": WOTSEC,
@@ -252,6 +260,37 @@ class SimuHomeTD:
         """
         return URIRef(f"{self.room_path(room)}#place")
 
+    def ambient_sensors(self, room_id: str) -> List[Tuple[str, str, Dict[str, Any]]]:
+        """The virtual sensors a room gets: one per environment variable it reports.
+
+        SimuHome has no ambient instrument -- it computes each room variable
+        from the appliances that affect it, so a light changes the illuminance
+        it never measures. A deployable home has the instruments, so SHTD mints
+        one sensor per variable the simulator reports for the room and serves
+        that same value through it.
+
+        Returns `(token, device_id, row)` per sensor. Empty when the feature is
+        switched off, which restores the pre-sensor graph exactly.
+        """
+        if not AMBIENT_SENSORS_ENABLED:
+            return []
+        room = self.rooms.get(room_id) or {}
+        out: List[Tuple[str, str, Dict[str, Any]]] = []
+        for token in sorted((room.get("state") or {})):
+            row = self.m.ambient_sensor(token)
+            if not row:
+                continue
+            out.append((token, f"{room_id}_{row['family']}_1", row))
+        return out
+
+    def ambient_sensor_for(self, room_id: str,
+                           device_id: str) -> Optional[Tuple[str, Dict[str, Any]]]:
+        """`(token, row)` when this device id names one of a room's virtual sensors."""
+        for token, minted, row in self.ambient_sensors(room_id):
+            if minted == device_id:
+                return token, row
+        return None
+
     def room_property_uri(self, room: str, sosa_property: str) -> URIRef:
         """A room's observable property, addressable from any document."""
         return URIRef(f"{self.room_path(room)}#{sosa_property}")
@@ -392,6 +431,18 @@ class SimuHomeTD:
             g.add((art, RDF.type, HMAS.Artifact))
             g.add((art, TD.title, Literal(device_id)))
 
+        # The virtual instruments, listed exactly like real devices so nothing
+        # downstream has to know which is which.
+        for _token, sensor_id, row in self.ambient_sensors(room_id):
+            art = URIRef(f"{self.artifact_path(room_id, sensor_id)}#artifact")
+            g.add((ws, HMAS.contains, art))
+            g.add((art, HMAS.isContainedIn, ws))
+            g.add((art, RDF.type, HMAS.Artifact))
+            g.add((art, TD.title, Literal(sensor_id)))
+            sensor_class = curie_to_uri(row.get("homeont_class"))
+            if sensor_class is not None:
+                g.add((art, RDF.type, sensor_class))
+
         self._subscribe_actions(g, ws, self.room_path(room_id), artifact=False)
         profile = URIRef(self.room_path(room_id))
         g.add((profile, RDF.type, HMAS.ResourceProfile))
@@ -422,8 +473,117 @@ class SimuHomeTD:
             g.add((art, TD.title, Literal(device_id)))
         return g
 
+    def _ambient_sensor_artifact(self, room_id: str, device_id: str,
+                                 token: str, row: Dict[str, Any]) -> Graph:
+        """The Thing Description of one virtual ambient sensor.
+
+        The instrument is SHTD's, but the reading is the simulator's: the value
+        behind this affordance is the same room state `get_room_states()`
+        reports, scaled the same way. The sensor says so in its own metadata
+        rather than presenting itself as hardware.
+        """
+        g = _new_graph()
+        path = self.artifact_path(room_id, device_id)
+        art = URIRef(f"{path}#artifact")
+        prop_row = self.m.room_state_property(token) or {}
+        name = str(prop_row.get("sosa_property") or token)
+
+        g.add((art, RDF.type, TD.Thing))
+        g.add((art, RDF.type, HMAS.Artifact))
+        g.add((art, TD.title, Literal(device_id)))
+        sensor_class = curie_to_uri(row.get("homeont_class"))
+        if sensor_class is not None:
+            g.add((art, RDF.type, sensor_class))
+        # saref:Sensor is what closes the path to saref:Device, which is how a
+        # resolver asks "is this a device at all". sosa:Sensor is what makes it
+        # an observer of the property below.
+        g.add((art, RDF.type, SAREF.Sensor))
+        g.add((art, RDF.type, SOSA.Sensor))
+        if row.get("title"):
+            g.add((art, RDFS.label, Literal(row["title"])))
+
+        # Not hardware, and it does not pretend to be: an agent reading this
+        # graph can tell a virtual instrument from an LG freezer.
+        g.add((art, SCHEMA.manufacturer, Literal("SHTD")))
+        g.add((art, SCHEMA.model, Literal(f"Virtual {row.get('title') or 'Sensor'}")))
+        g.add((art, RDFS.comment, Literal(
+            f"Virtual instrument. Reports the {name} of the "
+            f"{self._room_title(room_id)}.")))
+
+        room_ws = URIRef(f"{self.room_path(room_id)}#workspace")
+        g.add((art, HMAS.isContainedIn, room_ws))
+        g.add((room_ws, RDF.type, HMAS.Workspace))
+        g.add((room_ws, TD.title, Literal(self._room_title(room_id))))
+        g.add((room_ws, HMAS.contains, art))
+        home_ws = URIRef(f"{self.home_path()}#workspace")
+        g.add((room_ws, HMAS.isContainedIn, home_ws))
+        g.add((home_ws, RDF.type, HMAS.Workspace))
+        g.add((home_ws, TD.title, Literal(self.home)))
+        g.add((home_ws, HMAS.contains, room_ws))
+        _no_security(g, art)
+
+        place = self.place_uri(room_id)
+        g.add((art, HOME.isLocatedIn, place))
+        g.add((place, HOME.containsArtifact, art))
+        room_class = self._room_class(room_id)
+        if room_class is not None:
+            g.add((place, RDF.type, room_class))
+        g.add((place, RDF.type, HOME.BuildingSpace))
+
+        # The property it observes is the room environment's own -- the sensor
+        # does not own a second copy of the air temperature, it reads the one
+        # the environment has.
+        foi = self.foi_uri(room_id)
+        g.add((foi, RDF.type, HOME.Environment))
+        g.add((foi, RDF.type, SOSA.FeatureOfInterest))
+        g.add((foi, HOME.isEnvironmentOf, place))
+        room_property = self.room_property_uri(room_id, name)
+        g.add((art, SOSA.observes, room_property))
+        g.add((room_property, SOSA.isObservedBy, art))
+        g.add((room_property, SSN.isPropertyOf, foi))
+
+        # The affordance: this sensor's own reading, at its own URL.
+        prop = URIRef(f"{path}/properties/{name}")
+        g.add((art, TD.hasPropertyAffordance, prop))
+        g.add((prop, RDF.type, TD.PropertyAffordance))
+        g.add((prop, RDF.type, TDSOSA.ObservablePropertyAffordance))
+        g.add((prop, RDF.type, SOSA.ObservableProperty))
+        prop_class = curie_to_uri(prop_row.get("homeont_class"))
+        if prop_class is not None:
+            g.add((prop, RDF.type, prop_class))
+        g.add((prop, TD.name, Literal(name)))
+        g.add((prop, TD.title, Literal(name)))
+        g.add((prop, TD.isObservable, Literal(True, datatype=XSD.boolean)))
+        g.add((prop, SOSA.isObservedBy, art))
+        g.add((prop, SSN.isPropertyOf, foi))
+
+        qk = curie_to_uri(prop_row.get("quantityKind"))
+        if qk is not None:
+            g.add((prop, QUDT.hasQuantityKind, qk))
+        qunit = curie_to_uri(prop_row.get("qudt_unit"))
+        if qunit is not None:
+            g.add((prop, QUDT.unit, qunit))
+
+        schema = BNode()
+        g.add((schema, RDF.type, JS.NumberSchema))
+        if prop_row.get("unit"):
+            _add_unit(g, schema, prop_row["unit"])
+        g.add((prop, TD.hasOutputSchema, schema))
+
+        form = BNode()
+        g.add((prop, TD.hasForm, form))
+        g.add((form, HTV.methodName, Literal("GET")))
+        g.add((form, HCTL.hasTarget, URIRef(f"{path}/properties/{name}")))
+        g.add((form, HCTL.forContentType, Literal("application/json")))
+        g.add((form, HCTL.hasOperationType, TD.readProperty))
+        return g
+
     def artifact(self, room_id: str, device_id: str) -> Optional[Graph]:
         """One device's Thing Description."""
+        virtual = self.ambient_sensor_for(room_id, device_id)
+        if virtual is not None:
+            return self._ambient_sensor_artifact(room_id, device_id, *virtual)
+
         device = self.find_device(room_id, device_id)
         if device is None:
             return None

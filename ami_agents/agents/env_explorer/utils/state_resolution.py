@@ -58,6 +58,7 @@ PREFIX hctl:    <https://www.w3.org/2019/wot/hypermedia#>
 PREFIX hmas:    <https://purl.org/hmas/>
 PREFIX homeont: <http://example.org/homeont/>
 PREFIX saref:   <https://saref.etsi.org/core/>
+PREFIX schema:  <https://schema.org/>
 PREFIX rdfs:    <http://www.w3.org/2000/01/rdf-schema#>
 """
 
@@ -69,9 +70,15 @@ class StateOutcome(str, Enum):
     affordances, not how many rows came back. Several affordances of one type
     are one question answered by several sensors; several types are several
     questions and cannot be answered together.
+
+    `RESOLVED_ARTIFACT` is the case where the device was found but no affordance
+    reports what was asked. The artifact is still the answer to questions about
+    the device itself -- its make and model are stated on the Thing, not read
+    from a property -- so it is returned rather than discarded.
     """
 
     RESOLVED = "resolved_affordance"
+    RESOLVED_ARTIFACT = "resolved_artifact"
     NONE = "no_affordance"
     INDETERMINATE = "indeterminate_affordance"
     MISMATCHED = "mismatched_affordance"
@@ -79,11 +86,17 @@ class StateOutcome(str, Enum):
 
 @dataclass
 class ResolvedAffordance:
-    """One readable property affordance, as a value-retrieval tuple.
+    """One resolved device, with the affordance that answers the question.
 
     The field names are the ones the retrieval task speaks:
     `<artifact_name, artifact_type, workspace_name, affordance_name,
     affordance_type, parameter_name>`, plus the URI and read target behind them.
+
+    The affordance half is optional. When a device is found but no affordance
+    reports what was asked, the same entry carries the device alone and
+    `affordance_name` / `affordance_type` / `target` stay None -- the question
+    may still be answerable from `manufacturer` and `model`, which are stated on
+    the Thing rather than read from a property.
 
     `parameter_name` names a field inside an object-valued property (the hue of
     a colour reading). Nothing selects one yet -- the parser has no slot for it
@@ -93,11 +106,17 @@ class ResolvedAffordance:
 
     artifact: str
     artifact_name: str
-    artifact_type: Optional[str]
-    workspace_name: Optional[str]
-    affordance_name: str
-    affordance_type: str
-    target: str
+    artifact_type: Optional[str] = None
+    workspace_name: Optional[str] = None
+    # Thing-level facts about the device: what it is, rather than what it
+    # senses. Present on every entry, because "what brand is the freezer" is
+    # answerable from the same row that carries its temperature.
+    manufacturer: Optional[str] = None
+    model: Optional[str] = None
+    # Absent when the device resolved but no affordance matched the request.
+    affordance_name: Optional[str] = None
+    affordance_type: Optional[str] = None
+    target: Optional[str] = None
     parameter_name: Optional[str] = None
     # Set once read; absent until then, so an unread affordance is visibly
     # unread rather than indistinguishable from one whose value is null.
@@ -105,17 +124,30 @@ class ResolvedAffordance:
     has_value: bool = False
     detail: Optional[str] = None
 
+    @property
+    def is_readable(self) -> bool:
+        """Is there something to dereference, or only the device itself?"""
+        return self.target is not None
+
     def as_dict(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {
             "artifact_name": self.artifact_name,
             "artifact_type": self.artifact_type,
             "workspace_name": self.workspace_name,
-            "affordance_name": self.affordance_name,
-            "affordance_type": self.affordance_type,
-            "parameter_name": self.parameter_name,
             "artifact": self.artifact,
-            "target": self.target,
         }
+        if self.manufacturer:
+            out["manufacturer"] = self.manufacturer
+        if self.model:
+            out["model"] = self.model
+        # Omitted rather than emitted as null: an entry without an affordance is
+        # a device, and saying `"affordance_name": null` three times would
+        # describe it as a broken affordance instead.
+        if self.is_readable:
+            out["affordance_name"] = self.affordance_name
+            out["affordance_type"] = self.affordance_type
+            out["parameter_name"] = self.parameter_name
+            out["target"] = self.target
         if self.has_value:
             out["value"] = self.value
         if self.detail:
@@ -194,6 +226,30 @@ def discovered_graph(artifacts, workspaces, logger=None) -> Graph:
     return load_vocabulary(graph)
 
 
+def _scope_lines(location_class: Optional[str],
+                 device_class: Optional[str]) -> List[str]:
+    """The location and device constraints both queries share."""
+    lines: List[str] = []
+    if location_class:
+        lines.append(f"  ?space a {location_class} ; homeont:isSpaceOfWorkspace ?ws .")
+        lines.append("  ?space rdfs:label ?spaceLabel .")
+        lines.append("  ?ws hmas:contains ?artifact .")
+    if device_class:
+        # A path, so an intermediate class (`saref:Appliance`) still reaches its
+        # subclasses instead of matching only an exact assertion.
+        lines.append(f"  ?artifact a/rdfs:subClassOf* {device_class} .")
+    return lines
+
+
+# Thing-level facts about the device. OPTIONAL, unlike the names: a Thing
+# Description may legitimately state neither, and a device that does not say who
+# made it must still be found.
+_METADATA_LINES = [
+    "  OPTIONAL { ?artifact schema:manufacturer ?manufacturer }",
+    "  OPTIONAL { ?artifact schema:model ?model }",
+]
+
+
 def build_query(
     location_class: Optional[str] = None,
     device_class: Optional[str] = None,
@@ -210,23 +266,42 @@ def build_query(
 
     Names are required, not OPTIONAL: both belong to the retrieval tuple, so a
     Thing Description that states neither is malformed and should drop out
-    rather than yield a row with a silently missing field.
+    rather than yield a row with a silently missing field. The make and model
+    are OPTIONAL for the opposite reason -- they are facts a TD may omit.
     """
-    lines: List[str] = []
-    if location_class:
-        lines.append(f"  ?space a {location_class} ; homeont:isSpaceOfWorkspace ?ws .")
-        lines.append("  ?space rdfs:label ?spaceLabel .")
-        lines.append("  ?ws hmas:contains ?artifact .")
-    if device_class:
-        # A path, so an intermediate class (`saref:Appliance`) still reaches its
-        # subclasses instead of matching only an exact assertion.
-        lines.append(f"  ?artifact a/rdfs:subClassOf* {device_class} .")
+    lines = _scope_lines(location_class, device_class)
     lines.append("  ?artifact td:title ?artTitle ; td:hasPropertyAffordance ?prop .")
     lines.append("  ?prop a ?pc ; td:name ?name ; td:hasForm [ hctl:hasTarget ?target ] .")
     lines.append(f"  ?pc rdfs:subClassOf* {property_class} .")
+    lines.extend(_METADATA_LINES)
     lines.append("  FILTER EXISTS { ?artifact a/rdfs:subClassOf* saref:Device }")
     body = "\n".join(lines)
-    projection = "?artifact ?artTitle ?pc ?name ?target"
+    projection = "?artifact ?artTitle ?pc ?name ?target ?manufacturer ?model"
+    if location_class:
+        projection += " ?spaceLabel"
+    return (
+        f"{_PREFIXES}\n"
+        f"SELECT DISTINCT {projection} WHERE {{\n{body}\n}}"
+    )
+
+
+def build_artifact_query(
+    location_class: Optional[str] = None,
+    device_class: Optional[str] = None,
+) -> str:
+    """The same scope, without requiring an affordance.
+
+    Answers "is this device here at all, and what is it?" -- which is a
+    different question from "what can it tell me", and the one left when no
+    affordance reports what was asked. A device's make and model are stated on
+    the Thing, so this reaches them where the affordance query cannot.
+    """
+    lines = _scope_lines(location_class, device_class)
+    lines.append("  ?artifact td:title ?artTitle .")
+    lines.extend(_METADATA_LINES)
+    lines.append("  FILTER EXISTS { ?artifact a/rdfs:subClassOf* saref:Device }")
+    body = "\n".join(lines)
+    projection = "?artifact ?artTitle ?manufacturer ?model"
     if location_class:
         projection += " ?spaceLabel"
     return (
@@ -247,6 +322,25 @@ def _device_class(graph: Graph, artifact: Any) -> Optional[str]:
     return asserted[0] if asserted else None
 
 
+def _artifacts(graph: Graph, location_class: Optional[str],
+               device_class: Optional[str]) -> List[ResolvedAffordance]:
+    """The devices in scope, each as an entry with no affordance attached."""
+    rows = list(graph.query(build_artifact_query(location_class, device_class)))
+    return [
+        ResolvedAffordance(
+            artifact=str(row.artifact),
+            artifact_name=str(row.artTitle),
+            artifact_type=_device_class(graph, row.artifact),
+            workspace_name=(str(row.spaceLabel)
+                            if getattr(row, "spaceLabel", None) else None),
+            manufacturer=(str(row.manufacturer)
+                          if getattr(row, "manufacturer", None) else None),
+            model=str(row.model) if getattr(row, "model", None) else None,
+        )
+        for row in rows
+    ]
+
+
 def resolve_state_request(
     graph: Graph,
     location_class: Optional[str] = None,
@@ -254,7 +348,12 @@ def resolve_state_request(
     device_property: Optional[Dict[str, Any]] = None,
     environment_variable: Optional[Dict[str, Any]] = None,
 ) -> StateResolution:
-    """Find the affordances that can answer one structured state request.
+    """Find what can answer one structured state request.
+
+    Usually that is a property affordance. When the request names a device but
+    no affordance reports what was asked, the device itself is the answer --
+    "what make is the freezer" is answered from the Thing, not from a reading --
+    so the artifact is returned instead of the request failing.
 
     `graph` must already hold the discovered Thing Descriptions and the
     vocabulary (see `load_vocabulary`).
@@ -271,9 +370,11 @@ def resolve_state_request(
         "property_class": property_class,
     }
 
-    if not property_class:
-        # Nothing readable was named, so there is nothing to look for. Decided
-        # before any query runs -- this is a parse outcome, not a query result.
+    if not property_class and not device_class:
+        # Neither a property nor a device: nothing to look for, and nothing to
+        # return. A location alone does not qualify -- "how is the kitchen?"
+        # would otherwise be answered with an inventory of every device in it,
+        # which is not what was asked. Decided before any query runs.
         return StateResolution(
             outcome=StateOutcome.INDETERMINATE,
             query=asked,
@@ -281,48 +382,73 @@ def resolve_state_request(
                     "environment variable"),
         )
 
-    query = build_query(location_class, device_class, property_class)
-    rows = list(graph.query(query))
+    affordances: List[ResolvedAffordance] = []
+    if property_class:
+        rows = list(graph.query(
+            build_query(location_class, device_class, property_class)))
+        affordances = [
+            ResolvedAffordance(
+                artifact=str(row.artifact),
+                artifact_name=str(row.artTitle),
+                artifact_type=_device_class(graph, row.artifact),
+                workspace_name=(str(row.spaceLabel)
+                                if getattr(row, "spaceLabel", None) else None),
+                manufacturer=(str(row.manufacturer)
+                              if getattr(row, "manufacturer", None) else None),
+                model=str(row.model) if getattr(row, "model", None) else None,
+                affordance_name=str(row.name),
+                affordance_type=_curie(row.pc),
+                target=str(row.target),
+            )
+            for row in rows
+        ]
 
-    affordances = [
-        ResolvedAffordance(
-            artifact=str(row.artifact),
-            artifact_name=str(row.artTitle),
-            artifact_type=_device_class(graph, row.artifact),
-            workspace_name=(str(row.spaceLabel)
-                            if getattr(row, "spaceLabel", None) else None),
-            affordance_name=str(row.name),
-            affordance_type=_curie(row.pc),
-            target=str(row.target),
-        )
-        for row in rows
-    ]
-    property_classes = sorted({a.affordance_type for a in affordances})
-
-    if not affordances:
-        where = location_class or "this environment"
+    if affordances:
+        property_classes = sorted({a.affordance_type for a in affordances})
+        if len(property_classes) > 1:
+            # Usually the parser answered with a class too high in the taxonomy:
+            # one generic class matches many unrelated properties.
+            return StateResolution(
+                outcome=StateOutcome.MISMATCHED,
+                affordances=affordances,
+                property_classes=property_classes,
+                query=asked,
+                detail=(f"{property_class} matched {len(property_classes)} "
+                        "different property types; the request does not "
+                        "identify one"),
+            )
         return StateResolution(
-            outcome=StateOutcome.NONE,
-            query=asked,
-            detail=f"nothing in {where} senses {property_class}",
-        )
-
-    if len(property_classes) > 1:
-        # Usually the parser answered with a class too high in the taxonomy:
-        # one generic class matches many unrelated properties.
-        return StateResolution(
-            outcome=StateOutcome.MISMATCHED,
+            outcome=StateOutcome.RESOLVED,
             affordances=affordances,
             property_classes=property_classes,
             query=asked,
-            detail=(f"{property_class} matched {len(property_classes)} different "
-                    f"property types; the request does not identify one"),
+            detail=(f"{len(affordances)} affordance(s) of {property_classes[0]}"),
         )
 
+    # No affordance answered. If the request named a device, that device may
+    # still be there and may still answer a question about itself.
+    #
+    # Only when a device was named: "how bright is the kitchen" names a property
+    # nothing senses, and answering it with every device in the kitchen would be
+    # an inventory, not an answer. The device is what the question is *about*;
+    # a room is only where to look.
+    where = location_class or "this environment"
+    artifacts = (_artifacts(graph, location_class, device_class)
+                 if device_class else [])
+
+    if artifacts:
+        asked_for = property_class or "that"
+        return StateResolution(
+            outcome=StateOutcome.RESOLVED_ARTIFACT,
+            affordances=artifacts,
+            query=asked,
+            detail=(f"{len(artifacts)} device(s) found in {where}; none "
+                    f"reports {asked_for}"),
+        )
+
+    missing = device_class or property_class
     return StateResolution(
-        outcome=StateOutcome.RESOLVED,
-        affordances=affordances,
-        property_classes=property_classes,
+        outcome=StateOutcome.NONE,
         query=asked,
-        detail=(f"{len(affordances)} affordance(s) of {property_classes[0]}"),
+        detail=f"nothing in {where} matches {missing}",
     )

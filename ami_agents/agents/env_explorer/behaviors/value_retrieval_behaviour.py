@@ -42,12 +42,18 @@ class ValueRetrievalBehaviour(OneShotBehaviour):
             self.result = []
             return
 
+        # An entry resolved to a device rather than to an affordance has nothing
+        # to dereference: its answer is on the Thing, not behind a URL.
+        readable = [a for a in self.affordances if a.is_readable]
+        if not readable:
+            self.result = self.affordances
+            return
+
         try:
             timeout = aiohttp.ClientTimeout(total=READ_TIMEOUT_SECONDS)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 await asyncio.gather(*[
-                    self._read(session, affordance)
-                    for affordance in self.affordances
+                    self._read(session, affordance) for affordance in readable
                 ])
         except Exception as exc:
             # The session itself failed, so nothing was read. The resolution

@@ -152,6 +152,25 @@ def read_property(home: str, room: str, device: str, name: str,
     """Resolve a TD property name back to its Matter attribute and read it."""
     td = build(request)
     _check_home(td, home)
+
+    # A virtual ambient sensor reads the room state SimuHome already computes.
+    # Checked before the device lookup, since the simulator has no such device.
+    virtual = td.ambient_sensor_for(room, device)
+    if virtual is not None:
+        token, _row = virtual
+        prop_row = load_mappings().room_state_property(token) or {}
+        if str(prop_row.get("sosa_property") or token) != name:
+            raise HTTPException(
+                status_code=404, detail=f"no property '{name}' on {device}")
+        state = (td.rooms.get(room) or {}).get("state") or {}
+        if token not in state:
+            raise HTTPException(
+                status_code=404,
+                detail=f"the simulator reports no {token} for {room}")
+        # The same value and the same scaling `read_room_property` returns:
+        # one reading, reachable either as the room's or as this sensor's.
+        return JSONResponse(td.scale_room_state(token, state[token]))
+
     dev = td.find_device(room, device)
     if dev is None:
         raise HTTPException(status_code=404, detail=f"no device '{device}' in {room}")

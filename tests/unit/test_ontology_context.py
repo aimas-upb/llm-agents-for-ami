@@ -39,12 +39,25 @@ class TestSections:
     def test_section_counts(self, context):
         properties = context["device_properties"]
         assert len(context["locations"]) == 16
-        assert len(context["device_types"]) == 16
+        # 16 SimuHome device families + the 4 virtual ambient sensors SHTD
+        # mints, which the parser must be able to name ("the light sensor").
+        assert len(context["device_types"]) == 20
         assert len(properties["capabilities"]) == 19
         assert len(properties["states"]) == 47
         assert len(properties["actuatable"]) == 93
         assert len(properties["measurements"]) == 10
         assert len(context["environment_variables"]) == 4
+
+    def test_the_ambient_sensors_are_saref_sensors(self, context):
+        """The parent is what closes the path to saref:Device for a resolver."""
+        sensors = {e["class"]: e["parent_class"] for e in context["device_types"]
+                   if e["class"].endswith("Sensor")}
+        assert sensors == {
+            "homeont:TemperatureSensor": "saref:Sensor",
+            "homeont:HumiditySensor": "saref:Sensor",
+            "homeont:LightSensor": "saref:Sensor",
+            "homeont:AirQualitySensor": "saref:Sensor",
+        }
 
     def test_environment_variables_are_the_four_room_variables(self, context):
         assert [e["class"] for e in context["environment_variables"]] == [

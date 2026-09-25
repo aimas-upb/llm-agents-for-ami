@@ -59,6 +59,28 @@ class TestPromptInput:
         affordance["detail"] = "read failed: timeout"
         assert readings_for_prompt([affordance])[0]["note"] == "read failed: timeout"
 
+    def test_device_facts_are_shown_with_every_reading(self):
+        """"What make is the freezer" is answerable from an ordinary reading."""
+        affordance = aff("homeont:Freezer", "homeont:CompartmentTemperature", -18.0)
+        affordance["manufacturer"] = "LG Electronics"
+        affordance["model"] = "Freezer"
+        reading = readings_for_prompt([affordance])[0]
+        assert reading["manufacturer"] == "LG Electronics"
+        assert reading["model"] == "Freezer"
+        assert reading["property"] == "Compartment Temperature"
+
+    def test_an_artifact_only_entry_carries_no_property(self):
+        """The device was found; nothing reports what was asked of it."""
+        reading = readings_for_prompt([{
+            "artifact_name": "kitchen_freezer_1",
+            "artifact_type": "homeont:Freezer",
+            "workspace_name": "Kitchen",
+            "manufacturer": "LG Electronics", "model": "Freezer"}])[0]
+        assert reading["device"] == "Freezer"
+        assert reading["manufacturer"] == "LG Electronics"
+        assert "property" not in reading
+        assert "value" not in reading
+
     def test_an_unnamed_device_falls_back_to_its_instance_name(self):
         affordance = aff(None, "homeont:OnOff", True, name="odd_device_3")
         assert readings_for_prompt([affordance])[0]["device"] == "odd_device_3"

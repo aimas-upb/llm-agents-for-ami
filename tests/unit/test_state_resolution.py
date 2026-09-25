@@ -14,6 +14,7 @@ from rdflib import Graph
 
 from ami_agents.agents.env_explorer.utils.state_resolution import (
     StateOutcome,
+    build_artifact_query,
     build_query,
     load_vocabulary,
     resolve_state_request,
@@ -171,14 +172,18 @@ class TestNoAffordance:
                 environment_variable={"class": variable},
             )
             for affordance in result.affordances:
+                assert affordance.target is not None
                 assert "/artifacts/" in affordance.target, affordance.target
 
 
 class TestIndeterminate:
-    def test_no_property_named_at_all(self, graph):
-        result = resolve_state_request(
-            graph, location_class="homeont:Kitchen", device_class="homeont:Freezer",
-        )
+    def test_a_room_alone_is_not_a_question(self, graph):
+        """"How is the kitchen?" names nothing to look up.
+
+        Answering it with every device in the room would be an inventory, not
+        an answer, so this must not reach the artifact query.
+        """
+        result = resolve_state_request(graph, location_class="homeont:Kitchen")
         assert result.outcome is StateOutcome.INDETERMINATE
         assert result.affordances == []
 
@@ -186,6 +191,62 @@ class TestIndeterminate:
         """A parse failure needs no query -- an empty graph is enough."""
         result = resolve_state_request(Graph())
         assert result.outcome is StateOutcome.INDETERMINATE
+
+
+class TestResolvedArtifact:
+    """The device is there; what was asked of it is not.
+
+    Its make and model are stated on the Thing rather than read from a
+    property, so the artifact is still an answer to a question about the
+    device itself.
+    """
+
+    def test_a_device_named_without_a_property(self, graph):
+        result = resolve_state_request(
+            graph, location_class="homeont:Kitchen",
+            device_class="homeont:Freezer")
+        assert result.outcome is StateOutcome.RESOLVED_ARTIFACT
+        assert len(result.affordances) == 1
+        entry = result.affordances[0]
+        assert entry.artifact_name == "kitchen_freezer_1"
+        assert entry.manufacturer == "LG Electronics"
+        assert entry.model == "Freezer"
+        assert entry.target is None
+
+    def test_a_device_that_does_not_report_what_was_asked(self, graph):
+        """The freezer is there; it senses no illuminance."""
+        result = resolve_state_request(
+            graph, location_class="homeont:Kitchen",
+            device_class="homeont:Freezer",
+            device_property={"class": "homeont:Illuminance"})
+        assert result.outcome is StateOutcome.RESOLVED_ARTIFACT
+        assert result.affordances[0].artifact_type == "homeont:Freezer"
+
+    def test_an_absent_device_is_not_an_artifact(self, graph):
+        """qt1_infeasible_seed_49: no refrigerator in that kitchen."""
+        result = resolve_state_request(
+            graph, location_class="homeont:Bathroom",
+            device_class="homeont:Freezer")
+        assert result.outcome is StateOutcome.NONE
+        assert result.affordances == []
+
+    def test_a_property_nothing_senses_does_not_list_the_room(self, graph):
+        """No device named, so there is no device the question is about."""
+        result = resolve_state_request(
+            graph, location_class="homeont:Kitchen",
+            environment_variable={"class": "homeont:Illuminance"})
+        assert result.outcome is StateOutcome.NONE
+        assert result.affordances == []
+
+    def test_the_entry_omits_affordance_keys(self, graph):
+        """An artifact is a device, not an affordance with null fields."""
+        result = resolve_state_request(
+            graph, location_class="homeont:Kitchen",
+            device_class="homeont:Freezer")
+        entry = result.affordances[0].as_dict()
+        for key in ("affordance_name", "affordance_type", "target"):
+            assert key not in entry
+        assert entry["manufacturer"] == "LG Electronics"
 
 
 class TestMismatched:
@@ -280,4 +341,24 @@ class TestQueryComposition:
                             property_class="homeont:OnOff")
         assert "?artifact td:title ?artTitle" in query
         assert "?space rdfs:label ?spaceLabel ." in query
-        assert "OPTIONAL" not in query
+        # The names are required; only the make and model are OPTIONAL, being
+        # facts a Thing Description may legitimately omit.
+        assert "OPTIONAL { ?artifact schema:manufacturer" in query
+        assert "OPTIONAL { ?artifact schema:model" in query
+        assert query.count("OPTIONAL") == 2
+
+    def test_metadata_is_read_by_both_queries(self):
+        """Make and model ride along with a reading, not only with an artifact."""
+        for query in (build_query(device_class="homeont:Freezer",
+                                  property_class="homeont:OnOff"),
+                      build_artifact_query(device_class="homeont:Freezer")):
+            assert "?manufacturer" in query
+            assert "?model" in query
+
+    def test_the_artifact_query_binds_no_affordance(self):
+        """It answers "is it there", not "what can it tell me"."""
+        query = build_artifact_query(location_class="homeont:Kitchen",
+                                     device_class="homeont:Freezer")
+        assert "hasPropertyAffordance" not in query
+        assert "hasForm" not in query
+        assert "a/rdfs:subClassOf* homeont:Freezer" in query

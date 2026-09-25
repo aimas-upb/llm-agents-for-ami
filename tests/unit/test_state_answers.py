@@ -64,13 +64,19 @@ class TestNoAffordance:
         assert "no device in the Kitchen" in answer
         assert "Illuminance" in answer
 
-    def test_names_the_device_when_one_was_asked_for(self):
+    def test_a_named_device_that_is_absent_is_the_whole_answer(self):
+        """Not "no Freezer that reports X" -- that implies a Freezer exists.
+
+        When a device kind was named and nothing of that kind is there, the
+        missing device is the fact, and the property it would have reported is
+        beside the point.
+        """
         answer = no_affordance({"query": {
             "location_class": "homeont:Kitchen",
             "property_class": "homeont:CompartmentTemperature",
             "device_class": "homeont:Freezer"}})
-        assert "no Freezer in the Kitchen" in answer
-        assert "Compartment Temperature" in answer
+        assert "There is no Freezer in the Kitchen." in answer
+        assert "Compartment Temperature" not in answer
 
     def test_omits_the_room_when_none_was_asked_for(self):
         answer = no_affordance({"query": {
@@ -175,6 +181,44 @@ class TestRouting:
                                      "affordances": []}) is False
 
 
+class TestResolvedArtifact:
+    """The device was found; what was asked of it was not."""
+
+    def test_it_needs_the_question_read(self):
+        """"What make is it" and "is it on" resolve to the same artifact."""
+        assert needs_interpretation({
+            "outcome": "resolved_artifact",
+            "affordances": [aff("homeont:Freezer", None, None)]}) is True
+
+    def test_the_fallback_names_the_device_and_its_make(self):
+        response = {"outcome": "resolved_artifact",
+                    "query": {"location_class": "homeont:Kitchen",
+                              "device_class": "homeont:Freezer",
+                              "property_class": None},
+                    "affordances": [{"artifact_name": "kitchen_freezer_1",
+                                     "artifact_type": "homeont:Freezer",
+                                     "workspace_name": "Kitchen",
+                                     "manufacturer": "LG Electronics",
+                                     "model": "Freezer"}]}
+        answer = fallback(response)
+        assert "LG Electronics Freezer" in answer
+        assert "Kitchen" in answer
+
+    def test_the_fallback_says_what_was_unavailable(self):
+        response = {"outcome": "resolved_artifact",
+                    "query": {"location_class": "homeont:Kitchen",
+                              "device_class": "homeont:Freezer",
+                              "property_class": "homeont:Illuminance"},
+                    "affordances": [{"artifact_name": "kitchen_freezer_1",
+                                     "artifact_type": "homeont:Freezer",
+                                     "workspace_name": "Kitchen",
+                                     "manufacturer": "LG Electronics",
+                                     "model": "Freezer"}]}
+        answer = fallback(response)
+        assert "Illuminance" in answer
+        assert "nothing there reports" in answer
+
+
 class TestFallback:
     """What is said when the model could not be reached."""
 
@@ -184,6 +228,17 @@ class TestFallback:
             aff("homeont:AirPurifier", "homeont:AirPurifierOnOff", False)]})
         assert "the Fan" in answer and "the Air Purifier" in answer
         assert answer.rstrip().endswith("?")
+
+    def test_a_mismatch_names_makes_where_they_are_known(self):
+        """Often the make is what tells two candidates apart."""
+        one = aff("homeont:Fan", "homeont:FanOnOff", True)
+        one["manufacturer"] = "Samsung Electronics"
+        two = aff("homeont:AirPurifier", "homeont:AirPurifierOnOff", False)
+        two["manufacturer"] = "LG Electronics"
+        answer = fallback({"outcome": "mismatched_affordance",
+                           "affordances": [one, two]})
+        assert "Samsung Electronics Fan" in answer
+        assert "LG Electronics Air Purifier" in answer
 
     def test_a_structured_reading_still_reports_its_value(self):
         answer = fallback({"outcome": "resolved_affordance", "affordances": [

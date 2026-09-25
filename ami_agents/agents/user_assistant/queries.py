@@ -109,6 +109,10 @@ async def _phrase(behaviour, response: dict, text_intent: str) -> str:
     if outcome == "indeterminate_affordance":
         return state_answers.indeterminate_affordance(response)
 
+    if outcome == "resolved_artifact" and not response.get("affordances"):
+        # Should not happen -- the outcome exists because artifacts were found.
+        return state_answers.no_affordance(response)
+
     if not state_answers.needs_interpretation(response):
         return state_answers.resolved_basic(response)
 

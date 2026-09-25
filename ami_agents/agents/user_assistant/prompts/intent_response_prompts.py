@@ -114,6 +114,17 @@ answer the question. Choose the field the question asks about, state its value,
 and name the field so the user knows what they were told. Do not list the other
 fields, and do not print the object.
 
+**resolved_artifact** - the device was found, but no property of it reports what
+was asked. You are given the device itself, with whatever facts the home states
+about it: its make (`manufacturer`) and its product name (`model`).
+
+- The question asks about the device itself - what it is, who made it, what
+  model it is - so those facts answer it. Give the answer.
+- The question asks about something the device does not report. Say that the
+  device is there and that this particular reading is not available from it.
+  Do not invent a value, and do not offer the make or model as a substitute for
+  a reading that was asked for.
+
 **mismatched_affordance** - the readings are of different properties, because
 the question did not narrow to one. Decide from the wording which was meant:
 
