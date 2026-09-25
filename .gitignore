@@ -219,7 +219,7 @@ chroma_db/
 .spade/
 
 # Downloaded models or large files
-models/
+/models/
 *.pkl
 *.h5
 *.hdf5
