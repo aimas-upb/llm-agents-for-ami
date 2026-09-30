@@ -508,7 +508,8 @@ class SimuHomeTD:
         g.add((art, SCHEMA.model, Literal(f"Virtual {row.get('title') or 'Sensor'}")))
         g.add((art, RDFS.comment, Literal(
             f"Virtual instrument. Reports the {name} of the "
-            f"{self._room_title(room_id)}.")))
+            f"{self._room_title(room_id)} as the simulator computes it; "
+            "SimuHome models no ambient sensor of its own.")))
 
         room_ws = URIRef(f"{self.room_path(room_id)}#workspace")
         g.add((art, HMAS.isContainedIn, room_ws))

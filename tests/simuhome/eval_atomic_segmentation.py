@@ -82,16 +82,43 @@ QUALIFIERS = [
 
 # ---------------------------------------------------------------- episode I/O
 
+def read_episode_list(path: Path) -> List[str]:
+    """Episode filenames from a list file, one per line, `#` comments ignored.
+
+    A previous run's `rows.jsonl` carries each episode's `file`, so a subset of
+    interest -- the episodes a prompt change is meant to fix -- can be extracted
+    from it and replayed exactly. Without this the smallest unit of measurement
+    is a whole family.
+    """
+    if not path.is_file():
+        raise SystemExit(f"Episode list not found: {path}")
+    names: List[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line:
+            names.append(Path(line).name)
+    if not names:
+        raise SystemExit(f"Episode list is empty: {path}")
+    return names
+
+
 def load_episodes(
     benchmark_dir: Path,
     families: List[str],
     cases: List[str],
     limit: Optional[int],
+    only: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
-    """Load episodes grouped by (query_type, case), honouring --limit per group."""
+    """Load episodes grouped by (query_type, case), honouring --limit per group.
+
+    `only` restricts to the named episode files, applied after the family and
+    case filters so the two compose.
+    """
     if not benchmark_dir.is_dir():
         raise SystemExit(f"Benchmark directory not found: {benchmark_dir}")
 
+    wanted = set(only) if only else None
+    seen: set = set()
     by_group: Dict[tuple, List[Dict[str, Any]]] = {}
     for path in sorted(benchmark_dir.glob("*.json")):
         try:
@@ -108,9 +135,23 @@ def load_episodes(
         case = str(meta.get("case") or "")
         if query_type not in families or case not in cases:
             continue
+        if wanted is not None:
+            if path.name not in wanted:
+                continue
+            seen.add(path.name)
         by_group.setdefault((query_type, case), []).append(
             {"path": path, "episode": data}
         )
+
+    if wanted is not None:
+        # Named but not loaded: misspelled, absent, or excluded by --families.
+        # Reported rather than silently dropped -- a subset run that quietly
+        # skips half its episodes reads as a result.
+        missing = sorted(wanted - seen)
+        if missing:
+            print(f"  ! {len(missing)} listed episode(s) not loaded: "
+                  f"{', '.join(missing[:5])}"
+                  f"{' ...' if len(missing) > 5 else ''}")
 
     episodes: List[Dict[str, Any]] = []
     for key in sorted(by_group):
@@ -401,6 +442,14 @@ async def main() -> int:
                         help="Output token limit for --base-url (default: 4096)")
     parser.add_argument("--request-timeout", type=float, default=180,
                         help="Seconds per API attempt for --base-url (default: 180)")
+    parser.add_argument("--model-override",
+                        help="Model tag to use instead of the one agents.yaml "
+                             "sets for atomic_segmentation. Not valid with "
+                             "--base-url, which has its own --model.")
+    parser.add_argument("--episodes", type=Path,
+                        help="File of episode filenames, one per line, to run "
+                             "instead of whole families. Composes with "
+                             "--families/--case.")
     parser.add_argument("--reasoning-effort", choices=["minimal", "low", "medium", "high"],
                         help="Override the reasoning effort agents.yaml sets for "
                              "atomic_segmentation. Not valid with --base-url.")
@@ -416,6 +465,9 @@ async def main() -> int:
         # the previous sweep ended up measuring a configuration nobody chose.
         parser.error("--reasoning-effort applies to the agents.yaml route; "
                      "it cannot be combined with --base-url")
+    if args.model_override and args.base_url:
+        parser.error("--model-override applies to the agents.yaml route; "
+                     "with --base-url the model is given by --model")
 
     families = [f.strip() for f in args.families.split(",") if f.strip()]
     unknown = [f for f in families if f not in FAMILIES]
@@ -423,7 +475,8 @@ async def main() -> int:
         raise SystemExit(f"Unknown families {unknown}; valid: {FAMILIES}")
     cases = CASES if args.case == "both" else [args.case]
 
-    episodes = load_episodes(args.benchmark_dir, families, cases, args.limit)
+    only = read_episode_list(args.episodes) if args.episodes else None
+    episodes = load_episodes(args.benchmark_dir, families, cases, args.limit, only)
     if not episodes:
         raise SystemExit("No episodes matched the given filters")
 
@@ -444,19 +497,29 @@ async def main() -> int:
             str(PROJECT_ROOT / "ami_agents" / "config" / "agents.yaml"))
         ua_config = agents_config.get("user_assistant", {}) or {}
         llm_cfg = build_behaviour_llm_client(ua_config, "atomic_segmentation")
+        # Both overrides are applied to the resolved config, not to the
+        # environment: agents.yaml wins over the OPENAI_* env vars, so setting
+        # those would change nothing. Sweeping model or effort is an evaluation
+        # question, not a reason to edit the production default.
+        #
+        # Order matters: `build_llm_call_kwargs` decides between
+        # `temperature` and `reasoning_effort`/`max_completion_tokens` from the
+        # model NAME, so the model has to be substituted before the kwargs are
+        # built or a swap between a reasoning and a non-reasoning model would
+        # send the wrong parameter set.
+        if args.model_override:
+            llm_cfg = dataclasses.replace(llm_cfg, model=args.model_override)
         if args.reasoning_effort:
-            # agents.yaml wins over the OPENAI_REASONING_EFFORT env var, so an
-            # override has to be applied to the resolved config rather than to
-            # the environment. Sweeping effort is an evaluation question, not a
-            # reason to edit the production default.
             llm_cfg = dataclasses.replace(
                 llm_cfg, reasoning_effort=args.reasoning_effort)
         call_kwargs = build_llm_call_kwargs(llm_cfg)
     prompt = ATOMIC_SEGMENTATION_SYSTEM_PROMPT
 
     print(f"Benchmark : {args.benchmark_dir}")
-    print(f"Episodes  : {len(episodes)}  "
-          f"(families={families}, cases={cases}, limit={args.limit})")
+    scope = f"families={families}, cases={cases}, limit={args.limit}"
+    if only:
+        scope = f"list={args.episodes} ({len(only)} named), " + scope
+    print(f"Episodes  : {len(episodes)}  ({scope})")
     print(f"Model     : {llm_cfg.model}  kwargs={call_kwargs}")
     print(f"Concurrency: {args.concurrency}; repetitions: {args.repetitions}; "
           f"evaluations: {len(episodes) * args.repetitions}\n")

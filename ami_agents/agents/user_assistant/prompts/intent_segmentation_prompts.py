@@ -22,35 +22,83 @@ The distinction between the last two: an ENV_STATE_REQUEST asks for a **current 
 
 ## Atomicity
 
-An intent is **atomic** if it is fully independent of every other intent in the user's request — it can be acted upon (or answered) without knowing the outcome or the state of any other intent.
+An intent is **atomic** if it can be acted upon (or answered) on its own, without knowing the outcome or state of any other intent in the request. Intents may be explicit (a concrete command or question) or implicit (a desire, concern or complaint without a concrete action). Both are valid.
 
-Apply that single test. Its consequences:
+### The core rule: a split must not create a fragment
+Only split where every piece keeps its full meaning. A split is **not allowed** if cutting a phrase away from the rest would *make* it incomplete, ambiguous or implicit, when it was clear in the context of the input. Typical cases:
+- a reason or occasion cut away from the command it explains: "I need a bit more light to finish getting ready", "I'm clearing the table";
+- a vague wish cut away from the command that serves it: "clear the air" beside a purifier command;
+- a trigger cut away from the command it times: "Wait for washer 1 to finish";
+- a follow-up cut away from the command it continues: "Queue the live game so I can watch it";
+- a symptom cut away from the concern it belongs to: "my throat is scratchy" or "the plants' leaves are curling" beside "the living room is so dry".
 
-- **Independent requests split.** Two requests concerning different rooms, different devices, or different properties of one device are separate atomic intents, however they are joined ("and", "also", "then", a new sentence). Types may mix freely within one input, and each segment is typed on its own.
-- **Related subgoals do not split.** When the user ties parts together with a conditional, causal, or temporal relation — "if", "when", "whenever", "once", "after", "until", "while", "wait for X to finish, then ...", "N minutes after the previous action", "at 4:47 PM" — the whole construction is **one** atomic intent. Splitting it would destroy the relation that makes it a single request. This holds even when the construction commands several devices in several rooms: a scheduled block is one intent.
-- **Symptoms converge.** Multiple complaints, sensations, or descriptions that all point at one underlying concern in one place collapse into a **single** intent. "Ugh, the bathroom is so damp, towels still heavy from the wash, my skin feels a bit sticky and I am worrying about mildew" is ONE goal — damp towels, sticky skin and mildew are all symptoms of the same concern. Do not emit one intent per symptom. But a second concern about a **different** place or aspect in the same breath is its own intent.
-- **Actions serving one outcome stay together.** Several actions issued as one instruction against one device, jointly realising one desired outcome, form ONE atomic intent with multiple actions. "Okay utility room dryer 2, turn on, set to max and start running now" is one goal with three actions. "It is getting warm with the morning sun, turn on living room fan 1 and set the fan to 30 percent" is one goal with two actions. Contrast a genuinely separate second outcome, which splits: "set office heat pump 1 to heating mode. The wash cycle is done, set bathroom washer 1 to stopped" is two goals.
-- **A stated outcome is not a second intent.** When the request first says *what the user wants* in general terms — "I want the living room ready", "so the rooms need light", "I want the bathroom fresh" — and then gives an explicit command naming a device or a setting, the general statement is the **why** of that command, not a separate request. Fold it into the intent carrying the command.
-  - Apply this by **name matching only, never by guessing what a device does**: absorb the stated outcome into a command intent when the outcome names the **same room** as that command, or the **same device**. Treat an anaphor as naming what it refers to — "in there", "that room", "it", "the same one" name the room or device their antecedent names elsewhere in the phrase; resolve the reference first, then check whether the names match.
-  - If the stated outcome names a room or device that **no** command in the request mentions, it stays its own atomic intent. If it names no room or device at all, also leave it as its own intent — do not guess which command it belongs to.
-  - You are not judging whether the command would actually achieve the outcome; that is a later stage's job. You are only checking whether they name the same place or thing.
+Keep such a phrase in the same intent as the part that gives it its meaning.
 
+Symptoms need particular care. Complaints, sensations, worries and feelings that stem from one condition in one place are **one** concern. This holds even when they mention different things: the user's body, their mood, plants, furniture, guests. Split off, each symptom is only a partial view of that concern. Do not emit one intent per symptom.
+
+A phrase that raises a **different** concern is different. If it is about another place or another condition, is no vaguer when split off, and does not act as a reason or context for any explicit request in the input, it remains its own intent, unchanged. Example:
+- "Ugh, the bathroom is so damp. And the living room feels kind of clammy too". Two places, each complaint complete on its own, and neither serves a command, so each remains its own intent.
+
+### Order of checks
+1. **Find possible split points**: different devices, rooms, conditions or topics, however they are joined ("and", "also", "then", a new sentence). Different symptoms of one condition in one place are not split points.
+2. **Apply the core rule.** Drop any split that would make a piece incomplete, ambiguous or implicit when it was clear in context, including any split between symptoms of one concern. A piece that raises a different concern, and serves no explicit request, stays as its own intent.
+3. **Drop any split between commands that share one trigger or clock time.** They are one intent across any number of devices and rooms. "At 1:39 PM, which is 20 minutes after dishwasher 1 in the kitchen finishes, turn on light 1 in the dining room and light 1 in the bathroom" is one intent.
+4. **Drop any split between steps chained in time.** They are one intent across any number of devices and rooms. Steps are chained when:
+   - a step is timed from a previous step: "move blinds 1 to 80% closed 11 minutes from now and adjust it to 65% 19 minutes after the previous action";
+   - a step waits on another device's cycle: "wait for washer 1 to finish, then after 19 minutes start dryer 2";
+   - a device is paused or stopped by another device's cycle; that step stays with the device's other actions: "start washer 1 now and pause it when washer 2 finishes".
+5. **Drop any split between actions on the same device at the same moment that serve one outcome**, as in "turn on, set to max and start running now".
+6. **Keep all remaining splits.** Requests on different devices or rooms with no shared trigger and no chaining, and concerns about different places or conditions, are separate intents.
+
+Final check: every intent must be actionable without knowing the outcome of any other. If one depends on another, merge them.
 
 ### Worked examples
 
-- "What fan modes are available on dehumidifier 2 in the study room right now, and how is the humidity in the study room doing at the moment, is it still on the higher side?" → **2** intents: one ENV_CAPABILITIES_REQUEST (available fan modes) and one ENV_STATE_REQUEST (the current humidity; "is it still on the higher side" is the same question restated, not a second one).
-- "I was thinking about running a load later what brand or maker does the dishwasher 1 in the kitchen say it is and also how warm does the living room feel right now" → **2** ENV_STATE_REQUESTs (a device-internal property of the dishwasher; a room reading in a different room).
-- "Man the bathroom air feels kinda dusty my throat is a bit scratchy and my eyes feel gritty, its annoying me a little" → **1** GOAL_REQUEST (all symptoms converge on the bathroom air).
-- "Ugh that utility room light is just way too bright ... And the bathroom light is harsh too, like a clinic lamp ..." → **2** GOAL_REQUESTs (two rooms, two independent concerns).
-- "It is getting chilly in the office this evening, set office heat pump 1 to heating mode. The wash cycle is done, set bathroom washer 1 to stopped." → **2** GOAL_REQUESTs.
-- "I'm elbow deep in a pile of laundry by the washer so while I'm at the washer power on air purifier 1 in the bathroom at 17 minutes from now and set fan 80%, and 5 minutes after the previous action keep it powered on and set fan 30%. Also switch on light 1 in the utility room at 26 minutes from now so there is light for folding when I finish here." → **2** GOAL_REQUESTs: the purifier schedule is one intent (the second step is chained to the first by "5 minutes after the previous action", so it cannot be separated), and the independent light schedule is the other.
-- "At 4:47 PM, that is 17 minutes from now, turn on air purifier 1 in the bathroom and set the fan to 80 percent so it clears the steam and odors" → **1** GOAL_REQUEST with two actions, both under one scheduled time.
-- "I am folding laundry in the utility room. 30 minutes after the dryer 1 in the utility room finishes power on air purifier 1 in the bathroom and set fan to 60 percent and also power on light 1 in the utility room" → **2** GOAL_REQUESTs, both anchored on the same dryer condition but acting on independent devices in different rooms.
-- "Just realized we have a guest coming and I want towels ready on time. Wait for washer 1 in the utility room to finish. Then after 19 minutes start dryer 2 in the utility room and set it to Running state and Normal dryness level." → **1** GOAL_REQUEST: the wait, the delay and the dryer settings form one chained construction.
-- "Dishwasher 1 in the kitchen will finish around two forty eight PM based on the current cycle time. Start washer 1 in the utility room 14 minutes later so the machines do not overlap" → **1** GOAL_REQUEST: one condition, one action.
-- "I want the living room ready and comfortable for folding clothes so the air is cool. At 5:58 PM, which is 14 minutes before the washer finishes, turn on AC 1 in the living room to cooling with a medium fan" → **1** GOAL_REQUEST. The stated outcome names the living room and so does the command, so it is the why of that command, not a second intent.
-- "I am expecting guests soon so I want the bathroom fresh and the living room ready. At 12:41 PM, power on air purifier 1 in the bathroom and set the fan to a medium speed" → **2** GOAL_REQUESTs. The bathroom half is absorbed into the command; the living-room half stays, because no command in the request names the living room.
-- "Ugh, the bathroom is so damp, towels still heavy from the wash. And the living room feels kind of clammy too" → **2** GOAL_REQUESTs. There is no explicit command anywhere in the request, so there is nothing to absorb into and both concerns stand.
+**Nothing to split**
+
+- "how humid is it in the study room" → **1**.
+- "what fan modes are available on dehumidifier 2 in the study room" → **1**.
+
+**Split: independent requests**
+
+- "what brand does the dishwasher 1 in the kitchen say it is and also how warm does the living room feel right now" → **2**. Two questions about different things; each keeps its full meaning alone.
+- "what fan modes are available on dehumidifier 2 in the study room, and how is the humidity in the study room doing at the moment?" → **2**. Same room, but neither question needs the other to make sense.
+- "set office heat pump 1 to heating mode. The wash cycle is done, set bathroom washer 1 to stopped" → **2**. Two complete commands on different devices, with no shared trigger or chaining. "The wash cycle is done" stays with the washer command.
+
+**Split: concerns about different places**
+
+- "Ugh, the bathroom is so damp. And the living room feels kind of clammy too" → **2**. Two places. Each complaint is complete on its own and serves no command.
+
+**No split: the same request rephrased**
+
+- "is it still on the higher side, the humidity in the study room?" → **1**. One question, said twice.
+
+**No split: symptoms of one concern**
+
+- "Man the bathroom air feels kinda dusty my throat is a bit scratchy and my eyes feel gritty" → **1**. One condition in one place; the throat and eyes are symptoms of it.
+- "The bedroom is freezing tonight, my fingers are going numb, I can't relax at all and I'm worried the pipes by the window will crack" → **1**. Body, mood and a worry about the pipes all stem from the cold bedroom. Split off, "I can't relax at all" or "my fingers are going numb" would lose what they are about.
+
+**No split: several actions on one device at one moment**
+
+- "Okay utility room dryer 2, turn on, set to max and start running now" → **1**. Same device, same moment, one outcome.
+
+**No split: a reason, occasion or wish stays with its command**
+
+- "At 3:36 PM, turn on light 1 in the kids room so they have light for craft time while I am in the living room" → **1**. Split off, the reason would become ambiguous.
+- "Okay quick favor please power on bathroom light 1 now I need a bit more light to finish getting ready" → **1**. Same.
+- "I'm clearing the table, 20 minutes after the dishwasher 1 in the kitchen finishes, power on light 1 in the dining room" → **1**. Same.
+- "I want the bathroom fresh and the living room ready. At 12:41 PM, power on air purifier 1 in the bathroom and set the fan to a medium speed" → **1**. The wish frames the purifier command. Split off, "the living room ready" would be vaguer than it is inside the sentence.
+- "Okay I am about to start cooking so clear the air. Air purifier 1 in the kitchen power on and set the fan to eighty percent. Stop dishwasher 1 in the kitchen to avoid the noise. The kids just got home so light 1 in the kids room power on" → **3**. The three commands split. "Clear the air" is served by the purifier, so it stays with it rather than becoming a fourth intent.
+
+**No split: shared trigger**
+
+- "30 minutes after the dryer 1 in the utility room finishes power on air purifier 1 in the bathroom and also power on light 1 in the utility room" → **1**.
+- "Folding laundry and getting rooms ready. 23 minutes before the washer 1 in the utility room finishes, power on dehumidifier 1 in the bathroom and set its fan to 60% and set TV 1 in the living room to level 90" → **1**.
+
+**No split: steps chained in time**
+
+- "Wait for washer 1 in the utility room to finish. Then after 19 minutes start dryer 2 in the utility room and set it to Running state and Normal dryness level" → **1**. Split off, "Wait for washer 1 to finish" would be incomplete.
+- "Power on bathroom air purifier 1 and set the fan to 30 percent 28 minutes from now. Bump the fan to 40 percent 6 minutes after the previous action" → **1**. The second step is timed from the first.
 
 ## Writing the intent text
 
