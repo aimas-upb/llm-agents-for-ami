@@ -144,6 +144,29 @@ Import it the same way as `lab308.yaml`:
 When running HASP for this workspace:
 - set `AREAS` to the Home Assistant `area_id` created for `lab308e`
 - keep `BASE_WS_URI` aligned with the port you use to start `uvicorn`
+- set `SEMANTIC_CONFIG=lab308e.yaml` so the TDs carry the room and the
+  per-device overrides (see "Semantic typing" below)
+
+## Semantic typing (homeont / SAREF)
+HASP types every TD it serves with the home ontology
+(`ami_agents/shared/ontologies/homeont.ttl`), the same way SimuHome's TD builder
+does, so the agents' class-based ENV_STATE and capability queries work on a Home
+Assistant home:
+- the workspace's room (`homeont:StudyRoom`, ...) and its environment;
+- each device's class (`homeont:ColorLight`, `homeont:AirConditioner`, ...);
+- each property's class (`homeont:DimmableLightBrightness`, `homeont:Illuminance`, ...);
+- each action's command (`saref:OnCommand`, `homeont:SetModeCommand`, ...);
+- the TD-SOSA effect keys (`thermal_comfort` -> `homeont:AirTemperature`, ...).
+
+Defaults live in `semantic_mappings.yaml`. A home overrides them in the
+`semantic:` block of its config, read from `SEMANTIC_CONFIG`: `location_class`,
+and per device `device_class`, `properties` and `commands` (see `lab308e.yaml`).
+Anything unmapped stays untyped and is logged once.
+
+Each entity's state is its own property, `<domain>State` (`lightState`,
+`coverState`, `binarySensorState`; with the entity's object id appended when a
+device has two entities of one domain). `…/properties/state` is still served as
+a deprecated alias but is no longer advertised.
 
 ## 10) lab308e simulator loop
 `./simulate_lab308e.py` is a hardcoded real-time environment loop for `lab308e`.

@@ -71,28 +71,28 @@
   "pre_query_assertions": [
     {
       "type": "property_equals",
-      "path": "/workspaces/lab308e/artifacts/window_308e_cover/properties/state",
+      "path": "/workspaces/lab308e/artifacts/window_308e_cover/properties/coverState",
       "equals": "closed",
       "timeout_seconds": 20,
       "poll_interval_seconds": 1
     },
     {
       "type": "property_equals",
-      "path": "/workspaces/lab308e/artifacts/ceiling_fan_308e/properties/state",
+      "path": "/workspaces/lab308e/artifacts/ceiling_fan_308e/properties/switchState",
       "equals": "off",
       "timeout_seconds": 20,
       "poll_interval_seconds": 1
     },
     {
       "type": "property_equals",
-      "path": "/workspaces/lab308e/artifacts/person_counter_308e/properties/state",
+      "path": "/workspaces/lab308e/artifacts/person_counter_308e/properties/sensorState",
       "equals": 1,
       "timeout_seconds": 20,
       "poll_interval_seconds": 1
     },
     {
       "type": "property_equals",
-      "path": "/workspaces/lab308e/artifacts/presence_sensing_308e/properties/state",
+      "path": "/workspaces/lab308e/artifacts/presence_sensing_308e/properties/binarySensorState",
       "equals": "on",
       "timeout_seconds": 20,
       "poll_interval_seconds": 1
@@ -119,14 +119,14 @@
   "pass_criteria": [
     {
       "type": "property_equals",
-      "path": "/workspaces/lab308e/artifacts/window_308e_cover/properties/state",
+      "path": "/workspaces/lab308e/artifacts/window_308e_cover/properties/coverState",
       "equals": "open",
       "timeout_seconds": 30,
       "poll_interval_seconds": 1
     },
     {
       "type": "property_lte",
-      "path": "/workspaces/lab308e/artifacts/co2_sensing_308e/properties/state",
+      "path": "/workspaces/lab308e/artifacts/co2_sensing_308e/properties/sensorState",
       "lte": 2100,
       "timeout_seconds": 60,
       "poll_interval_seconds": 1

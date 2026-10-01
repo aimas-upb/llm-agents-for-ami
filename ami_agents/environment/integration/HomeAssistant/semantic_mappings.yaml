@@ -1,0 +1,116 @@
+# Home Assistant -> home ontology (homeont / SAREF) mappings for HASP.
+#
+# HASP types the TDs it serves from this table, so the agents' ENV_STATE and
+# ENV_CAPABILITY_QUERY resolvers -- SPARQL over ontology classes -- answer on a
+# Home Assistant home exactly as they do on a SimuHome one. The SimuHome
+# counterpart is tests/simuhome/td/mappings/*.yaml.
+#
+# Defaults only. A home overrides any of them per device in the `semantic:`
+# block of its own config (the file SEMANTIC_CONFIG points at); see
+# lab308e.yaml.
+#
+# Rules are tried in order and the first match wins, so a specific rule
+# (a device family, a device_class) goes before the general one it refines.
+# A rule's conditions:
+#   domain        HA entity domain (light, climate, ...)
+#   device_class  the entity's `device_class` attribute (one or a list)
+#   unit          the entity's `unit_of_measurement`
+#   supports      light only: brightness | color, from supported_color_modes
+#   hvac_modes_include   climate only: a mode the entity offers
+#   device        the homeont class already chosen for the device (one or a list)
+#   signal        `state`, or the attribute a property reads (one or a list)
+#   service       the HA service an action calls (one or a list)
+# Anything unmapped gets no domain type -- never an invented one -- and HASP
+# logs it once.
+
+# -- What a device is ----------------------------------------------------------
+# Decided from the device's primary entity: the first of its domains in
+# `domain_priority`.
+domain_priority: [climate, media_player, cover, light, fan, switch, binary_sensor, sensor]
+
+device_classes:
+  - {domain: climate, hvac_modes_include: cool, class: "homeont:AirConditioner"}
+  - {domain: climate, class: "homeont:Heater"}
+  - {domain: media_player, class: "homeont:MediaPlayer"}
+  - {domain: cover, class: "homeont:WindowCoveringController"}
+  - {domain: light, supports: color, class: "homeont:ColorLight"}
+  - {domain: light, supports: brightness, class: "homeont:DimmableLight"}
+  - {domain: light, class: "homeont:OnOffLight"}
+  - {domain: fan, class: "homeont:Fan"}
+  - {domain: sensor, device_class: temperature, class: "homeont:TemperatureSensor"}
+  - {domain: sensor, device_class: humidity, class: "homeont:HumiditySensor"}
+  - {domain: sensor, device_class: illuminance, class: "homeont:LightSensor"}
+  - {domain: sensor, device_class: carbon_dioxide, class: "homeont:CarbonDioxideSensor"}
+  - {domain: sensor, unit: ppm, class: "homeont:CarbonDioxideSensor"}
+  - {domain: sensor, unit: persons, class: "homeont:OccupancySensor"}
+  - {domain: binary_sensor, device_class: [occupancy, presence, motion], class: "homeont:OccupancySensor"}
+
+# -- What a property is ----------------------------------------------------------
+# The family leaf where homeont has one (DimmableLightBrightness), the generic
+# class otherwise. `declared: true` emits the property even while HA reports no
+# value for it -- an off light has no `brightness` attribute, yet it can be
+# dimmed; `default` is the value its schema is typed from.
+properties:
+  - {domain: light, signal: state, device: ["homeont:DimmableLight", "homeont:ColorLight"], class: "homeont:DimmableLightOnOff"}
+  - {domain: light, signal: state, device: "homeont:OnOffLight", class: "homeont:OnOffLightOnOff"}
+  - {domain: light, signal: state, class: "homeont:OnOff"}
+  - {domain: light, signal: brightness, supports: brightness, device: ["homeont:DimmableLight", "homeont:ColorLight"], class: "homeont:DimmableLightBrightness", declared: true, default: 0}
+  - {domain: light, signal: brightness, class: "homeont:LevelControlBrightness"}
+  - {domain: light, signal: rgb_color, class: "homeont:LightColor"}
+
+  - {domain: cover, signal: current_position, device: "homeont:WindowCoveringController", class: "homeont:WindowCoveringControllerPosition"}
+  - {domain: cover, signal: current_position, class: "homeont:WindowCoveringPosition"}
+
+  # A climate entity's state *is* its HVAC mode.
+  - {domain: climate, signal: state, device: "homeont:AirConditioner", class: "homeont:AirConditionerHvacMode"}
+  - {domain: climate, signal: state, device: "homeont:Heater", class: "homeont:HeaterHvacMode"}
+  - {domain: climate, signal: state, class: "homeont:ThermostatHvacMode"}
+  - {domain: climate, signal: temperature, device: "homeont:Heater", class: "homeont:HeaterHeatingSetpoint"}
+  - {domain: climate, signal: temperature, class: "homeont:TemperatureSetpoint"}
+  - {domain: climate, signal: fan_mode, device: "homeont:AirConditioner", class: "homeont:AirConditionerFanMode"}
+  - {domain: climate, signal: fan_mode, class: "homeont:FanControlFanMode"}
+  # The thermostat's own reading of the room's air.
+  - {domain: climate, signal: current_temperature, class: "homeont:AirTemperature"}
+
+  - {domain: fan, signal: state, class: "homeont:FanOnOff"}
+  - {domain: fan, signal: percentage, class: "homeont:FanFanSpeed"}
+  - {domain: fan, signal: preset_mode, class: "homeont:FanFanMode"}
+  - {domain: switch, signal: state, device: "homeont:Fan", class: "homeont:FanOnOff"}
+  - {domain: switch, signal: state, class: "homeont:OnOff"}
+
+  - {domain: media_player, signal: state, class: "homeont:MediaPlaybackState"}
+  - {domain: media_player, signal: volume_level, class: "homeont:Volume"}
+  - {domain: media_player, signal: source, class: "homeont:MediaInputSource"}
+
+  # Room variables, read by the sensor in the room.
+  - {domain: sensor, signal: state, device_class: temperature, class: "homeont:AirTemperature"}
+  - {domain: sensor, signal: state, device_class: humidity, class: "homeont:RelativeHumidity"}
+  - {domain: sensor, signal: state, device_class: illuminance, class: "homeont:Illuminance"}
+  - {domain: sensor, signal: state, device_class: carbon_dioxide, class: "homeont:CarbonDioxideConcentration"}
+  - {domain: sensor, signal: state, unit: ppm, class: "homeont:CarbonDioxideConcentration"}
+  - {domain: sensor, signal: state, unit: persons, class: "homeont:OccupantCount"}
+  - {domain: binary_sensor, signal: state, device_class: [occupancy, presence, motion], class: "homeont:Occupancy"}
+
+# -- What an action does -----------------------------------------------------------
+commands:
+  - {service: turn_on, class: "saref:OnCommand"}
+  - {service: turn_off, class: "saref:OffCommand"}
+  - {service: [toggle, media_play_pause], class: "saref:ToggleCommand"}
+  - {service: open_cover, class: "saref:OpenCommand"}
+  - {service: close_cover, class: "saref:CloseCommand"}
+  - {service: [stop_cover, media_stop], class: "saref:StopCommand"}
+  - {service: media_play, class: "saref:StartCommand"}
+  - {service: media_pause, class: "saref:PauseCommand"}
+  - {service: [set_cover_position, set_temperature, set_humidity, set_percentage, volume_set], class: "saref:SetAbsoluteLevelCommand"}
+  - {service: [volume_up, increase_speed], class: "saref:StepUpCommand"}
+  - {service: [volume_down, decrease_speed], class: "saref:StepDownCommand"}
+  - {service: [set_hvac_mode, set_fan_mode, set_preset_mode, set_swing_mode, set_swing_horizontal_mode, select_source, select_sound_mode, set_mode, set_direction], class: "homeont:SetModeCommand"}
+
+# -- Room variables HASP's TD-SOSA effect keys stand for -------------------------
+# The key-based URIs (…/environment/thermal_comfort) are kept; this adds the
+# homeont class beside them.
+environment_variables:
+  thermal_comfort: "homeont:AirTemperature"
+  luminosity: "homeont:Illuminance"
+  humidity: "homeont:RelativeHumidity"
+  occupancy_presence: "homeont:Occupancy"

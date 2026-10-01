@@ -75,14 +75,14 @@
       "assertions": [
         {
           "type": "property_lte",
-          "path": "/workspaces/lab308e/artifacts/glare_sensing_308e/properties/state",
+          "path": "/workspaces/lab308e/artifacts/glare_sensing_308e/properties/sensorState",
           "lte": 50,
           "timeout_seconds": 30,
           "poll_interval_seconds": 1
         },
         {
           "type": "property_equals",
-          "path": "/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/properties/state",
+          "path": "/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/properties/coverState",
           "equals": "closed",
           "timeout_seconds": 30,
           "poll_interval_seconds": 1

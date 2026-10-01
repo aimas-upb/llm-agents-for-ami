@@ -1479,3 +1479,108 @@ property."""@en ;
     rdfs:label "Relative Humidity Measurement Tolerance"@en ;
     rdfs:comment """The relative humidity measurement tolerance reported by the device."""@en ;
     rdfs:subClassOf ssn-system:Accuracy .
+
+################################################################################
+# 9. Home Assistant deployments (lab308e)
+#
+# Classes a Home Assistant home needs and the SimuHome corpus never did: room
+# variables a lab measures (CO2, occupancy, glare), the devices that measure
+# or change them, and the media and colour controls HA exposes. Each sits under
+# the same roots as the rest of this vocabulary, so the parsers, the resolvers
+# and SimuHome's TDs are unaffected by their addition.
+################################################################################
+
+# -- Room variables (a space's environment) ------------------------------------
+
+:CarbonDioxideConcentration a owl:Class ;
+	rdfs:label "CO2 Concentration"@en ;
+	rdfs:comment "How much carbon dioxide the air of a space holds, in parts per million. Rises with the number of people in the room and falls with ventilation; the usual measure of how stuffy a room is."@en ;
+	rdfs:subClassOf sosa:ObservableProperty ;
+	ssn:isPropertyOf :Environment ;
+	qudt:unit unit:PPM .
+
+:Occupancy a owl:Class ;
+	rdfs:label "Occupancy"@en ;
+	rdfs:comment "Whether anyone is present in a space: true while it is occupied, false while it is empty."@en ;
+	rdfs:subClassOf sosa:ObservableProperty ;
+	ssn:isPropertyOf :Environment .
+
+:OccupantCount a owl:Class ;
+	rdfs:label "Occupant Count"@en ;
+	rdfs:comment "How many people are present in a space."@en ;
+	rdfs:subClassOf sosa:ObservableProperty ;
+	ssn:isPropertyOf :Environment ;
+	qudt:unit unit:NUM .
+
+:Glare a owl:Class ;
+	rdfs:label "Glare"@en ;
+	rdfs:comment "How much uncomfortably bright light falls on the working surfaces or screens of a space, as a percentage. Direct sunlight raises it; closing blinds lowers it."@en ;
+	rdfs:subClassOf sosa:ObservableProperty ;
+	ssn:isPropertyOf :Environment ;
+	qudt:unit unit:PERCENT .
+
+# -- Devices --------------------------------------------------------------------
+
+:ColorLight a owl:Class ;
+	rdfs:label "Color Light"@en ;
+	rdfs:comment "A dimmable lamp that can also change the colour of the light it emits."@en ;
+	rdfs:subClassOf :DimmableLight .
+
+:Heater a owl:Class ;
+	rdfs:label "Heater"@en ;
+	rdfs:comment "A climate device that can only heat a space, towards a target temperature."@en ;
+	rdfs:subClassOf saref:HVAC .
+
+:MediaPlayer a owl:Class ;
+	rdfs:label "Media Player"@en ;
+	rdfs:comment "A device that plays or shows media: a projector, a display wall, a speaker."@en ;
+	rdfs:subClassOf saref:Appliance .
+
+:CarbonDioxideSensor a owl:Class ;
+	rdfs:label "CO2 Sensor"@en ;
+	rdfs:comment "An instrument that measures the carbon dioxide concentration of the air of the space it is in."@en ;
+	rdfs:subClassOf saref:Sensor .
+
+:OccupancySensor a owl:Class ;
+	rdfs:label "Occupancy Sensor"@en ;
+	rdfs:comment "An instrument that detects whether people are present in the space it is in, or counts them."@en ;
+	rdfs:subClassOf saref:Sensor .
+
+:GlareSensor a owl:Class ;
+	rdfs:label "Glare Sensor"@en ;
+	rdfs:comment "An instrument that measures glare on the working surfaces or screens of the space it is in."@en ;
+	rdfs:subClassOf saref:Sensor .
+
+# -- Device properties ------------------------------------------------------------
+
+:LightColor a owl:Class ;
+	rdfs:label "Light Color"@en ;
+	rdfs:comment "The colour of the light a lamp emits."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty .
+
+:Volume a owl:Class ;
+	rdfs:label "Volume"@en ;
+	rdfs:comment "How loud a media device plays, as a level from silent to its maximum."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty .
+
+:MediaInputSource a owl:Class ;
+	rdfs:label "Media Input Source"@en ;
+	rdfs:comment "Which input a media device shows or plays, chosen from the sources it offers (for example an HDMI port or a wireless share)."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty .
+
+:MediaPlaybackState a owl:Class ;
+	rdfs:label "Media Playback State"@en ;
+	rdfs:comment "What a media device is doing: off, on and idle, playing, or paused."@en ;
+	rdfs:subClassOf :DeviceStateProperty .
+
+:HeaterHvacMode a owl:Class ;
+	rdfs:label "Heater Hvac Mode"@en ;
+	rdfs:comment "What the climate device is trying to do: off or heating, on a heater."@en ;
+	rdfs:subClassOf :ThermostatHvacMode .
+
+:HeaterHeatingSetpoint a owl:Class ;
+	rdfs:label "Heater Heating Setpoint"@en ;
+	rdfs:comment "The temperature a heater heats the space towards."@en ;
+	rdfs:subClassOf :TemperatureSetpoint ;
+	qudt:hasQuantityKind quantitykind:ThermodynamicTemperature ;
+	qudt:unit unit:DEG_C .

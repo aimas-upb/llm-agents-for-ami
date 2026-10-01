@@ -30,7 +30,7 @@
   "pre_query_assertions": [
     {
       "type": "property_gte",
-      "path": "/workspaces/lab308e/artifacts/glare_sensing_308e/properties/state",
+      "path": "/workspaces/lab308e/artifacts/glare_sensing_308e/properties/sensorState",
       "gte": 50,
       "timeout_seconds": 20,
       "poll_interval_seconds": 1
@@ -102,7 +102,7 @@
   "pass_criteria": [
     {
       "type": "property_in",
-      "path": "/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/properties/state",
+      "path": "/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/properties/coverState",
       "values": ["closed", "closing"],
       "timeout_seconds": 60,
       "poll_interval_seconds": 1

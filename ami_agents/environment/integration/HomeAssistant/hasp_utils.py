@@ -148,7 +148,7 @@ class HomeAssistantRDF:
         }.items():
             self.g.bind(p, ns)
 
-    def _add_action(self, subj: URIRef, name: str, type_uri: URIRef,
+    def _add_action(self, subj: URIRef, name: str, type_uri: Optional[URIRef],
                     method: str, target: URIRef, ctype: str,
                     subproto: Optional[str] = None,
                     input_schema: Optional[BNode] = None,
@@ -157,7 +157,10 @@ class HomeAssistantRDF:
         act = BNode()
         self.g.add((subj, TD.hasActionAffordance, act))
         self.g.add((act, RDF.type, TD.ActionAffordance))
-        self.g.add((act, RDF.type, type_uri))
+        # None for an action whose kind the caller types itself (HASP adds the
+        # homeont / SAREF command class from semantic_mappings.yaml).
+        if type_uri is not None:
+            self.g.add((act, RDF.type, type_uri))
         self.g.add((act, TD.name, Literal(name)))
         self.g.add((act, TD.title, Literal(name)))
         if description:
@@ -449,6 +452,9 @@ class HomeAssistantRDF:
                     self.g.add((schema, JS.minimum, Literal(min_mireds)))
                 if max_mireds is not None:
                     self.g.add((schema, JS.maximum, Literal(max_mireds)))
+            elif attr_name in ("current_position", "current_tilt_position", "percentage"):
+                self.g.add((schema, JS.minimum, Literal(0)))
+                self.g.add((schema, JS.maximum, Literal(100)))
             elif attr_name == "temperature":
                 min_temp = entity_attributes.get("min_temp")
                 max_temp = entity_attributes.get("max_temp")
@@ -463,6 +469,9 @@ class HomeAssistantRDF:
                     self.g.add((schema, JS.description, Literal(f"Sensor value in {unit}")))
         elif isinstance(attr_value, float):
             self.g.add((schema, RDF.type, JS.NumberSchema))
+            if attr_name == "volume_level":
+                self.g.add((schema, JS.minimum, Literal(0.0)))
+                self.g.add((schema, JS.maximum, Literal(1.0)))
             # Add constraints for temperature-related attributes
             if attr_name in ("temperature", "current_temperature", "target_temp_low", "target_temp_high"):
                 min_temp = entity_attributes.get("min_temp")
@@ -499,14 +508,22 @@ class HomeAssistantRDF:
                 modes = entity_attributes.get("supported_color_modes", [])
                 for mode in modes:
                     self.g.add((schema, JS.enum, Literal(mode)))
+            elif attr_name == "source":
+                for source in entity_attributes.get("source_list", []) or []:
+                    self.g.add((schema, JS.enum, Literal(source)))
             elif attr_name == "state":
-                # Only add binary enum for states that are actually binary
-                # Skip binary enum for sensor domain or entities with unit_of_measurement
+                # What a state can be depends on the domain: a climate entity's
+                # state is its HVAC mode, a cover's is open/closed. Only the
+                # switch-like domains are binary; a sensor's value is open-ended.
                 unit = entity_attributes.get("unit_of_measurement")
-                if not (entity_domain == "sensor" or unit):
-                    # This is likely a binary state (switch, light, etc.)
-                    self.g.add((schema, JS.enum, Literal("on")))
-                    self.g.add((schema, JS.enum, Literal("off")))
+                if entity_domain == "climate":
+                    values = entity_attributes.get("hvac_modes", []) or []
+                else:
+                    values = STATE_VALUES.get(entity_domain or "", [])
+                    if not values and not (entity_domain == "sensor" or unit):
+                        values = ["on", "off"]
+                for value in values:
+                    self.g.add((schema, JS.enum, Literal(value)))
         elif isinstance(attr_value, (list, tuple)):
             self.g.add((schema, RDF.type, JS.ArraySchema))
             # For RGB colors
@@ -606,6 +623,46 @@ class HomeAssistantRDF:
     def serialize(self) -> str:
         out = self.g.serialize(format="turtle")
         return out.decode() if isinstance(out, bytes) else out
+
+# The states a domain's entities take, where the set is closed. Climate is
+# absent: its state is its HVAC mode, listed per entity in `hvac_modes`.
+STATE_VALUES = {
+    "light": ["on", "off"],
+    "switch": ["on", "off"],
+    "fan": ["on", "off"],
+    "binary_sensor": ["on", "off"],
+    "cover": ["open", "closed", "opening", "closing"],
+    "media_player": ["off", "on", "idle", "playing", "paused", "standby"],
+}
+
+
+def _camel(text: str, first_upper: bool) -> str:
+    parts = [p for p in "".join(c if c.isalnum() else " " for c in text).split() if p]
+    out = "".join(p[:1].upper() + p[1:] for p in parts)
+    return out if first_upper else out[:1].lower() + out[1:]
+
+
+def state_property_names(entity_ids: List[str]) -> Dict[str, str]:
+    """entity_id -> the name of the property that reads its state.
+
+    `<domain>State` (`lightState`, `mediaPlayerState`), so every entity of a
+    device has its own property instead of all of them sharing `state`. Where a
+    device has two entities of one domain the entity's object id tells them
+    apart: `sensorTemperatureSensing308eState`.
+    """
+    domains: Dict[str, int] = {}
+    for entity_id in entity_ids:
+        domain = entity_id.split(".", 1)[0]
+        domains[domain] = domains.get(domain, 0) + 1
+    names: Dict[str, str] = {}
+    for entity_id in entity_ids:
+        domain, _, object_id = entity_id.partition(".")
+        stem = _camel(domain, first_upper=False)
+        if domains[domain] > 1:
+            stem += _camel(object_id, first_upper=True)
+        names[entity_id] = f"{stem}State"
+    return names
+
 
 # Common metadata/admin attributes to filter out
 METADATA_ATTRIBUTES = {

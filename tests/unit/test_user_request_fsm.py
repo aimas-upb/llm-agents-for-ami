@@ -193,7 +193,6 @@ class TestSegmenting:
         state = fsm._states[SEGMENTING]
         with patch("ami_agents.agents.user_assistant.behaviours.user_request.pipeline") as pl:
             pl.fetch_capabilities = AsyncMock(return_value="{}")
-            pl.filter_capabilities_json = MagicMock(return_value={})
             pl.segment_into_atomic_intents = AsyncMock(return_value=[])
             await state.run()
 
@@ -209,7 +208,6 @@ class TestSegmenting:
         state = fsm._states[SEGMENTING]
         with patch("ami_agents.agents.user_assistant.behaviours.user_request.pipeline") as pl:
             pl.fetch_capabilities = AsyncMock(return_value="{}")
-            pl.filter_capabilities_json = MagicMock(return_value={})
             pl.segment_into_atomic_intents = AsyncMock(return_value=[intent])
             await state.run()
 
@@ -219,3 +217,39 @@ class TestSegmenting:
                              "type": "GOAL_REQUEST",
                              "qualifiers": ["incomplete", "achievement"],
                              "reason": "asks for an action"}]
+
+
+class _FakeStructuring:
+    """Stands in for a structuring OneShotBehaviour: done as soon as joined."""
+
+    def __init__(self, intent_text, logger=None):
+        self.intent_text = intent_text
+        self.error = None
+        self.result = {"text_intent": intent_text,
+                       "request_performative": "query_if",
+                       "device_property": {"class": "homeont:LevelControlBrightness"}}
+
+    async def join(self):
+        return None
+
+
+class TestExtracting:
+    @pytest.mark.asyncio
+    async def test_a_capability_question_is_structured_and_answered(self):
+        """No goal, so nothing to plan: structured, answered, done."""
+        fsm, agent = make_fsm(text="can you dim the kitchen lights")
+        fsm.atomic_intents = [MagicMock(text="can you dim the kitchen lights",
+                                        type="ENV_CAPABILITIES_REQUEST")]
+        fsm.answer_capabilities_query = AsyncMock()
+        state = fsm._states[EXTRACTING]
+        with patch("ami_agents.agents.user_assistant.behaviours.user_request."
+                   "EnvCapabilityStructuringBehaviour", _FakeStructuring):
+            await state.run()
+
+        agent.add_behaviour.assert_called_once()
+        fsm.answer_capabilities_query.assert_awaited_once()
+        sent = fsm.answer_capabilities_query.await_args[0][0]
+        assert sent["request_performative"] == "query_if"
+        assert sent["device_property"]["class"] == "homeont:LevelControlBrightness"
+        assert state.next_state == DONE
+        assert agent.requests.get("req-1").outcome == "answered"

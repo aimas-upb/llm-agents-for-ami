@@ -30,17 +30,13 @@ class TestLabels:
         assert label_for("homeont:Tv") == "TV"
         assert label_for("homeont:CompartmentTemperature") == "Compartment Temperature"
 
-    def test_every_class_in_the_capabilities_context_has_one(self):
+    def test_every_class_in_the_ontology_context_has_one(self):
         """A class added to homeont without a label would surface as CamelCase."""
         from ami_agents.agents.user_assistant.utils.ontology_context import (
-            get_capabilities_context)
+            get_ontology_context, iter_classes)
         from ami_agents.shared.utils.namespaces import local_name
 
-        context = get_capabilities_context()
-        classes = [e["class"] for e in context["locations"]
-                   + context["device_types"] + context["environment_variables"]]
-        for section in context["device_properties"].values():
-            classes += [e["class"] for e in section]
+        classes = [cls for cls, _, _ in iter_classes(get_ontology_context())]
 
         unlabelled = [c for c in classes if label_for(c) == local_name(c)
                       and " " not in label_for(c) and label_for(c) == local_name(c)

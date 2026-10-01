@@ -8,9 +8,11 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 from rdflib import Graph, Literal, Namespace, RDF, URIRef
 
 try:
-    from .hasp_utils import HomeAssistantRDF
+    from .hasp_utils import HomeAssistantRDF, state_property_names
+    from . import hasp_semantics
 except ImportError:  # pragma: no cover
-    from hasp_utils import HomeAssistantRDF
+    from hasp_utils import HomeAssistantRDF, state_property_names
+    import hasp_semantics
 
 
 HMAS = Namespace("https://purl.org/hmas/")
@@ -467,6 +469,17 @@ class HASPGraphCache:
         async with self._lock:
             _, device_entities, _, _, _ = self._resolve_artifact_unlocked(workspace_id, artifact_name)
             decoded_property_name = urllib.parse.unquote(property_name)
+            # `<domain>State` names one entity's state (see
+            # `state_property_names`); bare `state` is the deprecated alias
+            # that reads the first entity with one.
+            state_names = state_property_names(
+                [e.get("entity_id") for e in device_entities if e.get("entity_id")])
+            named_entity = next((entity_id for entity_id, name in state_names.items()
+                                 if name == decoded_property_name), None)
+            if named_entity is not None:
+                device_entities = [e for e in device_entities
+                                   if e.get("entity_id") == named_entity]
+                decoded_property_name = "state"
             for entity in device_entities:
                 entity_id = entity.get("entity_id")
                 entity_state = self.states_by_entity_id.get(entity_id, {})
@@ -685,6 +698,11 @@ class HASPGraphCache:
     ) -> str:
         rdf = HomeAssistantRDF(self.base_uri)
         rdf.workspace_to_rdf(area, [])
+        # The room the area is, and its environment: what the class-based
+        # resolvers scope by and name the room with.
+        hasp_semantics.add_room(
+            rdf.g, rdf.base, area,
+            URIRef(f"{rdf.base}workspaces/{area['area_id']}#workspace"))
         if entities:
             aid = area["area_id"]
             ws = URIRef(f"{rdf.base}workspaces/{aid}#workspace")

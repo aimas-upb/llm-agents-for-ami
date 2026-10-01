@@ -234,6 +234,17 @@ def domain_types(values: Iterable) -> List[str]:
     return [shorten(v) for v in (values or []) if is_domain_type(v)]
 
 
+def action_types(values: Iterable) -> List[str]:
+    """The terms that say what an action does, as CURIEs.
+
+    Home-ontology terms plus SAREF's command classes (`saref:OnCommand`,
+    `saref:SetAbsoluteLevelCommand`): actions are typed from both vocabularies.
+    Protocol actions (WebSub, JaCaMo artifact CRUD) carry neither.
+    """
+    return [shorten(v) for v in (values or [])
+            if is_domain_type(v) or in_namespace(v, SAREF)]
+
+
 def local_name(value: TermLike) -> str:
     """The bare local name of a term ('' if there is none)."""
     parts = split(value)

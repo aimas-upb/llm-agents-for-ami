@@ -1,68 +1,111 @@
-"""The capabilities context is a projection, so it is testable without an LLM.
+"""The ontology context is a projection, so it is testable without an LLM.
 
-These tests pin the shape the ENV_STATE parser prompt depends on. Two of them
-guard properties that would otherwise fail silently: the rdfs:label fallback
-(19 classes have no rdfs:comment) and the immediate-superclass rule (flattening
-to a branch root would make "pick the most specific class" unfollowable).
+These tests pin the shape the ENV_STATE and ENV_CAPABILITIES parser prompts
+depend on: every section a tree keyed by its root class. Two of them guard
+properties that would otherwise fail silently: the rdfs:label fallback (19
+classes have no rdfs:comment) and the nesting itself (flattening to a branch
+root would make "pick the most specific class" unfollowable).
 """
 
 import pytest
 
 from ami_agents.agents.user_assistant.utils.ontology_context import (
-    build_capabilities_context,
-    get_capabilities_context,
-    get_capabilities_context_json,
+    build_ontology_context,
+    get_capability_ontology_context,
+    get_capability_ontology_context_json,
+    get_ontology_context,
+    get_ontology_context_json,
+    iter_classes,
 )
 
-BRANCH_ROOTS = {
+PROPERTY_ROOTS = [
     "homeont:ActuatableDeviceProperty",
     "homeont:DeviceStateProperty",
     "homeont:DeviceCapabilityProperty",
-    "homeont:BuildingSpace",
-}
+    "sosa:ObservableProperty",
+]
 
 
 @pytest.fixture(scope="module")
 def context():
-    return build_capabilities_context()
+    return build_ontology_context()
 
 
-def _all_entries(context):
-    yield from context["locations"]
-    yield from context["device_types"]
-    for section in context["device_properties"].values():
-        yield from section
-    yield from context["environment_variables"]
+@pytest.fixture(scope="module")
+def capability_context():
+    return build_ontology_context(view="capabilities")
+
+
+def _nodes(context):
+    """class -> node, roots excluded (they carry no `class` key)."""
+    return {cls: node for cls, parent, node in iter_classes(context)
+            if parent is not None}
+
+
+def _parents(context):
+    return {cls: parent for cls, parent, _ in iter_classes(context)
+            if parent is not None}
+
+
+def _descendants(node):
+    for child in node.get("subclasses") or []:
+        yield child["class"]
+        yield from _descendants(child)
 
 
 class TestSections:
+    def test_sections_are_keyed_by_their_root_class(self, context):
+        assert list(context["locations"]) == ["homeont:BuildingSpace"]
+        assert list(context["device_types"]) == ["saref:Device"]
+        assert list(context["device_properties"]) == PROPERTY_ROOTS
+        assert list(context["environment_variables"]) == ["sosa:ObservableProperty"]
+
     def test_section_counts(self, context):
         properties = context["device_properties"]
-        assert len(context["locations"]) == 16
+        assert len(list(_descendants(context["locations"]["homeont:BuildingSpace"]))) == 16
         # 16 SimuHome device families + the 4 virtual ambient sensors SHTD
-        # mints, which the parser must be able to name ("the light sensor").
-        assert len(context["device_types"]) == 20
-        assert len(properties["capabilities"]) == 19
-        assert len(properties["states"]) == 47
-        assert len(properties["actuatable"]) == 93
-        assert len(properties["measurements"]) == 10
-        assert len(context["environment_variables"]) == 4
+        # mints + 6 Home Assistant (lab308e) devices, under the five SAREF
+        # families.
+        devices = context["device_types"]["saref:Device"]
+        assert len(devices["subclasses"]) == 5
+        assert len(list(_descendants(devices))) == 5 + 20 + 6
+        assert len(list(_descendants(properties["homeont:DeviceCapabilityProperty"]))) == 19
+        assert len(list(_descendants(properties["homeont:DeviceStateProperty"]))) == 47 + 1
+        assert len(list(_descendants(properties["homeont:ActuatableDeviceProperty"]))) == 93 + 5
+        assert len(list(_descendants(properties["sosa:ObservableProperty"]))) == 10
+        assert len(list(_descendants(
+            context["environment_variables"]["sosa:ObservableProperty"]))) == 8
 
     def test_the_ambient_sensors_are_saref_sensors(self, context):
         """The parent is what closes the path to saref:Device for a resolver."""
-        sensors = {e["class"]: e["parent_class"] for e in context["device_types"]
-                   if e["class"].endswith("Sensor")}
+        parents = _parents(context)
+        sensors = {cls: parents[cls] for cls in parents
+                   if cls.startswith("homeont:") and cls.endswith("Sensor")}
         assert sensors == {
             "homeont:TemperatureSensor": "saref:Sensor",
             "homeont:HumiditySensor": "saref:Sensor",
             "homeont:LightSensor": "saref:Sensor",
             "homeont:AirQualitySensor": "saref:Sensor",
+            # Home Assistant (lab308e)
+            "homeont:CarbonDioxideSensor": "saref:Sensor",
+            "homeont:OccupancySensor": "saref:Sensor",
+            "homeont:GlareSensor": "saref:Sensor",
         }
 
-    def test_environment_variables_are_the_four_room_variables(self, context):
-        assert [e["class"] for e in context["environment_variables"]] == [
+    def test_saref_devices_no_graph_uses_are_left_out(self, context):
+        devices = set(_descendants(context["device_types"]["saref:Device"]))
+        assert "saref:Switch" not in devices
+        assert "saref:SmokeSensor" not in devices
+
+    def test_environment_variables_are_the_room_variables(self, context):
+        root = context["environment_variables"]["sosa:ObservableProperty"]
+        assert [n["class"] for n in root["subclasses"]] == [
             "homeont:AirTemperature",
+            "homeont:CarbonDioxideConcentration",
+            "homeont:Glare",
             "homeont:Illuminance",
+            "homeont:Occupancy",
+            "homeont:OccupantCount",
             "homeont:Pm10MassConcentration",
             "homeont:RelativeHumidity",
         ]
@@ -74,26 +117,30 @@ class TestSections:
         kind; only ssn:isPropertyOf separates "how warm is the kitchen" from
         "how cold is the freezer".
         """
-        measurements = {
-            e["class"] for e in context["device_properties"]["measurements"]
-        }
-        environment = {e["class"] for e in context["environment_variables"]}
+        measurements = set(_descendants(
+            context["device_properties"]["sosa:ObservableProperty"]))
+        environment = set(_descendants(
+            context["environment_variables"]["sosa:ObservableProperty"]))
         assert "homeont:CompartmentTemperature" in measurements
         assert "homeont:CompartmentTemperature" not in environment
         assert "homeont:AirTemperature" not in measurements
 
+    def test_state_view_has_no_capability_sections(self, context):
+        assert "commands" not in context
+        assert "device_metadata" not in context
 
-class TestEntries:
-    def test_every_entry_has_class_description_and_parent(self, context):
-        for entry in _all_entries(context):
-            assert entry["class"], entry
-            assert entry["description"], entry
-            assert entry["parent_class"], entry
+
+class TestNodes:
+    def test_every_node_has_class_and_description(self, context):
+        for cls, parent, node in iter_classes(context):
+            assert node["description"], cls
+            if parent is not None:
+                assert node["class"] == cls
 
     def test_identifiers_are_curies(self, context):
-        for entry in _all_entries(context):
-            assert ":" in entry["class"]
-            assert not entry["class"].startswith("http"), entry
+        for cls, _, _ in iter_classes(context):
+            assert ":" in cls
+            assert not cls.startswith("http"), cls
 
     def test_label_fallback_when_no_comment(self, context):
         """19 classes carry no rdfs:comment and fall back to rdfs:label.
@@ -101,79 +148,103 @@ class TestEntries:
         Asserted by value, not merely non-emptiness: a regression that dropped
         comments everywhere would still pass a truthiness check.
         """
-        by_class = {e["class"]: e for e in _all_entries(context)}
-        assert by_class["homeont:AirConditioner"]["description"] == "Air Conditioner"
-        assert by_class["homeont:Illuminance"]["description"] == "Illuminance"
+        nodes = _nodes(context)
+        assert nodes["homeont:AirConditioner"]["description"] == "Air Conditioner"
+        assert nodes["homeont:Illuminance"]["description"] == "Illuminance"
 
     def test_comment_preferred_over_label(self, context):
-        by_class = {e["class"]: e for e in _all_entries(context)}
-        description = by_class["homeont:CompartmentTemperature"]["description"]
+        description = _nodes(context)["homeont:CompartmentTemperature"]["description"]
         assert "NOT the temperature of the room" in description
 
-    def test_parent_is_immediate_superclass_not_branch_root(self, context):
+    def test_nesting_follows_the_immediate_superclass(self, context):
         """Flattening to the root would hide the middle of a 3-level branch."""
-        by_class = {e["class"]: e for e in _all_entries(context)}
-        leaf = by_class["homeont:AirConditionerFanMode"]
-        assert leaf["parent_class"] == "homeont:FanControlFanMode"
+        parents = _parents(context)
+        assert parents["homeont:AirConditionerFanMode"] == "homeont:FanControlFanMode"
+        assert parents["homeont:FanControlFanMode"] == "homeont:ActuatableDeviceProperty"
+        assert parents["homeont:DimmableLightBrightness"] == "homeont:LevelControlBrightness"
+        assert parents["homeont:GuestBedroom"] == "homeont:Bedroom"
 
-        mid = by_class["homeont:FanControlFanMode"]
-        assert mid["parent_class"] == "homeont:ActuatableDeviceProperty"
-
-    def test_device_types_parent_is_the_saref_class(self, context):
-        by_class = {e["class"]: e for e in context["device_types"]}
-        assert by_class["homeont:AirConditioner"]["parent_class"] == "saref:HVAC"
+    def test_device_types_nest_under_their_saref_family(self, context):
+        assert _parents(context)["homeont:AirConditioner"] == "saref:HVAC"
 
     def test_specific_leaves_are_present_for_generic_classes(self, context):
         """The parser can only be specific if the specific classes are offered."""
-        actuatable = {e["class"] for e in context["device_properties"]["actuatable"]}
-        assert "homeont:OnOff" in actuatable
-        assert "homeont:OnOffLightOnOff" in actuatable
-        assert "homeont:AirConditionerOnOff" in actuatable
+        actuatable = set(_descendants(
+            context["device_properties"]["homeont:ActuatableDeviceProperty"]))
+        assert {"homeont:OnOff", "homeont:OnOffLightOnOff",
+                "homeont:AirConditionerOnOff"} <= actuatable
+
+    def test_a_root_is_never_its_own_descendant(self, context):
+        for root, node in context["device_properties"].items():
+            assert root not in set(_descendants(node))
+
+    def test_no_class_appears_twice_in_a_section(self, context):
+        for root, node in context["device_properties"].items():
+            classes = list(_descendants(node))
+            assert len(classes) == len(set(classes)), root
 
 
 class TestMeasurementKeys:
     def test_present_where_the_ontology_states_them(self, context):
-        by_class = {e["class"]: e for e in context["environment_variables"]}
-        illuminance = by_class["homeont:Illuminance"]
+        illuminance = _nodes(context)["homeont:Illuminance"]
         assert illuminance["measurement_quantity"] == "quantitykind:Illuminance"
         assert illuminance["measurement_unit"] == "unit:LUX"
 
     def test_absent_rather_than_null_where_not_stated(self, context):
         """A missing quantity kind is an absent key, never a null value."""
-        by_class = {e["class"]: e for e in context["locations"]}
-        kitchen = by_class["homeont:Kitchen"]
+        kitchen = _nodes(context)["homeont:Kitchen"]
         assert "measurement_quantity" not in kitchen
         assert "measurement_unit" not in kitchen
 
     def test_quantity_without_unit_is_allowed(self, context):
         """PowerFactor is dimensionless: quantity kind, no unit."""
-        by_class = {
-            e["class"]: e for e in context["device_properties"]["measurements"]
-        }
-        power_factor = by_class["homeont:PowerFactor"]
+        power_factor = _nodes(context)["homeont:PowerFactor"]
         assert power_factor["measurement_quantity"]
         assert "measurement_unit" not in power_factor
 
 
+class TestCapabilityView:
+    def test_adds_commands_and_device_metadata(self, capability_context):
+        assert list(capability_context["commands"]) == ["saref:Command"]
+        assert [m["property"] for m in capability_context["device_metadata"]] == [
+            "schema:manufacturer", "schema:model"]
+
+    def test_shares_every_state_section(self, context, capability_context):
+        for key in context:
+            assert capability_context[key] == context[key], key
+
+    def test_commands_come_from_homeont_and_saref(self, capability_context):
+        commands = set(_descendants(capability_context["commands"]["saref:Command"]))
+        assert {"homeont:SetModeCommand", "homeont:SetOnOffCommand",
+                "saref:SetAbsoluteLevelCommand", "saref:OnCommand"} <= commands
+
+    def test_a_class_with_several_parents_appears_once(self, capability_context):
+        """SetOnOffCommand specialises On, Off and Toggle: filed under one,
+        the others recorded, never duplicated."""
+        placements = [(parent, node) for cls, parent, node
+                      in iter_classes(capability_context)
+                      if cls == "homeont:SetOnOffCommand"]
+        assert len(placements) == 1
+        parent, node = placements[0]
+        assert parent == "saref:OffCommand"
+        assert node["also_subclass_of"] == ["saref:OnCommand", "saref:ToggleCommand"]
+
+    def test_a_root_carries_no_parent_of_its_own(self, capability_context):
+        device = capability_context["device_types"]["saref:Device"]
+        assert "also_subclass_of" not in device
+
+
 class TestRendering:
     def test_json_is_stable_and_cached(self):
-        assert get_capabilities_context() is get_capabilities_context()
-        assert get_capabilities_context_json() == get_capabilities_context_json()
+        assert get_ontology_context() is get_ontology_context()
+        assert get_ontology_context_json() == get_ontology_context_json()
+        assert get_capability_ontology_context() is get_capability_ontology_context()
 
-    def test_no_branch_root_is_ever_a_leaf_only_option(self, context):
-        """Branch roots appear as parent_class but must also be choosable.
-
-        They are in the context (a parser may legitimately need the mid-level
-        class); the prompt is what forbids answering with a root. This test
-        records that the roots are NOT silently filtered out of the sections,
-        so a change of policy is a deliberate edit rather than an accident.
-        """
-        actuatable = {e["class"] for e in context["device_properties"]["actuatable"]}
-        assert not (BRANCH_ROOTS & actuatable), (
-            "a branch root leaked into its own section"
-        )
+    def test_unknown_view_is_rejected(self):
+        with pytest.raises(ValueError):
+            build_ontology_context(view="everything")
 
     def test_size_is_within_budget(self):
         """~12k tokens; a large jump means the projection pulled in noise."""
-        rendered = get_capabilities_context_json()
-        assert len(rendered) < 60_000, len(rendered)
+        assert len(get_ontology_context_json()) < 60_000
+        assert len(get_capability_ontology_context_json()) < 60_000

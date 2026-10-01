@@ -129,7 +129,7 @@ Minimal example:
   "pass_criteria": [
     {
       "type": "property_equals",
-      "path": "/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/properties/state",
+      "path": "/workspaces/lab308e/artifacts/blackout_blinds_308e_cover/properties/coverState",
       "equals": "closed",
       "timeout_seconds": 30
     }

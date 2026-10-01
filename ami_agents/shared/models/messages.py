@@ -117,8 +117,15 @@ class MessageType(Enum):
     # nothing.
     ENV_SNAPSHOT_REQUEST = "env_snapshot_request"
     ENV_SNAPSHOT_RESPONSE = "env_snapshot_response"
+    # The whole environment's affordance tree (summary JSON or detailed RDF):
+    # the ISA's planning context. Names nothing and interprets nothing.
     ENV_CAPABILITIES_REQUEST = "env_capabilities_request"
     ENV_CAPABILITIES_RESPONSE = "env_capabilities_response"
+    # "Can anything here do X?", asked by class. The UA's structured capability
+    # question: ontology classes in, the affordances that provide them out,
+    # resolved from the TD graph without reading any device.
+    ENV_CAPABILITY_QUERY_REQUEST = "env_capability_query_request"
+    ENV_CAPABILITY_QUERY_RESPONSE = "env_capability_query_response"
     ENV_SEMANTIC_QUERY_REQUEST = "env_semantic_query_request"
     ENV_SEMANTIC_QUERY_RESPONSE = "env_semantic_query_response"
 

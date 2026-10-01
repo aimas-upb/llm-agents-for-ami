@@ -23,6 +23,11 @@ from hasp_utils import (HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST,
                         get_supported_service_fields, is_service_supported_for_entity,
                         validate_service_payload_for_entity)
 from hasp_cache import HASPGraphCache
+import hasp_semantics
+from hasp_utils import state_property_names
+
+# Re-read semantic_mappings.yaml and the home's SEMANTIC_CONFIG.
+reload_semantics = hasp_semantics.reload
 
 # Namespaces
 BASE_FALLBACK = "http://localhost:8080/"
@@ -652,6 +657,26 @@ def _domain_is_actuator(domain: str) -> bool:
     return domain in {"light", "cover", "climate", "humidifier", "fan", "switch", "media_player", "vacuum", "lock", "alarm_control_panel"}
 
 
+def _add_environment_variable_semantics(
+    rdf: HomeAssistantRDF,
+    env_var_uri: URIRef,
+    env_var_key: Optional[str],
+    room_environment: Optional[URIRef],
+) -> None:
+    """Type a TD-SOSA effect key's URI with the homeont room variable it is.
+
+    The key-based URI (…/environment/thermal_comfort) stays, so plans and
+    signifiers that name it are unaffected; the class beside it is what the
+    capability resolver matches an effect by.
+    """
+    env_class = hasp_semantics.current().environment_class(env_var_key)
+    if env_class is None:
+        return
+    hasp_semantics.add_type(rdf.g, env_var_uri, env_class)
+    if room_environment is not None:
+        rdf.g.add((env_var_uri, SSN.isPropertyOf, room_environment))
+
+
 def _add_tdsosa_property_links(
     rdf: HomeAssistantRDF,
     property_affordance: BNode,
@@ -660,7 +685,9 @@ def _add_tdsosa_property_links(
     env_var_key: Optional[str],
     observable: bool,
     actuatable: bool,
+    room_environment: Optional[URIRef] = None,
 ) -> None:
+    _add_environment_variable_semantics(rdf, env_var_uri, env_var_key, room_environment)
     if observable:
         rdf.g.add((property_affordance, RDF.type, TDSOSA.ObservablePropertyAffordance))
         rdf.g.add((env_var_uri, RDF.type, SOSA.ObservableProperty))
@@ -689,7 +716,9 @@ def _add_tdsosa_action_effect(
     actuation_uri: URIRef,
     direction: Optional[str],
     settling_time_seconds: Optional[float] = None,
+    room_environment: Optional[URIRef] = None,
 ) -> None:
+    _add_environment_variable_semantics(rdf, env_var_uri, env_var_key, room_environment)
     rdf.g.add((action_affordance, TDSOSA.hasEffectActuation, actuation_uri))
     rdf.g.add((actuation_uri, RDF.type, SOSA.Actuation))
     if direction == "increase":
@@ -1141,6 +1170,22 @@ def _build_cached_artifact_ttl(
     domains = {e["entity_id"].split(".")[0] for e in device_entities if e.get("entity_id")}
     if "light" in domains:
         rdf.g.add((art, RDF.type, EX.HueLamp))
+
+    # The homeont semantic layer (semantic_mappings.yaml + SEMANTIC_CONFIG):
+    # what the device is, and below what each of its affordances is.
+    semantics = hasp_semantics.current()
+    device_name = (device or {}).get("name") or artifact_label
+    room_environment = hasp_semantics.room_environment_uri(rdf.base, aid)
+    semantic_entities = {
+        e["entity_id"]: hasp_semantics.Entity(
+            e["entity_id"].split(".")[0],
+            (state_map.get(e["entity_id"]) or {}).get("attributes") or {})
+        for e in device_entities if e.get("entity_id")
+    }
+    device_class = semantics.device_class(device_name, semantic_entities.values())
+    hasp_semantics.add_type(rdf.g, art, device_class)
+    hasp_semantics.add_label(rdf.g, art, device_class)
+    state_names = state_property_names(list(semantic_entities))
     sec = BNode()
     rdf.g.add((art, TD.hasSecurityConfiguration, sec))
     rdf.g.add((sec, RDF.type, WOTSEC.NoSecurityScheme))
@@ -1192,13 +1237,16 @@ def _build_cached_artifact_ttl(
             action_affordance = rdf._add_action(
                 art,
                 action_name,
-                EX.StatusCommand,
+                None,
                 "POST",
                 URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/ha/{urllib.parse.quote(domain, safe='')}/{urllib.parse.quote(svc_name, safe='')}"),
                 "application/json",
                 input_schema=input_schema,
                 description=definition.get("description"),
             )
+            hasp_semantics.add_type(
+                rdf.g, action_affordance,
+                semantics.command_class(device_name, domain, svc_name))
             env_var_key = _resolve_env_var_override(
                 entity=domain_entity_meta,
                 device=device,
@@ -1236,6 +1284,7 @@ def _build_cached_artifact_ttl(
                     actuation_uri=actuation_uri,
                     direction=direction,
                     settling_time_seconds=settling_time_seconds,
+                    room_environment=room_environment,
                 )
 
     if "climate" in domains:
@@ -1244,7 +1293,8 @@ def _build_cached_artifact_ttl(
             rdf._add_action(
                 art,
                 "getThermostatState",
-                EX.StatusCommand,
+                # Reads the climate entity's whole state: a get, not a change.
+                hasp_semantics.expand("saref:GetCommand"),
                 "POST",
                 URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/getThermostatState"),
                 "application/json",
@@ -1269,12 +1319,16 @@ def _build_cached_artifact_ttl(
                     schema_value = int(state_value) if "." not in state_value else float(state_value)
                 except ValueError:
                     pass
-            property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/state")
+            state_name = state_names.get(entity_id, "state")
+            property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/{state_name}")
             schema = rdf._build_property_schema("state", schema_value, entity_attrs, entity_domain=entity_domain)
             state_prop = rdf._add_property(
-                art, "state", property_uri, output_schema=schema,
+                art, state_name, property_uri, output_schema=schema,
                 description=f"Current state of {entity_id}", observable=True
             )
+            hasp_semantics.add_type(rdf.g, state_prop, semantics.property_class(
+                device_name, device_class,
+                hasp_semantics.Entity(entity_domain, entity_attrs), "state"))
             state_env_key = _resolve_env_var_override(
                 entity=entity, device=device, artifact_label=artifact_label,
                 domain=entity_domain, signal_name="state",
@@ -1287,21 +1341,27 @@ def _build_cached_artifact_ttl(
                     env_var_uri=env_var_uri, env_var_key=state_env_key,
                     observable=_domain_is_observer(entity_domain),
                     actuatable=_domain_is_actuator(entity_domain),
+                    room_environment=room_environment,
                 )
 
         if entity_attrs:
             from hasp_utils import get_operational_attributes, get_metadata_attributes
             domain = entity_id.split(".")[0] if "." in entity_id else ""
             operational_attrs = get_operational_attributes(domain, entity_attrs)
+            semantic_entity = hasp_semantics.Entity(domain, entity_attrs)
+            emitted = set()
             for attr_name, attr_value in operational_attrs.items():
                 if attr_value is None:
                     continue
+                emitted.add(attr_name)
                 property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/{urllib.parse.quote(attr_name, safe='')}")
                 schema = rdf._build_property_schema(attr_name, attr_value, entity_attrs)
                 op_prop = rdf._add_property(
                     art, attr_name, property_uri, output_schema=schema,
                     description=f"{attr_name} of {entity_id}", observable=True
                 )
+                hasp_semantics.add_type(rdf.g, op_prop, semantics.property_class(
+                    device_name, device_class, semantic_entity, attr_name))
                 env_var_key = _resolve_env_var_override(
                     entity=entity, device=device, artifact_label=artifact_label,
                     domain=domain, signal_name=attr_name,
@@ -1314,7 +1374,26 @@ def _build_cached_artifact_ttl(
                         env_var_uri=env_var_uri, env_var_key=env_var_key,
                         observable=_domain_is_observer(domain),
                         actuatable=_domain_is_actuator(domain),
+                        room_environment=room_environment,
                     )
+
+            # Properties the device has by what it supports, whatever HA
+            # reports right now: an off light has no `brightness` attribute,
+            # yet it can be dimmed.
+            for rule in semantics.declared_properties(device_name, device_class, semantic_entity):
+                attr_name = str(rule["signal"])
+                if attr_name in emitted:
+                    continue
+                emitted.add(attr_name)
+                default = rule.get("default")
+                property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/{urllib.parse.quote(attr_name, safe='')}")
+                schema = rdf._build_property_schema(
+                    attr_name, default, {**entity_attrs, attr_name: default})
+                declared_prop = rdf._add_property(
+                    art, attr_name, property_uri, output_schema=schema,
+                    description=f"{attr_name} of {entity_id}", observable=True
+                )
+                hasp_semantics.add_type(rdf.g, declared_prop, str(rule["class"]))
 
             metadata_attrs = get_metadata_attributes(entity_attrs)
             for ts_field in ("last_changed", "last_reported", "last_updated"):

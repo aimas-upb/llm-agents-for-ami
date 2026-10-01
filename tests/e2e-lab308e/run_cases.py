@@ -1000,8 +1000,13 @@ class Lab308eHarness:
     def _hasp_state_url_for_entity(self, entity_id: str) -> Optional[str]:
         if "." not in entity_id:
             return None
-        artifact_name = entity_id.split(".", 1)[1]
-        return f"{self.yggdrasil_url}/workspaces/lab308e/artifacts/{artifact_name}/properties/state"
+        domain, artifact_name = entity_id.split(".", 1)
+        # HASP names one state property per entity: `<domain>State`
+        # (`sensorState`, `binarySensorState`); see hasp_utils.state_property_names.
+        state_name = "".join(
+            part.capitalize() if i else part
+            for i, part in enumerate(domain.split("_"))) + "State"
+        return f"{self.yggdrasil_url}/workspaces/lab308e/artifacts/{artifact_name}/properties/{state_name}"
 
     async def _wait_for_ha_state(
         self,
