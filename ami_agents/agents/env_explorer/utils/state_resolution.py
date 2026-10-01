@@ -44,7 +44,7 @@ _CURIE_PREFIXES = (
 )
 
 
-def _curie(uri: Any) -> str:
+def curie(uri: Any) -> str:
     text = str(uri)
     for prefix, namespace in _CURIE_PREFIXES:
         if text.startswith(namespace):
@@ -52,7 +52,7 @@ def _curie(uri: Any) -> str:
     return text
 
 
-_PREFIXES = """
+SPARQL_PREFIXES = """
 PREFIX td:      <https://www.w3.org/2019/wot/td#>
 PREFIX hctl:    <https://www.w3.org/2019/wot/hypermedia#>
 PREFIX hmas:    <https://purl.org/hmas/>
@@ -226,7 +226,7 @@ def discovered_graph(artifacts, workspaces, logger=None) -> Graph:
     return load_vocabulary(graph)
 
 
-def _scope_lines(location_class: Optional[str],
+def scope_lines(location_class: Optional[str],
                  device_class: Optional[str]) -> List[str]:
     """The location and device constraints both queries share."""
     lines: List[str] = []
@@ -244,7 +244,7 @@ def _scope_lines(location_class: Optional[str],
 # Thing-level facts about the device. OPTIONAL, unlike the names: a Thing
 # Description may legitimately state neither, and a device that does not say who
 # made it must still be found.
-_METADATA_LINES = [
+METADATA_LINES = [
     "  OPTIONAL { ?artifact schema:manufacturer ?manufacturer }",
     "  OPTIONAL { ?artifact schema:model ?model }",
 ]
@@ -269,18 +269,18 @@ def build_query(
     rather than yield a row with a silently missing field. The make and model
     are OPTIONAL for the opposite reason -- they are facts a TD may omit.
     """
-    lines = _scope_lines(location_class, device_class)
+    lines = scope_lines(location_class, device_class)
     lines.append("  ?artifact td:title ?artTitle ; td:hasPropertyAffordance ?prop .")
     lines.append("  ?prop a ?pc ; td:name ?name ; td:hasForm [ hctl:hasTarget ?target ] .")
     lines.append(f"  ?pc rdfs:subClassOf* {property_class} .")
-    lines.extend(_METADATA_LINES)
+    lines.extend(METADATA_LINES)
     lines.append("  FILTER EXISTS { ?artifact a/rdfs:subClassOf* saref:Device }")
     body = "\n".join(lines)
     projection = "?artifact ?artTitle ?pc ?name ?target ?manufacturer ?model"
     if location_class:
         projection += " ?spaceLabel"
     return (
-        f"{_PREFIXES}\n"
+        f"{SPARQL_PREFIXES}\n"
         f"SELECT DISTINCT {projection} WHERE {{\n{body}\n}}"
     )
 
@@ -296,21 +296,21 @@ def build_artifact_query(
     affordance reports what was asked. A device's make and model are stated on
     the Thing, so this reaches them where the affordance query cannot.
     """
-    lines = _scope_lines(location_class, device_class)
+    lines = scope_lines(location_class, device_class)
     lines.append("  ?artifact td:title ?artTitle .")
-    lines.extend(_METADATA_LINES)
+    lines.extend(METADATA_LINES)
     lines.append("  FILTER EXISTS { ?artifact a/rdfs:subClassOf* saref:Device }")
     body = "\n".join(lines)
     projection = "?artifact ?artTitle ?manufacturer ?model"
     if location_class:
         projection += " ?spaceLabel"
     return (
-        f"{_PREFIXES}\n"
+        f"{SPARQL_PREFIXES}\n"
         f"SELECT DISTINCT {projection} WHERE {{\n{body}\n}}"
     )
 
 
-def _device_class(graph: Graph, artifact: Any) -> Optional[str]:
+def device_class_of(graph: Graph, artifact: Any) -> Optional[str]:
     """The artifact's own device family, from the types it asserts.
 
     Read from the graph rather than projected by the query, so the ancestor
@@ -330,7 +330,7 @@ def _artifacts(graph: Graph, location_class: Optional[str],
         ResolvedAffordance(
             artifact=str(row.artifact),
             artifact_name=str(row.artTitle),
-            artifact_type=_device_class(graph, row.artifact),
+            artifact_type=device_class_of(graph, row.artifact),
             workspace_name=(str(row.spaceLabel)
                             if getattr(row, "spaceLabel", None) else None),
             manufacturer=(str(row.manufacturer)
@@ -390,14 +390,14 @@ def resolve_state_request(
             ResolvedAffordance(
                 artifact=str(row.artifact),
                 artifact_name=str(row.artTitle),
-                artifact_type=_device_class(graph, row.artifact),
+                artifact_type=device_class_of(graph, row.artifact),
                 workspace_name=(str(row.spaceLabel)
                                 if getattr(row, "spaceLabel", None) else None),
                 manufacturer=(str(row.manufacturer)
                               if getattr(row, "manufacturer", None) else None),
                 model=str(row.model) if getattr(row, "model", None) else None,
                 affordance_name=str(row.name),
-                affordance_type=_curie(row.pc),
+                affordance_type=curie(row.pc),
                 target=str(row.target),
             )
             for row in rows

@@ -4,6 +4,8 @@ from spade.behaviour import CyclicBehaviour
 
 from ....shared.models.messages import MessageType, META_CORRELATION_ID
 from ....shared.utils.demo_log import demo
+from ....shared.utils.state_urls import state_urls
+from .environment_snapshot_behaviour import state_property_urls
 
 
 class EnvironmentSemanticQueryBehaviour(CyclicBehaviour):
@@ -41,15 +43,10 @@ class EnvironmentSemanticQueryBehaviour(CyclicBehaviour):
             text = " ".join([str(artifact_id or ""), str(artifact_info.get("name") or "")]).lower()
             if not any(keyword in text for keyword in keywords):
                 continue
-            artifact_url = str(artifact_id or "")
-            if artifact_url.endswith("#artifact"):
-                artifact_url = artifact_url[: -len("#artifact")]
-            if not artifact_url:
-                continue
-            property_url = f"{artifact_url}/properties/state"
-            if property_url not in seen:
-                seen.add(property_url)
-                candidates.append(property_url)
+            for property_url in state_urls(artifact_id, artifact_info):
+                if property_url not in seen:
+                    seen.add(property_url)
+                    candidates.append(property_url)
         return candidates
 
     @staticmethod
@@ -60,6 +57,7 @@ class EnvironmentSemanticQueryBehaviour(CyclicBehaviour):
                 "name": getattr(artifact, "name", aid),
                 "workspace_id": getattr(artifact, "workspace_id", None),
                 "state": dict(getattr(artifact, "current_state", {}) or {}),
+                "state_property_urls": state_property_urls(agent, aid),
             }
         return {"artifacts": artifacts_snapshot}
 

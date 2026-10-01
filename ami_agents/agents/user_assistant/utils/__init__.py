@@ -13,15 +13,21 @@ from .plan import (
 )
 from .llm_client import LLMClientConfig, build_llm_client, build_llm_call_kwargs, build_behaviour_llm_client
 from .ontology_context import (
-    build_capabilities_context,
-    get_capabilities_context,
-    get_capabilities_context_json,
+    build_ontology_context,
+    get_capability_ontology_context,
+    get_capability_ontology_context_json,
+    get_ontology_context,
+    get_ontology_context_json,
+    iter_classes,
 )
 
 __all__ = [
-    "build_capabilities_context",
-    "get_capabilities_context",
-    "get_capabilities_context_json",
+    "build_ontology_context",
+    "get_capability_ontology_context",
+    "get_capability_ontology_context_json",
+    "get_ontology_context",
+    "get_ontology_context_json",
+    "iter_classes",
     "strip_code_fences",
     "loose_json_loads",
     "coerce_plan_dict",

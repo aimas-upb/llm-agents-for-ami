@@ -22,46 +22,8 @@ from ....shared.utils.logger import LoggerFactory
 from ..prompts.intent_parsing_prompts import ENV_STATE_REQUEST_PARSER_PROMPT
 from ..utils import loose_json_loads
 from ..utils.llm_client import build_behaviour_llm_client, build_llm_call_kwargs
-from ..utils.ontology_context import get_capabilities_context_json
-
-# The parser must answer with a class specific enough to identify something.
-# These are the taxonomy's roots: they match every property beneath them, so an
-# answer naming one resolves to everything and therefore to nothing.
-BRANCH_ROOTS = frozenset({
-    "homeont:ActuatableDeviceProperty",
-    "homeont:DeviceStateProperty",
-    "homeont:DeviceCapabilityProperty",
-    "sosa:ObservableProperty",
-})
-
-
-def _clean(value: Any) -> Optional[str]:
-    """A class identifier, or None.
-
-    Older prompts used "NA" as a sentinel; treat any such leftover as absent so
-    a caller never has to test for a magic string.
-    """
-    if value is None:
-        return None
-    text = str(value).strip()
-    if not text or text.upper() in {"NA", "NONE", "NULL", "UNKNOWN"}:
-        return None
-    return text
-
-
-def _clean_nested(value: Any, *keys: str) -> Optional[Dict[str, str]]:
-    """A `{class, ...}` object, or None if it carries no usable class."""
-    if not isinstance(value, dict):
-        return None
-    cls = _clean(value.get("class"))
-    if cls is None:
-        return None
-    out: Dict[str, str] = {"class": cls}
-    for key in keys:
-        extra = _clean(value.get(key))
-        if extra is not None:
-            out[key] = extra
-    return out
+from ..utils.intent_slots import BRANCH_ROOTS, clean_class, clean_nested
+from ..utils.ontology_context import get_ontology_context_json
 
 
 class EnvStateStructuringBehaviour(OneShotBehaviour):
@@ -80,7 +42,7 @@ class EnvStateStructuringBehaviour(OneShotBehaviour):
             f"[LLM CALL] Structuring ENV_STATE_REQUEST: {self.intent_text[:80]!r}"
         ))
         prompt = ENV_STATE_REQUEST_PARSER_PROMPT.format(
-            capabilities_context=get_capabilities_context_json()
+            ontology_context=get_ontology_context_json()
         )
         messages = [
             {"role": "system", "content": prompt},
@@ -119,11 +81,11 @@ class EnvStateStructuringBehaviour(OneShotBehaviour):
         """Coerce the LLM's object into the shape callers may rely on."""
         result: Dict[str, Any] = {
             "text_intent": str(parsed.get("text_intent") or self.intent_text),
-            "location_class": _clean(parsed.get("location_class")),
-            "device_class": _clean(parsed.get("device_class")),
-            "device_property": _clean_nested(
+            "location_class": clean_class(parsed.get("location_class")),
+            "device_class": clean_class(parsed.get("device_class")),
+            "device_property": clean_nested(
                 parsed.get("device_property"), "parent_class"),
-            "environment_variable": _clean_nested(
+            "environment_variable": clean_nested(
                 parsed.get("environment_variable"), "measurement_quantity"),
             "reason": str(parsed.get("reason") or ""),
         }

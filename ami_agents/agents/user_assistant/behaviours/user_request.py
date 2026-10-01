@@ -52,6 +52,7 @@ from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
 from ....shared.utils.spade_rpc import rpc_call, RpcTimeoutError
 from .. import pipeline, queries
+from .env_capability_structuring import EnvCapabilityStructuringBehaviour
 from .env_state_structuring import EnvStateStructuringBehaviour
 from ..models import (
     CONFIRM_TOKENS,
@@ -165,31 +166,31 @@ class ExtractingState(_RequestState):
         goals = [a for a in request.atomic_intents
                  if a.type == "GOAL_REQUEST"]
 
-        # Only the capabilities parser still takes the discovered environment;
-        # ENV_STATE structuring works from the ontology alone.
-        hierarchical = pipeline.build_capabilities_hierarchical_text(
-            request.caps_summary)
-
-        for intent in caps:
-            extraction = await pipeline.parse_atomic_intent(
-                request.agent, self.logger, intent.text, intent.type,
-                hierarchical)
-            self.logger.info(demo(
-                f"{_label('ENV_CAPABILITIES_REQUEST')}:\n"
-                f"{json.dumps(extraction, indent=2)}"))
-            await request.answer_capabilities_query(extraction)
-
-        # Structuring one state request is independent of structuring another,
-        # so spawn them all and then await: several questions in one utterance
-        # cost one round trip rather than N.
+        # Structuring one query is independent of structuring another, so spawn
+        # them all and then await: several questions in one utterance cost one
+        # round trip rather than N.
+        capability_structuring = [
+            EnvCapabilityStructuringBehaviour(intent.text, logger=self.logger)
+            for intent in caps
+        ]
         structuring = [
             EnvStateStructuringBehaviour(intent.text, logger=self.logger)
             for intent in state
         ]
-        for behaviour in structuring:
+        for behaviour in capability_structuring + structuring:
             request.agent.add_behaviour(behaviour)
-        for behaviour in structuring:
+        for behaviour in capability_structuring + structuring:
             await behaviour.join()
+
+        for behaviour in capability_structuring:
+            if behaviour.error:
+                self.logger.error(
+                    "ENV_CAPABILITIES structuring failed for %r: %s",
+                    behaviour.intent_text, behaviour.error)
+            self.logger.info(demo(
+                f"{_label('ENV_CAPABILITIES_REQUEST')}:\n"
+                f"{json.dumps(behaviour.result, indent=2)}"))
+            await request.answer_capabilities_query(behaviour.result)
 
         for behaviour in structuring:
             if behaviour.error:
@@ -206,6 +207,11 @@ class ExtractingState(_RequestState):
             request.finish("answered")
             self.set_next_state(DONE)
             return
+
+        # Both query parsers work from the ontology alone; only goal parsing
+        # still takes the discovered environment, as hierarchical text.
+        hierarchical = pipeline.build_capabilities_hierarchical_text(
+            request.caps_summary)
 
         extractions = await asyncio.gather(
             *[pipeline.parse_atomic_intent(request.agent, self.logger,
@@ -555,8 +561,7 @@ class UserRequestBehaviour(FSMBehaviour):
 
     async def answer_capabilities_query(self, extraction: dict) -> None:
         await queries.answer_capabilities_query(
-            self, self.last_message, self.thread, self.conv,
-            self.capabilities_ctx, extraction)
+            self, self.last_message, self.thread, self.conv, extraction)
 
     async def answer_state_query(self, extraction: dict) -> None:
         await queries.answer_state_query(

@@ -12,6 +12,7 @@ from .environment_capabilities_behaviour import EnvironmentCapabilitiesBehaviour
 from .environment_state_behaviour import EnvironmentStateBehaviour
 from .environment_snapshot_behaviour import EnvironmentSnapshotBehaviour
 from .property_resolution_behaviour import PropertyResolutionBehaviour
+from .capability_query_behaviour import CapabilityQueryBehaviour
 from .value_retrieval_behaviour import ValueRetrievalBehaviour
 from .environment_semantic_query_behaviour import EnvironmentSemanticQueryBehaviour
 
@@ -26,6 +27,7 @@ __all__ = [
     'EnvironmentStateBehaviour',
     'EnvironmentSnapshotBehaviour',
     'PropertyResolutionBehaviour',
+    'CapabilityQueryBehaviour',
     'ValueRetrievalBehaviour',
     'EnvironmentSemanticQueryBehaviour',
 ]

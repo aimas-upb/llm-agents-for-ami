@@ -32,6 +32,7 @@ from ...shared.protocols.agent_protocol import IAgent
 from ...shared.utils.demo_log import demo
 from ...shared.utils.logger import LoggerFactory
 from ...shared.utils.spade_rpc import RpcTimeoutError, rpc_call, send_via_router
+from ...shared.utils.state_urls import state_urls
 from .behaviours import EnvironmentReadyBehaviour, GoalRequestBehaviour
 from .utils import LLMClientConfig, build_llm_client, match_workspace, parse_or_empty
 
@@ -453,15 +454,10 @@ class InteractionSolverAgent(Agent, IAgent):
             ).lower()
             if not any(keyword in text for keyword in keywords):
                 continue
-            artifact_url = str(artifact_id or "")
-            if artifact_url.endswith("#artifact"):
-                artifact_url = artifact_url[: -len("#artifact")]
-            if not artifact_url:
-                continue
-            property_url = f"{artifact_url}/properties/state"
-            if property_url not in seen:
-                seen.add(property_url)
-                candidates.append(property_url)
+            for property_url in state_urls(artifact_id, artifact_info):
+                if property_url not in seen:
+                    seen.add(property_url)
+                    candidates.append(property_url)
         return candidates
 
     @staticmethod

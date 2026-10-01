@@ -339,6 +339,9 @@ def _condition_property_url(artifact_uri: str, prop_name: str) -> str:
     if not artifact_url:
         return prop
     if prop in ("", "state"):
+        # A signifier records only "state", not which entity's: this relies on
+        # HASP serving `state` as a deprecated alias of the per-entity
+        # `<domain>State` properties.
         return f"{artifact_url}/properties/state"
     return f"{artifact_url}/properties/{prop}"
 

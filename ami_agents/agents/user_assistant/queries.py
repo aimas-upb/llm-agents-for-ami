@@ -17,40 +17,68 @@ import json
 from ...shared.models.messages import MessageType
 from ...shared.utils.demo_log import demo
 from ...shared.utils.spade_rpc import rpc_call, RpcTimeoutError
-from . import pipeline
+from .behaviours.capability_answer import CapabilityAnswerBehaviour
 from .behaviours.state_answer import StateAnswerBehaviour
 from .models import ConversationPhase
-from .utils import state_answers
+from .utils import capability_answers, state_answers
 
 
 async def answer_capabilities_query(behaviour, msg, thread: str, conv,
-                                    capabilities_ctx: str, extraction: dict) -> None:
-    """Handle a capabilities query (structured + LLM formatting)."""
-    if not capabilities_ctx:
-        capabilities_ctx = await pipeline.fetch_capabilities(behaviour.agent, behaviour.logger)
+                                    extraction: dict) -> None:
+    """Answer one ENV_CAPABILITIES_REQUEST, per the outcome EnvExplorer reports.
 
-    if not capabilities_ctx:
-        await behaviour.reply("Unable to fetch environment capabilities right now.")
+    `extraction` holds the ontology classes the structuring stage produced and
+    the performative (`query` / `query_if`). EnvExplorer resolves the classes
+    against the TD graph -- reading nothing -- and reports what provides them.
+
+    A yes/no, a "cannot" and a "none" are phrased here from the response alone;
+    a found list goes through `CapabilityAnswerBehaviour`.
+    """
+    explorer_jid = behaviour.agent.target_jids.get("explorer")
+    if not explorer_jid:
+        await behaviour.reply("Error: EnvExplorer is not configured.")
         conv.phase = ConversationPhase.IDLE
         return
 
-    # Parse and filter capabilities JSON to reduce size
+    behaviour.logger.info(demo(
+        f"UA -> EnvExplorer ENV_CAPABILITY_QUERY_REQUEST: "
+        f"extraction={json.dumps(extraction)}"))
     try:
-        caps_dict = json.loads(capabilities_ctx) if isinstance(capabilities_ctx, str) else capabilities_ctx
-        ## log caps_dict with indentation for debugging
-        # behaviour.logger.info(demo(f"Raw capabilities JSON: {json.dumps(caps_dict, indent=2)}"))
+        result = await rpc_call(
+            behaviour.agent,
+            to_jid=str(explorer_jid),
+            request_type=MessageType.ENV_CAPABILITY_QUERY_REQUEST.value,
+            body=extraction,
+            expect_type=MessageType.ENV_CAPABILITY_QUERY_RESPONSE.value,
+            timeout=behaviour.agent.rpc_call_timeout,
+        )
+        behaviour.logger.info(demo(
+            f"ENV_CAPABILITY_QUERY_RESPONSE received: {(result.body or '')[:1000]}"))
 
-        filtered_caps = pipeline.filter_capabilities_json(caps_dict)
-        filtered_json = json.dumps(filtered_caps, indent=2)
+        response = json.loads(result.body or "{}")
+        text_intent = extraction.get("text_intent") or conv.user_message
+        await behaviour.reply(
+            await _phrase_capabilities(behaviour, response, text_intent))
+    except RpcTimeoutError:
+        await behaviour.reply("Timeout querying environment capabilities. Please try again.")
+    except Exception as exc:
+        behaviour.logger.error("Capability query failed: %s", exc, exc_info=True)
+        await behaviour.reply(f"Error querying capabilities: {exc}")
 
-        # behaviour.logger.info(demo(f"Filtered capabilities JSON: {filtered_json}"))
-    except Exception as e:
-        behaviour.logger.warning(f"Failed to filter capabilities JSON: {e}, using unfiltered")
-        filtered_json = capabilities_ctx
-
-    formatted = await pipeline.format_capabilities_response(behaviour.agent, behaviour.logger, filtered_json, extraction)
-    await behaviour.reply(formatted)
     conv.phase = ConversationPhase.IDLE
+
+
+async def _phrase_capabilities(behaviour, response: dict, text_intent: str) -> str:
+    """The sentence for one capability response."""
+    if not capability_answers.needs_interpretation(response):
+        return capability_answers.phrase(response)
+
+    answering = CapabilityAnswerBehaviour(
+        text_intent, response.get("entries") or [], logger=behaviour.logger)
+    behaviour.agent.add_behaviour(answering)
+    await answering.join()
+    return answering.result or capability_answers.fallback(response)
+
 
 async def answer_state_query(behaviour, msg, thread: str, conv,
                              extraction: dict) -> None:

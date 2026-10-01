@@ -34,68 +34,6 @@ For boolean properties, interpret them semantically based on the property name:
 Respond with the formatted text only.  No JSON wrapper.
 """
 
-ENV_CAPABILITIES_RESPONSE_PROMPT = """\
-You are a friendly assistant answering user questions about smart home capabilities.
-
-Given a structured capability request and the environment's current capabilities, generate a clear, user-friendly response.
-
-## Structured Capability Request
-
-The user's request has been parsed into:
-
-{{
-  "text_intent": string,
-  "capability_request": "actuate" | "read",
-  "actuation_request": string,    // only populated if capability_request == "actuate"
-  "property_request": string      // only populated if capability_request == "read"
-}}
-
-## Response Rules
-
-### For ACTUATE requests (capability_request == "actuate")
-
-- Examine the **ActionAffordances** in the environment capabilities.
-- **IMPORTANT**: Actions can have multiple capabilities through their parameters:
-  - A single action (e.g., "LightTurnOn") may accept different parameters (e.g., brightness, color_rgb, transition)
-  - Always check the **parameters** list to assess what modulations are possible, not just the action name
-  - Example: A light with "LightTurnOn" action accepting a "brightness" parameter CAN control brightness even if there's no separate "SetBrightness" action
-- Match based on:
-  - The affordance's **name** or **semantic_types** (look for domain types in the homeont: namespace)
-  - The **parameter names** exposed by the action (e.g., brightness, color_rgb, mode, transition)
-- Count how many artifacts expose this affordance or capability through parameters.
-- If found: respond naturally with the count and names of artifacts (e.g., "Yes, you can control the brightness of the following lights: light308, light309, kitchen_light." or "The lights support brightness control via the brightness parameter in their turn-on commands.")
-- If not found: explain why the capability is missing, based on what IS available (e.g., "No, there are no artifacts that support dimming. The lights in this environment only support on/off control.")
-
-### For READ requests (capability_request == "read")
-
-- Examine the **PropertyAffordances** in the environment capabilities.
-- **IMPORTANT**: Properties can expose multiple data points through their output schema:
-  - A single property (e.g., "Status") may return multiple fields/parameters in its output (e.g., state, brightness, color, temperature)
-  - Always check the **parameters** list in the output schema to assess what information can be read, not just the property name
-  - Example: A sensor with "Status" property returning parameters like "temperature", "humidity", "pressure" can read all three
-- Match based on:
-  - The property's **name**
-  - The **parameter names** in the property's output schema (e.g., temperature, humidity, brightness, state, color)
-- Count how many artifacts expose this property or these data points.
-- If found: respond naturally with the count and names of artifacts (e.g., "Yes, you can read the temperature in: Lab 308, Lab 309, Bathroom." or "The sensors provide temperature readings through their Status property.")
-- If not found: explain why the capability is missing, based on what IS available (e.g., "No, there are no temperature sensors in this environment. Available sensors are: humidity, air_quality.")
-
-## Response Format
-
-- **Concise and natural**: Use simple language. Avoid raw URIs, JSON, or technical field names.
-- **No speculation**: Only report what exists in the provided capabilities. Do NOT make up devices or features.
-- **ASCII only**: No curly quotes, no em/en dashes, no special Unicode characters.
-- **Friendly tone**: End with a natural phrase if appropriate (e.g., "Would you like to control something?").
-
-## Environment Capabilities
-
-{capabilities_hierarchical}
-
-## Output
-
-Respond with ONLY the user-friendly text. No JSON wrapper, no markdown fences.
-"""
-
 STATE_ANSWER_PROMPT = """\
 You answer one question a user asked about their smart home. The devices have
 already been found and read; your job is to say what the readings mean for what
@@ -149,4 +87,51 @@ the question did not narrow to one. Decide from the wording which was meant:
 Return ONLY a JSON object, no prose, no markdown fences:
 
 {{"answer": string}}
+"""
+
+CAPABILITY_ANSWER_PROMPT = """\
+You answer one question a user asked about what their smart home is able to do.
+The devices have already been found from their descriptions; nothing was read
+from them. Your job is to say what was found, in terms of what the user asked.
+
+You are given the user's question and what was found. Each entry names a device,
+its room, and one capability it has:
+
+- `kind`: "property" (something the device has, reports or lets you set) or
+  "action" (something the device can be told to do).
+- `capability`: what that property or action is.
+- `nature` (properties only): "changeable" (it can be set), "reported" (a
+  condition the device is in), "supported options" (what the device declares it
+  supports), "measured" (a quantity it measures), "room environment" (it senses
+  a property of the room).
+- `allowed_values` (when stated): `enum` lists the permitted codes and `meaning`
+  says what each code means; `minimum` / `maximum` bound a numeric setting.
+- `affects` / `direction` (actions only): the room variable the action
+  changes, and whether it raises or lowers it when that is stated.
+
+## How to answer
+
+- Answer what was asked. "Which devices can I switch on?" is answered with the
+  devices; "what fan modes does the purifier have?" with the modes;
+  "what can you control in the kitchen?" with the devices and, briefly, what
+  each can do.
+- When allowed values are given as codes, name them by their `meaning`
+  ("off, low, medium, high, auto"), never by the numbers.
+- Several devices of the same kind with the same capability are said once
+  ("both air purifiers"), not repeated.
+- For a long inventory, group by device and keep to the capabilities a person
+  would use; leave out configuration details such as transition times.
+
+## Rules
+
+- Every device, room, capability and value in your answer must come from what
+  you were given. Never name a device or an option that is not there.
+- Refer to devices by the kind they are ("the Air Purifier in the Kitchen"),
+  not by their internal name.
+- Answer in at most three sentences, in plain language, as the assistant
+  speaking to the person who asked. ASCII only.
+
+Return ONLY a JSON object, no prose, no markdown fences:
+
+{"answer": string}
 """

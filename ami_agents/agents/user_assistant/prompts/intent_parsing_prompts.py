@@ -6,34 +6,62 @@ environment's capabilities and the home ontology.
 """
 
 ENV_CAPABILITIES_REQUEST_PARSER_PROMPT = """\
-You are a smart home capability-request parser. You are given a SINGLE atomic intent that has already been classified as an ENV_CAPABILITIES_REQUEST — a request about what the environment is able to do (what it can actuate or what it can perceive/read).
+You parse a single smart home intent already classified as `ENV_CAPABILITIES_REQUEST` (a question about what the environment is **able** to do, sense, report or be set to, not about a current value). The intent is atomic, so do not split it. Output ontology **class identifiers** only, never the name of an individual device or room. A later stage turns your output into a graph query over the devices' descriptions.
 
-Your job is to extract structured information from this one atomic intent. Do not split it further; it is already atomic.
+## Output fields
 
-## What to extract
+- **text_intent** (the fragment of natural language for this intent, copied verbatim from the input).
+- **request_performative** (what kind of answer the question expects):
+  - `"query_if"` when it asks **whether** something can be done, sensed or reported and expects yes or no ("can you dim the kitchen lights?", "is there anything that measures humidity?", "do you know who made the fridge?").
+  - `"query"` when it asks **what / which / how** and expects the matching things listed ("which devices can I switch on?", "what fan modes does the purifier have?", "what can you control in the kitchen?").
+- **location_class** (the space the question is scoped to, from the `locations` section). Use `null` if it names no place.
+- **device_class** (the kind of device the question is about, from the `device_types` section). Use `null` if it names no device kind.
+- **device_property** as `{{"class": ..., "parent_class": ...}}`: the property of a device the question is about. Either
+  - a device's own property, from a tree under `device_properties`, or
+  - a fact about the device itself, from `device_metadata` (`schema:manufacturer` for who made it, `schema:model` for its product name); then `parent_class` is `null`.
+  Use `null` if the question is about a space's environment, or names no property.
+- **environment_variable** as `{{"class": ..., "measurement_quantity": ...}}` (a property of a space's environment, from `environment_variables`). Use `null` if the question is about a device's own property, or names none.
+- **command** as `{{"class": ..., "parent_class": ...}}`: the operation the question asks to be performed, from the `commands` section. Use `null` if the question is about sensing, knowing or reporting rather than doing.
+- **reason** (one sentence stating why you chose these classes).
 
-- **text_intent**: the natural language fragment from the request that describes this atomic intent. Copy it verbatim from the input — do not paraphrase, restate, or rephrase.
-- **capability_request**: either "actuate" or "read".
-  - "actuate" — the user asks whether the environment can CHANGE something / perform an action (e.g. "can you modify the light intensity?", "are you able to turn things on in the kitchen?").
-  - "read" — the user asks whether the environment can PERCEIVE / SENSE / report something (e.g. "can you perceive the temperature in the living room?", "do you know how humid the bathroom is?").
-- **actuation_request**: the name of the command referenced by the request, as a natural-language phrase (e.g. "turn on", "set the brightness"). Fill this ONLY when capability_request is "actuate". Set to "NA" if capability_request is "read", or if no command name can be determined from the text.
-- **property_request**: the name of the property referenced by the request, as a natural-language phrase (e.g. "temperature", "humidity"). Fill this ONLY when capability_request is "read". Set to "NA" if capability_request is "actuate", or if no property name can be determined from the text.
+Set any field to `null` when the question does not determine it. Never write `"NA"`, `"unknown"`, or `""` (a later stage must tell "not specified" apart from a real value). The fields `device_property` and `environment_variable` are mutually exclusive, so at most one is not null.
 
-## Rules
+## Which slots to fill
 
-- Exactly one of actuation_request / property_request will carry a value; the other is always "NA".
-- Extract command/property names as the user phrased them. Do NOT map them to ontology identifiers — this prompt does not require ontology alignment.
-- If the request is ambiguous between "actuate" and "read", use this decision tree:
-  - "what CAN do X" / "what CAN change X" / "what IS able to X" → **actuate** (asking if something can perform action X)
-  - "what IS X" / "what HAS X" / "can you sense/know X" → **read** (asking about perceiving/sensing a property)
-  - Focus on the verb structure: "can X" or "change/modify/turn/set" → actuation; "is/has" or "know/sense/perceive" → read
+- **Changing a device property** ("can you dim the lights?", "can I set the purifier's fan mode?"): fill `device_property` with the most specific class under `homeont:ActuatableDeviceProperty` (that tree means *can be changed*). Leave `command` `null`; the property already says what is changed.
+- **The options a device supports** ("what fan modes does the purifier have?", "which wash programmes are there?"): fill `device_property`. Prefer the class under `homeont:ActuatableDeviceProperty` for the setting itself (its permitted values are the options); use a class under `homeont:DeviceCapabilityProperty` only when the question asks about that declared capability as such.
+- **Sensing or reporting** ("can you tell how humid the bathroom is?", "does the washer report its remaining time?"): fill `environment_variable` (a room's environment) or `device_property` (a device's own condition or measurement). Leave `command` `null`.
+- **An operation, with no property named** ("what can you switch on in the kitchen?", "can anything be opened?"): fill `command` with the most specific class under `saref:Command` that the question supports.
+- **Changing a room's environment** ("can anything cool the living room?", "what would make the kitchen brighter?"): fill `environment_variable` with the variable affected, and `command`: the most specific command the question names, or `saref:Command` itself when it names no particular operation. This is the only place a root may be emitted.
+- **Who made / what model a device is**: fill `device_property` from `device_metadata`.
+- **Everything in a place or on a device** ("what can you control in the kitchen?", "what can the air conditioner do?"): fill only `location_class` and/or `device_class`.
 
-## Ontology Reference
+device_property or environment_variable: decide by what the question names. A device points to `device_property`, a bare room points to `environment_variable` ("how cold can the freezer get" is the freezer's own property; "can you tell how warm the kitchen is" is the kitchen's environment).
 
-Use the following ontology only as reference to understand what kinds of commands and properties are meaningful in this domain. Do not output ontology identifiers.
+## Selecting a class
 
-```turtle
-{ontology}
+Each section of the ontology context is a tree. Its key is the section's root class, and every node lists its more specific classes under `subclasses` (each subclass is a more specific version of the node it sits under). Your goal is the **most specific class whose meaning the question still supports**. A class more specific than the question warrants asserts something it never said; a class more general than necessary fails to pin down what is asked.
+
+Judge meaning from each node's `description`, not its class name (names can mislead). Some SAREF command descriptions are terse ("A type of command"); for those the class name is the only signal.
+
+1. State, in your own words, exactly what the question is about (for example "changing how bright a lamp is", "the named speed settings of a fan", "switching something on").
+2. Pick the tree to search, using "Which slots to fill" above.
+3. Walk down from the root. At each level, move into the subclass whose `description` matches what you stated; stop when no subclass of the current node still fits the question:
+   - If the question identifies a kind of device, keep descending to the node whose `description` restricts it to that same device.
+   - If the question does not identify a device, stop at the node that applies irrespective of device; do not descend into one restricted to a device.
+4. Never emit a root (a section key: `homeont:ActuatableDeviceProperty`, `homeont:DeviceStateProperty`, `homeont:DeviceCapabilityProperty`, `sosa:ObservableProperty`, `saref:Command`), with the single exception of `saref:Command` together with an `environment_variable`. A root denotes nothing in itself; if you stopped at one, restate what is asked more narrowly and redo from step 2.
+5. Emit the node you stopped at as `class`, and as `parent_class` the class of the node whose `subclasses` list contains it (for a node directly under a root, the root). Where a node lists `also_subclass_of`, it is equally a subclass of those classes; still emit the node it sits under as `parent_class`.
+
+The same walk applies to `location_class` (under `homeont:BuildingSpace`) and `device_class` (under `saref:Device`): choose the most specific node the question names.
+
+Every class you emit must appear verbatim in the ontology context. If nothing fits, emit `null` (never construct an identifier).
+
+## Ontology context
+
+Every class you may use, with its meaning and its place in the taxonomy. Select only from here, and copy `class`, `property` and `measurement_quantity` exactly as written.
+
+```json
+{ontology_context}
 ```
 
 ## Output
@@ -42,9 +70,13 @@ Return ONLY a JSON object, no prose, no markdown fences:
 
 {{
   "text_intent": string,
-  "capability_request": "actuate" | "read",
-  "actuation_request": string,
-  "property_request": string
+  "request_performative": "query" | "query_if",
+  "location_class": string | null,
+  "device_class": string | null,
+  "device_property": {{"class": string, "parent_class": string | null}} | null,
+  "environment_variable": {{"class": string, "measurement_quantity": string}} | null,
+  "command": {{"class": string, "parent_class": string}} | null,
+  "reason": string
 }}
 """
 
@@ -71,26 +103,28 @@ Decide by what the request names: a device points to `device_property`, a bare r
 
 ## Selecting the property class
 
-The classes in each section form a subclass hierarchy (`rdfs:subClassOf`): a subclass is a more specific version of its superclass. Your goal is the **most specific class whose meaning the request still supports**. A class more specific than the request warrants asserts something the request never said; a class more general than necessary fails to pin down the property.
+Each section of the ontology context is a tree. Its key is the section's root class, and every node lists its more specific classes under `subclasses` (each subclass is a more specific version of the node it sits under). Your goal is the **most specific class whose meaning the request still supports**. A class more specific than the request warrants asserts something the request never said; a class more general than necessary fails to pin down the property.
 
-Judge meaning from each entry's `description`, not its class name (names can mislead).
+Judge meaning from each node's `description`, not its class name (names can mislead).
 
 1. State, in your own words, the exact property the request asks about (for example "whether it is powered on", "the fan's named speed setting", or "a measured temperature").
-2. In the relevant section, collect every entry whose `description` matches that property. These will typically range from a general class down through more specific subclasses of it.
-3. From those, choose the most specific entry the request supports:
-   - If the request identifies a kind of device, choose the entry whose `description` restricts the property to that same device.
-   - If the request does not identify a device, choose the more general entry that applies to the property irrespective of device; do not choose one restricted to a device.
-4. Never emit these four classes, which are the roots of their sections and denote no property in themselves: `homeont:ActuatableDeviceProperty`, `homeont:DeviceStateProperty`, `homeont:DeviceCapabilityProperty`, `sosa:ObservableProperty`. If your choice is one of them, the property you stated in step 1 was too broad, so restate it more narrowly and redo from step 2.
-5. For the entry you chose, emit its class identifier and, as `parent_class`, the superclass recorded for it in the context (`rdfs:subClassOf`). Both come from that one entry; do not determine `parent_class` on your own.
+2. Pick the tree to search. For `device_property`, choose among the four roots under `device_properties` by what the property is: `homeont:ActuatableDeviceProperty` (something that can be changed), `homeont:DeviceStateProperty` (a condition the device is in), `homeont:DeviceCapabilityProperty` (what the device supports), `sosa:ObservableProperty` (a quantity the device measures about itself). For `environment_variable`, search the tree under `environment_variables`.
+3. Walk down from the root. At each level, move into the subclass whose `description` matches the property you stated; stop when no subclass of the current node still fits the request:
+   - If the request identifies a kind of device, keep descending to the node whose `description` restricts the property to that same device.
+   - If the request does not identify a device, stop at the node that applies to the property irrespective of device; do not descend into one restricted to a device.
+4. Never emit a root (a section key: `homeont:ActuatableDeviceProperty`, `homeont:DeviceStateProperty`, `homeont:DeviceCapabilityProperty`, `sosa:ObservableProperty`); a root denotes no property in itself. If you stopped at a root, the property you stated in step 1 was too broad, so restate it more narrowly and redo from step 2.
+5. Emit the node you stopped at as `class`, and as `parent_class` the class of the node whose `subclasses` list contains it (for a node directly under a root, the root). Do not determine `parent_class` on your own.
 
-Every class you emit must appear verbatim in the capabilities context. If nothing fits, emit `null` (never construct an identifier).
+The same walk applies to `location_class` (under `homeont:BuildingSpace`) and `device_class` (under `saref:Device`): choose the most specific node the request names.
 
-## Capabilities context
+Every class you emit must appear verbatim in the ontology context. If nothing fits, emit `null` (never construct an identifier).
 
-Every class you may use, with its meaning and its place in the taxonomy. Select only from here, and copy `class`, `parent_class`, and `measurement_quantity` exactly as written.
+## Ontology context
+
+Every class you may use, with its meaning and its place in the taxonomy. Select only from here, and copy `class` and `measurement_quantity` exactly as written.
 
 ```json
-{capabilities_context}
+{ontology_context}
 ```
 
 ## Output

@@ -21,197 +21,15 @@ import json
 from ...shared.models.messages import MessageType
 from ...shared.utils.spade_rpc import rpc_call
 from ...shared.utils.demo_log import demo
-from ...shared.utils.logger import LoggerFactory
-from ...shared.utils.namespaces import domain_types
+from ...shared.utils.namespaces import action_types
 from .models import AtomicIntent
-from .prompts.intent_parsing_prompts import (
-    ENV_CAPABILITIES_REQUEST_PARSER_PROMPT,
-    ENV_STATE_REQUEST_PARSER_PROMPT,
-    GOAL_REQUEST_PARSER_PROMPT,
-)
+from .prompts.intent_parsing_prompts import GOAL_REQUEST_PARSER_PROMPT
 from .prompts.intent_response_prompts import (
-    ENV_CAPABILITIES_RESPONSE_PROMPT,
     PLAN_SUMMARY_SYSTEM_PROMPT,
     QUERY_RESPONSE_SYSTEM_PROMPT,
 )
 from .prompts.intent_segmentation_prompts import ATOMIC_SEGMENTATION_SYSTEM_PROMPT
 from .utils import loose_json_loads
-from .utils.llm_client import build_behaviour_llm_client, build_llm_call_kwargs
-
-# The two `_filter_capabilities_json*` helpers are module-level and predate the
-# per-call logger, so they keep using the module logger they were written with.
-logger = LoggerFactory.get_logger("UserAssistant")
-
-
-def filter_capabilities_json(caps_dict: dict) -> dict:
-    """Filter capabilities JSON to reduce size for ENV_CAPABILITIES_RESPONSE_PROMPT.
-
-    Rules:
-    1. Omit 'description' if empty
-    2. Omit 'form' from action/property affordances
-    3. Exclude action affordances without ex: semantic types
-    4. Omit output_schema from property affordances
-    5. Omit input_schema from action affordances
-    6. Omit parameters if empty
-
-    Args:
-        caps_dict: Hierarchical capabilities dict from EnvExplorer
-
-    Returns:
-        Filtered dict with reduced size
-    """
-    filtered = {}
-
-    # Copy top-level fields
-    for key in ("discovery_complete",):
-        if key in caps_dict:
-            filtered[key] = caps_dict[key]
-
-    # Filter workspaces
-    filtered["workspaces"] = []
-    for ws in (caps_dict.get("workspaces") or []):
-        filtered_ws = {
-            k: v for k, v in ws.items()
-            if k not in ("form",) and not (k == "description" and not v)
-        }
-
-        # Filter artifacts
-        filtered_ws["artifacts"] = []
-        for artifact in (ws.get("artifacts") or []):
-            filtered_artifact = {
-                k: v for k, v in artifact.items()
-                if k not in ("form",) and not (k == "description" and not v)
-            }
-
-            # Filter affordances
-            filtered_artifact["affordances"] = []
-            for aff in (artifact.get("affordances") or []):
-                aff_type = aff.get("type", "")
-
-                # Rule 3: For action affordances, keep ONLY those with ex: namespace semantic types
-                if aff_type == "action_affordance":
-                    semantic_types = aff.get("semantic_types", [])
-                    # Keep only home-ontology types (the device/room vocabulary
-                    # the user reasons about), not protocol types like td:Thing.
-                    ex_types = domain_types(semantic_types)
-                    logger.debug(
-                        f"Action affordance {aff.get('name')}: semantic_types={semantic_types}, ex_types={ex_types}"
-                    )
-                    if not ex_types:
-                        logger.debug(
-                            f"Filtering out action affordance {aff.get('name')} (no ex: semantic types)"
-                        )
-                        continue
-
-                # Build filtered affordance
-                filtered_aff = {}
-
-                # Copy all fields except form, schemas, parameters, and empty descriptions
-                for key, val in aff.items():
-                    if key == "form":
-                        continue  # Rule 2
-                    elif key == "output_schema" and aff_type == "property_affordance":
-                        continue  # Rule 4
-                    elif key == "input_schema" and aff_type == "action_affordance":
-                        continue  # Rule 5
-                    elif key == "parameters":
-                        # Rule 6: Omit if empty
-                        if val and len(val) > 0:
-                            filtered_aff[key] = val
-                    elif key == "description" and not val:
-                        # Rule 1: Omit if empty
-                        continue
-                    else:
-                        filtered_aff[key] = val
-
-                filtered_artifact["affordances"].append(filtered_aff)
-
-            filtered_ws["artifacts"].append(filtered_artifact)
-
-        filtered["workspaces"].append(filtered_ws)
-
-    return filtered
-
-
-def filter_capabilities_json_for_state(caps_dict: dict) -> dict:
-    """Filter capabilities JSON for ENV_STATE_REQUEST parsing.
-
-    Rules:
-    1. Include ONLY property affordances (exclude all actions)
-    2. Omit 'form', 'output_schema'
-    3. Include 'description' only if non-empty
-    4. Omit 'parameters' if empty
-
-    Purpose: Minimal property list for state-query parser to align property names to artifact/property URIs.
-
-    Args:
-        caps_dict: Hierarchical capabilities dict from EnvExplorer
-
-    Returns:
-        Filtered dict containing only properties (no actions, no schemas/forms)
-    """
-    filtered = {}
-
-    # Copy top-level fields
-    for key in ("discovery_complete",):
-        if key in caps_dict:
-            filtered[key] = caps_dict[key]
-
-    # Filter workspaces
-    filtered["workspaces"] = []
-    for ws in (caps_dict.get("workspaces") or []):
-        filtered_ws = {
-            k: v for k, v in ws.items()
-            if k != "form" and not (k == "description" and not v)
-        }
-
-        # Filter artifacts
-        filtered_ws["artifacts"] = []
-        for artifact in (ws.get("artifacts") or []):
-            filtered_artifact = {
-                k: v for k, v in artifact.items()
-                if k != "form" and not (k == "description" and not v)
-            }
-
-            # Filter affordances: ONLY property affordances (no actions)
-            filtered_artifact["affordances"] = []
-            for aff in (artifact.get("affordances") or []):
-                aff_type = aff.get("type", "")
-
-                # Skip action affordances entirely
-                if aff_type != "property_affordance":
-                    continue
-
-                # Build filtered property affordance
-                filtered_aff = {}
-
-                # Copy fields except: form, output_schema, and empty description
-                for key, val in aff.items():
-                    if key == "form":
-                        continue  # Omit form
-                    elif key == "output_schema":
-                        continue  # Omit output schema
-                    elif key == "description" and not val:
-                        continue  # Omit empty description
-                    elif key == "parameters":
-                        # Only include if non-empty
-                        if val and len(val) > 0:
-                            filtered_aff[key] = val
-                    else:
-                        filtered_aff[key] = val
-
-                filtered_artifact["affordances"].append(filtered_aff)
-
-            filtered_ws["artifacts"].append(filtered_artifact)
-
-        filtered["workspaces"].append(filtered_ws)
-
-    return filtered
-
-
-# ============================================================================
-# UserMessageBehaviour class
-# ============================================================================
 
 
 async def segment_into_atomic_intents(agent, logger, user_text: str) -> list[AtomicIntent]:
@@ -268,8 +86,9 @@ async def segment_into_atomic_intents(agent, logger, user_text: str) -> list[Ato
 def build_capabilities_hierarchical_text(caps_summary: dict) -> str:
     """Build human-readable hierarchical text from capabilities summary JSON.
 
-    Filters ACTION affordances to only show those with ex: semantic types,
-    but includes ALL PROPERTY affordances. Delegates to format_capabilities_hierarchical_text()
+    Filters ACTION affordances to those typed with what they do -- a homeont
+    or SAREF command class -- leaving out protocol actions (WebSub, artifact
+    CRUD); includes ALL PROPERTY affordances. Delegates to format_capabilities_hierarchical_text()
     from env_explorer's data_formatting module, which handles the full formatting.
 
     Args:
@@ -305,16 +124,15 @@ def build_capabilities_hierarchical_text(caps_summary: dict) -> str:
             if artifact_desc:
                 lines.append(f"{indent}    description: {artifact_desc}")
 
-            # Format affordances: ACTION only if has ex: types, PROPERTY always
+            # Format affordances: ACTION only if typed with what it does
+            # (homeont or SAREF), PROPERTY always
             for aff in (artifact.get("affordances") or []):
                 aff_type = aff.get("type", "").replace("_affordance", "")
 
-                # For ACTION affordances, only include if they have ex: semantic types
+                # Protocol actions (WebSub, artifact CRUD) carry no such type
                 if aff_type == "action":
-                    semantic_types = aff.get("semantic_types", [])
-                    homeont_types = domain_types(semantic_types)
-                    if not homeont_types:
-                        continue  # Skip actions without homeont types
+                    if not action_types(aff.get("semantic_types", [])):
+                        continue
 
                 aff_name = aff.get("name", "Unknown")
                 lines.append(f"{indent}    {aff_type}: {aff_name}")
@@ -350,7 +168,7 @@ async def parse_atomic_intent(agent, logger, span: str, category: str, capabilit
 
     Args:
         span: The verbatim user text for this atomic intent
-        category: One of "GOAL_REQUEST", "ENV_STATE_REQUEST", "ENV_CAPABILITIES_REQUEST"
+        category: The segmenter's type; only "GOAL_REQUEST" is parsed here
         capabilities_hierarchical: Hierarchical text description of environment capabilities
 
     Returns:
@@ -358,30 +176,15 @@ async def parse_atomic_intent(agent, logger, span: str, category: str, capabilit
     """
     logger.info(demo(f"[LLM CALL] Parsing {category}: {span[:80]!r}"))
 
-    # Choose prompt and template variables by category
-    ontology = agent.ontology_ttl
-
-    if category == "GOAL_REQUEST":
-        prompt_template = GOAL_REQUEST_PARSER_PROMPT
-        prompt = prompt_template.format(
-            capabilities_hierarchical=capabilities_hierarchical,
-            ontology=ontology,
-        )
-    elif category == "ENV_STATE_REQUEST":
-        prompt_template = ENV_STATE_REQUEST_PARSER_PROMPT
-        prompt = prompt_template.format(
-            capabilities_hierarchical=capabilities_hierarchical,
-            ontology=ontology,
-        )
-    elif category == "ENV_CAPABILITIES_REQUEST":
-        prompt_template = ENV_CAPABILITIES_REQUEST_PARSER_PROMPT
-        prompt = prompt_template.format(
-            capabilities_hierarchical=capabilities_hierarchical,
-            ontology=ontology,
-        )
-    else:
-        # Unknown category — return minimal fallback
+    # Only goals are parsed here. ENV_STATE and ENV_CAPABILITIES questions are
+    # structured by their own behaviours, against the ontology context.
+    if category != "GOAL_REQUEST":
         return {"text_intent": span}
+
+    prompt = GOAL_REQUEST_PARSER_PROMPT.format(
+        capabilities_hierarchical=capabilities_hierarchical,
+        ontology=agent.ontology_ttl,
+    )
 
     messages = [
         {"role": "system", "content": prompt},
@@ -451,28 +254,6 @@ async def format_query_response(agent, logger, raw_data: str, user_text: str) ->
         logger.error("LLM query formatting failed: %s", exc)
         return raw_data
 
-
-async def format_capabilities_response(agent, logger, capabilities_ctx: str, extraction: dict) -> str:
-    """Call LLM to format capabilities response based on structured extraction."""
-    prompt = ENV_CAPABILITIES_RESPONSE_PROMPT.format(capabilities_hierarchical=capabilities_ctx)
-    messages = [
-        {"role": "system", "content": prompt},
-        {"role": "user", "content": json.dumps(extraction)},
-    ]
-    try:
-        # Build LLM client with capabilities_analysis config
-        llm_cfg = build_behaviour_llm_client(agent.config, "capabilities_analysis")
-        kwargs = build_llm_call_kwargs(llm_cfg)
-
-        response = await llm_cfg.client.chat.completions.create(
-            model=llm_cfg.model,
-            messages=messages,
-            **kwargs,
-        )
-        return (response.choices[0].message.content or "").strip() or "Unable to process capabilities query."
-    except Exception as exc:
-        logger.error("LLM capabilities formatting failed: %s", exc)
-        return "Unable to process capabilities query."
 
 # ------------------------------------------------------------------
 # DETERMINISTIC: handle goal → request plan → summarize
