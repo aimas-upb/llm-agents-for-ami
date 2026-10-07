@@ -37,6 +37,8 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 from rdflib import Graph, Namespace, URIRef
 from rdflib.namespace import OWL, RDF, RDFS
 
+from ....shared.utils.vocabulary import parse_into, saref, vocabulary
+
 HOMEONT = Namespace("http://example.org/homeont/")
 SOSA = Namespace("http://www.w3.org/ns/sosa/")
 SAREF = Namespace("https://saref.etsi.org/core/")
@@ -44,12 +46,6 @@ SSN = Namespace("http://www.w3.org/ns/ssn/")
 SSN_SYSTEM = Namespace("http://www.w3.org/ns/ssn/systems/")
 QUDT = Namespace("http://qudt.org/schema/qudt/")
 
-# .../ami_agents/agents/user_assistant/utils/ -> .../ami_agents/
-ONTOLOGY_DIR = Path(__file__).resolve().parents[3] / "shared" / "ontologies"
-ONTOLOGY_PATH = ONTOLOGY_DIR / "homeont.ttl"
-# SAREF supplies the device families' and the commands' own definitions, and
-# the command classes homeont does not redefine (SetAbsoluteLevelCommand).
-SAREF_PATH = ONTOLOGY_DIR / "saref.rdf"
 
 # Prefixes the context renders identifiers with. The parser quotes these back
 # verbatim and the resolver puts them straight into SPARQL, so they must match
@@ -188,10 +184,12 @@ def _section(graph: Graph, index: Dict[str, List[URIRef]], root: URIRef,
 
 
 def _load(ontology_path: Optional[Path]) -> Graph:
-    graph = Graph()
-    graph.parse(str(ontology_path or ONTOLOGY_PATH), format="turtle")
-    if SAREF_PATH.exists():
-        graph.parse(str(SAREF_PATH), format="xml")
+    """The shared vocabulary graph, or -- for a test passing its own homeont
+    file -- that file with SAREF, parsed afresh."""
+    if ontology_path is None:
+        return vocabulary()
+    graph = parse_into(Graph(), ontology_path, "turtle")
+    graph += saref()
     return graph
 
 
@@ -288,16 +286,20 @@ def get_capability_ontology_context() -> Dict[str, Any]:
 
 @lru_cache(maxsize=1)
 def get_ontology_context_json() -> str:
-    """The ENV_STATE context as the indented JSON a prompt embeds."""
-    import json
-
-    return json.dumps(get_ontology_context(), indent=2, ensure_ascii=False)
+    """The ENV_STATE context as the compact JSON a prompt embeds."""
+    return _compact_json(get_ontology_context())
 
 
 @lru_cache(maxsize=1)
 def get_capability_ontology_context_json() -> str:
-    """The ENV_CAPABILITIES context as the indented JSON a prompt embeds."""
+    """The ENV_CAPABILITIES context as the compact JSON a prompt embeds."""
+    return _compact_json(get_capability_ontology_context())
+
+
+def _compact_json(context: Dict[str, Any]) -> str:
+    """No indentation or padding: in a tree this deep, indentation alone was
+    over a quarter of the characters, and the model reads the nesting from the
+    brackets, not the whitespace."""
     import json
 
-    return json.dumps(get_capability_ontology_context(), indent=2,
-                      ensure_ascii=False)
+    return json.dumps(context, separators=(",", ":"), ensure_ascii=False)

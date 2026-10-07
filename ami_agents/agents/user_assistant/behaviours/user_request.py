@@ -42,7 +42,6 @@ from typing import Any, Dict, List, Optional
 
 from spade.behaviour import FSMBehaviour, State
 
-from ....shared.models.intents import goal_intent_from_dict
 from ....shared.models.messages import (
     META_REQUEST_ID,
     MessageType,
@@ -54,6 +53,7 @@ from ....shared.utils.spade_rpc import rpc_call, RpcTimeoutError
 from .. import pipeline, queries
 from .env_capability_structuring import EnvCapabilityStructuringBehaviour
 from .env_state_structuring import EnvStateStructuringBehaviour
+from .goal_structuring import GoalStructuringBehaviour
 from ..models import (
     CONFIRM_TOKENS,
     ConversationPhase,
@@ -110,18 +110,8 @@ class SegmentingState(_RequestState):
         request = self.request
         self.conv.phase = ConversationPhase.SEGMENTING
 
-        # Fetched here for the EXTRACTING stage's parsers, not for segmentation:
-        # segmentation is purely linguistic and takes no capabilities.
-        capabilities_ctx = await pipeline.fetch_capabilities(
-            request.agent, self.logger, detail_level="summary")
-        try:
-            caps_summary = json.loads(capabilities_ctx) if capabilities_ctx else {}
-        except (json.JSONDecodeError, AttributeError):
-            caps_summary = {}
-
-        request.capabilities_ctx = capabilities_ctx
-        request.caps_summary = caps_summary
-
+        # Segmentation is purely linguistic and takes no capabilities; each goal
+        # fetches its own scoped environment view in EXTRACTING.
         atomic_intents = await pipeline.segment_into_atomic_intents(
             request.agent, self.logger, request.user_text)
 
@@ -208,32 +198,46 @@ class ExtractingState(_RequestState):
             self.set_next_state(DONE)
             return
 
-        # Both query parsers work from the ontology alone; only goal parsing
-        # still takes the discovered environment, as hierarchical text.
-        hierarchical = pipeline.build_capabilities_hierarchical_text(
-            request.caps_summary)
+        # Each goal is structured by its own behaviour, against a goal context
+        # scoped to it; the segmenter's qualifiers pick the prompt and how much
+        # context it needs. A goal whose context cannot be had is not
+        # structured: there is no other description of the environment.
+        goal_structuring = [
+            GoalStructuringBehaviour(intent.text, intent.qualifiers,
+                                     logger=self.logger)
+            for intent in goals
+        ]
+        for behaviour in goal_structuring:
+            request.agent.add_behaviour(behaviour)
+        for behaviour in goal_structuring:
+            await behaviour.join()
 
-        extractions = await asyncio.gather(
-            *[pipeline.parse_atomic_intent(request.agent, self.logger,
-                                           intent.text, intent.type,
-                                           hierarchical)
-              for intent in goals],
-            return_exceptions=True,
-        )
+        unavailable = [b.intent_text for b in goal_structuring
+                       if b.context_unavailable]
+        if unavailable:
+            self.logger.error(
+                "No goal context for %d goal(s): %s",
+                len(unavailable), unavailable)
+            await self.reply(
+                "I couldn't get a description of the environment, so I can't "
+                "act on: " + "; ".join(f"\"{t}\"" for t in unavailable))
 
         parsed: List[Any] = []
-        for extraction in extractions:
-            if isinstance(extraction, Exception):
-                self.logger.error("Failed to parse atomic intent: %s", extraction)
+        for behaviour in goal_structuring:
+            if behaviour.result is None:
+                if not behaviour.context_unavailable:
+                    self.logger.error("Goal structuring failed for %r: %s",
+                                      behaviour.intent_text, behaviour.error)
                 continue
-            if isinstance(extraction, dict):
-                self.logger.info(demo(
-                    f"{_label('GOAL_REQUEST')}:\n"
-                    f"{json.dumps(extraction, indent=2)}"))
-                parsed.append(goal_intent_from_dict(extraction))
+            self.logger.info(demo(
+                f"{_label('GOAL_REQUEST')}:\n"
+                f"{json.dumps(behaviour.result.to_wire_dict(), indent=2)}"))
+            parsed.append(behaviour.result)
 
         if not parsed:
-            await self.reply("Could not parse your request. Could you rephrase?")
+            # Rephrasing cannot help when the environment was the problem.
+            if len(unavailable) < len(goals):
+                await self.reply("Could not parse your request. Could you rephrase?")
             request.finish("failed")
             self.set_next_state(DONE)
             return
@@ -260,19 +264,18 @@ class AwaitingPlanState(_RequestState):
             self.set_next_state(DONE)
             return
 
-        for index, intent in enumerate(request.parsed_intents):
-            self.logger.info(demo(
-                f"Parsed goal intent #{index + 1}: "
-                f"{json.dumps(intent.to_wire_dict(), indent=2)}"))
-
+        # One structure per atomic goal; each carries `text_intent`, so a
+        # planner that cannot yet read the structure still has the words.
         body: Dict[str, Any] = {
-            "intents": [i.to_wire_dict() for i in request.parsed_intents],
+            "intents": [s.to_wire_dict() for s in request.parsed_intents],
         }
         if self.conv.workspace_id:
             body["workspace_id"] = str(self.conv.workspace_id)
 
-        categories = [i.to_wire_dict().get("category", "unknown")
-                      for i in request.parsed_intents]
+        categories = [
+            f"{s.structure}:" + "/".join(
+                g.goal_specificity or "?" for g in s.goals.values())
+            for s in request.parsed_intents]
         self.logger.info(demo(
             f"UA -> InteractionSolver GOAL_REQUEST: "
             f"{len(request.parsed_intents)} intents, categories: {categories}"))
@@ -440,8 +443,6 @@ class UserRequestBehaviour(FSMBehaviour):
         self.logger = logger or LoggerFactory.get_logger("UserAssistant")
 
         # Filled in as the machine advances.
-        self.capabilities_ctx: str = ""
-        self.caps_summary: Dict[str, Any] = {}
         self.atomic_intents: List[Any] = []
         self.parsed_intents: List[Any] = []
         self.plan_body: Any = None

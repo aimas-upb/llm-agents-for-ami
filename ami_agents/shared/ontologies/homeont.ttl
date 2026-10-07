@@ -317,6 +317,8 @@ an attribute as type "list" and puts the element type in a child <entry>, so
 
 :AirConditioner a owl:Class ;
 	rdfs:label "Air Conditioner"@en ;
+	skos:altLabel "AC"@en ;
+	skos:altLabel "air con"@en ;
 	rdfs:subClassOf saref:HVAC .
 
 :HeatPump a owl:Class ;
@@ -325,14 +327,20 @@ an attribute as type "list" and puts the element type in a child <entry>, so
 
 :OnOffLight a owl:Class ;
 	rdfs:label "On/Off Light"@en ;
+	skos:altLabel "lamp"@en ;
 	rdfs:subClassOf saref:Actuator .
 
 :DimmableLight a owl:Class ;
 	rdfs:label "Dimmable Light"@en ;
+	skos:altLabel "lamp"@en ;
 	rdfs:subClassOf saref:Actuator .
 
 :WindowCoveringController a owl:Class ;
 	rdfs:label "Window Covering Controller"@en ;
+	skos:altLabel "blinds"@en ;
+	skos:altLabel "shades"@en ;
+	skos:altLabel "curtains"@en ;
+	skos:altLabel "window covering"@en ;
 	rdfs:subClassOf saref:Actuator .
 
 :AirPurifier a owl:Class ;
@@ -357,6 +365,7 @@ an attribute as type "list" and puts the element type in a child <entry>, so
 
 :LaundryWasher a owl:Class ;
 	rdfs:label "Laundry Washer"@en ;
+	skos:altLabel "washing machine"@en ;
 	rdfs:subClassOf saref:Appliance .
 
 :LaundryDryer a owl:Class ;
@@ -365,6 +374,7 @@ an attribute as type "list" and puts the element type in a child <entry>, so
 
 :Refrigerator a owl:Class ;
 	rdfs:label "Refrigerator"@en ;
+	skos:altLabel "fridge"@en ;
 	rdfs:subClassOf saref:Appliance .
 
 :Freezer a owl:Class ;
@@ -374,10 +384,13 @@ an attribute as type "list" and puts the element type in a child <entry>, so
 :Rvc a owl:Class ;
 	rdfs:label "RVC"@en ;
 	skos:altLabel "Robotic Vacuum Cleaner"@en ;
+	skos:altLabel "vacuum"@en ;
+	skos:altLabel "robot vacuum"@en ;
 	rdfs:subClassOf saref:Appliance .
 
 :Tv a owl:Class ;
 	rdfs:label "TV"@en ;
+	skos:altLabel "television"@en ;
 	rdfs:subClassOf saref:Appliance .
 
 # Ambient sensors: instruments that observe a room's environment rather than
@@ -536,9 +549,11 @@ so no single one of them describes this affordance: it is keyed by the attribute
 and carries the value as an argument, driving all three. It is therefore a
 specialisation of all three -- invoked with true it is an OnCommand, with false
 an OffCommand -- rather than falling back to a bare saref:Command, which would
-discard what SAREF already states."""@en ;
-    rdfs:subClassOf saref:OnCommand, saref:OffCommand, saref:ToggleCommand ;
-    saref:actsUpon :OnOff .
+discard what SAREF already states.
+
+What an action of this class changes is stated per action, in the TD: each
+action affordance `saref:actsUpon` the property affordance it writes."""@en ;
+    rdfs:subClassOf saref:OnCommand, saref:OffCommand, saref:ToggleCommand .
 
 :SetModeCommand a owl:Class ;
     rdfs:label "Set Mode Command"@en ;
@@ -640,7 +655,9 @@ property."""@en ;
 :OnOff a owl:Class ;
     rdfs:label "On/Off"@en ;
     rdfs:comment """Whether the device is powered on. Most devices refuse other operations while off, so switching on is usually the first step of any plan involving them."""@en ;
-    rdfs:subClassOf :ActuatableDeviceProperty .
+    # Also SAREF's on/off state, stated rather than left to be inferred: what
+    # an On/Off/Toggle command acts upon (see :SetOnOffCommand).
+    rdfs:subClassOf :ActuatableDeviceProperty, saref:OnOffState .
 
 :OnOffOffWaitTime a owl:Class ;
     rdfs:label "On/Off Off Wait Time"@en ;

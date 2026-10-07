@@ -114,3 +114,25 @@ environment_variables:
   luminosity: "homeont:Illuminance"
   humidity: "homeont:RelativeHumidity"
   occupancy_presence: "homeont:Occupancy"
+
+# -- What an action changes (saref:actsUpon) -----------------------------------
+# HASP links each action to the property affordances it changes, so a resolver
+# can ask "can this property be changed by that command?" without matching
+# names. Two sources, unioned:
+#   - a service field named like a property acts upon it (light.turn_on's
+#     `brightness`, climate.set_temperature's `temperature`, set_fan_mode's
+#     `fan_mode`, volume_set's `volume_level`, select_source's `source`);
+#   - these rules, for what a service changes without a field of that name.
+# `state` is the entity's own state property (`lightState`, `climateState`).
+# `fields_any` restricts a rule to services taking one of those fields.
+# Every matching rule applies.
+acts_upon:
+  - {service: [turn_on, turn_off, toggle], signals: [state]}
+  # A light dims through `brightness_pct`, not a field named `brightness`.
+  - {domain: light, service: turn_on, fields_any: [brightness, brightness_pct, brightness_step, brightness_step_pct], signals: [brightness]}
+  - {domain: cover, service: [open_cover, close_cover, stop_cover, toggle, set_cover_position], signals: [state, current_position]}
+  - {domain: climate, service: set_hvac_mode, signals: [state]}
+  - {domain: media_player, service: [media_play, media_pause, media_stop, media_play_pause], signals: [state]}
+  - {domain: media_player, service: [volume_up, volume_down], signals: [volume_level]}
+  - {domain: media_player, service: volume_mute, signals: [is_volume_muted]}
+  - {domain: fan, service: [increase_speed, decrease_speed], signals: [percentage]}

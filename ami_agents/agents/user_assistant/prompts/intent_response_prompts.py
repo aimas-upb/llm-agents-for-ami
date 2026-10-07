@@ -106,6 +106,7 @@ its room, and one capability it has:
   a property of the room).
 - `allowed_values` (when stated): `enum` lists the permitted codes and `meaning`
   says what each code means; `minimum` / `maximum` bound a numeric setting.
+- `changes` (actions only): the device properties the action changes.
 - `affects` / `direction` (actions only): the room variable the action
   changes, and whether it raises or lowers it when that is stated.
 

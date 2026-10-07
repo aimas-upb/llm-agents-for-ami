@@ -111,6 +111,77 @@ class TestCommand:
         assert "kitchen_on_off_light_1" in _names(result)
 
 
+class TestPropertyOrCommand:
+    """A capability may be modelled as a changeable property, as a command, or
+    both. When the parser fills both, both routes run and the answer is their
+    union."""
+
+    def test_both_routes_contribute(self, graph):
+        result = resolve_capability_request(
+            graph, device_class="homeont:DimmableLight",
+            device_property={"class": "homeont:LevelControlBrightness"},
+            command={"class": "saref:OnCommand"})
+        assert result.outcome is CapabilityOutcome.FOUND
+        assert {e.affordance_kind for e in result.entries} == {"property", "action"}
+
+    def test_the_command_alone_can_answer(self, graph):
+        """The device has no such property, but has the command."""
+        result = resolve_capability_request(
+            graph, device_class="homeont:AirPurifier",
+            device_property={"class": "homeont:LevelControlBrightness"},
+            command={"class": "saref:OnCommand"})
+        assert result.outcome is CapabilityOutcome.FOUND
+        assert {e.affordance_kind for e in result.entries} == {"action"}
+
+    def test_the_property_alone_can_answer(self, graph):
+        """The device has the property, but no such command."""
+        result = resolve_capability_request(
+            graph, device_class="homeont:DimmableLight",
+            device_property={"class": "homeont:LevelControlBrightness"},
+            command={"class": "saref:OpenCommand"})
+        assert result.outcome is CapabilityOutcome.FOUND
+        assert {e.affordance_kind for e in result.entries} == {"property"}
+
+    def test_neither_is_a_lack(self, graph):
+        result = resolve_capability_request(
+            graph, device_class="homeont:AirPurifier",
+            device_property={"class": "homeont:LevelControlBrightness"},
+            command={"class": "saref:OpenCommand"})
+        assert result.outcome is CapabilityOutcome.DEVICE_LACKS
+        assert " or " in result.detail
+
+
+class TestActsUpon:
+    """A command with a property that is not actuatable answers only through
+    the actions that state `saref:actsUpon` a property of that class."""
+
+    def test_every_action_states_what_it_changes(self, graph):
+        result = resolve_capability_request(
+            graph, device_class="homeont:DimmableLight",
+            command={"class": "saref:SetAbsoluteLevelCommand"})
+        assert result.outcome is CapabilityOutcome.FOUND
+        for entry in result.entries:
+            assert entry.acts_upon, entry.affordance_name
+            assert entry.acts_upon[0]["affordance_name"] == entry.affordance_name
+
+    def test_a_reported_state_nothing_acts_upon_is_a_lack(self, graph):
+        """The dishwasher reports its operational state; no command changes it."""
+        result = resolve_capability_request(
+            graph, device_class="homeont:Dishwasher",
+            device_property={"class": "homeont:OperationalStateOperationalState"},
+            command={"class": "saref:Command"})
+        assert result.outcome is CapabilityOutcome.DEVICE_LACKS
+        assert result.query["property_branch"] == "state"
+
+    def test_an_actuatable_property_still_unions(self, graph):
+        result = resolve_capability_request(
+            graph, device_class="homeont:DimmableLight",
+            device_property={"class": "homeont:LevelControlBrightness"},
+            command={"class": "saref:OnCommand"})
+        assert result.query["property_branch"] == "actuatable"
+        assert {e.affordance_kind for e in result.entries} == {"property", "action"}
+
+
 class TestEnvironmentVariable:
     def test_sensing_finds_the_reporting_device(self, graph):
         """"Can you tell how warm the bathroom is?" -- no command: sensing."""
@@ -208,3 +279,31 @@ class TestResponse:
     def test_performative_defaults_to_query(self, graph):
         response = capability_response(resolve_capability_request(graph), {})
         assert response["request_performative"] == "query"
+
+
+class TestNamedDevice:
+    """Goal structuring narrows a lookup to the device a goal names."""
+
+    def test_the_name_narrows_the_answer_to_that_device(self, graph):
+        result = resolve_capability_request(
+            graph, device_class="homeont:AirConditioner",
+            command={"class": "homeont:SetModeCommand"},
+            artifact_name="bathroom_air_conditioner_1")
+        assert result.outcome == CapabilityOutcome.FOUND
+        assert _names(result) == ["bathroom_air_conditioner_1"]
+        assert result.query["artifact_name"] == "bathroom_air_conditioner_1"
+
+    def test_entries_carry_the_room_class(self, graph):
+        result = resolve_capability_request(
+            graph, device_class="homeont:AirConditioner",
+            command={"class": "homeont:SetModeCommand"},
+            artifact_name="bathroom_air_conditioner_1")
+        assert {e.workspace_class for e in result.entries} == {"homeont:Bathroom"}
+
+    def test_a_name_nothing_matches_is_none(self, graph):
+        result = resolve_capability_request(
+            graph, device_class="homeont:AirConditioner",
+            command={"class": "homeont:SetModeCommand"},
+            artifact_name="garage_air_conditioner_9")
+        assert result.outcome == CapabilityOutcome.NONE
+        assert result.entries == []

@@ -17,6 +17,7 @@ from ami_agents.agents.user_assistant.behaviours.user_request import (
     UserRequestBehaviour,
 )
 from ami_agents.agents.user_assistant.models import ConversationState
+from ami_agents.shared.models.goal_structure import GoalStructure
 from ami_agents.agents.user_assistant.registry import PlanRegistry, RequestRegistry
 
 
@@ -192,7 +193,6 @@ class TestSegmenting:
         fsm, agent = make_fsm()
         state = fsm._states[SEGMENTING]
         with patch("ami_agents.agents.user_assistant.behaviours.user_request.pipeline") as pl:
-            pl.fetch_capabilities = AsyncMock(return_value="{}")
             pl.segment_into_atomic_intents = AsyncMock(return_value=[])
             await state.run()
 
@@ -207,7 +207,6 @@ class TestSegmenting:
                            qualifiers=["incomplete", "achievement"])
         state = fsm._states[SEGMENTING]
         with patch("ami_agents.agents.user_assistant.behaviours.user_request.pipeline") as pl:
-            pl.fetch_capabilities = AsyncMock(return_value="{}")
             pl.segment_into_atomic_intents = AsyncMock(return_value=[intent])
             await state.run()
 
@@ -253,3 +252,91 @@ class TestExtracting:
         assert sent["device_property"]["class"] == "homeont:LevelControlBrightness"
         assert state.next_state == DONE
         assert agent.requests.get("req-1").outcome == "answered"
+
+    @pytest.mark.asyncio
+    async def test_a_goal_without_context_is_not_structured(self):
+        """No environment view, nothing to structure against: no fallback, and
+        no "rephrase" either -- the wording was not the problem."""
+        fsm, agent = make_fsm()
+        fsm.atomic_intents = [MagicMock(text="turn on the kitchen light",
+                                        type="GOAL_REQUEST", qualifiers=[])]
+        state = fsm._states[EXTRACTING]
+        _FakeGoalStructuring.outcomes = {"turn on the kitchen light": None}
+        with patch(f"{FSM_MODULE}.GoalStructuringBehaviour", _FakeGoalStructuring):
+            await state.run()
+
+        assert fsm.send.await_count == 1
+        assert "turn on the kitchen light" in fsm.send.await_args[0][0].body
+        assert state.next_state == DONE
+        assert agent.requests.get("req-1").outcome == "failed"
+
+    @pytest.mark.asyncio
+    async def test_each_goal_is_structured_with_its_own_qualifiers(self):
+        fsm, _ = make_fsm()
+        fsm.atomic_intents = [
+            MagicMock(text="turn on the kitchen light", type="GOAL_REQUEST",
+                      qualifiers=["explicit", "achievement"]),
+            MagicMock(text="when washer 1 finishes start the dryer",
+                      type="GOAL_REQUEST",
+                      qualifiers=["explicit", "logical_dependency", "achievement"]),
+        ]
+        _FakeGoalStructuring.outcomes = {
+            i.text: GoalStructure.from_dict({"goal_specificity": "explicit"},
+                                            intent_text=i.text)
+            for i in fsm.atomic_intents}
+        _FakeGoalStructuring.seen = []
+        state = fsm._states[EXTRACTING]
+        with patch(f"{FSM_MODULE}.GoalStructuringBehaviour", _FakeGoalStructuring):
+            await state.run()
+
+        assert _FakeGoalStructuring.seen == [
+            ("turn on the kitchen light", ["explicit", "achievement"]),
+            ("when washer 1 finishes start the dryer",
+             ["explicit", "logical_dependency", "achievement"])]
+        assert [s.intent_text for s in fsm.parsed_intents] == [
+            i.text for i in fsm.atomic_intents]
+        assert state.next_state == AWAITING_PLAN
+
+
+class TestAwaitingPlan:
+    @pytest.mark.asyncio
+    async def test_goal_request_carries_the_structures(self):
+        fsm, agent = make_fsm()
+        agent.target_jids = {"solver": "solver@localhost"}
+        fsm.parsed_intents = [GoalStructure.from_dict(
+            {"goal_specificity": "explicit", "artifact_name": "kitchen_on_off_light_1"},
+            intent_text="turn on the kitchen light", structure="simple")]
+        state = fsm._states[AWAITING_PLAN]
+        with patch(f"{FSM_MODULE}.rpc_call",
+                   AsyncMock(return_value=MagicMock(body="{}"))) as rpc:
+            await state.run()
+
+        body = rpc.await_args.kwargs["body"]
+        (intent,) = body["intents"]
+        assert intent["text_intent"] == "turn on the kitchen light"
+        assert intent["goals"]["G1"]["artifact_name"] == "kitchen_on_off_light_1"
+        assert state.next_state == SUMMARIZING
+
+
+FSM_MODULE = "ami_agents.agents.user_assistant.behaviours.user_request"
+
+
+class _FakeGoalStructuring:
+    """Stands in for GoalStructuringBehaviour: done as soon as joined.
+
+    `outcomes` maps a goal's text to its GoalStructure, or None for a goal
+    whose context could not be had.
+    """
+
+    outcomes: dict = {}
+    seen: list = []
+
+    def __init__(self, intent_text, qualifiers=None, logger=None):
+        self.intent_text = intent_text
+        type(self).seen.append((intent_text, list(qualifiers or [])))
+        self.result = type(self).outcomes.get(intent_text)
+        self.context_unavailable = self.result is None
+        self.error = "goal context unavailable" if self.result is None else None
+
+    async def join(self):
+        return None

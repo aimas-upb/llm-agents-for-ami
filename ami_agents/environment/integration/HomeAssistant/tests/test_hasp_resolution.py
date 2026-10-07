@@ -290,3 +290,35 @@ def test_the_thermostat_read_is_a_get_command(graph):
         PREFIX saref: <https://saref.etsi.org/core/>
         SELECT ?name WHERE { ?a td:hasActionAffordance ?x . ?x td:name ?name ; a saref:GetCommand }""")
     assert {str(r.name) for r in rows} == {"getThermostatState"}
+
+
+
+class TestActsUpon:
+    def test_light_turn_on_changes_state_and_brightness(self, graph):
+        rows = graph.query("""
+            PREFIX td: <https://www.w3.org/2019/wot/td#>
+            PREFIX saref: <https://saref.etsi.org/core/>
+            SELECT ?pn WHERE { ?a td:title "ambient_lights_308e" ;
+                                  td:hasActionAffordance ?x .
+                               ?x td:name "LightTurnOn" ; saref:actsUpon ?p .
+                               ?p td:name ?pn }""")
+        assert {str(r.pn) for r in rows} >= {"lightState", "brightness"}
+
+    def test_play_answers_through_the_playback_state_it_changes(self, graph):
+        """Playback state is reported, not actuatable: only the commands that
+        act upon it answer."""
+        result = resolve_capability_request(
+            graph, device_class="homeont:MediaPlayer",
+            device_property={"class": "homeont:MediaPlaybackState"},
+            command={"class": "saref:StartCommand"})
+        assert result.outcome is CapabilityOutcome.FOUND
+        assert {e.affordance_kind for e in result.entries} == {"action"}
+        assert _names(result) == ["display_wall_308e", "projector_308e"]
+
+    def test_a_command_that_acts_on_something_else_does_not_answer(self, graph):
+        """Setting the volume does not change the playback state."""
+        result = resolve_capability_request(
+            graph, device_class="homeont:MediaPlayer",
+            device_property={"class": "homeont:MediaPlaybackState"},
+            command={"class": "saref:SetAbsoluteLevelCommand"})
+        assert result.outcome is CapabilityOutcome.DEVICE_LACKS

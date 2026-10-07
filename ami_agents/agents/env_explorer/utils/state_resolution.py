@@ -20,19 +20,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from rdflib import Graph, URIRef
 from rdflib.namespace import RDF
 
 from ....shared.utils.namespaces import domain_types
-
-ONTOLOGY_DIR = (
-    Path(__file__).resolve().parents[3] / "shared" / "ontologies"
-)
-HOMEONT_PATH = ONTOLOGY_DIR / "homeont.ttl"
-SAREF_PATH = ONTOLOGY_DIR / "saref.rdf"
+from ....shared.utils.vocabulary import vocabulary
 
 # Rendering IRIs back as CURIEs keeps the response speaking the same vocabulary
 # the request arrived in -- a caller that sent `homeont:AirTemperature` should
@@ -185,9 +179,9 @@ def load_vocabulary(graph: Optional[Graph] = None) -> Graph:
     constrained on device-ness silently returns nothing.
     """
     graph = graph if graph is not None else Graph()
-    graph.parse(str(HOMEONT_PATH), format="turtle")
-    if SAREF_PATH.exists():
-        graph.parse(str(SAREF_PATH), format="xml")
+    # Copied from the process-wide parse rather than parsed again: the graph
+    # is rebuilt per request, the vocabulary never changes.
+    graph += vocabulary()
     return graph
 
 

@@ -47,6 +47,7 @@ SSN = Namespace("http://www.w3.org/ns/ssn/")
 TD = Namespace("https://www.w3.org/2019/wot/td#")
 JS = Namespace("https://www.w3.org/2019/wot/json-schema#")
 TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
+SAREF = Namespace("https://saref.etsi.org/core/")
 
 _PREFIXES = SPARQL_PREFIXES + """PREFIX sosa:    <http://www.w3.org/ns/sosa/>
 PREFIX tdsosa:  <https://example.org/hmas/td-sosa-ext#>
@@ -95,6 +96,8 @@ class CapabilityEntry:
     artifact_name: str
     artifact_type: Optional[str] = None
     workspace_name: Optional[str] = None
+    # The room kind (`homeont:Kitchen`), so a caller can fill a location class.
+    workspace_class: Optional[str] = None
     manufacturer: Optional[str] = None
     model: Optional[str] = None
     affordance_name: Optional[str] = None
@@ -107,6 +110,9 @@ class CapabilityEntry:
     # For an effect: the variable acted on and, when stated, the direction.
     effect_on: Optional[str] = None
     effect_direction: Optional[str] = None
+    # For an action: the properties it changes (`saref:actsUpon`), each as
+    # {"affordance_name", "affordance_type"}.
+    acts_upon: Optional[List[Dict[str, Any]]] = None
 
     def as_dict(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {
@@ -117,9 +123,10 @@ class CapabilityEntry:
         }
         # Omitted rather than null, as in ENV_STATE: an entry without an
         # affordance is a device, not a broken affordance.
-        for key in ("manufacturer", "model", "affordance_name",
+        for key in ("workspace_class", "manufacturer", "model", "affordance_name",
                     "affordance_kind", "affordance_type", "property_branch",
-                    "permitted_values", "effect_on", "effect_direction"):
+                    "permitted_values", "effect_on", "effect_direction",
+                    "acts_upon"):
             value = getattr(self, key)
             if value:
                 out[key] = value
@@ -181,6 +188,24 @@ def build_action_query(location_class: Optional[str],
     lines.append("  ?artifact td:title ?artTitle ; td:hasActionAffordance ?aff .")
     lines.append("  ?aff a ?ac ; td:name ?name .")
     lines.append(f"  ?ac rdfs:subClassOf* {command_class} .")
+    return _finish(lines, "?artifact ?artTitle ?aff ?ac ?name ?manufacturer ?model",
+                   location_class)
+
+
+def build_acts_upon_query(location_class: Optional[str],
+                          device_class: Optional[str],
+                          command_class: str,
+                          property_class: str) -> str:
+    """Actions performing `command_class` that change a `property_class` property.
+
+    The link is the action's own `saref:actsUpon` triple to the property
+    affordance it changes, never a shared name.
+    """
+    lines = scope_lines(location_class, device_class)
+    lines.append("  ?artifact td:title ?artTitle ; td:hasActionAffordance ?aff .")
+    lines.append("  ?aff a ?ac ; td:name ?name ; saref:actsUpon ?target .")
+    lines.append(f"  ?ac rdfs:subClassOf* {command_class} .")
+    lines.append(f"  ?target a/rdfs:subClassOf* {property_class} .")
     return _finish(lines, "?artifact ?artTitle ?aff ?ac ?name ?manufacturer ?model",
                    location_class)
 
@@ -256,6 +281,23 @@ def permitted_values(graph: Graph, schema: Any) -> Optional[Dict[str, Any]]:
     return out or None
 
 
+_CURIE_NAMESPACES = {
+    "homeont": str(HOMEONT),
+    "saref": str(SAREF),
+    "sosa": str(SOSA),
+    "schema": "https://schema.org/",
+}
+
+
+def expand_curie(value: Optional[str]) -> Optional[URIRef]:
+    """`homeont:OnOff` -> its IRI; a full IRI is returned as is."""
+    if not value:
+        return None
+    prefix, _, local = str(value).partition(":")
+    namespace = _CURIE_NAMESPACES.get(prefix)
+    return URIRef(namespace + local) if namespace else URIRef(str(value))
+
+
 def property_branch(graph: Graph, cls: Any) -> Optional[str]:
     """Which root a property class descends from (or `environment`)."""
     uri = URIRef(str(cls))
@@ -266,6 +308,18 @@ def property_branch(graph: Graph, cls: Any) -> Optional[str]:
         if root in ancestors:
             return name
     return None
+
+
+def acts_upon(graph: Graph, action: Any) -> List[Dict[str, Any]]:
+    """The property affordances an action states it changes."""
+    targets = []
+    for target in graph.objects(action, SAREF.actsUpon):
+        name = graph.value(target, TD.name)
+        types = sorted(curie(t) for t in graph.objects(target, RDF.type)
+                       if str(t).startswith(str(HOMEONT)))
+        targets.append({"affordance_name": str(name) if name else None,
+                        "affordance_type": types[0] if types else None})
+    return sorted(targets, key=lambda t: str(t["affordance_name"]))
 
 
 def _effect_direction(graph: Graph, actuation: Any) -> Optional[str]:
@@ -290,6 +344,16 @@ def workspace_label(graph: Graph, artifact: Any) -> Optional[str]:
     return None
 
 
+def workspace_class(graph: Graph, artifact: Any) -> Optional[str]:
+    """The room kind an artifact is in (`homeont:Kitchen`), not just its name."""
+    for workspace in graph.subjects(HMAS.contains, URIRef(str(artifact))):
+        for space in graph.subjects(HOMEONT.isSpaceOfWorkspace, workspace):
+            for cls in sorted(graph.objects(space, RDF.type), key=str):
+                if str(cls).startswith(str(HOMEONT)) and cls != HOMEONT.BuildingSpace:
+                    return curie(cls)
+    return None
+
+
 def _optional(row: Any, name: str) -> Optional[str]:
     value = getattr(row, name, None)
     return str(value) if value is not None else None
@@ -303,6 +367,7 @@ def _entry(graph: Graph, row: Any, kind: Optional[str] = None) -> CapabilityEntr
         artifact_type=device_class_of(graph, row.artifact),
         workspace_name=(_optional(row, "spaceLabel")
                         or workspace_label(graph, row.artifact)),
+        workspace_class=workspace_class(graph, row.artifact),
         manufacturer=_optional(row, "manufacturer"),
         model=_optional(row, "model"),
     )
@@ -319,6 +384,7 @@ def _entry(graph: Graph, row: Any, kind: Optional[str] = None) -> CapabilityEntr
         schema = graph.value(aff, TD.hasOutputSchema)
     else:
         schema = graph.value(aff, TD.hasInputSchema)
+        entry.acts_upon = acts_upon(graph, aff) or None
     entry.permitted_values = permitted_values(graph, schema)
     return entry
 
@@ -367,12 +433,41 @@ def resolve_capability_request(
     device_property: Optional[Dict[str, Any]] = None,
     environment_variable: Optional[Dict[str, Any]] = None,
     command: Optional[Dict[str, Any]] = None,
+    artifact_name: Optional[str] = None,
 ) -> CapabilityResolution:
     """Find what in the environment provides one structured capability.
 
     `graph` must already hold the discovered Thing Descriptions and the
     vocabulary (see `state_resolution.discovered_graph`).
+
+    `artifact_name` narrows the answer to the device with that `td:title` --
+    used when a goal names its device but not its room.
     """
+    resolution = _resolve(graph, location_class, device_class, device_property,
+                          environment_variable, command)
+    if not artifact_name:
+        return resolution
+
+    resolution.query = dict(resolution.query or {}, artifact_name=artifact_name)
+    named = [e for e in resolution.entries if e.artifact_name == artifact_name]
+    if named:
+        resolution.entries = named
+        return resolution
+    return CapabilityResolution(
+        outcome=CapabilityOutcome.NONE,
+        query=resolution.query,
+        detail=f"no device titled {artifact_name!r} matches: {resolution.detail}",
+    )
+
+
+def _resolve(
+    graph: Graph,
+    location_class: Optional[str],
+    device_class: Optional[str],
+    device_property: Optional[Dict[str, Any]],
+    environment_variable: Optional[Dict[str, Any]],
+    command: Optional[Dict[str, Any]],
+) -> CapabilityResolution:
     property_class = _class_of(device_property)
     environment_class = _class_of(environment_variable)
     command_class = _class_of(command)
@@ -390,42 +485,62 @@ def resolve_capability_request(
         return _resolve_metadata(graph, location_class, device_class,
                                  property_class, asked, where)
 
-    if property_class:
+    # A capability can be modelled as a changeable property, as a command, or
+    # both; the vocabulary decides which slots the parser fills.
+    #   command + actuatable property  -> union of the property and command routes;
+    #   command + any other property   -> only the commands that `saref:actsUpon`
+    #                                     a property of that class.
+    branch = (property_branch(graph, expand_curie(property_class))
+              if property_class else None)
+    asked["property_branch"] = branch
+    acts_upon_only = bool(property_class and command_class and branch != "actuatable")
+
+    entries: List[CapabilityEntry] = []
+    asked_for: List[str] = []
+
+    if acts_upon_only:
+        rows = graph.query(build_acts_upon_query(
+            location_class, device_class, command_class, property_class))
+        entries += [_entry(graph, row, "action") for row in rows]
+        asked_for.append(f"{command_class} acting on {property_class}")
+    elif property_class:
         rows = graph.query(build_property_query(
             location_class, device_class, property_class))
-        entries = [_entry(graph, row, "property") for row in rows]
-        what = property_class
-    elif environment_class and command_class:
+        entries += [_entry(graph, row, "property") for row in rows]
+        asked_for.append(property_class)
+
+    if environment_class and command_class:
         rows = graph.query(build_effect_query(
             location_class, device_class, environment_class, command_class))
-        entries = []
         for row in rows:
             entry = _entry(graph, row, "action")
             entry.effect_on = environment_class
             entry.effect_direction = _effect_direction(graph, row.actuation)
             entries.append(entry)
-        what = f"an action affecting {environment_class}"
+        asked_for.append(f"an action affecting {environment_class}")
     elif environment_class:
         rows = graph.query(build_property_query(
             location_class, device_class, environment_class))
-        entries = [_entry(graph, row, "property") for row in rows]
-        what = environment_class
-    elif command_class:
+        entries += [_entry(graph, row, "property") for row in rows]
+        asked_for.append(environment_class)
+    elif command_class and not acts_upon_only:
         rows = graph.query(build_action_query(
             location_class, device_class, command_class))
-        entries = [_entry(graph, row, "action") for row in rows]
-        what = command_class
-    elif location_class or device_class:
+        entries += [_entry(graph, row, "action") for row in rows]
+        asked_for.append(command_class)
+
+    if not asked_for:
+        if not (location_class or device_class):
+            return CapabilityResolution(
+                outcome=CapabilityOutcome.INDETERMINATE,
+                query=asked,
+                detail="the request named no location, device, property, "
+                       "environment variable or command",
+            )
         rows = graph.query(build_inventory_query(location_class, device_class))
         entries = [_entry(graph, row) for row in rows]
-        what = "anything"
-    else:
-        return CapabilityResolution(
-            outcome=CapabilityOutcome.INDETERMINATE,
-            query=asked,
-            detail="the request named no location, device, property, "
-                   "environment variable or command",
-        )
+        asked_for.append("anything")
+    what = " or ".join(asked_for)
 
     entries = _dedupe(entries)
     if entries:

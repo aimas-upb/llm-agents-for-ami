@@ -35,16 +35,15 @@ readable in one place, and so an unparseable ontology cannot silently remove one
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Iterable, List, Optional, Union
 
 from rdflib import Graph, Namespace, URIRef
 from rdflib.namespace import NamespaceManager
 
+from .vocabulary import ONTOLOGY_DIR, homeont  # noqa: F401  (ONTOLOGY_DIR re-exported)
+
 # Anything that can name a term: a URIRef, a full IRI, or an already-short CURIE.
 TermLike = Union[URIRef, str, None]
-
-ONTOLOGY_DIR = Path(__file__).resolve().parents[1] / "ontologies"
 
 # The vocabularies the environment serves, as namespace objects rather than
 # strings so callers can build terms (`HOMEONT.Kitchen`) and compare membership
@@ -98,18 +97,12 @@ def _build_manager() -> NamespaceManager:
     for prefix, namespace in _DECLARED.items():
         manager.bind(prefix, namespace, override=True, replace=True)
 
-    homeont_file = ONTOLOGY_DIR / "homeont.ttl"
-    if homeont_file.is_file():
-        source = Graph()
-        try:
-            source.parse(str(homeont_file), format="turtle")
-        except Exception:
-            # A malformed ontology must not stop the agents from starting; the
-            # declarations above already cover every vocabulary in use.
-            return manager
-        for prefix, namespace in source.namespaces():
-            if prefix:
-                manager.bind(prefix, namespace, override=False, replace=False)
+    # A missing or malformed ontology parses to an empty graph (see
+    # `vocabulary`); the declarations above already cover every vocabulary in
+    # use, so the agents still start.
+    for prefix, namespace in homeont().namespaces():
+        if prefix:
+            manager.bind(prefix, namespace, override=False, replace=False)
     return manager
 
 

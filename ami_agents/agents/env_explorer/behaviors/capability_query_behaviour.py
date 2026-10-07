@@ -89,6 +89,7 @@ def resolve_capability_payload(agent, payload: Dict[str, Any]) -> CapabilityReso
             device_property=payload.get("device_property"),
             environment_variable=payload.get("environment_variable"),
             command=payload.get("command"),
+            artifact_name=payload.get("artifact_name"),
         )
     except Exception as exc:
         agent.logger.error("Capability resolution failed: %s", exc, exc_info=True)

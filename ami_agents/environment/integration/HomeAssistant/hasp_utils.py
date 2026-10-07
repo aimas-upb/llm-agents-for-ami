@@ -862,6 +862,17 @@ def get_supported_service_fields(domain: str, entity_attributes: Dict[str, Any],
         supported_color_modes = set(entity_attributes.get("supported_color_modes", []))
 
         for field_name, field_def in service_fields.items():
+            # Home Assistant states per field which colour modes it applies to
+            # (`filter.attribute.supported_color_modes`); where it does, that is
+            # the answer -- an `hs` light dims through `brightness_pct` and
+            # takes `rgb_color`. The rules below cover fields without a filter.
+            mode_filter = (((field_def or {}).get("filter") or {})
+                           .get("attribute") or {}).get("supported_color_modes")
+            if mode_filter:
+                if supported_color_modes & set(mode_filter):
+                    supported[field_name] = field_def
+                continue
+
             # Always include basic fields
             if field_name in ("transition", "flash", "effect"):
                 supported[field_name] = field_def

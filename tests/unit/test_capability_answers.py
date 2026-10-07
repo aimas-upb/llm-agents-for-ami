@@ -55,6 +55,16 @@ class TestDeterministic:
         assert text == ("No. The Air Purifier in the Kitchen does not provide "
                         "Level Control Brightness.")
 
+    def test_property_and_command_are_both_named(self):
+        text = ca.phrase(response(
+            "device_lacks_capability", "query_if", [entry()],
+            property_class="homeont:LevelControlBrightness",
+            command_class="saref:SetAbsoluteLevelCommand",
+            property_branch="actuatable"))
+        assert text == ("No. The Air Purifier in the Kitchen does not provide "
+                        "Level Control Brightness or support the Set absolute "
+                        "level command.")
+
     def test_an_effect_question_reads_as_changing_the_variable(self):
         text = ca.phrase(response(
             "none", location_class="homeont:Kitchen",
@@ -103,3 +113,20 @@ class TestPromptEntries:
             effect_on="homeont:Illuminance", effect_direction="increase")])
         assert items[0]["affects"] == "Illuminance"
         assert items[0]["direction"] == "increase"
+
+
+def test_a_command_on_a_reported_state_reads_as_changing_it():
+    text = ca.phrase(response(
+        "device_lacks_capability", "query_if", [entry(device="homeont:MediaPlayer")],
+        property_class="homeont:MediaPlaybackState",
+        command_class="saref:StartCommand", property_branch="state"))
+    assert text == ("No. The Media Player in the Kitchen does not support a "
+                    "Start command that changes Media Playback State.")
+
+
+def test_actions_tell_the_model_what_they_change():
+    items = ca.entries_for_prompt([entry(
+        affordance_kind="action", affordance_type="saref:OnCommand",
+        acts_upon=[{"affordance_name": "brightness",
+                    "affordance_type": "homeont:DimmableLightBrightness"}])])
+    assert items[0]["changes"] == ["Dimmable Light Brightness"]

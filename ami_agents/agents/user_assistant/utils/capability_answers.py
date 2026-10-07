@@ -131,6 +131,10 @@ def entries_for_prompt(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                                          entry["property_branch"])
         if entry.get("permitted_values"):
             item["allowed_values"] = entry["permitted_values"]
+        changes = [label_for(t.get("affordance_type")) or t.get("affordance_name")
+                   for t in entry.get("acts_upon") or []]
+        if changes:
+            item["changes"] = [c for c in changes if c]
         if entry.get("effect_on"):
             item["affects"] = label_for(entry["effect_on"])
             if entry.get("effect_direction"):
@@ -151,6 +155,12 @@ def _provides(query: Dict[str, Any], bare: bool = False) -> str:
     if prop in ("schema:manufacturer", "schema:model"):
         fact = "manufacturer" if prop == "schema:manufacturer" else "model"
         return f"state{'' if bare else 's'} its {fact}"
+    if prop and command and query.get("property_branch") != "actuatable":
+        return (f"support{'' if bare else 's'} a {label_for(command)} that "
+                f"changes {label_for(prop)}")
+    if prop and command:
+        return (f"provide{'' if bare else 's'} {label_for(prop)} or "
+                f"support{'' if bare else 's'} the {label_for(command)}")
     if prop:
         return f"provide{'' if bare else 's'} {label_for(prop)}"
     if environment:

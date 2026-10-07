@@ -806,7 +806,7 @@ class SimuHomeTD:
 
         if actuatable:
             self._action_affordance(g, art, path, name, record, row, siblings,
-                                    device_type, room_id)
+                                    device_type, room_id, acts_upon=prop)
 
     def _property_class(self, g: Graph, prop: BNode, record: Dict[str, Any],
                         row: Dict[str, Any], device_type: str) -> None:
@@ -840,7 +840,8 @@ class SimuHomeTD:
     def _action_affordance(self, g: Graph, art: URIRef, path: str, name: str,
                            record: Dict[str, Any], row: Dict[str, Any],
                            siblings: Optional[Dict[str, Any]],
-                           device_type: str = "", room_id: str = "") -> None:
+                           device_type: str = "", room_id: str = "",
+                           acts_upon: Optional[BNode] = None) -> None:
         """The invocation half of an actuatable property.
 
         One flat action name -- the same `td:name` the property uses -- so a
@@ -865,6 +866,13 @@ class SimuHomeTD:
         # invisible to the planner by design"; publishing it as a triple
         # contradicted that.
         self._action_class(g, action, record, row, device_type)
+
+        # What the action changes, stated rather than implied by the shared
+        # name: `saref:actsUpon` the property affordance it writes. A resolver
+        # asking "can this property be changed by that command?" follows this
+        # triple; it never matches action and property by `td:name`.
+        if acts_upon is not None:
+            g.add((action, SAREF.actsUpon, acts_upon))
 
         # The input schema is the value the action accepts, so it carries the
         # same permitted values and bounds the read schema does -- that is what

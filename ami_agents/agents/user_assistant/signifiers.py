@@ -36,11 +36,6 @@ from spade.behaviour import OneShotBehaviour
 
 from ...bt_planning.signifier_bridge import extract_signifiers_from_bt
 from ...shared.community.community_client import CommunitySignifierClient
-from ...shared.models.intents import (
-    ExplicitGoalIntent,
-    ImplicitGoalIntent,
-    Intent,
-)
 from ...shared.models.messages import MessageType
 from ...shared.utils.demo_log import demo
 from ...shared.utils.logger import LoggerFactory
@@ -282,9 +277,10 @@ class SignifierExtractor:
     def extract(self, context: ExecutionContext,
                 outcome: ExecutionOutcome) -> List[dict]:
         intent_strings = [self._as_query_string(i) for i in context.intents]
+        # Any intent that serialises itself -- the old explicit/implicit intents
+        # and the new GoalStructure alike.
         structured = [
-            i.to_wire_dict()
-            if isinstance(i, (ImplicitGoalIntent, ExplicitGoalIntent, Intent))
+            i.to_wire_dict() if hasattr(i, "to_wire_dict")
             else (i if isinstance(i, dict) else None)
             for i in context.intents
         ]

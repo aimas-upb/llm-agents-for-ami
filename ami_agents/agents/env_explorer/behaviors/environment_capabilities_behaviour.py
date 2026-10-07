@@ -4,11 +4,17 @@ from spade.behaviour import CyclicBehaviour
 
 from ....shared.models.messages import MessageType, META_CORRELATION_ID
 from ....shared.utils.demo_log import demo
+from ..utils.actuation_context import (
+    build_actuation_context,
+    render_actuation_context,
+    scope_artifacts,
+)
 from ..utils.data_formatting import (
     format_capabilities_payload,
     format_capabilities_summary_hierarchical,
     format_capabilities_detailed_rdf,
 )
+from ..utils.state_resolution import discovered_graph
 
 
 class EnvironmentCapabilitiesBehaviour(CyclicBehaviour):
@@ -32,15 +38,26 @@ class EnvironmentCapabilitiesBehaviour(CyclicBehaviour):
 
         # Parse request body to extract detail_level
         detail_level = "summary"  # default
+        body = {}
         try:
             if msg.body:
                 body = json.loads(msg.body)
                 detail_level = body.get("detail_level", "summary")
         except (json.JSONDecodeError, AttributeError):
-            pass
+            body = {}
 
-        # Generate capabilities response payload
-        response_payload = self._generate_capabilities_payload(detail_level)
+        # Generate capabilities response payload. `goal_context` is the goal
+        # structurer's scoped view; `actuation_only` is it with both
+        # additions off.
+        if detail_level in ("goal_context", "actuation_only"):
+            response_payload = self._generate_goal_context_payload(
+                body.get("goal_text"),
+                with_properties=bool(body.get("with_properties")),
+                with_environment=bool(body.get("with_environment")),
+                detail_level=detail_level,
+            )
+        else:
+            response_payload = self._generate_capabilities_payload(detail_level)
         ## Log the response payload for debugging (can be removed in production)
         # self.agent.logger.info(demo(f"Generated capabilities payload: {response_payload}"))
 
@@ -65,6 +82,53 @@ class EnvironmentCapabilitiesBehaviour(CyclicBehaviour):
 
         workspace_count = len(response_payload.get('workspaces', {})) if isinstance(response_payload, dict) else 0
         self.agent.logger.info(demo(f"Sent capabilities response with {workspace_count} workspaces"))
+
+    def _generate_goal_context_payload(self, goal_text, with_properties=False,
+                                       with_environment=False,
+                                       detail_level="goal_context"):
+        """The goal context, scoped to `goal_text` when one is given.
+
+        See `utils/actuation_context.py` for the view and the scoping rules.
+        """
+        try:
+            graph = discovered_graph(
+                self.agent.artifacts.values(),
+                self.agent.environment_map.values(),
+                logger=self.agent.logger,
+            )
+            artifacts, scope = scope_artifacts(
+                graph, goal_text,
+                max_artifacts=self.agent.actuation_max_artifacts,
+                max_actions=self.agent.actuation_max_actions,
+                with_properties=with_properties,
+            )
+            context = build_actuation_context(
+                graph, artifacts,
+                with_properties=with_properties,
+                with_environment=with_environment,
+            )
+        except Exception as e:
+            self.agent.logger.error(f"Error building goal context: {e}", exc_info=True)
+            return {
+                "error": "goal_context_failed",
+                "detail": str(e),
+                "detail_level": detail_level,
+            }
+
+        self.agent.logger.info(demo(
+            f"Goal context for {goal_text!r} "
+            f"(properties={with_properties}, environment={with_environment}): "
+            f"rule={scope.get('rule')} "
+            f"rooms={scope.get('matched_rooms', [])} "
+            f"devices={scope.get('matched_devices', [])} "
+            f"workspaces={scope.get('workspaces', [])} "
+            f"artifacts={'all' if artifacts is None else len(artifacts)}"))
+        return {
+            "detail_level": detail_level,
+            "scope": scope,
+            "context": context,
+            "text": render_actuation_context(context),
+        }
 
     def _generate_capabilities_payload(self, detail_level: str = "summary"):
         """

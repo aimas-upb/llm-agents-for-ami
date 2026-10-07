@@ -38,6 +38,10 @@ from .behaviors import (
     EnvironmentSnapshotBehaviour,
     CapabilityQueryBehaviour,
 )
+from .utils.actuation_context import (
+    DEFAULT_MAX_ACTION_AFFORDANCES,
+    DEFAULT_MAX_ARTIFACTS,
+)
 
 
 # Configuration constants as fallbacks
@@ -48,6 +52,10 @@ _EXPERIENCE_ENGINE_DEFAULTS = {
 }
 _TIMEOUTS = {
     "message_reception": 5.0,
+}
+_ACTUATION_CONTEXT_DEFAULTS = {
+    "max_artifacts": DEFAULT_MAX_ARTIFACTS,
+    "max_action_affordances": DEFAULT_MAX_ACTION_AFFORDANCES,
 }
 
 
@@ -111,6 +119,13 @@ class EnvExplorerAgent(Agent, IAgent):
         min_similarity_raw = self.config.get("experience_engine", {}).get("default_min_similarity", _EXPERIENCE_ENGINE_DEFAULTS["default_min_similarity"])
         self._experience_engine_default_min_similarity = float(min_similarity_raw)
         self._experience_engine_shacl_validation_enabled = self.config.get("experience_engine", {}).get("shacl_validation_enabled", "false").lower() == "true"
+
+        # Scoping thresholds for the goal parser's actuation-only context
+        actuation_config = self.config.get("actuation_context", {})
+        self.actuation_max_artifacts = int(actuation_config.get(
+            "max_artifacts", _ACTUATION_CONTEXT_DEFAULTS["max_artifacts"]))
+        self.actuation_max_actions = int(actuation_config.get(
+            "max_action_affordances", _ACTUATION_CONTEXT_DEFAULTS["max_action_affordances"]))
 
     async def setup(self):
         """Set up the agent behaviors and templates."""

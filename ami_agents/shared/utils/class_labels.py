@@ -19,37 +19,23 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Optional
 
-from rdflib import Graph, RDFS, URIRef
+from rdflib import RDFS
 
-from .namespaces import ONTOLOGY_DIR, expand, local_name
-
-HOMEONT_PATH = ONTOLOGY_DIR / "homeont.ttl"
-# SAREF names the commands an action performs ("On command") and the device
-# families homeont hangs its devices from; homeont's own label wins where both
-# state one.
-SAREF_PATH = ONTOLOGY_DIR / "saref.rdf"
+from .namespaces import expand, local_name
+from .vocabulary import homeont, saref
 
 
 @lru_cache(maxsize=1)
 def _labels() -> dict:
-    """Every `rdfs:label` in the home ontology and SAREF, read once per process.
+    """Every `rdfs:label` in the home ontology and SAREF, built once per process.
 
-    A plain dict rather than a live graph: this is a lookup table consulted once
-    per answered question, and keeping the graph would hold the whole ontology
-    for the sake of one predicate.
+    SAREF names the commands an action performs ("On command") and the device
+    families homeont hangs its devices from; homeont is read first, so its own
+    label wins where both state one. A missing or malformed ontology yields no
+    labels, and callers fall back to the local name.
     """
     table: dict = {}
-    for path, fmt in ((HOMEONT_PATH, "turtle"), (SAREF_PATH, "xml")):
-        if not path.is_file():
-            continue
-        graph = Graph()
-        try:
-            graph.parse(str(path), format=fmt)
-        except Exception:
-            # A malformed ontology degrades the phrasing of an answer; it must
-            # not stop the agent from answering. Callers fall back to the local
-            # name.
-            continue
+    for graph in (homeont(), saref()):
         for subject, label in graph.subject_objects(RDFS.label):
             # Several labels may be stated (one per language); the first read
             # wins, and homeont is read first.

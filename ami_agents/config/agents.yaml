@@ -59,6 +59,13 @@ env_explorer:
     shacl_validation_enabled: "${SHACL_VALIDATION_ENABLED:-true}"
     enable_shacl_cache: "${SHACL_CACHE_ENABLED:-false}"
 
+  # Actuation-only context for the UA goal parser: below either threshold the
+  # whole environment is sent; above both, it is scoped to the rooms or device
+  # families the goal names.
+  actuation_context:
+    max_artifacts: "${ACTUATION_CTX_MAX_ARTIFACTS:-15}"
+    max_action_affordances: "${ACTUATION_CTX_MAX_ACTIONS:-50}"
+
   timeouts:
     message_reception: "${ENV_MESSAGE_TIMEOUT:-5.0}"
 

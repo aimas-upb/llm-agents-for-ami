@@ -227,6 +227,23 @@ class Semantics:
         self._unmapped(f"service {domain}.{service}")
         return None
 
+    def acts_upon(self, domain: str, service: str,
+                  fields: Iterable[str] = ()) -> Set[str]:
+        """The signals (`state` or attribute names) a service changes.
+
+        Its field names, plus every `acts_upon` rule matching the service.
+        """
+        fields = {str(f) for f in fields}
+        signals = set(fields)
+        entity = Entity(domain=domain)
+        for rule in self.mappings.get("acts_upon") or []:
+            if not _matches(rule, entity, service=service):
+                continue
+            if "fields_any" in rule and not (_as_set(rule["fields_any"]) & fields):
+                continue
+            signals |= _as_set(rule.get("signals"))
+        return signals
+
     def environment_class(self, env_key: Optional[str]) -> Optional[str]:
         """The homeont room variable a TD-SOSA effect key stands for."""
         if not env_key:

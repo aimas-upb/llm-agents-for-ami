@@ -126,3 +126,17 @@ def test_class_labels_come_from_homeont(defaults):
     assert defaults.label("homeont:ColorLight") == "Color Light"
     assert defaults.label("homeont:WindowCoveringController")
     assert defaults.label(None) is None
+
+
+
+class TestActsUpon:
+    def test_fields_named_like_properties(self, defaults):
+        assert defaults.acts_upon("climate", "set_temperature", ["temperature"]) == {"temperature"}
+
+    def test_rules_add_what_no_field_names(self, defaults):
+        assert defaults.acts_upon("cover", "set_cover_position", ["position"]) >= {
+            "state", "current_position"}
+
+    def test_brightness_pct_changes_brightness(self, defaults):
+        assert "brightness" in defaults.acts_upon("light", "turn_on", ["brightness_pct"])
+        assert "brightness" not in defaults.acts_upon("light", "turn_on", ["effect"])

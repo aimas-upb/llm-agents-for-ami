@@ -21,9 +21,7 @@ import json
 from ...shared.models.messages import MessageType
 from ...shared.utils.spade_rpc import rpc_call
 from ...shared.utils.demo_log import demo
-from ...shared.utils.namespaces import action_types
 from .models import AtomicIntent
-from .prompts.intent_parsing_prompts import GOAL_REQUEST_PARSER_PROMPT
 from .prompts.intent_response_prompts import (
     PLAN_SUMMARY_SYSTEM_PROMPT,
     QUERY_RESPONSE_SYSTEM_PROMPT,
@@ -83,131 +81,6 @@ async def segment_into_atomic_intents(agent, logger, user_text: str) -> list[Ato
         return []
 
 
-def build_capabilities_hierarchical_text(caps_summary: dict) -> str:
-    """Build human-readable hierarchical text from capabilities summary JSON.
-
-    Filters ACTION affordances to those typed with what they do -- a homeont
-    or SAREF command class -- leaving out protocol actions (WebSub, artifact
-    CRUD); includes ALL PROPERTY affordances. Delegates to format_capabilities_hierarchical_text()
-    from env_explorer's data_formatting module, which handles the full formatting.
-
-    Args:
-        caps_summary: Hierarchical dict from format_capabilities_summary_hierarchical()
-
-    Returns:
-        Human-readable hierarchical string
-    """
-    if not caps_summary or not caps_summary.get("discovery_complete"):
-        return "Environment discovery not yet complete."
-
-    lines = []
-
-    def format_workspace(ws_node: dict, indent: str = "") -> None:
-        """Recursively format a workspace and its contents."""
-        ws_name = ws_node.get("name", "Unknown")
-        lines.append(f"{indent}Workspace: {ws_name}")
-        semantic_types = ws_node.get("semantic_types", [])
-        if semantic_types:
-            lines.append(f"{indent}  semantic_types: {', '.join(semantic_types)}")
-        description = ws_node.get("description", "")
-        if description:
-            lines.append(f"{indent}  description: {description}")
-
-        # Format artifacts in this workspace
-        for artifact in (ws_node.get("artifacts") or []):
-            artifact_name = artifact.get("name", "Unknown")
-            lines.append(f"{indent}  Artifact: {artifact_name}")
-            artifact_types = artifact.get("semantic_types", [])
-            if artifact_types:
-                lines.append(f"{indent}    semantic_types: {', '.join(artifact_types)}")
-            artifact_desc = artifact.get("description", "")
-            if artifact_desc:
-                lines.append(f"{indent}    description: {artifact_desc}")
-
-            # Format affordances: ACTION only if typed with what it does
-            # (homeont or SAREF), PROPERTY always
-            for aff in (artifact.get("affordances") or []):
-                aff_type = aff.get("type", "").replace("_affordance", "")
-
-                # Protocol actions (WebSub, artifact CRUD) carry no such type
-                if aff_type == "action":
-                    if not action_types(aff.get("semantic_types", [])):
-                        continue
-
-                aff_name = aff.get("name", "Unknown")
-                lines.append(f"{indent}    {aff_type}: {aff_name}")
-
-                # Include semantic types if present
-                aff_semantic_types = aff.get("semantic_types", [])
-                if aff_semantic_types:
-                    lines.append(f"{indent}      semantic_types: {', '.join(aff_semantic_types)}")
-
-                # Include description if present
-                aff_desc = aff.get("description", "")
-                if aff_desc:
-                    lines.append(f"{indent}      description: {aff_desc}")
-
-                # Include parameters if present
-                parameters = aff.get("parameters", [])
-                if parameters:
-                    lines.append(f"{indent}      parameters: {', '.join(parameters)}")
-
-        # Format sub-workspaces
-        for sub_ws in (ws_node.get("sub_workspaces") or []):
-            format_workspace(sub_ws, indent + "  ")
-
-    # Process all root workspaces
-    for ws in (caps_summary.get("workspaces") or []):
-        format_workspace(ws)
-
-    return "\n".join(lines) if lines else "No environment capabilities found."
-
-
-async def parse_atomic_intent(agent, logger, span: str, category: str, capabilities_hierarchical: str) -> dict:
-    """Parse a single atomic intent span using LLM per-span prompts.
-
-    Args:
-        span: The verbatim user text for this atomic intent
-        category: The segmenter's type; only "GOAL_REQUEST" is parsed here
-        capabilities_hierarchical: Hierarchical text description of environment capabilities
-
-    Returns:
-        Dict with parsed structured intent fields (LLM output), or fallback dict on error
-    """
-    logger.info(demo(f"[LLM CALL] Parsing {category}: {span[:80]!r}"))
-
-    # Only goals are parsed here. ENV_STATE and ENV_CAPABILITIES questions are
-    # structured by their own behaviours, against the ontology context.
-    if category != "GOAL_REQUEST":
-        return {"text_intent": span}
-
-    prompt = GOAL_REQUEST_PARSER_PROMPT.format(
-        capabilities_hierarchical=capabilities_hierarchical,
-        ontology=agent.ontology_ttl,
-    )
-
-    messages = [
-        {"role": "system", "content": prompt},
-        {"role": "user", "content": span},
-    ]
-
-    try:
-        response = await agent.llm_client.chat.completions.create(
-            model=agent.llm_model,
-            messages=messages,
-            **agent.build_llm_kwargs(),
-        )
-        raw = (response.choices[0].message.content or "").strip()
-        logger.info(demo("Raw intent extraction output: %s"), raw[:1000])
-        parsed = loose_json_loads(raw)
-        if isinstance(parsed, dict):
-            return parsed
-    except Exception as exc:
-        logger.warning("LLM per-span parsing failed for [%s]: %s", category, exc)
-
-    # Fallback: minimal dict with only text_intent
-    return {"text_intent": span}
-
 # ------------------------------------------------------------------
 # NLG: plan summary (LLM call)
 # ------------------------------------------------------------------
@@ -260,42 +133,74 @@ async def format_query_response(agent, logger, raw_data: str, user_text: str) ->
 # ------------------------------------------------------------------
 
 
-async def fetch_capabilities(agent, logger, detail_level: str = "summary") -> str:
-    """Fetch environment capabilities from EnvExplorer via RPC.
+async def fetch_goal_context(agent, logger, goal_text: str,
+                             with_properties: bool = False,
+                             with_environment: bool = False) -> str:
+    """Fetch the goal context for one goal from EnvExplorer via RPC.
 
-    Args:
-        detail_level: One of "summary" (default, lightweight hierarchical JSON)
-                     or "detailed" (full RDF/Turtle graph).
+    EnvExplorer scopes it to the rooms or device families `goal_text` names
+    once the home is too large to send whole; the flags add what devices
+    report and each room's environment variables. Returns "" when the context
+    cannot be had -- there is no other environment description to fall back on.
     """
     explorer_jid = agent.target_jids.get("explorer")
     if not explorer_jid:
-        logger.info(demo("Capability fetch skipped: no explorer JID configured"))
+        logger.info(demo("Goal context fetch skipped: no explorer JID configured"))
         return ""
     try:
         result = await rpc_call(
             agent,
             to_jid=str(explorer_jid),
             request_type=MessageType.ENV_CAPABILITIES_REQUEST.value,
-            body={"query": "all", "detail_level": detail_level},
+            body={"detail_level": "goal_context", "goal_text": goal_text,
+                  "with_properties": with_properties,
+                  "with_environment": with_environment},
             expect_type=MessageType.ENV_CAPABILITIES_RESPONSE.value,
             timeout=agent.rpc_call_timeout,
         )
-        body = result.body or ""
-        logger.info(
-            demo("Capabilities fetched: body_len=%d"),
-            len(body),
-        )
-        try:
-            payload = json.loads(body)
-            summary = payload.get("summary") if isinstance(payload, dict) else None
-            if isinstance(summary, str) and summary.strip():
-                return summary
-        except (json.JSONDecodeError, TypeError):
-            pass
-        return body
+        payload = json.loads(result.body or "{}")
     except Exception as exc:
-        logger.warning("Failed to fetch capabilities: %s", exc)
+        logger.warning("Failed to fetch goal context: %s", exc)
         return ""
+
+    if not isinstance(payload, dict) or payload.get("error"):
+        logger.warning("Goal context unavailable: %s",
+                       payload.get("detail") if isinstance(payload, dict) else payload)
+        return ""
+    scope = payload.get("scope") or {}
+    text = payload.get("text") or ""
+    logger.info(demo(
+        f"Goal context fetched (properties={with_properties}, "
+        f"environment={with_environment}): rule={scope.get('rule')} "
+        f"workspaces={scope.get('workspaces', [])} chars={len(text)}"))
+    return text
+
+
+async def resolve_candidates(agent, logger, payload: dict) -> dict:
+    """Ask EnvExplorer what in this home fits a partly named goal or condition.
+
+    The same ENV_CAPABILITY_QUERY the capability questions use: classes in,
+    matching devices and affordances out, nothing read. Returns the response,
+    or {} if it cannot be had -- the caller then leaves the goal as it is.
+    """
+    explorer_jid = agent.target_jids.get("explorer")
+    if not explorer_jid:
+        return {}
+    try:
+        result = await rpc_call(
+            agent,
+            to_jid=str(explorer_jid),
+            request_type=MessageType.ENV_CAPABILITY_QUERY_REQUEST.value,
+            body=payload,
+            expect_type=MessageType.ENV_CAPABILITY_QUERY_RESPONSE.value,
+            timeout=agent.rpc_call_timeout,
+        )
+        response = json.loads(result.body or "{}")
+    except Exception as exc:
+        logger.warning("Candidate resolution failed for %r: %s",
+                       payload.get("text_intent"), exc)
+        return {}
+    return response if isinstance(response, dict) else {}
 
 
 def collect_action_urls(tree_spec: dict) -> list[str]:

@@ -1186,6 +1186,10 @@ def _build_cached_artifact_ttl(
     hasp_semantics.add_type(rdf.g, art, device_class)
     hasp_semantics.add_label(rdf.g, art, device_class)
     state_names = state_property_names(list(semantic_entities))
+    # Actions are built before the properties they change; `saref:actsUpon`
+    # is linked once both exist.
+    property_nodes: Dict[Tuple[str, str], BNode] = {}
+    pending_acts_upon: List[Tuple[BNode, str, str, str, List[str]]] = []
     sec = BNode()
     rdf.g.add((art, TD.hasSecurityConfiguration, sec))
     rdf.g.add((sec, RDF.type, WOTSEC.NoSecurityScheme))
@@ -1247,6 +1251,9 @@ def _build_cached_artifact_ttl(
             hasp_semantics.add_type(
                 rdf.g, action_affordance,
                 semantics.command_class(device_name, domain, svc_name))
+            if action_affordance is not None and domain_entity:
+                pending_acts_upon.append((action_affordance, domain_entity, domain,
+                                          svc_name, list(supported_fields)))
             env_var_key = _resolve_env_var_override(
                 entity=domain_entity_meta,
                 device=device,
@@ -1329,6 +1336,7 @@ def _build_cached_artifact_ttl(
             hasp_semantics.add_type(rdf.g, state_prop, semantics.property_class(
                 device_name, device_class,
                 hasp_semantics.Entity(entity_domain, entity_attrs), "state"))
+            property_nodes[(entity_id, "state")] = state_prop
             state_env_key = _resolve_env_var_override(
                 entity=entity, device=device, artifact_label=artifact_label,
                 domain=entity_domain, signal_name="state",
@@ -1362,6 +1370,7 @@ def _build_cached_artifact_ttl(
                 )
                 hasp_semantics.add_type(rdf.g, op_prop, semantics.property_class(
                     device_name, device_class, semantic_entity, attr_name))
+                property_nodes[(entity_id, attr_name)] = op_prop
                 env_var_key = _resolve_env_var_override(
                     entity=entity, device=device, artifact_label=artifact_label,
                     domain=domain, signal_name=attr_name,
@@ -1394,6 +1403,7 @@ def _build_cached_artifact_ttl(
                     description=f"{attr_name} of {entity_id}", observable=True
                 )
                 hasp_semantics.add_type(rdf.g, declared_prop, str(rule["class"]))
+                property_nodes[(entity_id, attr_name)] = declared_prop
 
             metadata_attrs = get_metadata_attributes(entity_attrs)
             for ts_field in ("last_changed", "last_reported", "last_updated"):
@@ -1406,6 +1416,14 @@ def _build_cached_artifact_ttl(
                     art, "metadata", metadata_property_uri, output_schema=metadata_schema,
                     description=f"Metadata attributes of {entity_id}", observable=False
                 )
+
+    # What each action changes: the property affordances of its entity named
+    # by its fields or by the `acts_upon` rules in semantic_mappings.yaml.
+    for action_affordance, entity_id, domain, svc_name, fields in pending_acts_upon:
+        for signal in sorted(semantics.acts_upon(domain, svc_name, fields)):
+            target = property_nodes.get((entity_id, signal))
+            if target is not None:
+                rdf.g.add((action_affordance, hasp_semantics.SAREF.actsUpon, target))
 
     rdf._add_action(art, "getArtifactRepresentation", JACAMO.PerceiveArtifact, "GET",
                     URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}"), "application/json")

@@ -19,6 +19,7 @@ from ...shared.models.intents import (  # noqa: F401
     ImplicitGoalIntent,
     Intent,
 )
+from ...shared.models.goal_structure import GoalStructure
 
 
 class ConversationPhase(Enum):
@@ -71,7 +72,8 @@ class ConversationState:
     # FSM once that lands, and the plans this request produces keep it as
     # provenance either way.
     request_id: Optional[str] = None
-    intents: List[Union[ImplicitGoalIntent, ExplicitGoalIntent]] = field(default_factory=list)
+    # One structure per atomic goal of the request being handled.
+    intents: List[GoalStructure] = field(default_factory=list)
     workspace_id: Optional[str] = None
     plan_json: Optional[str] = None
     plan_hash: Optional[str] = None
