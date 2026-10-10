@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 
 from rdflib import Graph, Namespace, RDF, URIRef
 from ....shared.models.environment import AffordanceType
+from ....shared.utils.namespaces import NAMESPACE_MANAGER
 
 
 def _short_iri(value: Any) -> str:
@@ -732,41 +733,14 @@ def format_capabilities_detailed_rdf(agent_instance) -> str:
     if not agent_instance.discovery_complete:
         return ""
 
-    # Canonical prefix block
-    prefix_block = """\
-@prefix ex: <http://example.org/> .
-@prefix hmas: <https://purl.org/hmas/> .
-@prefix td: <https://www.w3.org/2019/wot/td#> .
-@prefix hctl: <https://www.w3.org/2019/wot/hypermedia#> .
-@prefix jsonschema: <https://www.w3.org/2019/wot/json-schema#> .
-@prefix http: <http://www.w3.org/2011/http#> .
-@prefix homeont: <https://example.org/homeont#> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix jacamo: <https://purl.org/hmas/jacamo/> .
-@prefix wotsec: <https://www.w3.org/2019/wot/security#> .
-@prefix websub: <https://purl.org/hmas/websub/> .
-
-"""
-
-    # Create a merged graph
+    # Bind every vocabulary the agents use (`shared/utils/namespaces`) before
+    # adding triples, so terms serialise as readable CURIEs. The serialised
+    # prefix declarations are kept as rdflib writes them: replacing them with a
+    # hand-written block once left `ns1:`, `saref:` and `sosa:` undeclared and
+    # bound `homeont:` to the wrong IRI, and the dump would not parse.
     merged_graph = Graph()
-
-    # Bind canonical namespaces to the merged graph BEFORE adding triples
-    # This ensures rdflib uses these prefixes during serialization instead of generating ns1, ns2, etc.
-    from rdflib import Namespace
-    merged_graph.bind("hmas", Namespace("https://purl.org/hmas/"))
-    merged_graph.bind("td", Namespace("https://www.w3.org/2019/wot/td#"))
-    merged_graph.bind("hctl", Namespace("https://www.w3.org/2019/wot/hypermedia#"))
-    merged_graph.bind("jsonschema", Namespace("https://www.w3.org/2019/wot/json-schema#"))
-    merged_graph.bind("http", Namespace("http://www.w3.org/2011/http#"))
-    merged_graph.bind("homeont", Namespace("https://example.org/homeont#"))
-    merged_graph.bind("rdfs", Namespace("http://www.w3.org/2000/01/rdf-schema#"))
-    merged_graph.bind("rdf", Namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
-    merged_graph.bind("ex", Namespace("http://example.org/"))
-    merged_graph.bind("jacamo", Namespace("https://purl.org/hmas/jacamo/"))
-    merged_graph.bind("wotsec", Namespace("https://www.w3.org/2019/wot/security#"))
-    merged_graph.bind("websub", Namespace("https://purl.org/hmas/websub/"))
+    for prefix, namespace in NAMESPACE_MANAGER.namespaces():
+        merged_graph.bind(prefix, namespace, override=True, replace=True)
 
     # Add all workspace RDF
     for ws in (agent_instance.environment_map or {}).values():
@@ -790,18 +764,5 @@ def format_capabilities_detailed_rdf(agent_instance) -> str:
                 # Skip malformed RDF
                 pass
 
-    # Serialize merged graph to Turtle
-    serialized = merged_graph.serialize(format="turtle")
-
-    # Strip any @prefix declarations emitted by rdflib (to avoid duplication)
-    # and prepend our canonical block
-    lines = serialized.split("\n")
-    filtered_lines = [line for line in lines if not line.strip().startswith("@prefix")]
-    filtered_content = "\n".join(filtered_lines).strip()
-
-    # Combine prefix block with filtered content
-    if filtered_content:
-        return prefix_block + filtered_content
-    else:
-        return prefix_block.rstrip()
+    return merged_graph.serialize(format="turtle")
 

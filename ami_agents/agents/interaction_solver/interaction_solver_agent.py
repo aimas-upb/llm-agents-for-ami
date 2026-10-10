@@ -41,6 +41,7 @@ from .utils import LLMClientConfig, build_llm_client, match_workspace, parse_or_
 _DEFAULT_CONTEXT_TIMEOUT_S = 10.0
 _DEFAULT_COMMUNITY_TIMEOUT_S = 10.0
 _DEFAULT_MAX_PLANNING_ATTEMPTS = 3
+_DEFAULT_EXPLICIT_PLANNING_ATTEMPTS = 2
 
 
 class InteractionSolverAgent(Agent, IAgent):
@@ -96,6 +97,15 @@ class InteractionSolverAgent(Agent, IAgent):
             planning_llm.get("max_planning_attempts", _DEFAULT_MAX_PLANNING_ATTEMPTS)
         )
         self.bt_planner = AsyncBTPlanner(max_attempts=max_attempts)
+
+        # ── Lightweight LLM for explicit goals ──────────────────────
+        # An explicit goal is planned against one device's affordances; a small
+        # model is enough (`planning.explicit_planning`).
+        self.explicit_llm: LLMClientConfig = build_llm_client(
+            self.config, section="explicit_planning")
+        explicit_cfg = (self.config.get("planning", {}) or {}).get("explicit_planning", {}) or {}
+        self.explicit_bt_planner = AsyncBTPlanner(max_attempts=int(
+            explicit_cfg.get("max_planning_attempts", _DEFAULT_EXPLICIT_PLANNING_ATTEMPTS)))
 
         # ── Community signifier client (optional) ───────────────────
         community_cfg = (self.config.get("planning", {}) or {}).get("community", {}) or {}

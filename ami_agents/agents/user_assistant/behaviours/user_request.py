@@ -61,6 +61,7 @@ from ..models import (
     REJECT_TOKENS,
 )
 from ..utils import canonicalize_plan_for_hash, coerce_plan_dict, count_bt_nodes
+from ..utils.goal_resolution import structure_clarification
 
 logger = LoggerFactory.get_logger("UserAssistant")
 
@@ -234,6 +235,23 @@ class ExtractingState(_RequestState):
                 f"{json.dumps(behaviour.result.to_wire_dict(), indent=2)}"))
             parsed.append(behaviour.result)
 
+        # A goal only the user can resolve -- naming no device ("turn it off"),
+        # no action ("the fan"), or one of several rooms -- never reaches the
+        # InteractionSolver; the user is asked instead.
+        questions = {id(s): structure_clarification(s) for s in parsed}
+        unclear = [s for s in parsed if questions[id(s)]]
+        if unclear:
+            parsed = [s for s in parsed if not questions[id(s)]]
+            self.logger.info(demo(
+                f"[GOAL] Clarification needed, not planned: "
+                f"{[s.intent_text for s in unclear]}"))
+            await self.reply("\n".join(
+                f"About \"{s.intent_text}\": {questions[id(s)]}" for s in unclear))
+            if not parsed:
+                request.finish("clarification_needed")
+                self.set_next_state(DONE)
+                return
+
         if not parsed:
             # Rephrasing cannot help when the environment was the problem.
             if len(unavailable) < len(goals):
@@ -309,6 +327,28 @@ class AwaitingPlanState(_RequestState):
         self.set_next_state(SUMMARIZING)
 
 
+def split_clarifications(plan_obj: Dict[str, Any]):
+    """The plan without its `requires_clarification` entries, and one question
+    per such entry. A single-tree plan has none."""
+    plans = plan_obj.get("plans")
+    if not isinstance(plans, list):
+        return plan_obj, []
+    keep, questions = [], []
+    for entry in plans:
+        if isinstance(entry, dict) and entry.get("requires_clarification"):
+            intent = entry.get("intent") or {}
+            text = intent.get("text_intent") if isinstance(intent, dict) else None
+            question = entry.get("explanation") or "Which device do you mean?"
+            questions.append(f"About \"{text}\": {question}" if text else question)
+        else:
+            keep.append(entry)
+    if not questions:
+        return plan_obj, []
+    rest = {k: v for k, v in plan_obj.items() if k != "requires_clarification"}
+    rest["plans"] = keep
+    return rest, questions
+
+
 class SummarizingState(_RequestState):
     """Store the plan, hash it, and tell the user what it will do."""
 
@@ -322,6 +362,18 @@ class SummarizingState(_RequestState):
             request.finish("failed")
             self.set_next_state(DONE)
             return
+
+        # Goals the solver could not choose devices for come back as
+        # clarification entries: ask about those, and go on with the rest.
+        plan_obj, questions = split_clarifications(plan_obj)
+        if questions:
+            self.logger.info(demo(
+                f"[PLAN] Clarification needed for {len(questions)} goal(s)"))
+            await self.reply("\n".join(questions))
+            if not plan_obj.get("plans"):
+                request.finish("clarification_needed")
+                self.set_next_state(DONE)
+                return
 
         canonical, plan_hash = canonicalize_plan_for_hash(plan_obj)
         self.conv.plan_json = canonical

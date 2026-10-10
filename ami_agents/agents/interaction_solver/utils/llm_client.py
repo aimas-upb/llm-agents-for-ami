@@ -28,12 +28,18 @@ class LLMClientConfig:
     max_completion_tokens: Optional[int]
 
 
-def build_llm_client(config: Dict[str, Any]) -> LLMClientConfig:
-    """Resolve planning LLM settings and build an AsyncOpenAI client."""
+def build_llm_client(config: Dict[str, Any],
+                     section: str = "llm_planning") -> LLMClientConfig:
+    """Resolve the LLM settings of one `planning.<section>` and build a client.
+
+    `llm_planning` is the general BT planner; `explicit_planning` the lightweight
+    model that plans an explicit goal against one device. A section's keys
+    override the shared `llm.providers.<provider>` settings.
+    """
     llm_root = config.get("llm", {}) or {}
     provider_name = llm_root.get("default_provider", "openai")
     provider_cfg = (llm_root.get("providers", {}) or {}).get(provider_name, {}) or {}
-    planning_llm = (config.get("planning", {}) or {}).get("llm_planning", {}) or {}
+    planning_llm = (config.get("planning", {}) or {}).get(section, {}) or {}
 
     # Debug: log what we're resolving
     import logging

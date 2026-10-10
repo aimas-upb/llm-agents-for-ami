@@ -126,3 +126,56 @@ def envelope_llm_plans(
     if has_impossible:
         out["impossible"] = True
     return out
+
+
+def envelope_plan_entries(
+    entries: List[Dict[str, Any]],
+    workspace_id: Optional[str],
+) -> Dict[str, Any]:
+    """Reply assembled from per-intent plan entries, in the request's order.
+
+    The same multi-plan shape as `envelope_llm_plans`, for replies some of
+    whose entries were planned deterministically and some by the workflow.
+    An entry without a tree is not executed; its explanation says why.
+    """
+    out: Dict[str, Any] = {
+        "plan_type": PLAN_TYPE_BT,
+        "plans": entries,
+        "workspace_id": workspace_id,
+    }
+    if any(e.get("impossible") for e in entries):
+        out["impossible"] = True
+    # Goals the solver could not choose devices for: the UA asks the user.
+    if any(e.get("requires_clarification") for e in entries):
+        out["requires_clarification"] = True
+    return out
+
+
+def plan_entries_from_envelope(
+    envelope: Dict[str, Any],
+    intents: List[Any],
+) -> List[Dict[str, Any]]:
+    """The workflow's reply for `intents`, as plan entries.
+
+    A multi-plan reply already has one entry per intent. A single-tree reply
+    covers all its intents with one tree, so it becomes one entry listing
+    them. An error reply becomes one tree-less entry per intent, carrying the
+    error so the summary can say what went wrong.
+    """
+    wire = [i.to_wire_dict() for i in intents]
+    plans = envelope.get("plans")
+    if isinstance(plans, list):
+        return [p for p in plans if isinstance(p, dict)]
+    if envelope.get("error"):
+        return [{"tree": None, "intent": w, "error": envelope["error"],
+                 "explanation": envelope.get("detail", "")} for w in wire]
+    entry: Dict[str, Any] = {
+        "tree": envelope.get("tree") or None,
+        "explanation": envelope.get("explanation", ""),
+        "intent": wire[0] if wire else None,
+        "intents": wire,
+    }
+    for key in ("impossible", "signifier_reuse", "signifier_ids"):
+        if envelope.get(key):
+            entry[key] = envelope[key]
+    return [entry]

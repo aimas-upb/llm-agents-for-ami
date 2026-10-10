@@ -37,7 +37,18 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 from rdflib import Graph, Namespace, URIRef
 from rdflib.namespace import OWL, RDF, RDFS
 
-from ....shared.utils.vocabulary import parse_into, saref, vocabulary
+from ....shared.utils.vocabulary import (
+    ACTUATABLE_PROPERTY_ROOT,
+    BUILDING_SPACE_ROOT,
+    CAPABILITY_PROPERTY_ROOT,
+    COMMAND_ROOT,
+    DEVICE_ROOT,
+    OBSERVABLE_PROPERTY_ROOT,
+    STATE_PROPERTY_ROOT,
+    parse_into,
+    saref,
+    vocabulary,
+)
 
 HOMEONT = Namespace("http://example.org/homeont/")
 SOSA = Namespace("http://www.w3.org/ns/sosa/")
@@ -220,25 +231,25 @@ def build_ontology_context(
         # match nothing.
         return cls in _DEVICE_ROOTS or str(cls).startswith(str(HOMEONT))
 
-    device_types = _section(graph, index, SAREF.Device, keep=is_device_type)
+    device_types = _section(graph, index, DEVICE_ROOT, keep=is_device_type)
 
     context: Dict[str, Any] = {
-        "locations": _section(graph, index, HOMEONT.BuildingSpace),
+        "locations": _section(graph, index, BUILDING_SPACE_ROOT),
         "device_types": device_types,
         "device_properties": {
-            **_section(graph, index, HOMEONT.ActuatableDeviceProperty),
-            **_section(graph, index, HOMEONT.DeviceStateProperty),
-            **_section(graph, index, HOMEONT.DeviceCapabilityProperty),
-            **_section(graph, index, SOSA.ObservableProperty,
+            **_section(graph, index, ACTUATABLE_PROPERTY_ROOT),
+            **_section(graph, index, STATE_PROPERTY_ROOT),
+            **_section(graph, index, CAPABILITY_PROPERTY_ROOT),
+            **_section(graph, index, OBSERVABLE_PROPERTY_ROOT,
                        keep=lambda cls: not is_environment(cls),
                        description=_SOSA_OBSERVABLE_PROPERTY),
         },
         "environment_variables": _section(
-            graph, index, SOSA.ObservableProperty, keep=is_environment,
+            graph, index, OBSERVABLE_PROPERTY_ROOT, keep=is_environment,
             description=_SOSA_OBSERVABLE_PROPERTY),
     }
     if view == "capabilities":
-        context["commands"] = _section(graph, index, SAREF.Command)
+        context["commands"] = _section(graph, index, COMMAND_ROOT)
         context["device_metadata"] = [dict(entry) for entry in DEVICE_METADATA]
     return context
 

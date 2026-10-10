@@ -14,9 +14,20 @@ from spade.behaviour import CyclicBehaviour
 from ....shared.models.messages import META_CORRELATION_ID, MessageType
 from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
+from ....shared.models.goal_structure import GoalStructure
 from ....shared.models.intents import ImplicitGoalIntent, ExplicitGoalIntent, goal_intent_from_dict
 from ....shared.models.intents import Intent
-from ..utils.plan_envelope import envelope_error
+from ..utils.ambiguous_goal_plan import ambiguous_goal
+from ..utils.explicit_goal_plan import deterministic_goal
+from ..utils.incomplete_goal_plan import incomplete_goal
+from ..utils.plan_envelope import (
+    envelope_error,
+    envelope_plan_entries,
+    plan_entries_from_envelope,
+)
+from .ambiguous_goal_planning import AmbiguousGoalPlanningBehaviour
+from .explicit_goal_planning import ExplicitGoalPlanningBehaviour
+from .incomplete_goal_planning import IncompleteGoalPlanningBehaviour
 from .planning_workflow import PlanningWorkflowBehaviour
 
 
@@ -55,21 +66,86 @@ class GoalRequestBehaviour(CyclicBehaviour):
             await self._reply(msg, MessageType.PLAN_CREATED.value, envelope)
             return
 
+        # Explicit, incomplete and ambiguous achievement goals are planned on
+        # their own paths -- from the TD graph alone, or by an LLM against a
+        # context cut to the goal; everything else goes through the workflow.
+        explicit = self._select(intent_objects, deterministic_goal)
+        incomplete = self._select(intent_objects, incomplete_goal)
+        ambiguous = self._select(intent_objects, ambiguous_goal)
+        if explicit or incomplete or ambiguous:
+            envelope = await self._plan_mixed(
+                intent_objects, explicit, incomplete, workspace_id, ambiguous)
+        else:
+            envelope = await self._run_workflow(
+                [self._planner_intent(i) for i in intent_objects], workspace_id)
+        self._log_plan_summary(envelope)
+        await self._reply(msg, MessageType.PLAN_CREATED.value, envelope)
+
+    async def _run_workflow(self, intents, workspace_id):
         workflow = PlanningWorkflowBehaviour(
-            intents=intent_objects,
+            intents=intents,
             workspace_id=workspace_id,
             logger=self.logger,
         )
         self.agent.add_behaviour(workflow)
         await workflow.join()
-
-        envelope = workflow.reply_envelope or envelope_error(
+        return workflow.reply_envelope or envelope_error(
             "plan_generation_failed",
             "Planning workflow returned no envelope.",
-            intent_objects,
+            intents,
         )
-        self._log_plan_summary(envelope)
-        await self._reply(msg, MessageType.PLAN_CREATED.value, envelope)
+
+    @staticmethod
+    def _select(items, selector):
+        """(index, goal) for every structure the selector accepts."""
+        return [(index, goal) for index, item in enumerate(items)
+                if isinstance(item, GoalStructure)
+                and (goal := selector(item)) is not None]
+
+    async def _plan_mixed(self, items, explicit, incomplete, workspace_id,
+                          ambiguous=()) -> dict:
+        """Explicit goals (``ExplicitGoalPlanningBehaviour``), incomplete ones
+        (``IncompleteGoalPlanningBehaviour``) and ambiguous ones
+        (``AmbiguousGoalPlanningBehaviour``) on their own paths, the workflow
+        for the rest, merged into one multi-plan reply in the request's order."""
+        entries = {}
+
+        # Every explicit, incomplete and ambiguous goal gets an entry here: a
+        # tree, impossible, a clarification request, or an error.
+        for selected, cls in ((explicit, ExplicitGoalPlanningBehaviour),
+                              (incomplete, IncompleteGoalPlanningBehaviour),
+                              (ambiguous, AmbiguousGoalPlanningBehaviour)):
+            if not selected:
+                continue
+            behaviour = cls([goal for _, goal in selected], logger=self.logger)
+            self.agent.add_behaviour(behaviour)
+            await behaviour.join()
+            for (index, _), result in zip(selected, behaviour.results):
+                entries[index] = [{**result, "intent": items[index].to_wire_dict()}]
+
+        rest = [index for index in range(len(items)) if index not in entries]
+        if rest:
+            rest_intents = [self._planner_intent(items[i]) for i in rest]
+            reply = await self._run_workflow(rest_intents, workspace_id)
+            rest_entries = plan_entries_from_envelope(reply, rest_intents)
+            if len(rest_entries) == len(rest):
+                for index, entry in zip(rest, rest_entries):
+                    # The planner saw only the words; keep the structure.
+                    entries[index] = [{**entry, "intent": items[index].to_wire_dict()}]
+            else:
+                # One tree for several intents: it stands where the first was.
+                entries[rest[0]] = rest_entries
+
+        ordered = [entry for index in sorted(entries) for entry in entries[index]]
+        return envelope_plan_entries(ordered, workspace_id)
+
+    @staticmethod
+    def _planner_intent(item):
+        """What the workflow plans from: a structure's words, until it reads
+        structures; legacy intents as they are."""
+        if isinstance(item, GoalStructure):
+            return Intent(intent_text=item.to_query_string())
+        return item
 
     # ── helpers ────────────────────────────────────────────────────────
 
@@ -91,8 +167,10 @@ class GoalRequestBehaviour(CyclicBehaviour):
             if isinstance(raw_intents, list):
                 for item in raw_intents:
                     if isinstance(item, dict):
-                        # Check if this is a goal intent with category field (new format)
-                        if item.get("category") in ("implicit", "explicit"):
+                        if isinstance(item.get("goals"), dict):
+                            # A structured goal from the UA's goal structuring.
+                            intent_objects.append(GoalStructure.from_dict(item))
+                        elif item.get("category") in ("implicit", "explicit"):
                             intent_objects.append(goal_intent_from_dict(item))
                         else:
                             # Fallback for other intent types

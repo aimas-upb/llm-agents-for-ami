@@ -227,16 +227,45 @@ class TestCapabilitiesDetailedRDF:
         result = format_capabilities_detailed_rdf(mock_agent)
         assert result == ""
 
-    def test_discovery_complete_returns_turtle(self, agent_with_minimal_env):
-        """Should return Turtle string with canonicalized prefixes."""
+    def test_discovery_complete_returns_turtle_that_parses(self, agent_with_minimal_env):
+        """The dump is read back by the InteractionSolver: it must parse, with
+        every prefix it uses declared."""
+        from rdflib import Graph
+
         result = format_capabilities_detailed_rdf(agent_with_minimal_env)
-        assert isinstance(result, str)
-        assert len(result) > 0
-        # Should include canonical prefixes
-        assert "@prefix hmas:" in result
-        assert "@prefix td:" in result
-        assert "@prefix hctl:" in result
-        assert "@prefix jsonschema:" in result
+        assert isinstance(result, str) and result
+        assert len(Graph().parse(data=result, format="turtle")) > 0
+
+    def test_simuhome_dump_parses_with_its_terms_intact(self):
+        """Regression: a hand-written prefix block once left `ns1:`, `saref:`
+        and `sosa:` undeclared and bound `homeont:` to the wrong IRI, so the
+        InteractionSolver parsed an empty graph."""
+        import json
+        from pathlib import Path
+        from types import SimpleNamespace
+
+        from rdflib import Graph, URIRef
+
+        episode = (Path(__file__).resolve().parents[3] / "SimuHome" / "data"
+                   / "benchmark" / "qt1_feasible_seed_1.json")
+        if not episode.is_file():
+            pytest.skip("SimuHome benchmark corpus not available")
+        from ami_agents.environment.integration.SimuHome.td_builder import SimuHomeTD
+
+        config = json.loads(episode.read_text())["initial_home_config"]
+        b = SimuHomeTD("http://localhost:8097", "test", config)
+        agent = SimpleNamespace(
+            discovery_complete=True,
+            environment_map={r: SimpleNamespace(rdf=b.room_workspace(r).serialize(format="turtle"))
+                             for r in config["rooms"]},
+            artifacts={d["device_id"]: SimpleNamespace(thing_description=SimpleNamespace(
+                rdf=b.artifact(r, d["device_id"]).serialize(format="turtle")))
+                for r in config["rooms"] for d in config["rooms"][r].get("devices", [])})
+
+        graph = Graph().parse(data=format_capabilities_detailed_rdf(agent), format="turtle")
+        homeont = "http://example.org/homeont/"
+        assert (None, None, URIRef(homeont + "AirConditioner")) in graph
+        assert (None, None, URIRef(homeont + "Bathroom")) in graph
 
     def test_no_duplicate_prefixes(self, agent_with_minimal_env):
         """Should not have duplicate @prefix declarations."""

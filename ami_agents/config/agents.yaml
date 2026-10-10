@@ -92,6 +92,13 @@ interaction_solver:
       # max_tokens: 8192
       max_planning_attempts: 3  # retries for BT generation
 
+    # Lightweight model for an explicit goal whose action needs a value the
+    # goal did not determine: planned against that one device's affordances.
+    explicit_planning:
+      model: "${EXPLICIT_PLANNING_MODEL:-gpt-5-nano}"
+      reasoning_effort: "${EXPLICIT_PLANNING_REASONING_EFFORT:-low}"
+      max_planning_attempts: "${EXPLICIT_PLANNING_ATTEMPTS:-2}"
+
 # Request-type taxonomy used across agents (NLU classification labels).
 # Reference list — keep in sync with UserAssistant prompts and EnvExplorer
 # behaviour routing.

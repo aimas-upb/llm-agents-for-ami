@@ -6,20 +6,28 @@ encapsulates a single 'todo': context query, signifier matching, community
 lookup, BT plan generation).
 """
 
+from .ambiguous_goal_planning import AmbiguousGoalPlanningBehaviour
 from .bt_plan_generation import BTPlanGenerationBehaviour
 from .community_signifier_query import CommunitySignifierQueryBehaviour
 from .env_context_query import EnvContextQueryBehaviour
 from .environment_ready import EnvironmentReadyBehaviour
+from .explicit_goal_llm_planning import ExplicitGoalLLMPlanningBehaviour
+from .explicit_goal_planning import ExplicitGoalPlanningBehaviour
 from .goal_request import GoalRequestBehaviour
+from .incomplete_goal_planning import IncompleteGoalPlanningBehaviour
 from .planning_workflow import PlanningWorkflowBehaviour
 from .signifier_match_query import SignifierMatchQueryBehaviour
 
 __all__ = [
+    "AmbiguousGoalPlanningBehaviour",
     "BTPlanGenerationBehaviour",
     "CommunitySignifierQueryBehaviour",
     "EnvContextQueryBehaviour",
     "EnvironmentReadyBehaviour",
+    "ExplicitGoalLLMPlanningBehaviour",
+    "ExplicitGoalPlanningBehaviour",
     "GoalRequestBehaviour",
+    "IncompleteGoalPlanningBehaviour",
     "PlanningWorkflowBehaviour",
     "SignifierMatchQueryBehaviour",
 ]

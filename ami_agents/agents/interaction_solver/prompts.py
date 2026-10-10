@@ -57,3 +57,27 @@ Output: {"intent_text": "Ugh the bathroom humidity is so high, my skin feels cla
 Input: "Something feels off in here"
 Output: {"intent_text": "Something feels off in here", "affected_env_vars": [{"variable": "unknown", "direction": "unknown"}]}
 """
+
+# Asked of the small model for a "modify" goal whose read-compute-set recipe
+# could not be read off the Thing Descriptions alone. It names the pieces; the
+# InteractionSolver checks them against the TDs and builds the tree itself.
+MODIFY_RECIPE_PROMPT = """
+You complete the plan for ONE relative change to ONE smart-home device ("dim the light by 20%", "lower the setpoint by 2 degrees").
+
+The change is applied as: read the current value of a property, compute the new value, set it with an action. You only name the pieces; you do not write a plan.
+
+You receive the structured goal and the device's affordances (actions with their input, properties with their output).
+
+Return ONLY one JSON object:
+{"action": "<action name>", "parameter": "value" | "<parameter name>", "property": "<property name>",
+ "mode": "add" | "scale", "amount": <number>, "min": <number> | null, "max": <number> | null}
+
+- action: the action that sets the value being changed, by its name.
+- parameter: "value" when the action's input is a single value; otherwise the name of the input parameter that takes it.
+- property: the property holding the current value of what the action changes, by its name.
+- amount: the change from the goal, keeping its sign (positive increases, negative decreases).
+- mode: "add" when the amount is added as it is (a plain amount, or a percentage of a property that is itself in percent); "scale" when it is a percentage of the current value.
+- min, max: the range the new value must stay in, from the property's or the action's schema; null if none is stated.
+
+If the device has no action and property that can make this change, return {"impossible": "<why, in one sentence>"}. Never invent a name.
+"""

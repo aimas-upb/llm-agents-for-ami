@@ -158,30 +158,50 @@ class TestView:
 
     def test_an_action_states_what_it_changes_and_moves(self, graph):
         text = render_actuation_context(build_actuation_context(graph))
-        assert 'Artifact "bathroom_air_conditioner_1" "Air Conditioner": ' \
-               'homeont:AirConditioner, saref:HVAC, hmas:Artifact' in text
-        assert 'acts upon: "coolingSetpoint" (homeont:AirConditionerCoolingSetpoint)' in text
-        assert ('environment effect: "air_temperature" (homeont:AirTemperature; '
-                'quantitykind:ThermodynamicTemperature; unit:DEG_C) '
-                'of "Bathroom environment"') in text
+        assert ('acts upon: property "coolingSetpoint" '
+                '(class: homeont:AirConditionerCoolingSetpoint)') in text
+        assert ('environment effect: variable "air_temperature" (class: homeont:AirTemperature; '
+                'quantity kind: quantitykind:ThermodynamicTemperature; unit: unit:DEG_C) '
+                'of environment "Bathroom environment"') in text
+
+    def test_a_device_name_is_never_confused_with_its_class_label(self, graph):
+        text = render_actuation_context(build_actuation_context(graph))
+        assert re.search(r'Artifact\n\s+name: "bathroom_air_conditioner_1"\n'
+                         r'\s+class: homeont:AirConditioner \(class label: "Air Conditioner"\)\n'
+                         r'\s+semantic types: homeont:AirConditioner, saref:HVAC, hmas:Artifact\n',
+                         text)
+
+    def test_an_action_names_its_title_and_command_class(self, graph):
+        text = render_actuation_context(build_actuation_context(graph))
+        assert re.search(r'Action\n\s+name: "coolingSetpoint"\n'
+                         r'\s+command class: saref:SetAbsoluteLevelCommand\n', text)
 
     def test_a_direct_value_carries_its_type_unit_and_meaning(self, graph):
         text = render_actuation_context(build_actuation_context(graph))
-        assert "input: direct value; js:IntegerSchema; unit: unit:DEG_C" in text
-        assert re.search(r"input: direct value; js:IntegerSchema; description: 0 = Off", text)
+        assert "input: direct value; type: js:IntegerSchema; unit: unit:DEG_C" in text
+        assert re.search(r"input: direct value; type: js:IntegerSchema; description: 0 = Off",
+                         text)
+
+    def test_a_bounded_input_states_its_range(self, graph):
+        text = render_actuation_context(build_actuation_context(graph))
+        assert re.search(r'name: "brightness"\n\s+command class: \S+\n'
+                         r'\s+input: direct value; type: js:IntegerSchema; '
+                         r'range: \[min: 1, max: 254\]\n', text)
 
     def test_manufacturer_and_model_are_shown(self, graph):
         text = render_actuation_context(build_actuation_context(graph))
-        assert "manufacturer: LG Electronics; model: Air Conditioner" in text
+        assert "manufacturer: LG Electronics\n" in text
+        assert "model: Air Conditioner\n" in text
 
 
 class TestParameterizedCall:
     def test_object_input_renders_as_named_nested_parameters(self, small_home):
         text = render_actuation_context(build_actuation_context(small_home))
         assert "input: parameterized call" in text
-        assert "- brightness: js:IntegerSchema; unit: unit:PERCENT" in text
-        assert "- hs: object" in text
-        assert "- hue: js:NumberSchema; description: degrees on the colour wheel" in text
+        assert '- parameter "brightness": type: js:IntegerSchema; unit: unit:PERCENT' in text
+        assert '- parameter "hs": object' in text
+        assert ('- parameter "hue": type: js:NumberSchema; '
+                'description: degrees on the colour wheel') in text
 
     def test_object_input_structure(self, small_home):
         context = build_actuation_context(small_home)
@@ -387,9 +407,10 @@ class TestProperties:
         assert "office_temperature_sensor" not in plain
         full = render_actuation_context(
             build_actuation_context(sensor_home, with_properties=True))
-        assert 'Artifact "office_temperature_sensor"' in full
-        assert 'Property "temperature": homeont:AirTemperature' in full
-        assert "output: direct value; js:NumberSchema; unit: unit:DEG_C" in full
+        assert 'name: "office_temperature_sensor"' in full
+        assert re.search(r'Property\n\s+name: "temperature"\n'
+                         r'\s+property class: homeont:AirTemperature\n', full)
+        assert "output: direct value; type: js:NumberSchema; unit: unit:DEG_C" in full
 
     def test_a_named_sensor_counts_only_with_properties(self, sensor_home):
         goal = "when the temperature sensor reads above 25 turn on the fan"
@@ -405,8 +426,10 @@ class TestProperties:
         text = render_actuation_context(
             build_actuation_context(graph, with_properties=True))
         assert not re.search(r"https?://", text)
-        assert ('Property "coolingSetpoint": homeont:AirConditionerCoolingSetpoint '
-                '(actuatable; values as Action "coolingSetpoint")') in text
+        assert re.search(r'name: "coolingSetpoint"\n'
+                         r'\s+property class: homeont:AirConditionerCoolingSetpoint\n'
+                         r'\s+kind: actuatable\n'
+                         r'\s+values: as Action "coolingSetpoint"\n', text)
 
 
 class TestEnvironment:
@@ -419,24 +442,28 @@ class TestEnvironment:
         assert var["observed_by"] == [{"artifact": "office_temperature_sensor",
                                        "affordance": "temperature"}]
         text = render_actuation_context(context)
-        assert 'Environment "Office environment"' in text
-        assert ("Variable (no room-level property): homeont:AirTemperature; "
-                "unit:DEG_C; observed by: office_temperature_sensor.temperature") in text
+        assert re.search(r'Environment\n\s+name: "Office environment"\n', text)
+        assert re.search(r'Variable\n\s+name: none \(no room-level property\)\n'
+                         r'\s+class: homeont:AirTemperature\n'
+                         r'\s+unit: unit:DEG_C\n'
+                         r'\s+observed by: office_temperature_sensor.temperature', text)
 
     @needs_corpus
     def test_room_variables_name_the_device_readings_that_observe_them(self, graph):
         text = render_actuation_context(
             build_actuation_context(graph, with_environment=True))
         # The AC's own reading is typed with a subclass of AirTemperature.
-        assert ('Variable "air_temperature": homeont:AirTemperature; '
-                "quantitykind:ThermodynamicTemperature; unit:DEG_C; "
-                "observed by: bathroom_air_conditioner_1.temperature") in text
+        assert re.search(r'name: "air_temperature"\n'
+                         r'\s+class: homeont:AirTemperature\n'
+                         r'\s+quantity kind: quantitykind:ThermodynamicTemperature\n'
+                         r'\s+unit: unit:DEG_C\n'
+                         r'\s+observed by: [^\n]*bathroom_air_conditioner_1.temperature', text)
 
     @needs_corpus
     def test_a_variable_nothing_observes_says_so(self, graph):
         text = render_actuation_context(
             build_actuation_context(graph, with_environment=True))
-        assert re.search(r'Variable "illuminance": .*observed by: none', text)
+        assert re.search(r'name: "illuminance"\n(\s+\w[^\n]*\n)*?\s+observed by: none\n', text)
 
 
 @needs_corpus
@@ -444,9 +471,9 @@ class TestWrittenProperties:
     def test_a_property_an_action_writes_points_at_it_instead_of_repeating(self, graph):
         text = render_actuation_context(
             build_actuation_context(graph, with_properties=True))
-        line = ('Property "fanMode": homeont:AirConditionerFanMode '
-                '(actuatable; values as Action "fanMode")')
-        assert line in text
+        line = 'values: as Action "fanMode"'
+        assert re.search(r'name: "fanMode"\n\s+property class: homeont:AirConditionerFanMode\n'
+                         r'\s+kind: actuatable\n\s+values: as Action "fanMode"\n', text)
         # No output block follows it: the action's input already lists the values.
         following = text.split(line, 1)[1].lstrip("\n").splitlines()[0]
         assert not following.strip().startswith("output:")
@@ -454,18 +481,20 @@ class TestWrittenProperties:
     def test_a_capability_keeps_its_type_but_not_its_gloss(self, graph):
         text = render_actuation_context(
             build_actuation_context(graph, with_properties=True))
-        assert re.search(r'Property "fanModeSequence": \S+ \(capability\)\n'
-                         r'\s+output: direct value; js:IntegerSchema\n', text)
+        assert re.search(r'name: "fanModeSequence"\n\s+property class: \S+\n'
+                         r'\s+kind: capability\n'
+                         r'\s+output: direct value; type: js:IntegerSchema\n', text)
         assert "OffLowMedHigh" not in text
 
     def test_a_state_keeps_its_gloss(self, graph):
         text = render_actuation_context(
             build_actuation_context(graph, with_properties=True))
-        assert re.search(r'Property "operationalState": \S+ \(state\)\n'
-                         r'\s+output: direct value; \S+; description: ', text)
+        assert re.search(r'name: "operationalState"\n\s+property class: \S+\n'
+                         r'\s+kind: state\n'
+                         r'\s+output: direct value; type: \S+; description: ', text)
 
     def test_an_action_keeps_its_gloss(self, graph):
         text = render_actuation_context(
             build_actuation_context(graph, with_properties=True))
-        assert re.search(r'Action "fanMode": .*\n\s+input: direct value; '
-                         r'js:IntegerSchema; description: 0 = Off', text)
+        assert re.search(r'Action\n\s+name: "fanMode"\n.*\n\s+input: direct value; '
+                         r'type: js:IntegerSchema; description: 0 = Off', text)

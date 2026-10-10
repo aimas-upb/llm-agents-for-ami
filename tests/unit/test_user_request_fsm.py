@@ -298,6 +298,96 @@ class TestExtracting:
         assert state.next_state == AWAITING_PLAN
 
 
+class TestClarification:
+    def _structure(self, text, **goal):
+        return GoalStructure.from_dict(goal, intent_text=text, structure="simple")
+
+    @pytest.mark.asyncio
+    async def test_a_goal_naming_no_device_is_asked_about_not_planned(self):
+        fsm, agent = make_fsm(text="turn it off")
+        fsm.atomic_intents = [MagicMock(text="turn it off", type="GOAL_REQUEST",
+                                        qualifiers=["incomplete", "achievement"])]
+        _FakeGoalStructuring.outcomes = {
+            "turn it off": self._structure("turn it off", goal_specificity="incomplete")}
+        state = fsm._states[EXTRACTING]
+        with patch(f"{FSM_MODULE}.GoalStructuringBehaviour", _FakeGoalStructuring):
+            await state.run()
+
+        assert fsm.parsed_intents == []
+        body = fsm.send.await_args[0][0].body
+        assert '"turn it off"' in body and "Which device" in body
+        assert state.next_state == DONE
+        assert agent.requests.get("req-1").outcome == "clarification_needed"
+
+    @pytest.mark.asyncio
+    async def test_the_other_goals_still_go_to_planning(self):
+        fsm, _ = make_fsm(text="turn on the kitchen light and turn it off")
+        fsm.atomic_intents = [
+            MagicMock(text="turn on the kitchen light", type="GOAL_REQUEST",
+                      qualifiers=["incomplete", "achievement"]),
+            MagicMock(text="turn it off", type="GOAL_REQUEST",
+                      qualifiers=["incomplete", "achievement"])]
+        _FakeGoalStructuring.outcomes = {
+            "turn on the kitchen light": self._structure(
+                "turn on the kitchen light", goal_specificity="incomplete",
+                location_class="homeont:Kitchen", artifact_class="homeont:Light",
+                affordance_class="homeont:SetOnOffCommand"),
+            "turn it off": self._structure("turn it off", goal_specificity="incomplete")}
+        state = fsm._states[EXTRACTING]
+        with patch(f"{FSM_MODULE}.GoalStructuringBehaviour", _FakeGoalStructuring):
+            await state.run()
+
+        assert [s.intent_text for s in fsm.parsed_intents] == ["turn on the kitchen light"]
+        assert '"turn it off"' in fsm.send.await_args[0][0].body
+        assert state.next_state == AWAITING_PLAN
+
+
+class TestClarificationEntries:
+    """The solver's reply may ask about some goals: ask, and confirm the rest."""
+
+    PLAN = {"type": "action", "name": "a", "action_url": "http://h/a"}
+
+    def _fsm_with(self, *entries):
+        fsm, agent = make_fsm()
+        fsm.plan_body = json.dumps({"plan_type": "bt", "plans": list(entries),
+                                    "requires_clarification": True})
+        return fsm, agent
+
+    def _ask(self, text):
+        return {"tree": None, "requires_clarification": True,
+                "explanation": "Which device do you mean: lamp or ceiling_light?",
+                "intent": {"text_intent": text}}
+
+    @pytest.mark.asyncio
+    async def test_the_question_is_asked_and_the_rest_is_summarised(self):
+        fsm, _ = self._fsm_with(self._ask("turn on the bedroom light"),
+                                {"tree": self.PLAN, "intent": {"text_intent": "x"}})
+        sent = []
+        fsm.send = AsyncMock(side_effect=lambda msg: sent.append(msg.body))
+        state = fsm._states[SUMMARIZING]
+        with patch(f"{FSM_MODULE}.pipeline.summarize_plan",
+                   AsyncMock(return_value="I will do x.")) as summarize:
+            await state.run()
+
+        assert sent == ['About "turn on the bedroom light": '
+                        'Which device do you mean: lamp or ceiling_light?',
+                        "I will do x."]
+        summarised = json.loads(summarize.await_args[0][2])
+        assert [p["intent"]["text_intent"] for p in summarised["plans"]] == ["x"]
+        assert "requires_clarification" not in summarised
+        assert state.next_state == AWAITING_CONFIRMATION
+
+    @pytest.mark.asyncio
+    async def test_only_questions_end_the_request(self):
+        fsm, agent = self._fsm_with(self._ask("turn on the bedroom light"))
+        state = fsm._states[SUMMARIZING]
+        with patch(f"{FSM_MODULE}.pipeline.summarize_plan", AsyncMock()) as summarize:
+            await state.run()
+        summarize.assert_not_awaited()
+        assert state.next_state == DONE
+        assert agent.requests.get("req-1").outcome == "clarification_needed"
+
+
 class TestAwaitingPlan:
     @pytest.mark.asyncio
     async def test_goal_request_carries_the_structures(self):

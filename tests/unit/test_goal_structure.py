@@ -15,7 +15,7 @@ EXPLICIT = {
     "artifact_name": "bathroom_air_conditioner_1",
     "affordance_class": "homeont:SetModeCommand", "parent_class": "saref:Command",
     "affordance_name": "hvacMode", "parameter_name": "NA",
-    "goal_effect": "set", "target_value": "cooling",
+    "goal_effect": "set", "target_value_text": "cooling mode", "target_value_determined": "3",
 }
 
 
@@ -26,9 +26,9 @@ class TestGoalSpec:
         assert GoalSpec.from_dict({"parameter_name": "level"}).parameter_name == "level"
 
     def test_na_means_none_outside_the_two_na_slots(self):
-        goal = GoalSpec.from_dict({"artifact_name": "NA", "target_value": "null"})
+        goal = GoalSpec.from_dict({"artifact_name": "NA", "target_value_text": "null"})
         assert goal.artifact_name is None
-        assert goal.target_value is None
+        assert goal.target_value_text is None
 
     def test_values_outside_a_vocabulary_are_dropped(self):
         goal = GoalSpec.from_dict({"goal_specificity": "implicit",
@@ -43,6 +43,30 @@ class TestGoalSpec:
         assert wire["goal_dependency_structure"] is None
         for key, value in EXPLICIT.items():
             assert wire[key] == value, key
+
+    def test_a_modify_goal_carries_its_percentage_flag(self):
+        goal = GoalSpec.from_dict({**EXPLICIT, "goal_effect": "modify",
+                                   "target_value_text": "by 20%",
+                                   "target_value_determined": "-20",
+                                   "target_value_is_percentage": "true"})
+        wire = goal.to_wire_dict()
+        assert wire["target_value_is_percentage"] is True
+        assert wire["target_value_determined"] == "-20"
+        assert GoalSpec.from_dict({"target_value_is_percentage": False}).target_value_is_percentage is False
+        # Missing or unreadable: not a percentage.
+        assert GoalSpec.from_dict({}).target_value_is_percentage is False
+        assert GoalSpec.from_dict({"target_value_is_percentage": "maybe"}).target_value_is_percentage is False
+
+    def test_an_incomplete_goal_carries_its_quantifier(self):
+        goal = GoalSpec.from_dict({"goal_specificity": "incomplete",
+                                   "intent_text": "turn on the kitchen lights",
+                                   "location_class": "homeont:Kitchen",
+                                   "artifact_class": "homeont:Light", "quantifier": "All"})
+        assert goal.to_wire_dict()["quantifier"] == "all"
+        assert GoalSpec.from_dict({"quantifier": "one"}).quantifier == "one"
+        # "any" is the predicates' label; for a goal it settles to "one".
+        assert GoalSpec.from_dict({"quantifier": "any"}).quantifier == "one"
+        assert GoalSpec.from_dict({"quantifier": "each"}).quantifier is None
 
     def test_ambiguous_carries_environment_vars_not_device_slots(self):
         goal = GoalSpec.from_dict({
@@ -79,7 +103,7 @@ class TestPredicateSpec:
             "location_class": "homeont:LivingRoom",
             "artifact_class": "homeont:WindowCoveringController",
             "property_class": "homeont:WindowCoveringPosition",
-            "property_field": "NA", "comparison": "==", "target_value": "half open",
+            "property_field": "NA", "comparison": "==", "target_value_text": "half open",
             "quantifier": "all", "role": "scope", "applies_to": ["G1"]})
         wire = pred.to_wire_dict()
         assert wire["property_field"] == NA

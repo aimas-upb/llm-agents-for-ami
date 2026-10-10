@@ -28,6 +28,7 @@ from ..utils.signifier_fast_path import (
     try_build_signifier_only_tree,
 )
 from ..utils.signifier_matching import merge_signifier_matches
+from ..utils.environment_graph import fetch_environment_graph
 from ....bt_planning import explicit_intent_handler
 from .bt_plan_generation import BTPlanGenerationBehaviour
 from .community_signifier_query import CommunitySignifierQueryBehaviour
@@ -513,42 +514,6 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
         Cache it to avoid redundant RPC calls within a single planning workflow.
         """
         if not hasattr(self, "_cached_rdf_graph"):
-            try:
-                import json
-
-                # Use agent's _query_env_explorer which handles response parsing correctly
-                response_body = await self.agent._query_env_explorer(
-                    message_type=MessageType.ENV_CAPABILITIES_REQUEST.value,
-                    body={"detail_level": "detailed"},
-                    expect_type=MessageType.ENV_CAPABILITIES_RESPONSE.value,
-                )
-
-                # Response is a JSON object with payload field containing RDF Turtle
-                rdf_ttl = ""
-                try:
-                    response_data = json.loads(response_body)
-                    if isinstance(response_data, dict):
-                        rdf_ttl = response_data.get("payload", "")
-                except (json.JSONDecodeError, ValueError):
-                    # If not JSON, assume it's raw Turtle
-                    rdf_ttl = response_body
-
-                self._cached_rdf_graph = Graph()
-
-                if rdf_ttl:
-                    # Log first and last 300 chars to see prefix declarations and content
-                    if len(rdf_ttl) > 600:
-                        self.logger.info(demo(f"RDF start: {rdf_ttl[:300]}"))
-                        self.logger.info(demo(f"RDF end: {rdf_ttl[-300:]}"))
-                    else:
-                        self.logger.info(demo(f"RDF content: {rdf_ttl}"))
-
-                    self._cached_rdf_graph.parse(data=rdf_ttl, format="turtle")
-                    self.logger.info(demo(f"RDF graph parsed successfully"))
-
-            except Exception as e:
-                self.logger.error(demo(f"Failed to fetch RDF graph: {e}"))
-                self._cached_rdf_graph = Graph()
-
+            self._cached_rdf_graph = await fetch_environment_graph(self.agent, self.logger)
         return self._cached_rdf_graph
 

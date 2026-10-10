@@ -25,6 +25,7 @@ from .affordance_nodes import (
     ActionAffordanceNode,
     ComparisonOperator,
     ComparisonPropertyConditionNode,
+    PropertyAffordanceNode,
     PropertyConditionNode,
     SettlingTimeWaitNode,
     WaitPropertyConditionNode,
@@ -140,6 +141,9 @@ def _compile_action(spec, compile_child):
         name=_name(spec),
         action_url=spec["action_url"],
         parameters=spec.get("parameters", {}),
+        # A parameter whose value is computed while the tree runs (a read, then
+        # a compute node) names the blackboard key holding it.
+        parameter_keys=spec.get("parameter_keys", {}),
     )
     settling = spec.get("settling_time_seconds")
     if not isinstance(settling, (int, float)) or settling <= 0:
@@ -202,6 +206,30 @@ def _compile_wait_condition(spec, compile_child):
     return node
 
 
+def _compile_read(spec, compile_child):
+    """Read a property and leave its value on the blackboard, under `output`.
+
+    The existing `PropertyAffordanceNode`: it stores the reading as a
+    `PropertyValue`, which a compute node unwraps.
+    """
+    return PropertyAffordanceNode(
+        name=_name(spec),
+        property_url=spec["property_url"],
+        result_key=spec["output"],
+    )
+
+
+def _compile_ignore_failure(spec, compile_child):
+    """Run the one child; report SUCCESS even when it fails.
+
+    py_trees' own `FailureIsSuccess` decorator. Used so that one device failing
+    in a plan over several devices does not stop the others.
+    """
+    (child,) = spec["children"]
+    return py_trees.decorators.FailureIsSuccess(
+        name=_name(spec), child=compile_child(child))
+
+
 def _compile_compute(spec, compile_child):
     return BlackboardComputeNode(
         name=_name(spec),
@@ -227,7 +255,32 @@ def _validate_action(spec, path, validate_child):
     url = spec.get("action_url")
     if not url or not isinstance(url, str):
         return [f"{path}: action nodes require 'action_url'"]
+    keys = spec.get("parameter_keys", {})
+    if not isinstance(keys, dict) or not all(
+            isinstance(k, str) and isinstance(v, str) for k, v in keys.items()):
+        return [f"{path}: action 'parameter_keys' must map parameter names "
+                f"to blackboard keys"]
     return []
+
+
+def _validate_read(spec, path, validate_child):
+    errors: List[str] = []
+    url = spec.get("property_url")
+    if not url or not isinstance(url, str):
+        errors.append(f"{path}: read nodes require 'property_url'")
+    if not spec.get("output") or not isinstance(spec.get("output"), str):
+        errors.append(f"{path}: read nodes require an 'output' blackboard key")
+    return errors
+
+
+def _validate_ignore_failure(spec, path, validate_child):
+    # `children` with exactly one entry, like a composite: every tree walker
+    # (auto-confirmation, node counts, action URL collection) recurses on
+    # `children`, so the actions inside stay visible to them.
+    children = spec.get("children")
+    if not isinstance(children, list) or len(children) != 1:
+        return [f"{path}: ignore_failure nodes require exactly one entry in 'children'"]
+    return validate_child(children[0], f"{path}.children[0]")
 
 
 def _validate_condition(spec, path, validate_child):
@@ -287,3 +340,6 @@ register_node_type("wait_condition", compile=_compile_wait_condition,
                    validate=_validate_wait_condition)
 register_node_type("compute", compile=_compile_compute, validate=_validate_compute)
 register_node_type("settle", compile=_compile_settle, validate=_validate_settle)
+register_node_type("read", compile=_compile_read, validate=_validate_read)
+register_node_type("ignore_failure", compile=_compile_ignore_failure,
+                   validate=_validate_ignore_failure)

@@ -62,6 +62,40 @@ register_compute_op("max", lambda values, args: max((v for v in values if v is n
 register_compute_op("min", lambda values, args: min((v for v in values if v is not None), default=None))
 
 
+def _change_clamped(values: List[Any], args: Dict[str, Any]) -> Any:
+    """A relative change of a value read just before, kept within the range.
+
+    `values[0]` is the current value -- the `PropertyValue` a `read` node stores,
+    or a bare number. `args`:
+
+        amount    the signed change ("-20")
+        mode      "add":   new = current + amount
+                  "scale": new = current + amount / 100 * current  (a percentage)
+        min, max  the range; a result outside it is set to the bound it crossed
+        integer   round the result (the input takes integers)
+
+    A current value that is not a number raises, so the node fails rather than
+    sending something the device would reject.
+    """
+    current = values[0] if values else None
+    current = getattr(current, "value", current)          # unwrap a PropertyValue
+    if isinstance(current, bool) or not isinstance(current, (int, float)):
+        raise ValueError(f"current value {current!r} is not a number")
+    amount = float(args["amount"])
+    if args.get("mode") == "scale":
+        new = current + amount / 100.0 * current
+    else:
+        new = current + amount
+    if args.get("min") is not None:
+        new = max(new, args["min"])
+    if args.get("max") is not None:
+        new = min(new, args["max"])
+    return int(round(new)) if args.get("integer") else new
+
+
+register_compute_op("change_clamped", _change_clamped)
+
+
 class BlackboardComputeNode(py_trees.behaviour.Behaviour):
     """
     A custom node that reads inputs from the blackboard, applies a registered

@@ -70,9 +70,14 @@ class AsyncBTPlanner:
         temperature: Optional[float] = None,
         reasoning_effort: Optional[str] = None,
         max_completion_tokens: Optional[int] = None,
+        goal_brief: Optional[str] = None,
     ) -> dict:
         """
         Generate a JSON IR behavior tree.
+
+        `goal_brief` is the goal as the UserAssistant structured it (device,
+        action, value words), appended to the user message so the model plans
+        from what was already worked out rather than re-reading the sentence.
 
         Args:
             intents: List of user intents to satisfy
@@ -107,8 +112,10 @@ class AsyncBTPlanner:
             observable_property_hints=obs_hints_text,
         )
 
-        # Format user message with intents
+        # Format user message with intents (and the structured goal, if given)
         user_message = self._format_user_message(intents)
+        if goal_brief:
+            user_message += f"\n\nStructured goal:\n{goal_brief}"
 
         messages = [
             {"role": "system", "content": system_prompt},

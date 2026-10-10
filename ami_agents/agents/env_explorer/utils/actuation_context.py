@@ -121,7 +121,7 @@ def _owner(graph: Graph, affordance: Any) -> Optional[Any]:
 # --------------------------------------------------------------------------
 
 def _schema(graph: Graph, schema: Any) -> Dict[str, Any]:
-    """A value schema: its type, unit and description, or its parameters.
+    """A value schema: its type, range, unit and description, or its parameters.
 
     An ObjectSchema is a parameterized call -- the action takes named fields,
     each described the same way, recursively.
@@ -140,6 +140,11 @@ def _schema(graph: Graph, schema: Any) -> Dict[str, Any]:
 
     out: Dict[str, Any] = {"form": "direct value",
                            "type": types[0] if types else None}
+    # The bounds the device accepts (js:minimum / js:maximum), as numbers.
+    for key, predicate in (("minimum", JS.minimum), ("maximum", JS.maximum)):
+        bound = graph.value(schema, predicate)
+        if bound is not None:
+            out[key] = bound.toPython() if hasattr(bound, "toPython") else str(bound)
     unit = graph.value(schema, QUDT.unit)
     if unit is not None:
         out["unit"] = shorten(unit)
@@ -417,6 +422,12 @@ def build_actuation_context(graph: Graph,
 # Rendering
 # --------------------------------------------------------------------------
 
+# Every element starts on a line of its own kind ("Artifact", "Action", ...),
+# and every fact about it beneath is labelled ("name:", "class:", ...). The
+# model copies names and classes out of this text, so nothing may be left for
+# it to infer from position: a device's title and its class's label used to sit
+# side by side as two quoted strings, and the label got copied as the name.
+
 def _render_schema(schema: Dict[str, Any], indent: str, lines: List[str],
                    direction: str = "input") -> None:
     """An action's input or a property's output.
@@ -435,16 +446,20 @@ def _render_schema(schema: Dict[str, Any], indent: str, lines: List[str],
 
 def _render_parameter(parameter: Dict[str, Any], indent: str, lines: List[str]) -> None:
     inner = parameter["parameter_schema"]
+    name = f"- parameter \"{parameter['parameter_name']}\""
     if inner.get("form") == "parameterized call":
-        lines.append(f"{indent}- {parameter['parameter_name']}: object")
+        lines.append(f"{indent}{name}: object")
         for sub in inner.get("parameters", []):
             _render_parameter(sub, indent + "  ", lines)
     else:
-        lines.append(f"{indent}- {parameter['parameter_name']}: {_value_facts(inner)}")
+        lines.append(f"{indent}{name}: {_value_facts(inner)}")
 
 
 def _value_facts(schema: Dict[str, Any]) -> str:
-    facts = [schema.get("type") or "untyped"]
+    facts = [f"type: {schema.get('type') or 'untyped'}"]
+    # Shown only when both bounds are stated: half a range says little.
+    if schema.get("minimum") is not None and schema.get("maximum") is not None:
+        facts.append(f"range: [min: {schema['minimum']}, max: {schema['maximum']}]")
     if schema.get("unit"):
         facts.append(f"unit: {schema['unit']}")
     if schema.get("description"):
@@ -452,69 +467,94 @@ def _value_facts(schema: Dict[str, Any]) -> str:
     return "; ".join(facts)
 
 
+# How the facts of a referenced property or variable are labelled.
+_FACT_LABELS = {"class": "class", "quantity_kind": "quantity kind", "unit": "unit",
+                "comment": "comment"}
+
+
 def _render_property(entry: Dict[str, Any], keys: Iterable[str]) -> str:
-    facts = [entry[k] for k in keys if entry.get(k)]
+    facts = [f"{_FACT_LABELS[k]}: {entry[k]}" for k in keys if entry.get(k)]
     return f"\"{entry.get('title')}\"" + (f" ({'; '.join(facts)})" if facts else "")
 
 
 def _render_environment(environment: Dict[str, Any], indent: str,
                         lines: List[str]) -> None:
-    lines.append(f"{indent}Environment \"{environment.get('label')}\"")
+    lines.append(f"{indent}Environment")
+    lines.append(f"{indent}  name: \"{environment.get('label')}\"")
     for var in environment.get("variables", []):
-        facts = [var[k] for k in ("class", "quantity_kind", "unit") if var.get(k)]
         observers = ", ".join(f"{o['artifact']}.{o['affordance']}"
                               for o in var.get("observed_by", [])) or "none"
-        title = f"\"{var['title']}\"" if var.get("title") else "(no room-level property)"
-        lines.append(f"{indent}  Variable {title}: {'; '.join(facts)}; "
-                     f"observed by: {observers}")
+        lines.append(f"{indent}  Variable")
+        lines.append(f"{indent}    name: " + (f"\"{var['title']}\"" if var.get("title")
+                                               else "none (no room-level property)"))
+        for key in ("class", "quantity_kind", "unit"):
+            if var.get(key):
+                lines.append(f"{indent}    {_FACT_LABELS[key]}: {var[key]}")
+        lines.append(f"{indent}    observed by: {observers}")
 
 
 def _render_properties(properties: List[Dict[str, Any]], indent: str,
                        lines: List[str]) -> None:
     for prop in properties:
-        notes = [prop["branch"]] if prop.get("branch") else []
+        lines.append(f"{indent}Property")
+        lines.append(f"{indent}  name: \"{prop.get('title')}\"")
+        lines.append(f"{indent}  property class: {prop.get('class')}")
+        if prop.get("branch"):
+            lines.append(f"{indent}  kind: {prop['branch']}")
         if prop.get("written_by"):
-            notes.append(f"values as Action \"{prop['written_by']}\"")
-        detail = f" ({'; '.join(notes)})" if notes else ""
-        lines.append(f"{indent}Property \"{prop.get('title')}\": "
-                     f"{prop.get('class')}{detail}")
+            lines.append(f"{indent}  values: as Action \"{prop['written_by']}\"")
         if prop.get("output"):
             _render_schema(prop["output"], indent + "  ", lines, direction="output")
 
 
+def _render_action(action: Dict[str, Any], indent: str, lines: List[str]) -> None:
+    lines.append(f"{indent}Action")
+    lines.append(f"{indent}  name: \"{action.get('title')}\"")
+    lines.append(f"{indent}  command class: {', '.join(action['command_types'])}")
+    if action.get("input"):
+        _render_schema(action["input"], indent + "  ", lines)
+    for target in action.get("acts_upon", []):
+        lines.append(f"{indent}  acts upon: property "
+                     f"{_render_property(target, ('class', 'comment'))}")
+    for effect in action.get("environment_effect", []):
+        where = (f" of environment \"{effect['environment']}\""
+                 if effect.get("environment") else "")
+        lines.append(f"{indent}  environment effect: variable "
+                     f"{_render_property(effect, ('class', 'quantity_kind', 'unit'))}"
+                     f"{where}")
+
+
+def _render_artifact(art: Dict[str, Any], indent: str, lines: List[str]) -> None:
+    lines.append(f"{indent}Artifact")
+    lines.append(f"{indent}  name: \"{art.get('title')}\"")
+    # The device's class: its homeont type, with the class's own label -- the
+    # label names the kind of device, never this device.
+    if art["homeont_types"]:
+        label = f" (class label: \"{art['label']}\")" if art.get("label") else ""
+        lines.append(f"{indent}  class: {', '.join(art['homeont_types'])}{label}")
+    types = art["homeont_types"] + art["saref_types"] + art["hmas_types"]
+    lines.append(f"{indent}  semantic types: {', '.join(types)}")
+    for key in ("manufacturer", "model"):
+        if art.get(key):
+            lines.append(f"{indent}  {key}: {art[key]}")
+    for action in art.get("actions", []):
+        _render_action(action, indent + "  ", lines)
+    _render_properties(art.get("properties", []), indent + "  ", lines)
+
+
 def render_actuation_context(context: Dict[str, Any]) -> str:
-    """Compact indented text for a prompt: one fact per line, no URIs."""
+    """Compact indented text for a prompt: one labelled fact per line, no URIs."""
     lines: List[str] = []
 
     def workspace(ws: Dict[str, Any], indent: str) -> None:
-        kind = f" ({ws['space_class']})" if ws.get("space_class") else ""
-        lines.append(f"{indent}Workspace \"{ws.get('title')}\"{kind}")
+        lines.append(f"{indent}Workspace")
+        lines.append(f"{indent}  name: \"{ws.get('title')}\"")
+        if ws.get("space_class"):
+            lines.append(f"{indent}  room class: {ws['space_class']}")
         if ws.get("environment"):
             _render_environment(ws["environment"], indent + "  ", lines)
         for art in ws.get("artifacts", []):
-            types = art["homeont_types"] + art["saref_types"] + art["hmas_types"]
-            label = f" \"{art['label']}\"" if art.get("label") else ""
-            lines.append(f"{indent}  Artifact \"{art.get('title')}\"{label}: "
-                         f"{', '.join(types)}")
-            made = [f"{k}: {art[k]}" for k in ("manufacturer", "model") if art.get(k)]
-            if made:
-                lines.append(f"{indent}    {'; '.join(made)}")
-            for action in art.get("actions", []):
-                lines.append(f"{indent}    Action \"{action.get('title')}\": "
-                             f"{', '.join(action['command_types'])}")
-                if action.get("input"):
-                    _render_schema(action["input"], indent + "      ", lines)
-                for target in action.get("acts_upon", []):
-                    lines.append(f"{indent}      acts upon: "
-                                 f"{_render_property(target, ('class', 'comment'))}")
-                for effect in action.get("environment_effect", []):
-                    where = (f" of \"{effect['environment']}\""
-                             if effect.get("environment") else "")
-                    lines.append(
-                        f"{indent}      environment effect: "
-                        f"{_render_property(effect, ('class', 'quantity_kind', 'unit'))}"
-                        f"{where}")
-            _render_properties(art.get("properties", []), indent + "    ", lines)
+            _render_artifact(art, indent + "  ", lines)
         for sub in ws.get("workspaces", []):
             workspace(sub, indent + "  ")
 

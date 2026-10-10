@@ -307,3 +307,16 @@ class TestNamedDevice:
             artifact_name="garage_air_conditioner_9")
         assert result.outcome == CapabilityOutcome.NONE
         assert result.entries == []
+
+
+class TestEnvironmentVariableRooms:
+    """What an environment predicate's lookup gets back: the readings of a
+    variable class, each with the room it is in."""
+
+    def test_readings_of_a_variable_carry_their_room(self, graph):
+        result = resolve_capability_request(
+            graph, environment_variable={"class": "homeont:AirTemperature"})
+        assert result.outcome == CapabilityOutcome.FOUND
+        rooms = {(e.workspace_class, e.workspace_name) for e in result.entries}
+        assert ("homeont:Bathroom", "Bathroom") in rooms
+        assert all(cls for cls, _ in rooms)
