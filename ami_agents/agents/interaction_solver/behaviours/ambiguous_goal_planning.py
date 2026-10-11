@@ -3,6 +3,12 @@
 Spawned by ``GoalRequestBehaviour`` for the goals ``ambiguous_goal`` accepts.
 Fetches the TD graph once, then per goal:
 
+    0. recall(agent, goal)                   a past successful plan for exactly
+                                             these variables: what it used goes
+                                             to the planner as signifier hints,
+                                             which take precedence over the
+                                             context (the LLM still plans)
+
     1. build_specific_context(graph, goal)   per implied variable: the room's
                                              variable, the actions acting on it,
                                              the properties they act upon and the
@@ -14,6 +20,10 @@ Fetches the TD graph once, then per goal:
     3. a plan entry: a tree, impossible, or an error
 
 No variable with an action acting on it: impossible, with no LLM call.
+
+The entry carries `llm: True` and the `goal_context` (the affordances, per
+variable) so the UserAssistant can snapshot those properties before the plan
+runs and remember the plan once it has succeeded.
 """
 
 from __future__ import annotations
@@ -28,6 +38,7 @@ from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
 from ..utils.ambiguous_goal_plan import SOURCE
 from ..utils.environment_graph import fetch_environment_graph
+from ..utils.signifier_memory import recall
 from ..utils.specific_capability_context import build_specific_context
 
 
@@ -56,8 +67,14 @@ class AmbiguousGoalPlanningBehaviour(OneShotBehaviour):
             return {"tree": None, "impossible": True, "source": SOURCE,
                     "explanation": f"Nothing in this home acts on {variables}."}
 
-        # 2. The general planner model, with only that context.
+        # 2. What a past successful plan for exactly these variables used: hints.
         agent = self.agent
+        remembered = await recall(agent, goal, self.logger)
+        hints = ({"used": remembered.get("used"), "intent_text": remembered.get("intent_text"),
+                  "signifier_id": remembered.get("signifier_id")}
+                 if remembered and remembered.get("used") else None)
+
+        # 3. The general planner model, with only that context.
         reasoning = agent.model.startswith("o") or agent.model.startswith("gpt-5")
         self.logger.info(demo(
             f"Ambiguous goal {goal.intent_text!r} ({variables}): planning with "
@@ -68,6 +85,7 @@ class AmbiguousGoalPlanningBehaviour(OneShotBehaviour):
                 intents=[goal.intent_text or variables],
                 affordances=context.affordances,
                 observable_property_hints=context.observable_property_hints,
+                signifier_hints=hints,
                 goal_brief=context.goal_brief,
                 client=agent.llm_client,
                 model=agent.model,
@@ -80,7 +98,7 @@ class AmbiguousGoalPlanningBehaviour(OneShotBehaviour):
             return {"tree": None, "error": "ambiguous_planning_failed", "source": SOURCE,
                     "explanation": str(exc)}
 
-        # 3. The plan entry, in the multi-plan envelope's shape.
+        # 4. The plan entry, in the multi-plan envelope's shape.
         explanation = result.get("explanation", "")
         if result.get("impossible"):
             return {"tree": None, "impossible": True, "source": SOURCE,
@@ -88,4 +106,6 @@ class AmbiguousGoalPlanningBehaviour(OneShotBehaviour):
         if not result.get("tree"):
             return {"tree": None, "error": "ambiguous_planning_failed", "source": SOURCE,
                     "explanation": explanation or "The planner returned no tree."}
-        return {"tree": result["tree"], "explanation": explanation, "source": SOURCE}
+        return {"tree": result["tree"], "explanation": explanation, "source": SOURCE,
+                "llm": True, "goal_context": context.goal_context,
+                **({"signifier_id": hints["signifier_id"]} if hints else {})}

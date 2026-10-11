@@ -1,7 +1,5 @@
-"""Storage modules for RD4 Signifier System."""
+"""Storage of the memory engine."""
 
 from src.storage.memory_store import MemoryStore
-from src.storage.registry import SignifierRegistry
-from src.storage.representation import RepresentationService
 
-__all__ = ["MemoryStore", "SignifierRegistry", "RepresentationService"]
+__all__ = ["MemoryStore"]

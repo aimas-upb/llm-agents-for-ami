@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from src.models.signifier import Signifier
+from src.models.signifier import GoalSignifier
 from src.validation import (
     AuthoringValidationError,
     AuthoringValidator,
@@ -37,7 +37,7 @@ class ValidateAuthoringRequest(BaseModel):
         strict_mode: Enable strict validation
     """
 
-    signifier: Signifier
+    signifier: GoalSignifier
     strict_mode: bool = Field(default=False)
 
 

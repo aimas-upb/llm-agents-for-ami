@@ -3,6 +3,10 @@
 Spawned by ``GoalRequestBehaviour`` for the goals ``incomplete_goal`` accepts.
 Fetches the TD graph once, then per goal:
 
+    remembered                      a plan an LLM made for exactly this goal
+                                    before (`utils/signifier_memory.py`):
+                                    replayed whole, nothing else is done
+
     VALUE_ONLY (no action named)    the small model, against every device the
                                     goal's class and room allow, told that the
                                     request may be impossible with them
@@ -33,6 +37,7 @@ from ....shared.utils.demo_log import demo
 from ....shared.utils.incomplete_goals import VALUE_ONLY, incomplete_case
 from ....shared.utils.logger import LoggerFactory
 from ..utils.environment_graph import fetch_environment_graph
+from ..utils.signifier_memory import recall, replay_entry
 from ..utils.incomplete_goal_plan import (
     CLARIFY,
     IMPOSSIBLE,
@@ -66,6 +71,11 @@ class IncompleteGoalPlanningBehaviour(OneShotBehaviour):
     async def _plan(self, graph: Graph, goal: GoalSpec) -> Dict[str, Any]:
         case = incomplete_case(goal)
 
+        # 0. A plan a model already made for exactly this goal: replayed whole.
+        remembered = replay_entry(await recall(self.agent, goal, self.logger) or {})
+        if remembered is not None:
+            return remembered
+
         # 1. No action named: the small model chooses one among the candidate
         #    devices' affordances -- or says it is impossible.
         if case == VALUE_ONLY:
@@ -73,7 +83,7 @@ class IncompleteGoalPlanningBehaviour(OneShotBehaviour):
                 f"Incomplete goal {goal.intent_text!r}: no action named -- planning "
                 f"against the {goal.artifact_class or 'devices'} with the small model"))
             (entry,) = await self._run(ExplicitGoalLLMPlanningBehaviour(
-                [goal], graph, logger=self.logger))
+                [goal], graph, logger=self.logger, recall_memory=False))
             return {**entry, "source": SOURCE}
 
         # 2. The action is named: find the devices it fits, and choose.

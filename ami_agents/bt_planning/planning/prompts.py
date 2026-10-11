@@ -295,83 +295,46 @@ def _short_state_key(key) -> str:
     return text.rsplit("/", 1)[-1] or text
 
 
-EXPLICIT_SIMILARITY_THRESHOLD = 0.95
-
-
 def format_signifier_hints(
-    signifier_matches: dict | None,
+    signifier_hints: dict | None,
     url_to_ref: dict[str, str] | None = None,
 ) -> str:
+    """A remembered plan for exactly this situation, as hints for the planner.
+
+    `signifier_hints` is what memory recalled for an ambiguous goal
+    (`interaction_solver/utils/signifier_memory.py`): the affordances a past
+    successful plan for the same variables actually used --
+    ``{"used": {"actions": [{url, artifact, action, parameters}],
+    "properties": [{url, artifact, property}]}, "intent_text", "signifier_id"}``.
+    Only what was used is shown, not the environment as it was then. The system
+    prompt's Source Priority makes these authoritative over the context.
     """
-    Format signifier matches as BT planning hints.
-
-    Matches above ``EXPLICIT_SIMILARITY_THRESHOLD`` are labelled as *exact*
-    (reuse affordance **and** parameters as-is).  Lower-similarity matches
-    are labelled as *suggested* (reuse affordance, but adjust parameters to
-    the current context).
-
-    Args:
-        signifier_matches: Dict of intent -> match data from EnvExplorer/community
-        url_to_ref: Optional map of affordance target URL -> short affordance id
-
-    Returns:
-        Formatted hints string for the planning prompt
-    """
-    if not signifier_matches:
+    if not isinstance(signifier_hints, dict):
+        return ""
+    used = signifier_hints.get("used") or {}
+    actions = [a for a in used.get("actions") or [] if isinstance(a, dict)]
+    properties = [p for p in used.get("properties") or [] if isinstance(p, dict)]
+    if not actions and not properties:
         return ""
     url_to_ref = url_to_ref or {}
 
-    lines = ["## Past Successful Plans (Signifier Hints)", ""]
+    def ref(url) -> str:
+        return url_to_ref.get(str(url or "").rstrip("/"), str(url or ""))
+
+    lines = ["## Past Successful Plan (Signifier Hints)", ""]
     lines.append(
-        "Use these hints from previous interactions when planning. "
-        "If a hint's affordance exists in the affordances list, prefer it."
-    )
+        f"A plan for exactly this situation succeeded before "
+        f"(\"{signifier_hints.get('intent_text')}\"). Use the same affordances where "
+        f"they are in the affordances list; set values for the current state.")
+    for action in actions:
+        parameters = action.get("parameters")
+        lines.append(f"- action {ref(action.get('url'))} "
+                     f"({action.get('artifact')}.{action.get('action')})"
+                     + (f" with parameters {parameters}" if parameters else ""))
+    for prop in properties:
+        lines.append(f"- read {ref(prop.get('url'))} "
+                     f"({prop.get('artifact')}.{prop.get('property')})")
     lines.append("")
-
-    for intent, match_data in signifier_matches.items():
-        if not isinstance(match_data, dict):
-            continue
-
-        finals = match_data.get("final_matches", [])
-        matches = match_data.get("matches", [])
-
-        if not finals and not matches:
-            lines.append(f"Intent: \"{intent}\" -- No prior experience.")
-            continue
-
-        # Find best match
-        best_match = None
-        if matches:
-            if finals:
-                for m in matches:
-                    if str(m.get("signifier_id")) == str(finals[0]):
-                        best_match = m
-                        break
-            if not best_match:
-                best_match = matches[0]
-
-        if best_match:
-            similarity = best_match.get("intent_similarity", best_match.get("similarity"))
-            is_explicit = (similarity is not None and float(similarity) >= EXPLICIT_SIMILARITY_THRESHOLD)
-
-            lines.append(f"Intent: \"{intent}\"")
-            aff_uri = best_match.get("affordance_uri", "")
-            if aff_uri:
-                ref = url_to_ref.get(str(aff_uri).rstrip("/"), aff_uri)
-                lines.append(f"  Recommended affordance_id: {ref}")
-            payload = best_match.get("payload_hint") or best_match.get("payload")
-            if payload:
-                if is_explicit:
-                    lines.append(f"  Exact match -- reuse these parameters as-is: {payload}")
-                else:
-                    lines.append(f"  Suggested parameters (adjust to current context): {payload}")
-            if similarity is not None:
-                lines.append(f"  Confidence: {similarity}")
-            source = best_match.get("source", "")
-            if source:
-                lines.append(f"  Source: {source}")
-            lines.append("")
-
     return "\n".join(lines)
 
 

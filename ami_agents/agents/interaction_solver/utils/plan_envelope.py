@@ -65,27 +65,6 @@ def envelope_llm_plan(
     return out
 
 
-def envelope_signifier_reuse(
-    tree: Dict[str, Any],
-    signifier_ids: List[str],
-    intents: List[Union[ImplicitGoalIntent, ExplicitGoalIntent, Intent]],
-    workspace_id: Optional[str],
-) -> Dict[str, Any]:
-    """Reply for the signifier-only fast-path (no LLM call)."""
-    return {
-        "plan_type": PLAN_TYPE_BT,
-        "tree": tree,
-        "explanation": "Plan recovered from signifiers (no LLM call needed).",
-        "intents": [
-            i.to_wire_dict() if hasattr(i, 'to_wire_dict') else i.to_dict()
-            for i in intents
-        ],
-        "workspace_id": workspace_id,
-        "signifier_reuse": True,
-        "signifier_ids": signifier_ids,
-    }
-
-
 def envelope_llm_plans(
     plans_by_intent: Dict[str, Dict[str, Any]],
     intents: List[Union[ImplicitGoalIntent, ExplicitGoalIntent, Intent]],
@@ -175,7 +154,7 @@ def plan_entries_from_envelope(
         "intent": wire[0] if wire else None,
         "intents": wire,
     }
-    for key in ("impossible", "signifier_reuse", "signifier_ids"):
+    for key in ("impossible",):
         if envelope.get(key):
             entry[key] = envelope[key]
     return [entry]

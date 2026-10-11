@@ -217,5 +217,5 @@ class GoalRequestBehaviour(CyclicBehaviour):
             has_tree = any(p.get("tree") for p in plans if isinstance(p, dict))
 
         self.logger.info(
-            demo(f"Plan created: has_tree={has_tree} signifier_reuse={envelope.get('signifier_reuse', False)} impossible={envelope.get('impossible', False)} error={envelope.get('error')}")
+            demo(f"Plan created: has_tree={has_tree} from_memory={sum(1 for p in (plans or []) if isinstance(p, dict) and p.get('source') == 'memory')} impossible={envelope.get('impossible', False)} error={envelope.get('error')}")
         )

@@ -168,10 +168,16 @@ class TestContext:
         dark = ("illuminance", "homeont:Illuminance", "homeont:Bathroom", "Bathroom")
         assert build_specific_context(graph, _goal(dark)) is None
 
-    def test_the_brief_names_the_variables_and_leaves_the_direction_to_the_model(self, graph):
+    def test_the_brief_names_the_variables_and_the_instructions(self, graph):
         brief = build_specific_context(graph, _goal(DAMP_BATHROOM)).goal_brief
-        assert '"relative_humidity" (homeont:RelativeHumidity) in Bathroom' in brief
+        assert '"relative_humidity" (homeont:RelativeHumidity) in Bathroom\n' in brief
         assert DIRECTION_INSTRUCTIONS in brief
+
+    def test_the_brief_carries_the_wanted_direction(self, graph):
+        goal = _goal(DAMP_BATHROOM)
+        goal.implied_environment_vars[0].property_change_direction = "decrease"
+        brief = build_specific_context(graph, goal).goal_brief
+        assert "in Bathroom -- wanted: decrease" in brief
 
 
 class TestSelection:
@@ -220,7 +226,10 @@ class TestBehaviour:
                 "parameters": {"value": True}}
         agent = _agent({"tree": tree, "explanation": "dehumidify"})
         entry = await _plan(graph, _goal(DAMP_BATHROOM), agent)
-        assert entry == {"tree": tree, "explanation": "dehumidify", "source": "ambiguous_llm"}
+        assert (entry["tree"], entry["source"], entry["llm"]) == (tree, "ambiguous_llm", True)
+        # The context goes with the entry, for the snapshot and for memory.
+        (variable,) = entry["goal_context"]["variables"]
+        assert {p["role"] for p in variable["properties"]} == {"acted_upon", "reading"}
 
         kwargs = agent.bt_planner.generate_bt.await_args.kwargs
         assert kwargs["client"] == "general-client" and kwargs["model"] == "gpt-5-mini"

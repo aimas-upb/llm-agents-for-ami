@@ -523,30 +523,6 @@ class InteractionSolverAgent(Agent, IAgent):
 
     # ── Planning orchestration ─────────────────────────────────────
 
-    @staticmethod
-    def _summarise_signifier_matches(signifier_matches: Any) -> Dict[str, Any]:
-        if not isinstance(signifier_matches, dict):
-            return {"signifier_match_count": 0, "signifier_ids": []}
-
-        signifier_ids: List[str] = []
-        match_count = 0
-        for match_data in signifier_matches.values():
-            if not isinstance(match_data, dict):
-                continue
-            finals = match_data.get("final_matches")
-            if isinstance(finals, list):
-                signifier_ids.extend(str(f) for f in finals if str(f).strip())
-                match_count += len(finals)
-                continue
-            matches = match_data.get("matches")
-            if isinstance(matches, list):
-                match_count += len(matches)
-
-        return {
-            "signifier_match_count": match_count,
-            "signifier_ids": signifier_ids,
-        }
-
     async def _generate_plan(
         self,
         intents: List[Intent],
@@ -556,8 +532,7 @@ class InteractionSolverAgent(Agent, IAgent):
         """Gather context and generate a BT JSON IR plan.
 
         Returns a JSON string with the plan in behavior-tree format:
-        ``{plan_type, tree, explanation, intents, intent_type, impossible?,
-        signifier_reuse?}``.
+        ``{plan_type, tree, explanation, intents, intent_type, impossible?}``.
         """
         intents = [i for i in (intents or []) if i.to_query_string().strip()]
         if not intents:
@@ -575,15 +550,6 @@ class InteractionSolverAgent(Agent, IAgent):
 
         workspace_id = self._normalize_workspace_id(await self._resolve_workspace_id(workspace_id))
         intent_strings = [i.to_query_string() for i in intents]
-
-        # Fast-path: if every intent has a signifier match, build the BT
-        # directly without calling EnvExplorer for capabilities/state or the LLM.
-        reused_plan = await self._try_build_plan_from_signifiers(
-            intents, workspace_id=workspace_id, intent_type=intent_type
-        )
-        if reused_plan is not None:
-            self.logger.info(demo("BT recovered from signifiers (no EnvExplorer context queries, no LLM)"))
-            return json.dumps(reused_plan, indent=2)
 
         try:
             context = await self._gather_planning_context(
@@ -611,7 +577,7 @@ class InteractionSolverAgent(Agent, IAgent):
                 intents=intent_strings,
                 affordances=context.get("affordances", []),
                 state=context.get("state"),
-                signifier_hints=context.get("signifier_matches"),
+                signifier_hints=None,
                 observable_property_hints=(
                     context.get("observable_property_hints")
                     if self.td_sosa_supported
@@ -637,7 +603,6 @@ class InteractionSolverAgent(Agent, IAgent):
                 indent=2,
             )
 
-        signifier_summary = self._summarise_signifier_matches(context.get("signifier_matches"))
         output: Dict[str, Any] = {
             "plan_type": "behavior_tree",
             "tree": result.get("tree") or None,
@@ -646,64 +611,12 @@ class InteractionSolverAgent(Agent, IAgent):
             "workspace_id": workspace_id,
             "intent_type": intent_type,
             "td_sosa_supported": self.td_sosa_supported,
-            "signifier_reuse": False,
-            "planning_path": (
-                "fresh_planning_with_signifier_hints"
-                if signifier_summary.get("signifier_match_count")
-                else "fresh_planning"
-            ),
-            **signifier_summary,
+            "planning_path": "fresh_planning",
         }
         if result.get("impossible"):
             output["impossible"] = True
 
         return json.dumps(output, indent=2)
-
-    async def _try_build_plan_from_signifiers(
-        self,
-        intents: List[Intent],
-        workspace_id: Optional[str] = None,
-        intent_type: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
-        """Try to build a BT JSON IR directly from signifier matches.
-
-        EnvExplorer hosts the signifier engine so we still query it via
-        SIGNIFIER_MATCH_REQUEST here, but we intentionally skip
-        ENV_CAPABILITIES_REQUEST / ENV_STATE_REQUEST on this fast path.
-        Returns ``None`` if any intent lacks a usable match.
-        """
-        intent_strings = [i.to_query_string() for i in intents]
-        try:
-            signifier_matches = await self._gather_signifier_matches(
-                intent_strings,
-                workspace_id=workspace_id,
-                intent_type=intent_type,
-                structured_intents=[i.to_dict() for i in intents],
-            )
-        except Exception:
-            return None
-
-        if not isinstance(signifier_matches, dict) or not signifier_matches:
-            return None
-
-        tree = build_bt_from_signifiers(signifier_matches, intents)
-        if tree is None:
-            return None
-
-        signifier_summary = self._summarise_signifier_matches(signifier_matches)
-
-        return {
-            "plan_type": "behavior_tree",
-            "tree": tree,
-            "explanation": "Plan recovered from signifiers (no LLM call needed).",
-            "intents": [i.to_dict() for i in intents],
-            "workspace_id": workspace_id,
-            "intent_type": intent_type,
-            "td_sosa_supported": self.td_sosa_supported,
-            "signifier_reuse": True,
-            "planning_path": "signifier_reuse",
-            **signifier_summary,
-        }
 
     async def _gather_planning_context(
         self,
@@ -712,7 +625,7 @@ class InteractionSolverAgent(Agent, IAgent):
         intent_type: Optional[str] = None,
         structured_intents: Optional[List[Intent]] = None,
     ) -> Dict[str, Any]:
-        """Pull affordances + state from EnvExplorer and attach signifier hints."""
+        """Pull affordances + state from EnvExplorer."""
         self.logger.info(demo("Gathering context from EnvExplorer (workspace_id=%r)"), workspace_id)
         raw_aff, raw_state = await asyncio.gather(
             self._query_env_explorer(
@@ -779,14 +692,6 @@ class InteractionSolverAgent(Agent, IAgent):
                 workspace_id,
             )
 
-        signifier_matches: Dict[str, Any] = {}
-        try:
-            signifier_matches = await self._gather_signifier_matches(
-                intents, workspace_id=workspace_id, intent_type=intent_type
-            )
-        except Exception:
-            signifier_matches = {}
-
         observable_property_hints: Dict[str, Any] = {}
         if not self.td_sosa_supported:
             self.logger.info(demo("Skipping semantic HASP query: td_sosa_supported=%s"), self.td_sosa_supported)
@@ -832,7 +737,7 @@ class InteractionSolverAgent(Agent, IAgent):
                     demo("Skipping semantic HASP query: no observable properties inferred from intents=%s"),
                     intents,
                 )
-        # Cache the most recent context snapshot for future signifier-only planning.
+        # Cache the most recent context snapshot.
         try:
             self._cached_affordances = affordances if isinstance(affordances, list) else []
             self._cached_state_payload = state_payload if isinstance(state_payload, dict) else {}
@@ -861,96 +766,5 @@ class InteractionSolverAgent(Agent, IAgent):
             "intents": intents,
             "affordances": affordances,
             "state": narrowed_payload.get("state") or narrowed_payload,
-            "signifier_matches": signifier_matches,
             "observable_property_hints": observable_property_hints,
         }
-
-    async def _gather_signifier_matches(
-        self,
-        intents: List[str],
-        workspace_id: Optional[str] = None,
-        intent_type: Optional[str] = None,
-        structured_intents: Optional[List[dict]] = None,
-    ) -> Dict[str, Any]:
-        """Ask EnvExplorer (and optionally the community API) for signifier matches."""
-        intents = [str(i).strip() for i in (intents or []) if str(i).strip()]
-        if not intents:
-            return {}
-
-        intent_to_structured: Dict[str, dict] = {}
-        if structured_intents and len(structured_intents) == len(intents):
-            for intent_str, si in zip(intents, structured_intents):
-                if isinstance(si, dict):
-                    intent_to_structured[intent_str] = si
-
-        # Local EnvExplorer RPCs.
-        local_out: Dict[str, Any] = {}
-        if self.target_jids.get("explorer"):
-            local_results = await asyncio.gather(
-                *[
-                    query_local_signifier_match(
-                        self._query_env_explorer,
-                        i,
-                        workspace_id,
-                        intent_type,
-                        intent_to_structured.get(i),
-                    )
-                    for i in intents
-                ],
-                return_exceptions=True,
-            )
-            for intent, res in zip(intents, local_results):
-                if isinstance(res, Exception):
-                    local_out[intent] = {"error": "signifier_query_failed", "detail": str(res)}
-                else:
-                    local_out[intent] = res
-
-        # Community signifier API.
-        community_out: Dict[str, Any] = {}
-        if self.community_client:
-            community_results = await asyncio.gather(
-                *[query_community_signifier_match(self.community_client, i) for i in intents],
-                return_exceptions=True,
-            )
-            for intent, res in zip(intents, community_results):
-                if isinstance(res, Exception):
-                    community_out[intent] = {}
-                else:
-                    community_out[intent] = res if isinstance(res, dict) else {}
-
-        out = merge_signifier_matches(local_out, community_out, intents)
-        self._log_signifier_search(out, self.logger)
-        return out
-
-    @staticmethod
-    def _log_signifier_search(results: Dict[str, Any], logger) -> None:
-        """Emit demo-friendly summary lines for each intent's match result."""
-        for intent, payload in results.items():
-            if not isinstance(payload, dict):
-                continue
-            if payload.get("error"):
-                logger.info(demo("Signifier search failed: intent=%r error=%s"), intent, payload.get("error"))
-                continue
-
-            matches = payload.get("matches") if isinstance(payload.get("matches"), list) else []
-            finals = payload.get("final_matches") if isinstance(payload.get("final_matches"), list) else []
-            total = payload.get("total_signifiers")
-            community_count = sum(1 for m in matches if isinstance(m, dict) and m.get("source") == "community")
-
-            if finals:
-                logger.info(
-                    demo("Signifier search: intent=%r matches=%d (community=%d) final=%d top=%s"),
-                    intent,
-                    len(matches),
-                    community_count,
-                    len(finals),
-                    finals[0],
-                )
-            else:
-                logger.info(
-                    demo("Signifier search: intent=%r matches=%d (community=%d) final=0 stored_total=%s"),
-                    intent,
-                    len(matches),
-                    community_count,
-                    total if total is not None else "?",
-                )

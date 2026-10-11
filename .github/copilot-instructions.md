@@ -36,22 +36,25 @@ If you find yourself adding `_generate_plan` / `_gather_context` /
 `_handle_X` to an agent class — stop and put it in a behaviour or utils
 module instead.
 
-## Intent-type semantics (MUST preserve)
+## Memory (signifiers)
 
-Every link in this chain must keep `intent_type` and structured intent:
+Goals are remembered under an exact key built by
+`shared/utils/goal_signifiers.py:signifier_key` (kinds: `explicit`,
+`incomplete`, `incomplete_text`, `ambiguous`), used by both the UA (recording)
+and the ISA (recall).
+
+Only successful plans are recorded: explicit / incomplete ones only when an
+LLM made them (`llm: true`; whole tree, replayed on an exact hit); ambiguous
+ones always (context snapshot taken before the first tick + the affordances
+used, given to the planner as hints on an exact hit); never a memory replay.
 
 ```
-UA NLU prompt -> Intent + intent_type ('explicit' | 'implicit')
-UA -> ISA  GOAL_REQUEST  {intents, intent_type, workspace_id}
-ISA -> EnvExplorer  SIGNIFIER_MATCH_REQUEST  {intent, intent_type, query_structured_intent}
-EnvExplorer signifier matcher v2:
-  EXPLICIT -> skip context validation
-  IMPLICIT -> enforce context validation
-BT planner -> matches >= 0.95 labelled 'exact' (EXPLICIT_SIMILARITY_THRESHOLD)
+UA   on success -> SIGNIFIER_RECORD_EXECUTION_REQUEST {signifier} -> EnvExplorer
+ISA  before an LLM call -> SIGNIFIER_MATCH_REQUEST {kind, key} -> EnvExplorer,
+     then the community memory on a miss
 ```
 
-Dropping `intent_type` or `structured_intent` silently breaks the
-EMAS-demo semantic-modelling story.
+Change key fields only in `signifier_key`.
 
 ## Style / commits
 
@@ -72,7 +75,7 @@ EMAS-demo semantic-modelling story.
 4. Add yaml keys that no Python code reads.
 5. Force-push `master`, `emas2026`, or `aamas2026demo`.
 6. Use `--no-verify` on commits.
-7. Drop `intent_type` / `query_structured_intent` from the request chain.
+7. Build a signifier key anywhere but `signifier_key`.
 8. Launch a long-running or paid job yourself — hand over the command.
 
 ## Long-running and paid jobs — hand over the command

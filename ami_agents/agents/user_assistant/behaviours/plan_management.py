@@ -90,7 +90,7 @@ class PlanManagementBehaviour(CyclicBehaviour):
         goal_description = envelope.get("goal_description") or ""
         plan_hash = envelope.get("plan_hash")
 
-        for index, (plan_id, tree_spec, intent) in enumerate(
+        for index, (plan_id, tree_spec, intent, entry) in enumerate(
                 self._split(envelope.get("plan_id"), plan_obj)):
             if not tree_spec:
                 continue
@@ -134,16 +134,12 @@ class PlanManagementBehaviour(CyclicBehaviour):
                 # Everything recording needs that only the envelope knows. The
                 # executor passes it straight through without reading it.
                 recording_options={
-                    # This plan's own intent, and therefore its own category.
-                    "intents": [intent] if intent else [],
-                    "intent_type": self._intent_category(intent),
+                    # This plan's own entry (how it was planned: source, llm,
+                    # goal_context) and its own goal structure.
+                    "entry": {k: v for k, v in entry.items() if k != "tree"},
+                    "intent": intent if isinstance(intent, dict) else None,
                     "workspace_id": envelope.get("workspace_id")
                     or plan_obj.get("workspace_id"),
-                    "td_sosa_supported": bool(
-                        envelope.get("td_sosa_supported")
-                        or plan_obj.get("td_sosa_supported")),
-                    "is_signifier_reuse": bool(
-                        plan_obj.get("signifier_reuse")),
                 },
             )
             template = Template()
@@ -161,8 +157,8 @@ class PlanManagementBehaviour(CyclicBehaviour):
 
         The ISA plans one tree per atomic intent, and a multi-plan envelope
         carries that intent on each entry (`envelope_llm_plans`). So a plan has
-        exactly one intent, and therefore exactly one category -- which is what
-        signifier recording needs, and what a request-level label would blur.
+        exactly one intent -- and its entry says how it was planned (source,
+        llm, goal_context), which is what memory recording needs.
         """
         from ....shared.models.messages import new_plan_id
 
@@ -173,13 +169,13 @@ class PlanManagementBehaviour(CyclicBehaviour):
                 if not isinstance(plan, dict):
                     continue
                 plan_id = base_id if (index == 0 and base_id) else new_plan_id()
-                out.append((plan_id, plan.get("tree"), plan.get("intent")))
+                out.append((plan_id, plan.get("tree"), plan.get("intent"), plan))
             return out
 
         # Single-plan envelopes list their intents instead.
         intents = plan_obj.get("intents") or []
         intent = intents[0] if intents else None
-        return [(base_id or new_plan_id(), plan_obj.get("tree"), intent)]
+        return [(base_id or new_plan_id(), plan_obj.get("tree"), intent, plan_obj)]
 
     @staticmethod
     def _intent_text(intent: Any) -> str:
@@ -187,19 +183,6 @@ class PlanManagementBehaviour(CyclicBehaviour):
         if isinstance(intent, dict):
             return str(intent.get("text_intent") or intent.get("intent_text") or "")
         return str(intent or "")
-
-    @staticmethod
-    def _intent_category(intent: Any) -> Optional[str]:
-        """This plan's intent category, uppercased.
-
-        One intent, one category -- currently EXPLICIT or IMPLICIT, but the set
-        is expected to grow, so this reads whatever the intent declares rather
-        than testing against a fixed pair.
-        """
-        if not isinstance(intent, dict):
-            return None
-        category = intent.get("category")
-        return str(category).upper() if category else None
 
     @staticmethod
     def _classify_type(plan_obj: Dict[str, Any], intent: Any) -> PlanType:

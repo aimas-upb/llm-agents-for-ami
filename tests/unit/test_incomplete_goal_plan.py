@@ -249,7 +249,7 @@ class _FakeExplicit:
 class _FakeLLM:
     seen = []
 
-    def __init__(self, goals, graph, logger=None):
+    def __init__(self, goals, graph, logger=None, recall_memory=True):
         type(self).seen = [(g.goal_specificity, g.artifact_name) for g in goals]
         self.results = [{"tree": {"type": "action", "name": f"llm:{g.artifact_name}"},
                          "explanation": "llm"} for g in goals]

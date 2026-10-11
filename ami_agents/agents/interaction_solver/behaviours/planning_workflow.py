@@ -1,8 +1,7 @@
 """Per-request planning workflow: orchestrates the four sub-Behaviours.
 
 Spawned by ``GoalRequestBehaviour`` once per GOAL_REQUEST. It runs the
-context queries, decides between the signifier-only fast path and the
-LLM path, and writes the final reply onto ``self.reply_envelope``. The
+context queries, plans with the LLM, and writes the final reply onto ``self.reply_envelope``. The
 caller (GoalRequestBehaviour) sends the SPADE reply, so the workflow
 doesn't need access to the original message envelope itself.
 """
@@ -21,24 +20,16 @@ from ..utils.plan_envelope import (
     envelope_error,
     envelope_llm_plan,
     envelope_llm_plans,
-    envelope_signifier_reuse,
 )
-from ..utils.signifier_fast_path import (
-    collect_signifier_ids,
-    try_build_signifier_only_tree,
-)
-from ..utils.signifier_matching import merge_signifier_matches
 from ..utils.environment_graph import fetch_environment_graph
 from ....bt_planning import explicit_intent_handler
 from .bt_plan_generation import BTPlanGenerationBehaviour
-from .community_signifier_query import CommunitySignifierQueryBehaviour
 from .env_context_query import EnvContextQueryBehaviour
 from .implicit_goal_desire import ImplicitGoalDesireInferenceBehaviour
-from .signifier_match_query import SignifierMatchQueryBehaviour
 
 
 class PlanningWorkflowBehaviour(OneShotBehaviour):
-    """Coordinate signifier matching, fast path, and LLM planning per request."""
+    """Coordinate context gathering and LLM planning per request."""
 
     def __init__(
         self,
@@ -117,7 +108,7 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
 
         self.logger.info(demo(f"Step 0 complete: inferred={inferred_count} [{', '.join(inferred_vars) if inferred_vars else 'none'}] skipped={skipped_count} failed={failed_count}"))
 
-        # Step 0.5 — EXPLICIT intent SPARQL path (before signifier matching)
+        # Step 0.5 — EXPLICIT intent SPARQL path
         self.logger.info(demo("Step 0.5: Processing EXPLICIT intents via SPARQL path"))
         explicit_intents = [i for i in self.intents if isinstance(i, ExplicitGoalIntent)]
         implicit_intents = [i for i in self.intents if not isinstance(i, ExplicitGoalIntent)]
@@ -191,7 +182,7 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
         else:
             self.logger.debug(demo("Step 0.5: No EXPLICIT intents, skipping SPARQL path"))
 
-        # Update intent_strings to reflect implicit-only list for signifier matching
+        # Update intent_strings to the implicit-only list
         intent_strings = [i.to_query_string() for i in implicit_intents]
 
         # If no implicit intents remain and we have explicit results, build reply (early exit optimization)
@@ -209,58 +200,9 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                 self.logger.info(demo(f"PlanningWorkflow complete: all EXPLICIT intents produced deterministic BTs"))
                 return
 
-        # Step 1 — signifier matching (local + community in parallel).
-        # For intents with affected_env_vars, use v3 matching; others skip matching
-        matching_intents = [i for i in implicit_intents if i.to_query_string() in intent_strings]
-        self.logger.info(demo(f"Step 1: Signifier matching for {len(matching_intents)} intent(s) (v3={len([i for i in matching_intents if isinstance(i, ImplicitGoalIntent) and i.to_query_string() in affected_env_vars_by_intent and affected_env_vars_by_intent.get(i.to_query_string())])} with env_vars)"))
-        merged_matches = await self._gather_signifier_matches(
-            intent_strings,
-            affected_env_vars_by_intent=affected_env_vars_by_intent,
-        )
-        self.logger.debug(demo(f"Step 1: Signifier matching complete, analyzing results"))
-        self._log_signifier_search(merged_matches)
-
-        # Count results by type
-        exact_count = 0
-        hint_count = 0
-        error_count = 0
-        for payload in merged_matches.values():
-            if isinstance(payload, dict):
-                if payload.get("error"):
-                    error_count += 1
-                else:
-                    exact = payload.get("exact_matches", [])
-                    hints = payload.get("affordance_hints", [])
-                    exact_count += len(exact) if isinstance(exact, list) else 0
-                    hint_count += len(hints) if isinstance(hints, list) else 0
-        self.logger.info(demo(f"Step 1 complete: exact_matches={exact_count} affordance_hints={hint_count} errors={error_count}"))
-
-        # Step 2 — try the signifier-only fast path.
-        self.logger.info(demo(f"Step 2: Attempting signifier-only fast path"))
-        fast_tree = try_build_signifier_only_tree(merged_matches, self.intents)
-        if fast_tree is not None:
-            self.logger.info(
-                demo(
-                    "Step 2: SUCCESS - BT recovered from signifiers (no EnvExplorer context queries, no LLM)"
-                )
-            )
-            # Populate affected_env_vars back into intent objects for storage in signifiers
-            for intent_obj in self.intents:
-                if isinstance(intent_obj, ImplicitGoalIntent):
-                    intent_str = intent_obj.to_query_string()
-                    if intent_str in affected_env_vars_by_intent:
-                        intent_obj.affected_env_vars = affected_env_vars_by_intent[intent_str]
-
-            self.reply_envelope = envelope_signifier_reuse(
-                tree=fast_tree,
-                signifier_ids=collect_signifier_ids(merged_matches, self.intents),
-                intents=self.intents,
-                workspace_id=self.workspace_id,
-            )
-            self.logger.info(demo(f"PlanningWorkflow complete: signifier-only fast path succeeded"))
-            return
-        else:
-            self.logger.info(demo(f"Step 2: Fast path did not produce a tree, proceeding to LLM path"))
+        # No signifier matching here: memory is consulted by the structured-goal
+        # paths, by exact key (`utils/signifier_memory.py`). This workflow plans
+        # what those paths do not take, from the environment alone.
 
         # Step 3 — LLM path: gather context, then generate.
         self.logger.info(demo(f"Step 3: Gathering environment context from EnvExplorer (workspace_id={self.workspace_id!r})"))
@@ -335,16 +277,7 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                         )
                     )
 
-            signifier_hints_count = 0
-            if merged_matches and isinstance(merged_matches, dict):
-                for payload in merged_matches.values():
-                    if isinstance(payload, dict):
-                        exact = payload.get("exact_matches", [])
-                        hints = payload.get("affordance_hints", [])
-                        signifier_hints_count += len(exact) if isinstance(exact, list) else 0
-                        signifier_hints_count += len(hints) if isinstance(hints, list) else 0
-
-            self.logger.debug(demo(f"Step 4: {intent_label} BT planner input: affordances={len(affordances_for_planner)} env_vars={has_env_vars} signifier_hints={signifier_hints_count} filtered={affordance_filtering_applied}"))
+            self.logger.debug(demo(f"Step 4: {intent_label} BT planner input: affordances={len(affordances_for_planner)} env_vars={has_env_vars} filtered={affordance_filtering_applied}"))
 
             plan_gen = BTPlanGenerationBehaviour(
                 intent_strings=[intent_str],  # Plan single intent at a time
@@ -354,7 +287,7 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                     if isinstance(ctx.state_payload, dict)
                     else ctx.state_payload
                 ),
-                signifier_hints=merged_matches,
+                signifier_hints=None,
                 affected_env_vars=affected_env_vars_for_planner if affected_env_vars_for_planner else None,
                 logger=self.logger,
             )
@@ -409,104 +342,6 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
             workspace_id=self.workspace_id,
         )
         self.logger.info(demo(f"PlanningWorkflow complete: {len(plans_by_intent)} plan(s) generated successfully via LLM path"))
-
-    async def _gather_signifier_matches(
-        self,
-        intent_strings: List[str],
-        affected_env_vars_by_intent: Optional[Dict[str, Optional[List[Dict[str, str]]]]] = None,
-    ) -> Dict[str, Any]:
-        """Spawn local signifier behaviour and optionally community signifier behaviour.
-
-        Community signifier matching is only queried AFTER local matching if:
-        1. There is a community client available
-        2. At least one intent is an implicit goal with subtype == "implicit_intent"
-        3. Local matching found no (or weak) matches for those implicit intents
-
-        Explicit intents never trigger community queries (they are fully specified).
-        """
-        # Only pass affected_env_vars if they are populated (for v3 matching)
-        affected_env_vars_for_matching = {
-            intent_str: env_vars
-            for intent_str, env_vars in (affected_env_vars_by_intent or {}).items()
-            if env_vars is not None
-        } if affected_env_vars_by_intent else None
-
-        local_b = SignifierMatchQueryBehaviour(
-            intents=self.intents,
-            workspace_id=self.workspace_id,
-            affected_env_vars=affected_env_vars_for_matching,
-            logger=self.logger,
-        )
-        self.agent.add_behaviour(local_b)
-
-        # Wait for local matching to complete first
-        await local_b.join()
-        local_matches = local_b.matches
-
-        # Decide whether to query community based on:
-        # - Local matching results for implicit_intent subtypes
-        # - Availability of community client
-        community_b: Optional[CommunitySignifierQueryBehaviour] = None
-        implicit_intents_needing_community = []
-
-        if getattr(self.agent, "community_client", None) is not None:
-            # Check which implicit_intent subtypes had insufficient local matches
-            for intent in self.intents:
-                if isinstance(intent, ImplicitGoalIntent) and intent.subtype == "implicit_intent":
-                    intent_str = intent.to_query_string()
-                    match_data = local_matches.get(intent_str, {})
-                    exact_matches = match_data.get("exact_matches", [])
-                    # If no exact matches, consult community
-                    if not exact_matches:
-                        implicit_intents_needing_community.append(intent_str)
-
-            # Only spawn community behaviour if there are implicit intents without local matches
-            if implicit_intents_needing_community:
-                community_b = CommunitySignifierQueryBehaviour(
-                    intent_strings=implicit_intents_needing_community, logger=self.logger
-                )
-                self.agent.add_behaviour(community_b)
-                await community_b.join()
-
-        return merge_signifier_matches(
-            local_matches,
-            community_b.matches if community_b is not None else {},
-            intent_strings,
-        )
-
-    def _log_signifier_search(self, results: Dict[str, Any]) -> None:
-        """Demo-friendly per-intent summary of signifier search outcomes."""
-        for intent, payload in results.items():
-            if not isinstance(payload, dict):
-                continue
-            if payload.get("error"):
-                self.logger.info(
-                    demo(f"Signifier search failed: intent={intent!r} error={payload.get('error')}")
-                )
-                continue
-
-            exact = payload.get("exact_matches") if isinstance(payload.get("exact_matches"), list) else []
-            hints = payload.get("affordance_hints") if isinstance(payload.get("affordance_hints"), list) else []
-            total = payload.get("total_signifiers")
-            community_count = sum(
-                1 for m in exact + hints if isinstance(m, dict) and m.get("source") == "community"
-            )
-
-            if exact:
-                top_signifier = exact[0].get("signifier_id", "?") if exact else "?"
-                self.logger.info(
-                    demo(
-                        f"Signifier search: intent={intent!r} exact={len(exact)} affordance_hints={len(hints)} "
-                        f"(community={community_count}) top={top_signifier}"
-                    )
-                )
-            else:
-                self.logger.info(
-                    demo(
-                        f"Signifier search: intent={intent!r} exact=0 affordance_hints={len(hints)} "
-                        f"(community={community_count}) stored_total={total if total is not None else '?'}"
-                    )
-                )
 
     async def _get_environment_rdf_graph(self) -> Graph:
         """

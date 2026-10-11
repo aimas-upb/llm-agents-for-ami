@@ -1,104 +1,71 @@
-"""Signifier data models (CASHMERE-inspired).
+"""The signifier record: what a successful goal execution is remembered as.
 
-These models are used by the RD4 Signifier System to:
-- parse and normalize signifiers from RDF (Turtle)
-- store signifiers as JSON documents
-- support intent matching and context validation (SHACL)
+A goal is remembered under an exact key built from its structure (the agents
+build it: `ami_agents/shared/utils/goal_signifiers.py`). The record's content
+depends on the kind of goal:
+
+    explicit, incomplete,   the whole executed plan (`tree`): a goal that needed
+    incomplete_text         an LLM is replayed on an exact match, without one
+
+    ambiguous               the context the plan was made in (`context`: the
+                            affordances acting on and reading each environment
+                            variable, the properties those actions act upon, with
+                            their values at execution start) and the affordances
+                            the plan actually used (`used`) -- given back to the
+                            planner as hints on an exact match
+
+`shacl_shapes` may hold shapes over the stored context, for the SHACL context
+validation (`src/validation`), which is kept but not used for matching yet.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime, timezone
-from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
-class SignifierStatus(str, Enum):
-    """Lifecycle status for a signifier."""
-
-    ACTIVE = "active"
-    DEPRECATED = "deprecated"
+SignifierKind = Literal["explicit", "incomplete", "incomplete_text", "ambiguous"]
+SIGNIFIER_KINDS = ("explicit", "incomplete", "incomplete_text", "ambiguous")
 
 
-class ValueCondition(BaseModel):
-    """A single value constraint for a context property."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    operator: str = Field(default="equals", min_length=1)
-    value: Any = None
-    datatype: Optional[str] = None
+def key_digest(kind: str, key: Dict[str, Any]) -> str:
+    """The index of a key: the same kind and fields always give the same digest."""
+    canonical = json.dumps([kind, key], sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-class StructuredCondition(BaseModel):
-    """A structured context condition (artifact + property + constraints)."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    artifact: str = Field(default="", min_length=1)
-    property_affordance: str = Field(default="", min_length=1)
-    value_conditions: List[ValueCondition] = Field(default_factory=list)
-
-
-class IntentContext(BaseModel):
-    """Recommended context for successful affordance usage."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    nl_description: Optional[str] = None
-    structured_conditions: List[StructuredCondition] = Field(default_factory=list)
-    shacl_shapes: Optional[str] = None
-
-
-class IntentionDescription(BaseModel):
-    """Natural language + optional structured intent representation."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    nl_text: str = Field(default="", min_length=1)
-    structured: Optional[Dict[str, Any]] = None
-
-
-class Provenance(BaseModel):
-    """Provenance metadata for a signifier."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    created_by: str = Field(default="system", min_length=1)
-    source: Optional[str] = None
-
-
-class Signifier(BaseModel):
-    """Canonical signifier record stored in the RD4 memory store."""
+class GoalSignifier(BaseModel):
+    """One remembered goal execution."""
 
     model_config = ConfigDict(extra="forbid")
 
     signifier_id: str = Field(..., min_length=1)
-    version: int = Field(default=1, ge=1)
-    status: SignifierStatus = SignifierStatus.ACTIVE
+    kind: SignifierKind
+    key: Dict[str, Any]
+    key_digest: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    workspace_id: Optional[str] = None
+    intent_text: Optional[str] = None
+    # The goal as structured (GoalSpec wire dict), for reading the record back.
+    goal: Dict[str, Any] = Field(default_factory=dict)
 
-    intent: IntentionDescription
-    context: IntentContext
+    # explicit / incomplete / incomplete_text: the plan to replay.
+    tree: Optional[Dict[str, Any]] = None
 
-    affordance_uri: str = Field(..., min_length=1)
-    intent_type: Optional[str] = Field(default=None, pattern="^(EXPLICIT|IMPLICIT)$")
-    affected_env_vars: Optional[List[Dict[str, str]]] = Field(default=None)
-    provenance: Optional[Provenance] = None
+    # ambiguous: where the plan was made, and what it used.
+    context: Optional[Dict[str, Any]] = None
+    used: Optional[Dict[str, Any]] = None
+
+    # Optional SHACL shapes over the stored context (validation, not matching).
+    shacl_shapes: Optional[str] = None
+
+    def model_post_init(self, __context: Any) -> None:
+        # The digest always follows from the kind and key.
+        self.key_digest = key_digest(self.kind, self.key)
 
     def to_json_doc(self) -> Dict[str, Any]:
-        """Return a JSON-serializable dict suitable for file storage."""
-
+        """A JSON-serialisable dict, for file storage and the wire."""
         return self.model_dump(mode="json")
-
-    def get_property_keys(self) -> Set[Tuple[str, str]]:
-        """Return (artifact_uri, property_uri) keys referenced by this signifier."""
-
-        keys: Set[Tuple[str, str]] = set()
-        for condition in self.context.structured_conditions:
-            if condition.artifact and condition.property_affordance:
-                keys.add((condition.artifact, condition.property_affordance))
-        return keys
-

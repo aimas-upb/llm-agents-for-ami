@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from rdflib import Graph, SH, URIRef
 
-from src.models.signifier import Signifier
+from src.models.signifier import GoalSignifier
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class AuthoringValidator:
         logger.info(f"Authoring Validator initialized (strict={strict_mode})")
 
     def validate_signifier(
-        self, signifier: Signifier, enable_shacl_check: bool = True
+        self, signifier: GoalSignifier, enable_shacl_check: bool = True
     ) -> List[str]:
         """Validate signifier structure.
 
@@ -57,8 +57,8 @@ class AuthoringValidator:
 
         errors.extend(self._check_required_fields(signifier))
 
-        if enable_shacl_check and signifier.context.shacl_shapes:
-            errors.extend(self._check_shacl_shapes(signifier.context.shacl_shapes))
+        if enable_shacl_check and signifier.shacl_shapes:
+            errors.extend(self._check_shacl_shapes(signifier.shacl_shapes))
 
         if self.strict_mode:
             errors.extend(self._check_optional_fields(signifier))
@@ -71,34 +71,30 @@ class AuthoringValidator:
 
         return errors
 
-    def _check_required_fields(self, signifier: Signifier) -> List[str]:
-        """Check required signifier fields.
+    def _check_required_fields(self, signifier: GoalSignifier) -> List[str]:
+        """Check what every record needs, and what its kind needs.
 
-        Args:
-            signifier: The signifier to check
-
-        Returns:
-            List of error messages
+        A replayable record (explicit / incomplete) needs its plan; an
+        ambiguous one needs the context it was made in and what it used.
         """
         errors = []
 
         if not signifier.signifier_id:
             errors.append("Missing signifier_id")
+        if not signifier.key:
+            errors.append("Missing key")
 
-        if not signifier.affordance_uri:
-            errors.append("Missing affordance_uri (cashmere:signifies)")
-
-        if not signifier.intent:
-            errors.append("Missing intent (cashmere:hasIntentionDescription)")
-        elif not signifier.intent.nl_text:
-            errors.append("Missing intent.nl_text")
-
-        if not signifier.context:
-            errors.append("Missing context (cashmere:recommendsContext)")
+        if signifier.kind == "ambiguous":
+            if not signifier.context:
+                errors.append("Missing context (an ambiguous record keeps its context)")
+            if not signifier.used:
+                errors.append("Missing used affordances")
+        elif not signifier.tree:
+            errors.append("Missing tree (a replayable record keeps its plan)")
 
         return errors
 
-    def _check_optional_fields(self, signifier: Signifier) -> List[str]:
+    def _check_optional_fields(self, signifier: GoalSignifier) -> List[str]:
         """Check optional but recommended fields.
 
         Args:
@@ -109,13 +105,11 @@ class AuthoringValidator:
         """
         warnings = []
 
-        if not signifier.context.shacl_shapes and not signifier.context.structured_conditions:
-            warnings.append(
-                "No SHACL shapes or structured conditions defined"
-            )
+        if signifier.kind == "ambiguous" and not signifier.shacl_shapes:
+            warnings.append("No SHACL shapes over the stored context")
 
-        if not signifier.provenance:
-            warnings.append("Missing provenance information")
+        if not signifier.intent_text:
+            warnings.append("Missing intent_text")
 
         return warnings
 
@@ -199,7 +193,7 @@ class AuthoringValidator:
         return errors
 
     def validate_and_raise(
-        self, signifier: Signifier, enable_shacl_check: bool = True
+        self, signifier: GoalSignifier, enable_shacl_check: bool = True
     ) -> None:
         """Validate signifier and raise exception if invalid.
 

@@ -433,16 +433,12 @@ class TestPlanManagement:
         assert len(agent.requests.get("req-1").plan_ids) == 2
 
     @pytest.mark.asyncio
-    async def test_each_plan_carries_its_own_intent_category(self):
-        """One plan, one intent, one category — mixed requests do not blur.
-
-        `envelope_llm_plans` puts each atomic intent on its own plan entry, so
-        an explicit goal and an implicit one in the same utterance are recorded
-        with the context each actually warrants.
-        """
+    async def test_each_plan_carries_its_own_entry_and_goal(self):
+        """One plan, one entry: how it was planned (source, llm, goal_context)
+        and its own goal structure go to recording -- mixed requests do not blur."""
         agent = make_agent()
         agent.requests.open("req-1", "thread-a",
-                            "turn on lamp_3 and make the room comfortable")
+                            "turn on lamp_3 and the bathroom is so damp")
         manager = PlanManagementBehaviour()
         manager.agent = agent
         manager.send = AsyncMock()
@@ -452,33 +448,26 @@ class TestPlanManagement:
             MessageType.PLAN_EXECUTE_REQUEST.value if k == "type" else None)
         msg.body = json.dumps({
             "plan_id": "plan-1", "request_id": "req-1", "thread": "thread-a",
-            "goal_description": "turn on lamp_3 and make the room comfortable",
+            "goal_description": "turn on lamp_3 and the bathroom is so damp",
             "workspace_id": "ws-1",
             "plan": {"plans": [
-                {"tree": TREE, "intent": {"category": "explicit",
-                                          "text_intent": "turn on lamp_3"}},
-                {"tree": TREE, "intent": {"category": "implicit",
-                                          "text_intent": "make it comfortable"}},
+                {"tree": TREE, "source": "explicit_deterministic",
+                 "intent": {"text_intent": "turn on lamp_3"}},
+                {"tree": TREE, "source": "ambiguous_llm", "llm": True,
+                 "goal_context": {"variables": []},
+                 "intent": {"text_intent": "the bathroom is so damp"}},
             ]}})
 
         await manager._accept(msg)
 
         options = [call[0][0]._recording_options
                    for call in agent.add_behaviour.call_args_list]
-        assert [o["intent_type"] for o in options] == ["EXPLICIT", "IMPLICIT"]
-        # And each carries only its own intent.
-        assert options[0]["intents"][0]["text_intent"] == "turn on lamp_3"
-        assert options[1]["intents"][0]["text_intent"] == "make it comfortable"
+        assert [o["entry"]["source"] for o in options] == ["explicit_deterministic",
+                                                           "ambiguous_llm"]
+        assert options[1]["entry"]["llm"] is True
+        assert "tree" not in options[1]["entry"]
+        assert options[0]["intent"]["text_intent"] == "turn on lamp_3"
         assert all(o["workspace_id"] == "ws-1" for o in options)
-
-    def test_intent_category_reads_whatever_the_intent_declares(self):
-        # The category set is expected to grow beyond explicit/implicit.
-        assert PlanManagementBehaviour._intent_category(
-            {"category": "explicit"}) == "EXPLICIT"
-        assert PlanManagementBehaviour._intent_category(
-            {"category": "conditional"}) == "CONDITIONAL"
-        assert PlanManagementBehaviour._intent_category({}) is None
-        assert PlanManagementBehaviour._intent_category(None) is None
 
     @pytest.mark.asyncio
     async def test_a_maintenance_plan_gets_the_maintenance_behaviour(self):

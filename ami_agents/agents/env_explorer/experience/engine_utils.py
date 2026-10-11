@@ -1,162 +1,81 @@
-import asyncio
+"""The EnvExplorer's handle on the memory engine.
+
+The engine (`ami_agents/shared/memory`) is a separate component -- also served
+on its own as the community memory -- that this agent manages: it opens the
+engine's `MemoryStore` once and keeps the SHACL tools ready alongside it.
+
+    ensure_experience_engine_ready(agent)   open the store (idempotent, locked)
+    list_experience_engine_signifiers(...)  the stored records, newest first
+
+The SHACL validator and context builder are set up but not used for matching:
+matching is by exact key. They are kept for exact value checks of an
+ambiguous goal's stored context later.
+"""
+
 from typing import Any, Dict, Optional
 
 from ....shared.utils.demo_log import demo
-from ..utils.matching_utils import workspace_match
+
+# Fallback for `experience_engine.signifier_limit` in agents.yaml.
+DEFAULT_SIGNIFIER_LIMIT = 10000
 
 
 async def ensure_experience_engine_ready(agent_instance) -> bool:
-    """
-    Ensure Experience engine is ready for the agent.
-
-    Args:
-        agent_instance: The EnvExplorerAgent instance
-
-    Returns:
-        True if Experience engine is ready, False if initialization failed
-    """
+    """Open the memory store and the SHACL tools, once. True when ready."""
     if agent_instance._experience_engine_ready:
         return True
 
     async with agent_instance._experience_engine_lock:
         if agent_instance._experience_engine_ready:
             return True
-
         try:
             from ....shared import memory as experience_engine_memory
 
             experience_engine_memory.ensure_engine_on_path()
 
-            from src.matching.registry import IntentMatcherRegistry  # type: ignore[import-not-found]
-            from src.storage.registry import SignifierRegistry  # type: ignore[import-not-found]
+            from src.storage.memory_store import MemoryStore  # type: ignore[import-not-found]
             from src.validation.context_builder import ContextGraphBuilder  # type: ignore[import-not-found]
             from src.validation.shacl_validator import SHACLValidator  # type: ignore[import-not-found]
 
             cfg = get_experience_engine_config(agent_instance.config)
-
-            storage_dir = cfg.get("storage_dir")
-            if not storage_dir:
-                storage_dir = str(experience_engine_memory.get_default_storage_dir())
-
-            enable_authoring_validation = bool(cfg.get("enable_authoring_validation", False))
+            storage_dir = (cfg.get("storage_dir")
+                           or str(experience_engine_memory.get_default_storage_dir()))
 
             agent_instance._experience_engine_storage_dir = str(storage_dir)
-            agent_instance._experience_engine_registry = SignifierRegistry(
-                storage_dir=agent_instance._experience_engine_storage_dir,
-                enable_authoring_validation=enable_authoring_validation,
-            )
-
-            # Use configured default matcher version from agent config
-            preferred_version = str(agent_instance._experience_engine_default_matcher_version or "v0")
-            matcher_registry = IntentMatcherRegistry(default_version=preferred_version)
-            agent_instance._experience_engine_matcher_registry = matcher_registry
-            agent_instance._experience_engine_default_matcher_version = matcher_registry.get_default_version()
-
-            try:
-                configured_min_similarity = cfg.get(
-                    "min_similarity",
-                    cfg.get(
-                        "default_min_similarity",
-                        getattr(agent_instance, "_experience_engine_default_min_similarity", 0.5),
-                    ),
-                )
-                agent_instance._experience_engine_default_min_similarity = float(configured_min_similarity)
-            except Exception:
-                agent_instance._experience_engine_default_min_similarity = float(
-                    getattr(agent_instance, "_experience_engine_default_min_similarity", 0.5)
-                )
-
+            agent_instance._experience_engine_store = MemoryStore(storage_dir)
             agent_instance._experience_engine_context_builder = ContextGraphBuilder()
-            agent_instance._experience_engine_shacl_validator = SHACLValidator(enable_caching=bool(cfg.get("enable_shacl_cache", False)))
+            agent_instance._experience_engine_shacl_validator = SHACLValidator(
+                enable_caching=str(cfg.get("enable_shacl_cache", "false")).lower() == "true")
 
             agent_instance._experience_engine_ready = True
-            agent_instance.logger.info(
-                demo(f"Experience engine ready (storage_dir={agent_instance._experience_engine_storage_dir}, matcher_default={agent_instance._experience_engine_default_matcher_version})")
-            )
+            agent_instance.logger.info(demo(
+                f"Memory engine ready (storage_dir={storage_dir}, "
+                f"records={len(agent_instance._experience_engine_store)})"))
             return True
-
         except Exception as e:
-            agent_instance.logger.error(f"Failed to initialize Experience engine: {e}", exc_info=True)
+            agent_instance.logger.error(f"Failed to initialize the memory engine: {e}",
+                                        exc_info=True)
             return False
 
 
 def get_experience_engine_config(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """
-    Get experience engine configuration with defaults.
-
-    Args:
-        config: Agent configuration dictionary
-
-    Returns:
-        Experience engine configuration dictionary
-    """
+    """The `experience_engine` section of the agent's config."""
     return (config or {}).get("experience_engine", {}) or {}
 
 
-def build_experience_engine_context_snapshot(agent_instance, workspace_id: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
-    """
-    Build Experience engine context snapshot from agent's current state.
-
-    Args:
-        agent_instance: The EnvExplorerAgent instance
-        workspace_id: Optional workspace ID to filter artifacts
-
-    Returns:
-        Context dictionary mapping artifact URIs to their current state
-    """
-    context: Dict[str, Dict[str, Any]] = {}
-
-    for artifact in (agent_instance.artifacts or {}).values():
-        if workspace_id and not workspace_match(getattr(artifact, "workspace_id", None), workspace_id):
-            continue
-
-        artifact_uri = str(getattr(artifact, "artifact_id", "") or "")
-        if not artifact_uri:
-            continue
-
-        state = getattr(artifact, "current_state", {}) or {}
-        if not isinstance(state, dict):
-            continue
-
-        # ContextGraphBuilder expects: {artifact_uri: {property_uri: value}}
-        context[artifact_uri] = {str(k): v for k, v in state.items()}
-
-    return context
-
-
-async def list_experience_engine_signifiers(agent_instance, experience_engine_defaults: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    List all stored signifiers.
-
-    Args:
-        agent_instance: The EnvExplorerAgent instance
-        experience_engine_defaults: Default Experience engine configuration values
-
-    Returns:
-        Dictionary containing signifiers list or error information
-    """
-    if not agent_instance._experience_engine_ready:
-        await ensure_experience_engine_ready(agent_instance)
-
-    if not agent_instance._experience_engine_registry:
+async def list_experience_engine_signifiers(agent_instance) -> Dict[str, Any]:
+    """The stored records, newest first, up to the configured limit."""
+    if not await ensure_experience_engine_ready(agent_instance):
         return {"ok": False, "error": "experience_engine_not_ready"}
-
     try:
-        signifier_limit_raw = agent_instance.config.get("experience_engine", {}).get("signifier_limit", experience_engine_defaults["signifier_limit"])
-        signifier_limit = int(signifier_limit_raw)
-        signifiers_raw = agent_instance._experience_engine_registry.list_signifiers(
-            limit=signifier_limit
-        )
-        signifiers_out = []
-        for s in signifiers_raw:
-            signifiers_out.append({
-                "signifier_id": s.signifier_id,
-                "version": s.version,
-                "status": getattr(s.status, "value", str(s.status)),
-                "intent": getattr(s.intent, "nl_text", ""),
-                "affordance_uri": s.affordance_uri,
-            })
-        return {"total": len(signifiers_out), "signifiers": signifiers_out}
+        limit = int(get_experience_engine_config(agent_instance.config).get(
+            "signifier_limit", DEFAULT_SIGNIFIER_LIMIT))
+        records = agent_instance._experience_engine_store.list(limit=limit)
+        return {"total": len(records),
+                "signifiers": [{"signifier_id": r.signifier_id, "kind": r.kind,
+                                "intent_text": r.intent_text, "key": r.key,
+                                "created_at": r.created_at.isoformat()}
+                               for r in records]}
     except Exception as e:
         agent_instance.logger.error(f"Error listing signifiers: {e}", exc_info=True)
         return {"ok": False, "error": "exception", "detail": str(e)}

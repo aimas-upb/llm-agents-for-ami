@@ -14,79 +14,52 @@ def client():
     return CommunitySignifierClient(api_url="http://localhost:9000")
 
 
+def _session(status=200, body=None, error=None):
+    """An aiohttp session whose POST answers `status` / `body`, or raises."""
+    mock_resp = AsyncMock()
+    mock_resp.status = status
+    mock_resp.json = AsyncMock(return_value=body)
+    mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_resp.__aexit__ = AsyncMock(return_value=False)
+    mock_session = AsyncMock()
+    mock_session.post = (MagicMock(side_effect=error) if error
+                         else MagicMock(return_value=mock_resp))
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+    return mock_session
+
+
+KEY = {"goal_specificity": "explicit", "artifact_name": "ac"}
+
+
 class TestMatchSignifiers:
-    """Tests for CommunitySignifierClient.match_signifiers()."""
+    """match_signifiers: the record under an exact {kind, key}, or None."""
 
     @pytest.mark.asyncio
-    async def test_match_success(self, client):
-        mock_resp = AsyncMock()
-        mock_resp.status = 200
-        mock_resp.json = AsyncMock(return_value={
-            "matches": [
-                {"signifier_id": "sig-001", "affordance_uri": "http://test/turn_on", "intent_similarity": 0.9}
-            ],
-            "final_matches": ["sig-001"],
-        })
-        mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
-        mock_resp.__aexit__ = AsyncMock(return_value=False)
-
-        mock_session = AsyncMock()
-        mock_session.post = MagicMock(return_value=mock_resp)
-        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_session.__aexit__ = AsyncMock(return_value=False)
-
-        with patch("aiohttp.ClientSession", return_value=mock_session):
-            result = await client.match_signifiers("increase light")
-
-        assert "matches" in result
-        assert len(result["matches"]) == 1
+    async def test_a_match_is_returned(self, client):
+        record = {"signifier_id": "sig-001", "kind": "explicit", "tree": {"type": "action"}}
+        session = _session(body={"match": record})
+        with patch("aiohttp.ClientSession", return_value=session):
+            result = await client.match_signifiers("explicit", KEY)
+        assert result == record
+        _, kwargs = session.post.call_args
+        assert kwargs["json"] == {"kind": "explicit", "key": KEY}
 
     @pytest.mark.asyncio
-    async def test_match_empty(self, client):
-        mock_resp = AsyncMock()
-        mock_resp.status = 200
-        mock_resp.json = AsyncMock(return_value={"matches": [], "final_matches": []})
-        mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
-        mock_resp.__aexit__ = AsyncMock(return_value=False)
-
-        mock_session = AsyncMock()
-        mock_session.post = MagicMock(return_value=mock_resp)
-        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_session.__aexit__ = AsyncMock(return_value=False)
-
-        with patch("aiohttp.ClientSession", return_value=mock_session):
-            result = await client.match_signifiers("unknown intent")
-
-        assert result.get("matches", []) == []
+    async def test_no_match_is_none(self, client):
+        with patch("aiohttp.ClientSession", return_value=_session(body={"match": None})):
+            assert await client.match_signifiers("explicit", KEY) is None
 
     @pytest.mark.asyncio
-    async def test_match_server_error(self, client):
-        mock_resp = AsyncMock()
-        mock_resp.status = 500
-        mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
-        mock_resp.__aexit__ = AsyncMock(return_value=False)
-
-        mock_session = AsyncMock()
-        mock_session.post = MagicMock(return_value=mock_resp)
-        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_session.__aexit__ = AsyncMock(return_value=False)
-
-        with patch("aiohttp.ClientSession", return_value=mock_session):
-            result = await client.match_signifiers("test")
-
-        assert result == {}
+    async def test_a_server_error_is_none(self, client):
+        with patch("aiohttp.ClientSession", return_value=_session(status=500)):
+            assert await client.match_signifiers("explicit", KEY) is None
 
     @pytest.mark.asyncio
-    async def test_match_connection_error(self, client):
-        mock_session = AsyncMock()
-        mock_session.post = MagicMock(side_effect=ClientError("Connection refused"))
-        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_session.__aexit__ = AsyncMock(return_value=False)
-
-        with patch("aiohttp.ClientSession", return_value=mock_session):
-            result = await client.match_signifiers("test")
-
-        assert result == {}
+    async def test_a_connection_error_is_none(self, client):
+        with patch("aiohttp.ClientSession",
+                   return_value=_session(error=ClientError("Connection refused"))):
+            assert await client.match_signifiers("explicit", KEY) is None
 
 
 class TestPublishSignifier:

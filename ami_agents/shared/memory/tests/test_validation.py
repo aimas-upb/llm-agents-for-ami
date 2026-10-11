@@ -7,12 +7,7 @@ and authoring validation.
 import pytest
 from rdflib import Graph
 
-from src.models.signifier import (
-    IntentContext,
-    IntentionDescription,
-    Provenance,
-    Signifier,
-)
+from src.models.signifier import GoalSignifier
 from src.validation import (
     AuthoringValidationError,
     AuthoringValidator,
@@ -215,82 +210,43 @@ class TestSHACLValidator:
 
 
 class TestAuthoringValidator:
-    """Tests for Authoring Validator."""
+    """The authoring validator, over the goal signifier record."""
+
+    TREE = {"type": "action", "action_url": "http://h/a", "parameters": {"value": 1}}
+
+    def _explicit(self, **fields):
+        base = {"signifier_id": "sig-1", "kind": "explicit",
+                "key": {"artifact_name": "ac"}, "intent_text": "cool it", "tree": self.TREE}
+        return GoalSignifier(**{**base, **fields})
 
     def test_validate_valid_signifier(self):
-        """Test validating a valid signifier."""
         validator = AuthoringValidator(strict_mode=False)
-
-        signifier = Signifier(
-            signifier_id="test-signifier",
-            version=1,
-            intent=IntentionDescription(nl_text="test intent"),
-            context=IntentContext(),
-            affordance_uri="http://example.org/affordance",
-            provenance=Provenance(created_by="test"),
-        )
-
-        errors = validator.validate_signifier(signifier, enable_shacl_check=False)
-
-        assert len(errors) == 0
+        assert validator.validate_signifier(self._explicit(), enable_shacl_check=False) == []
 
     def test_validate_missing_fields(self):
-        """Test validating signifier with missing required fields."""
         validator = AuthoringValidator(strict_mode=False)
-
-        signifier = Signifier.model_construct(
-            signifier_id="",
-            version=1,
-            intent=IntentionDescription(nl_text="test"),
-            context=IntentContext(),
-            affordance_uri="",
-            provenance=Provenance(created_by="test"),
-        )
-
-        errors = validator.validate_signifier(signifier, enable_shacl_check=False)
-
-        assert len(errors) > 0
-        assert any("signifier_id" in err for err in errors)
-        assert any("affordance_uri" in err for err in errors)
+        errors = validator.validate_signifier(self._explicit(tree=None),
+                                              enable_shacl_check=False)
+        assert any("tree" in err for err in errors)
+        ambiguous = GoalSignifier(signifier_id="sig-2", kind="ambiguous", key={"v": 1})
+        errors = validator.validate_signifier(ambiguous, enable_shacl_check=False)
+        assert any("context" in err for err in errors)
+        assert any("used" in err for err in errors)
 
     def test_validate_invalid_shacl_shapes(self):
-        """Test validating signifier with invalid SHACL shapes."""
         validator = AuthoringValidator(strict_mode=False)
-
         invalid_shapes = """
         @prefix sh: <http://www.w3.org/ns/shacl#> .
         invalid turtle syntax
         """
-
-        signifier = Signifier(
-            signifier_id="test-signifier",
-            version=1,
-            intent=IntentionDescription(nl_text="test intent"),
-            context=IntentContext(shacl_shapes=invalid_shapes),
-            affordance_uri="http://example.org/affordance",
-            provenance=Provenance(created_by="test"),
-        )
-
-        errors = validator.validate_signifier(signifier, enable_shacl_check=True)
-
-        assert len(errors) > 0
+        errors = validator.validate_signifier(self._explicit(shacl_shapes=invalid_shapes),
+                                              enable_shacl_check=True)
         assert any("parse" in err.lower() for err in errors)
 
     def test_validate_and_raise_strict_mode(self):
-        """Test strict mode raises exception on validation failure."""
         validator = AuthoringValidator(strict_mode=True)
-
-        signifier = Signifier.model_construct(
-            signifier_id="",
-            version=1,
-            intent=IntentionDescription(nl_text="test"),
-            context=IntentContext(),
-            affordance_uri="http://example.org/affordance",
-            provenance=Provenance(created_by="test"),
-        )
-
         with pytest.raises(AuthoringValidationError):
-            validator.validate_signifier(signifier)
+            validator.validate_signifier(self._explicit(tree=None))
 
 
 class TestIntegration:

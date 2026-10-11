@@ -647,44 +647,34 @@ class TestEqualityGateDetection:
 
 
 class TestHintFormatting:
-    def test_signifier_hints_show_refs(self):
+    def test_signifier_hints_show_what_the_past_plan_used_as_refs(self):
         index = build_affordance_index(AFFORDANCES)
         url_to_ref = build_url_to_ref(index)
         hints = format_signifier_hints(
-            {
-                "turn on the light": {
-                    "final_matches": ["sig-1"],
-                    "matches": [
-                        {
-                            "signifier_id": "sig-1",
-                            "affordance_uri": LIGHT_ACTION["target"],
-                            "intent_similarity": 0.97,
-                            "payload": {"brightness": 100},
-                        }
-                    ],
-                }
-            },
+            {"intent_text": "it is too dark", "signifier_id": "sig-1",
+             "used": {"actions": [{"url": LIGHT_ACTION["target"], "artifact": "light308",
+                                   "action": "setBrightness",
+                                   "parameters": {"brightness": 100}}],
+                      "properties": [{"url": LIGHT_PROPERTY["target"],
+                                      "artifact": "light308", "property": "brightness"}]}},
             url_to_ref=url_to_ref,
         )
-        assert "Recommended affordance_id: light308/setBrightness" in hints
+        assert "- action light308/setBrightness (light308.setBrightness) " \
+               "with parameters {'brightness': 100}" in hints
+        assert "- read light308/brightness (light308.brightness)" in hints
+        assert '"it is too dark"' in hints
 
     def test_signifier_hints_fall_back_to_url(self):
         hints = format_signifier_hints(
-            {
-                "x": {
-                    "final_matches": ["sig-1"],
-                    "matches": [
-                        {
-                            "signifier_id": "sig-1",
-                            "affordance_uri": "http://elsewhere/unknown",
-                            "intent_similarity": 0.9,
-                        }
-                    ],
-                }
-            },
+            {"used": {"actions": [{"url": "http://elsewhere/unknown", "artifact": "a",
+                                   "action": "b"}]}},
             url_to_ref={},
         )
-        assert "Recommended affordance_id: http://elsewhere/unknown" in hints
+        assert "- action http://elsewhere/unknown (a.b)" in hints
+
+    def test_nothing_used_is_no_hint(self):
+        assert format_signifier_hints({"used": {"actions": [], "properties": []}}) == ""
+        assert format_signifier_hints(None) == ""
 
     def test_observable_hints_map_urls_to_refs(self):
         index = build_affordance_index(AFFORDANCES)

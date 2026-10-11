@@ -22,9 +22,9 @@ class CommunitySignifierClient:
     The community API is the Experience Engine signifier API (shared/memory/src/api/)
     running as a shared service accessible by all environments.
 
-    Endpoints used:
-    - POST /matching/match - match signifiers by intent
-    - POST /signifiers - create/publish a signifier
+    Endpoints used (the memory engine's API, `shared/memory/src/api/routes/signifiers.py`):
+    - POST /matching/match - the record under an exact {kind, key}
+    - POST /signifiers - publish a goal signifier
     - GET /signifiers - list all signifiers
     """
 
@@ -44,55 +44,22 @@ class CommunitySignifierClient:
 
         self.timeout = aiohttp.ClientTimeout(total=timeout)
 
-    async def match_signifiers(
-        self,
-        intent: str,
-        k: int = 5,
-        min_similarity: float = None,
-    ) -> dict:
-        """
-        Query community for signifier matches.
-
-        Args:
-            intent: Natural language intent to match
-            k: Maximum number of matches to return
-            min_similarity: Minimum similarity threshold
-
-        Returns:
-            Dict with match results (matches, final_matches, etc.)
-        """
-        # Use config value if min_similarity not explicitly provided
-        if min_similarity is None:
-            min_similarity = self.config.get("experience_engine", {}).get("min_similarity", 0.5)
-
+    async def match_signifiers(self, kind: str, key: dict) -> Optional[dict]:
+        """The community's record under exactly this kind and key, or None
+        (also on any failure: the community is a fallback, never required)."""
         try:
             async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                async with session.post(
-                    f"{self.api_url}/matching/match",
-                    json={
-                        "intent": intent,
-                        "k": k,
-                        "min_similarity": min_similarity,
-                    },
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        logger.debug(
-                            f"Community match for '{intent}': "
-                            f"{len(data.get('matches', []))} matches"
-                        )
-                        return data
-                    else:
-                        logger.warning(
-                            f"Community match failed: HTTP {resp.status}"
-                        )
-                        return {}
-        except aiohttp.ClientError as e:
-            logger.warning(f"Community match request failed: {e}")
-            return {}
+                async with session.post(f"{self.api_url}/matching/match",
+                                        json={"kind": kind, "key": key}) as resp:
+                    if resp.status != 200:
+                        logger.warning(f"Community match failed: HTTP {resp.status}")
+                        return None
+                    data = await resp.json()
+                    match = data.get("match") if isinstance(data, dict) else None
+                    return match if isinstance(match, dict) else None
         except Exception as e:
-            logger.warning(f"Unexpected error in community match: {e}")
-            return {}
+            logger.warning(f"Community match request failed: {e}")
+            return None
 
     async def publish_signifier(self, signifier_data: dict) -> bool:
         """
@@ -112,8 +79,8 @@ class CommunitySignifierClient:
                 ) as resp:
                     if resp.status in (200, 201):
                         logger.info(
-                            f"Published signifier to community: "
-                            f"{signifier_data.get('intent', 'unknown')}"
+                            f"Published {signifier_data.get('kind', '?')} signifier to "
+                            f"community: {signifier_data.get('intent_text', 'unknown')}"
                         )
                         return True
                     else:
@@ -139,7 +106,8 @@ class CommunitySignifierClient:
             async with aiohttp.ClientSession(timeout=self.timeout) as session:
                 async with session.get(f"{self.api_url}/signifiers") as resp:
                     if resp.status == 200:
-                        return await resp.json()
+                        data = await resp.json()
+                        return data.get("signifiers", []) if isinstance(data, dict) else []
                     return []
         except Exception as e:
             logger.warning(f"Community list request failed: {e}")

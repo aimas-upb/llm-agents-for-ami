@@ -1,10 +1,18 @@
-"""Embedded RD4 Signifier Engine (vendored).
+"""The memory engine (vendored): remembered goal executions, matched by exact key.
 
-The engine code is structured as a standalone package rooted at
-`ami_agents/shared/memory/`, with a top-level import namespace of `src`.
+A separate component: the EnvExplorer manages one embedded instance, and the
+same code is served on its own as the community memory (`src/api`). The code is
+a standalone package rooted at `ami_agents/shared/memory/`, with a top-level
+import namespace of `src`:
 
-To use it embedded in this repo, add this directory to `sys.path` so that
-imports like `from src.storage.registry import SignifierRegistry` work.
+    src/models/signifier.py        GoalSignifier, the record
+    src/storage/memory_store.py    MemoryStore: record / match / list
+    src/validation/                SHACL context validation (kept, not used for
+                                   matching yet)
+
+To use it embedded in this repo, add this directory to `sys.path` (see
+`ensure_engine_on_path`) so that imports like
+`from src.storage.memory_store import MemoryStore` work.
 """
 
 from __future__ import annotations

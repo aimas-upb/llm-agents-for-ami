@@ -45,11 +45,6 @@ from .utils.actuation_context import (
 
 
 # Configuration constants as fallbacks
-_EXPERIENCE_ENGINE_DEFAULTS = {
-    "default_matcher_version": "v2",
-    "default_min_similarity": 0.5,
-    "signifier_limit": 10000,
-}
 _TIMEOUTS = {
     "message_reception": 5.0,
 }
@@ -111,14 +106,14 @@ class EnvExplorerAgent(Agent, IAgent):
         self._experience_engine_ready = False
         self._experience_engine_lock = asyncio.Lock()
         self._experience_engine_storage_dir: Optional[str] = None
-        self._experience_engine_registry = None
-        self._experience_engine_matcher_registry = None
+        # The memory engine (`shared/memory`), opened by ensure_experience_engine_ready.
+        self._experience_engine_store = None
         self._experience_engine_context_builder = None
         self._experience_engine_shacl_validator = None
-        self._experience_engine_default_matcher_version = self.config.get("experience_engine", {}).get("default_matcher_version", _EXPERIENCE_ENGINE_DEFAULTS["default_matcher_version"])
-        min_similarity_raw = self.config.get("experience_engine", {}).get("default_min_similarity", _EXPERIENCE_ENGINE_DEFAULTS["default_min_similarity"])
-        self._experience_engine_default_min_similarity = float(min_similarity_raw)
-        self._experience_engine_shacl_validation_enabled = self.config.get("experience_engine", {}).get("shacl_validation_enabled", "false").lower() == "true"
+        # SHACL context validation is kept but not used for matching yet.
+        self._experience_engine_shacl_validation_enabled = str(
+            self.config.get("experience_engine", {}).get("shacl_validation_enabled", "false")
+        ).lower() == "true"
 
         # Scoping thresholds for the goal parser's actuation-only context
         actuation_config = self.config.get("actuation_context", {})

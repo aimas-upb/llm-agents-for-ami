@@ -173,8 +173,11 @@ def combine(results: List[Dict[str, Any]], chosen: List[Candidate]) -> Dict[str,
     explanation. None planned: impossible (or the first error), with every
     device's reason.
     """
+    # Whether a model made any device's plan: then the whole entry is worth
+    # remembering once it has run.
+    llm = {"llm": True} if any(r.get("llm") for r in results) else {}
     if len(results) == 1:
-        return {**results[0], "source": SOURCE}
+        return {**results[0], "source": SOURCE, **llm}
     planned = [(c, r) for c, r in zip(chosen, results) if r.get("tree")]
     failed = [(c, r) for c, r in zip(chosen, results) if not r.get("tree")]
     reasons = "; ".join(f"{c.title}: {r.get('explanation', '')}" for c, r in failed)
@@ -190,5 +193,5 @@ def combine(results: List[Dict[str, Any]], chosen: List[Candidate]) -> Dict[str,
     return {"tree": {"type": "sequence", "name": "every matching device",
                      "children": [{"type": "ignore_failure", "name": c.title,
                                    "children": [r["tree"]]} for c, r in planned]},
-            "explanation": explanation, "source": SOURCE}
+            "explanation": explanation, "source": SOURCE, **llm}
 

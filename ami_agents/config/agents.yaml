@@ -51,10 +51,8 @@ env_explorer:
       temperature: 0.0
       max_tokens: 8192
 
-  # Experience Engine — signifier registry, matcher, optional SHACL validator.
+  # Memory engine — exact-key goal signifiers; SHACL validator kept, unused for matching.
   experience_engine:
-    default_matcher_version: "${SIGNIFIER_MATCHER_VERSION:-v3}"
-    default_min_similarity: "${SIGNIFIER_MIN_SIMILARITY:-0.5}"
     signifier_limit: "${SIGNIFIER_LIMIT:-10000}"
     shacl_validation_enabled: "${SHACL_VALIDATION_ENABLED:-true}"
     enable_shacl_cache: "${SHACL_CACHE_ENABLED:-false}"

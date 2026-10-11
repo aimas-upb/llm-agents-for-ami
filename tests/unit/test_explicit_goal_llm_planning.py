@@ -77,7 +77,9 @@ class TestLLMPlanning:
                 "parameters": {"value": 3}}
         agent = _agent({"tree": tree, "explanation": "cool"})
         (entry,) = await _run_llm(graph, [_goal()], agent)
-        assert entry == {"tree": tree, "explanation": "cool", "source": "explicit_llm"}
+        # `llm`: made by a model, so remembered once it has run.
+        assert entry == {"tree": tree, "explanation": "cool", "source": "explicit_llm",
+                         "llm": True}
 
         kwargs = agent.explicit_bt_planner.generate_bt.await_args.kwargs
         assert kwargs["client"] == "small-client" and kwargs["model"] == "gpt-5-nano"

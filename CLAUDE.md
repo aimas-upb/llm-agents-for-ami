@@ -48,27 +48,26 @@ ami_agents/
 │   │   ├── env_explorer_agent.py     # Slim Agent class
 │   │   ├── behaviors/                # One Behaviour per request type (cap, state, sig_match, ...)
 │   │   ├── utils/                    # Pure helpers
-│   │   └── experience/               # Experience-Engine bootstrap + matching helpers
+│   │   └── experience/               # Memory-engine bootstrap (MemoryStore, SHACL tools)
 │   └── interaction_solver/
 │       ├── interaction_solver_agent.py  # Slim Agent class — RPC wrapper + state
 │       ├── behaviours/               # GoalRequest, EnvironmentReady, PlanningWorkflow,
-│       │                             # EnvContextQuery, SignifierMatchQuery,
-│       │                             # CommunitySignifierQuery, BTPlanGeneration
-│       └── utils/                    # plan_envelope, signifier_fast_path, llm_client, ...
+│       │                             # Explicit/Incomplete/AmbiguousGoalPlanning,
+│       │                             # EnvContextQuery, BTPlanGeneration
+│       └── utils/                    # plan_envelope, signifier_memory, llm_client, ...
 ├── bt_planning/
 │   ├── planning/bt_planner.py    # AsyncBTPlanner — the LLM-backed BT generator
 │   ├── execution/ir_executor.py  # Tick-based BT executor
-│   ├── nodes/                    # BT node implementations (HTTP, action, etc.)
-│   └── signifier_bridge.py       # Build BT from stored signifiers (fast-path)
+│   └── nodes/                    # BT node implementations (HTTP, action, etc.)
 ├── environment/
 │   ├── connection/hmas_client.py
 │   └── integration/integration_engine.py   # YggdrasilIntegration
 └── shared/
     ├── models/                  # Message, plan, environment models
     ├── protocols/               # IAgent, ILLMService
-    ├── memory/                  # Signifier registry + matchers (v0/v1/v2)
+    ├── memory/                  # Memory engine: GoalSignifier, MemoryStore (exact keys), SHACL
     ├── community/               # Cross-environment signifier-sharing client
-    └── utils/                   # logger, spade_rpc, demo_log, config_resolver
+    └── utils/                   # logger, spade_rpc, demo_log, goal_signifiers, ...
 ```
 
 ## 3. Conventions you MUST follow
@@ -157,23 +156,29 @@ There are two LLM clients (UA and ISA), both built by their respective
 If you add a new agent that needs an LLM, copy this pattern; do NOT
 re-implement client construction inline.
 
-### 3.7 Intent semantics (EXPLICIT / IMPLICIT)
+### 3.7 Memory (signifiers)
 
-The user message is classified as EXPLICIT (user named exact artifact
-IDs) or IMPLICIT (inferred from environment context). The classification
-is threaded:
+Goals are remembered under an exact key built by
+`shared/utils/goal_signifiers.py:signifier_key` (kinds: `explicit`,
+`incomplete`, `incomplete_text`, `ambiguous`). The same function is used by
+the UA (recording) and the ISA (recall), so the two cannot drift.
+
+Only successful plans are recorded:
+- explicit / incomplete: only when an LLM made the plan (`llm: true` on the
+  plan entry); the whole tree is stored and replayed on an exact hit;
+- ambiguous: always; the context snapshot (taken before the plan's first
+  tick) and the affordances the plan used are stored, and given to the
+  planner as signifier hints on an exact hit;
+- never a plan replayed from memory (`source: "memory"`).
 
 ```
-UA NLU prompt         -> Intent + intent_type
-UA -> ISA GOAL_REQUEST {intents, intent_type, workspace_id}
-ISA -> EnvExplorer SIGNIFIER_MATCH_REQUEST {intent, intent_type, query_structured_intent}
-EnvExplorer signifier matcher v2 -> EXPLICIT skips context validation;
-                                     IMPLICIT enforces context validation
-BT planner format_signifier_hints -> labels matches >= 0.95 as "exact"
+UA      PlanExecutionBehaviour.on_start -> snapshot (ambiguous entries)
+UA      on success -> SIGNIFIER_RECORD_EXECUTION_REQUEST {signifier} -> EnvExplorer
+ISA     before an LLM call -> SIGNIFIER_MATCH_REQUEST {kind, key} -> EnvExplorer,
+        then the community memory on a miss
 ```
 
-If you touch any link in this chain, preserve the `intent_type` and
-`structured_intent` payload — do not silently drop them.
+If you touch the key fields, change them only in `signifier_key`.
 
 ## 4. Workflows
 
@@ -240,9 +245,9 @@ conda run -n ami-agents python tests/manual_test_full_flow_plan.py --sequence 3 
    human asks.
 6. **Never force-push to `master`, `emas2026`, or `aamas2026demo`.**
 7. **Never call `print()` inside `ami_agents/`.** Use the logger.
-8. **Never drop `intent_type` / `query_structured_intent` from the
-   GOAL_REQUEST → SIGNIFIER_MATCH_REQUEST chain.** It breaks the
-   EMAS demo's semantic-modelling story (§3.7).
+8. **Never build a signifier key outside `signifier_key`**
+   (`shared/utils/goal_signifiers.py`). Recording and recall must use the
+   same key (§3.7).
 9. **Never launch a long-running or paid job yourself.** Print the exact
    command line and let the human run it. See §5.1.
 

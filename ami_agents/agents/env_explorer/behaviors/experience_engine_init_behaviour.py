@@ -22,8 +22,8 @@ from ..experience.engine_utils import ensure_experience_engine_ready
 
 
 class InitializeExperienceEngineBehaviour(OneShotBehaviour):
-    """Initialise the Experience Engine (SignifierRegistry, IntentMatcherRegistry,
-    ContextGraphBuilder, SHACLValidator) once during agent startup."""
+    """Initialise the memory engine (MemoryStore, ContextGraphBuilder,
+    SHACLValidator) once during agent startup."""
 
     async def run(self) -> None:
         self.agent.logger.info(demo("Initialising Experience Engine..."))
@@ -32,7 +32,7 @@ class InitializeExperienceEngineBehaviour(OneShotBehaviour):
             self.agent.logger.info(
                 demo(
                     f"Experience Engine startup complete "
-                    f"(matcher_default={self.agent._experience_engine_default_matcher_version}, storage_dir={self.agent._experience_engine_storage_dir})"
+                    f"(storage_dir={self.agent._experience_engine_storage_dir})"
                 )
             )
         else:

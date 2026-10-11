@@ -78,7 +78,8 @@ The request expresses a desired change of the environment — a complaint, sensa
   - **property_class**: its class (e.g. homeont:RelativeHumidity), as listed as its `class`;
   - **property_quantity**: its quantity kind;
   - **property_measurement_unit**: its unit;
-  - **property_sensed_space**: {"space_class": the room class, "space_name": the room's name} of the environment it belongs to.
+  - **property_sensed_space**: {"space_class": the room class, "space_name": the room's name} of the environment it belongs to;
+  - **property_change_direction**: "increase" or "decrease" — the way the user wants this variable to go ("so damp" → relative humidity "decrease"; "too dark" → illuminance "increase"; "freezing in here" → air temperature "increase").
   List one entry per variable and room the request implies.
 """
 
@@ -203,7 +204,8 @@ For an ambiguous goal:
  "implied_environment_vars": [{"property_name": string, "property_class": string | null,
    "property_quantity": string | null,
    "property_measurement_unit": string | null,
-   "property_sensed_space": {"space_class": string | null, "space_name": string | null}}]}
+   "property_sensed_space": {"space_class": string | null, "space_name": string | null},
+   "property_change_direction": "increase" | "decrease"}]}
 """
 
 DEPENDENCY_OUTPUT = """\

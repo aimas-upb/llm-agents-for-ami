@@ -8,6 +8,8 @@ specific capability context -- the one device it names -- by the small model
 configured under `planning.explicit_planning`.
 
 Per goal:
+    0. recall(agent, goal)                    a plan an LLM made for exactly this
+                                              goal before: replayed, no model call
     1. build_specific_context(graph, goal)    the device's affordances + a brief
     2. set:    explicit_bt_planner.generate_bt(...)   the same planner as the
                                               workflow's, with the small client
@@ -17,7 +19,8 @@ Per goal:
                                               recipe is checked against the TDs
                                               and built into the read -> compute
                                               -> set tree (`modify_goal_plan`)
-    3. a plan entry: a tree, impossible, or an error
+    3. a plan entry: a tree, impossible, or an error. An entry the model made
+       carries `llm: True` -- the UserAssistant remembers it once it has run.
 """
 
 from __future__ import annotations
@@ -34,6 +37,7 @@ from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
 from ..prompts import MODIFY_RECIPE_PROMPT
 from ..utils.modify_goal_plan import describe, modify_tree, recipe_from_answer
+from ..utils.signifier_memory import recall, replay_entry
 from ..utils.specific_capability_context import SpecificCapabilityContext, build_specific_context
 
 SOURCE = "explicit_llm"
@@ -43,10 +47,13 @@ class ExplicitGoalLLMPlanningBehaviour(OneShotBehaviour):
     """Plan each goal against its own device; ``results`` holds one plan entry
     per goal, in order (a tree, impossible, or an error -- never None)."""
 
-    def __init__(self, goals: List[GoalSpec], graph: Graph, logger=None) -> None:
+    def __init__(self, goals: List[GoalSpec], graph: Graph, logger=None,
+                 recall_memory: bool = True) -> None:
         super().__init__()
         self.goals = goals
         self.graph = graph
+        # False when the caller has already asked memory for these goals.
+        self.recall_memory = recall_memory
         self.logger = logger or LoggerFactory.get_logger("InteractionSolver")
         self.results: List[Dict[str, Any]] = []
 
@@ -56,6 +63,12 @@ class ExplicitGoalLLMPlanningBehaviour(OneShotBehaviour):
 
     async def _plan(self, goal: GoalSpec) -> Dict[str, Any]:
         where = f"{goal.artifact_name}.{goal.affordance_name}"
+
+        # 0. A plan a model already made for exactly this goal: replayed.
+        if self.recall_memory:
+            remembered = replay_entry(await recall(self.agent, goal, self.logger) or {})
+            if remembered is not None:
+                return remembered
 
         # 1. The context: the goal's device(s), or nothing to plan against.
         context = build_specific_context(self.graph, goal)
@@ -102,7 +115,8 @@ class ExplicitGoalLLMPlanningBehaviour(OneShotBehaviour):
             return {"tree": None, "error": "explicit_planning_failed", "source": SOURCE,
                     "explanation": explanation or "The planner returned no tree."}
         self.logger.info(demo(f"Explicit goal {where}: planned by {cfg.model}"))
-        return {"tree": result["tree"], "explanation": explanation, "source": SOURCE}
+        return {"tree": result["tree"], "explanation": explanation, "source": SOURCE,
+                "llm": True}
 
     async def _plan_modify(self, goal: GoalSpec,
                            context: SpecificCapabilityContext) -> Dict[str, Any]:
@@ -147,7 +161,7 @@ class ExplicitGoalLLMPlanningBehaviour(OneShotBehaviour):
                     "explanation": f"The model's recipe cannot be used: {recipe}."}
         self.logger.info(demo(f"Explicit goal {where}: recipe from {cfg.model}"))
         return {"tree": modify_tree(recipe), "explanation": describe(recipe),
-                "source": SOURCE}
+                "source": SOURCE, "llm": True}
 
 
 def _is_reasoning(model: str) -> bool:

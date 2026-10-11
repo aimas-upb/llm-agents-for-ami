@@ -68,6 +68,14 @@ class TestGoalSpec:
         assert GoalSpec.from_dict({"quantifier": "any"}).quantifier == "one"
         assert GoalSpec.from_dict({"quantifier": "each"}).quantifier is None
 
+    def test_an_ambiguous_variable_carries_its_change_direction(self):
+        data = {"goal_specificity": "ambiguous", "implied_environment_vars": [
+            {"property_name": "relative_humidity", "property_change_direction": "Decrease"},
+            {"property_name": "illuminance", "property_change_direction": "brighter"}]}
+        damp, dark = GoalSpec.from_dict(data).to_wire_dict()["implied_environment_vars"]
+        assert damp["property_change_direction"] == "decrease"
+        assert "property_change_direction" not in dark      # not increase/decrease
+
     def test_ambiguous_carries_environment_vars_not_device_slots(self):
         goal = GoalSpec.from_dict({
             "goal_specificity": "ambiguous", "goal_kind": "achievement",

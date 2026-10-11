@@ -89,6 +89,10 @@ class SpecificCapabilityContext:
     # they affect, in the planner's "Observable Property Effects" format
     # (`bt_planning/planning/prompts.py format_observable_property_hints`).
     observable_property_hints: Optional[Dict[str, Any]] = None
+    # For an ambiguous goal: per variable, the actions acting on it and the
+    # properties read (those the actions act upon, and the readings) -- what
+    # the UserAssistant snapshots before the plan runs, and remembers after.
+    goal_context: Optional[Dict[str, Any]] = None
 
 
 # --------------------------------------------------------------------------
@@ -471,15 +475,17 @@ SELECT DISTINCT ?artifact ?prop WHERE {
 }
 """
 
-# Told to the planner with every ambiguous goal: the direction is its call.
+# Told to the planner with every ambiguous goal. The structurer gives the wanted
+# direction per variable; when it could not, the planner decides it.
 DIRECTION_INSTRUCTIONS = (
-    "For each variable above, decide from the request whether the user wants it to "
-    "increase or decrease (\"so damp\" -> humidity decrease; \"too dark\" -> "
-    "illuminance increase). Then choose actions, and their values, that move it that "
-    "way. Most actions only say they influence the variable: decide from the action "
-    "and its input which value moves it the wanted way (turn a dehumidifier on; lower "
-    "a cooling setpoint). Read the current value first when the value to set depends "
-    "on it. If nothing can move a variable the wanted way, answer impossible.")
+    "Move each variable above the wanted way. Where no direction is given, decide "
+    "from the request whether the user wants it to increase or decrease (\"so damp\" "
+    "-> humidity decrease; \"too dark\" -> illuminance increase). Then choose actions, "
+    "and their values, that move it that way. Most actions only say they influence "
+    "the variable: decide from the action and its input which value moves it the "
+    "wanted way (turn a dehumidifier on; lower a cooling setpoint). Read the current "
+    "value first when the value to set depends on it. If nothing can move a variable "
+    "the wanted way, answer impossible.")
 
 
 def _direction(graph: Graph, actuation: Any) -> str:
@@ -515,7 +521,9 @@ def ambiguous_brief(goal: GoalSpec) -> str:
     lines = ["- environment variables the request is about:"]
     for var in goal.implied_environment_vars:
         room = var.space_name or var.space_class or "?"
-        lines.append(f"  - \"{var.property_name}\" ({var.property_class}) in {room}")
+        wanted = (f" -- wanted: {var.property_change_direction}"
+                  if var.property_change_direction else "")
+        lines.append(f"  - \"{var.property_name}\" ({var.property_class}) in {room}{wanted}")
     lines.append(f"- {DIRECTION_INSTRUCTIONS}")
     return "\n".join(lines)
 
@@ -531,6 +539,7 @@ def _ambiguous_achievement(graph: Graph, goal: GoalSpec) -> Optional[SpecificCap
     affordances: Dict[str, Dict[str, Any]] = {}       # by target URL, deduped
     artifacts: List[str] = []
     results: List[Dict[str, Any]] = []
+    recorded: List[Dict[str, Any]] = []               # the goal_context, per variable
 
     def add(affordance: Dict[str, Any], artifact: Any) -> None:
         affordances.setdefault(affordance["target"], affordance)
@@ -546,6 +555,7 @@ def _ambiguous_achievement(graph: Graph, goal: GoalSpec) -> Optional[SpecificCap
             # 1. The actions acting on this room's variable, with their stated
             #    direction, and the properties they act upon (current values).
             actions = []
+            properties: List[Dict[str, Any]] = []
             for row in graph.query(_AFFECTING_QUERY, initBindings=bindings):
                 action = action_affordance(graph, row.artifact, row.action)
                 add(action, row.artifact)
@@ -554,7 +564,11 @@ def _ambiguous_achievement(graph: Graph, goal: GoalSpec) -> Optional[SpecificCap
                                 "action_target": action["target"],
                                 "direction": _direction(graph, row.actuation)})
                 for prop in graph.objects(row.action, SAREF.actsUpon):
-                    add(property_affordance(graph, row.artifact, prop), row.artifact)
+                    acted_upon = property_affordance(graph, row.artifact, prop)
+                    add(acted_upon, row.artifact)
+                    properties.append({"artifact": acted_upon["artifact_name"],
+                                       "property": acted_upon["name"],
+                                       "url": acted_upon["target"], "role": "acted_upon"})
             if not actions:
                 continue
 
@@ -566,6 +580,9 @@ def _ambiguous_achievement(graph: Graph, goal: GoalSpec) -> Optional[SpecificCap
                 reading = property_affordance(graph, row.artifact, row.prop)
                 add(reading, row.artifact)
                 readings.append(reading["target"])
+                properties.append({"artifact": reading["artifact_name"],
+                                   "property": reading["name"],
+                                   "url": reading["target"], "role": "reading"})
 
             results.append({
                 "property_uri": (f"\"{_title(graph, var) or implied.property_name}\" of "
@@ -573,6 +590,14 @@ def _ambiguous_achievement(graph: Graph, goal: GoalSpec) -> Optional[SpecificCap
                 "actions": sorted(actions, key=lambda a: (a["artifact_title"] or "",
                                                           a["action_name"] or "")),
                 "readable_property_urls": sorted(set(readings)),
+            })
+            recorded.append({
+                "variable": _title(graph, var) or implied.property_name,
+                "property_class": implied.property_class, "room": room,
+                "actions": [{"artifact": a["artifact_title"], "action": a["action_name"],
+                             "url": a["action_target"], "direction": a["direction"]}
+                            for a in actions],
+                "properties": properties,
             })
 
     if not results:
@@ -582,6 +607,7 @@ def _ambiguous_achievement(graph: Graph, goal: GoalSpec) -> Optional[SpecificCap
         artifacts=artifacts,
         goal_brief=ambiguous_brief(goal),
         observable_property_hints={"results": results},
+        goal_context={"variables": recorded},
     )
 
 
