@@ -75,7 +75,7 @@ CASES = ["feasible", "infeasible"]
 INTENT_TYPES = ["GOAL_REQUEST", "ENV_STATE_REQUEST", "ENV_CAPABILITIES_REQUEST"]
 QUALIFIERS = [
     "explicit", "incomplete", "ambiguous",
-    "logical_dependency", "temporal_dependency",
+    "logical_dependency", "temporal_dependency", "sequential_dependency",
     "achievement", "maintenance",
 ]
 

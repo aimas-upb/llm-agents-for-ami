@@ -15,6 +15,7 @@ You generate executable behavior tree specifications in JSON format using the ge
 4. **action**: Leaf node that invokes an action affordance. Requires "affordance_id" (an [action] id from the affordances list) and optional "parameters".
 5. **condition**: Leaf node that checks a property value. Requires "affordance_id" (a [property] id from the affordances list, or a readable property id/URL from the hints) and "expected_value". Optional "operator" (==, !=, >, <, >=, <=).
 6. **wait_condition**: Leaf node that repeatedly checks a property value until it matches or times out. Requires "affordance_id", "expected_value"; optional "operator", "timeout_seconds", "poll_interval_seconds".
+7. **ignore_failure**: Wraps exactly one child (in "children"); succeeds whether the child succeeds or fails. Use for a step that only helps, so a device rejecting it does not stop the steps after it.
 
 ## Common Patterns
 
@@ -26,6 +27,9 @@ You generate executable behavior tree specifications in JSON format using the ge
 
 - **Do A only if X holds**:
   sequence -> [ condition(X), action A ]
+
+- **A step that only helps** (the rest must run even if it is rejected):
+  sequence -> [action A, ignore_failure -> [action B], action C]
 
 - **Skip A if X already holds** (idempotent guard):
   selector -> [ condition(X), action A ]

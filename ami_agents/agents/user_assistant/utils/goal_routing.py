@@ -2,7 +2,8 @@
 
 Decided from the segmenter's qualifiers alone:
 
-    simple       achievement, no logical_dependency / temporal_dependency
+    simple       achievement, no logical_dependency / temporal_dependency /
+                 sequential_dependency
     dependency   anything else -- a dependency label, or maintenance
 
 and the context follows from what the structure will have to name:
@@ -21,7 +22,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-DEPENDENCY_LABELS = frozenset({"logical_dependency", "temporal_dependency"})
+# `sequential_dependency`: several instructions to one device, carried out one
+# after another -- the dependency structuring makes one goal per instruction.
+DEPENDENCY_LABELS = frozenset({"logical_dependency", "temporal_dependency",
+                               "sequential_dependency"})
 SPECIFICITY_LABELS = frozenset({"explicit", "incomplete", "ambiguous"})
 KIND_LABELS = frozenset({"achievement", "maintenance"})
 

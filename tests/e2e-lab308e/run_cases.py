@@ -1245,8 +1245,8 @@ class Lab308eHarness:
             "notify_on_discovery_complete": True,
             "notify_agents": [self.solver_jid],
         }
-        config.setdefault("llm", {}).setdefault("providers", {}).setdefault("openai", {})
-        config["llm"]["providers"]["openai"].update(
+        config.setdefault("default_llm", {}).setdefault("providers", {}).setdefault("openai", {})
+        config["default_llm"]["providers"]["openai"].update(
             {
                 "api_key": os.getenv("OPENAI_API_KEY"),
                 "base_url": base_url,
@@ -1254,12 +1254,12 @@ class Lab308eHarness:
             }
         )
         if self._requires_default_temperature(model, base_url):
-            config["llm"]["providers"]["openai"]["temperature"] = 1.0
+            config["default_llm"]["providers"]["openai"]["temperature"] = 1.0
             config.setdefault("interaction_solver", {}).setdefault("planning", {}).setdefault("llm_planning", {})
             config["interaction_solver"]["planning"]["llm_planning"]["temperature"] = 1.0
             llm_timeout = float(os.getenv("AMI_LLM_TIMEOUT", "180"))
-            config.setdefault("llm", {}).setdefault("retry", {})
-            config["llm"]["retry"]["timeout"] = llm_timeout
+            config.setdefault("default_llm", {}).setdefault("retry", {})
+            config["default_llm"]["retry"]["timeout"] = llm_timeout
             config.setdefault("timeouts", {}).setdefault("llm", {})
             config["timeouts"]["llm"]["default"] = llm_timeout
             config["timeouts"]["llm"]["reasoning"] = max(
@@ -1267,7 +1267,7 @@ class Lab308eHarness:
                 llm_timeout,
             )
         if reasoning_effort:
-            config["llm"]["providers"]["openai"]["reasoning_effort"] = reasoning_effort
+            config["default_llm"]["providers"]["openai"]["reasoning_effort"] = reasoning_effort
         config.setdefault("planning", {})
         config["planning"]["timeout"] = float(os.getenv("AMI_PLANNING_TIMEOUT", "180"))
         bt_max_ticks = int(os.getenv("BT_MAX_TICKS_USER_ASSISTANT", "240"))

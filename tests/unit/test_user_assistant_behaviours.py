@@ -186,12 +186,12 @@ class TestConversationStateFlow:
 
     def test_goal_flow_phases(self):
         """Verify the expected phase transitions for a goal request."""
-        from ami_agents.shared.models.intents import ImplicitGoalIntent
+        from ami_agents.shared.models.goal_structure import GoalStructure
         conv = ConversationState()
         assert conv.phase == ConversationPhase.IDLE
 
         conv.phase = ConversationPhase.EXTRACTING_INTENTS
-        conv.intents = [ImplicitGoalIntent(text_intent="turn on the light", reason="User wants light on")]
+        conv.intents = [GoalStructure(intent_text="turn on the light")]
         assert conv.phase == ConversationPhase.EXTRACTING_INTENTS
 
         conv.phase = ConversationPhase.AWAITING_PLAN
@@ -215,13 +215,13 @@ class TestConversationStateFlow:
 
     def test_reject_flow(self):
         """Verify that rejecting a plan clears state properly."""
-        from ami_agents.shared.models.intents import ImplicitGoalIntent
+        from ami_agents.shared.models.goal_structure import GoalStructure
         conv = ConversationState(
             phase=ConversationPhase.AWAITING_CONFIRMATION,
             plan_json='{"tree": {}}',
             plan_hash="abc",
             plan_summary="A plan",
-            intents=[ImplicitGoalIntent(text_intent="turn on the light", reason="User wants light on")],
+            intents=[GoalStructure(intent_text="turn on the light")],
         )
         conv.clear_plan()
         conv.phase = ConversationPhase.IDLE

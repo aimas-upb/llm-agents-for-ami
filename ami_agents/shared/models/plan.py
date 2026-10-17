@@ -12,6 +12,7 @@ class PlanType(Enum):
     """Types of plans in the system."""
     IMMEDIATE = "immediate"  # One-time execution
     MAINTENANCE = "maintenance"  # Persistent, triggered goals
+    DEPENDENCY = "dependency"  # Goals with conditions / timing: runs until it concludes
 
 
 class PlanStatus(Enum):

@@ -38,7 +38,7 @@ def build_llm_client(config: Dict[str, Any]) -> LLMClientConfig:
 
     Raises ``ValueError`` if no API key is available (via config or env var).
     """
-    llm_root = config.get("llm", {}) or {}
+    llm_root = config.get("default_llm", {}) or {}
     provider_name = llm_root.get("default_provider", "openai")
     provider_cfg = (llm_root.get("providers", {}) or {}).get(provider_name, {}) or {}
 
@@ -50,7 +50,7 @@ def build_llm_client(config: Dict[str, Any]) -> LLMClientConfig:
     if not api_key:
         raise ValueError(
             "Missing OpenAI API key. Set OPENAI_API_KEY or "
-            "llm.providers.openai.api_key in agents.yaml."
+            "default_llm.providers.openai.api_key in agents.yaml."
         )
 
     model = str(provider_cfg.get("model") or "gpt-4")
@@ -144,12 +144,10 @@ def build_behaviour_llm_client(
             "Missing OpenAI API key. Set OPENAI_API_KEY env var."
         )
 
-    # Get behaviour-specific config, fallback to global defaults
+    # Behaviour settings from the agent's own `llm`, fallback to the shared `default_llm`
     agent_llm = config.get("llm", {}) or {}
-    behaviour_cfg = (agent_llm.get(behaviour_key) or {}) if agent_llm else {}
-
-    global_llm = config.get("llm", {}) or {}
-    llm_root = config.get("llm", {}) or {}
+    behaviour_cfg = agent_llm.get(behaviour_key) or {}
+    llm_root = config.get("default_llm", {}) or {}
 
     model = str(behaviour_cfg.get("model") or llm_root.get("default_model") or "gpt-4o-mini")
     base_url = "https://api.openai.com/v1"

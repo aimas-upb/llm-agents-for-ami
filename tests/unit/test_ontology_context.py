@@ -71,7 +71,7 @@ class TestSections:
         assert len(list(_descendants(devices))) == 5 + 20 + 6
         assert len(list(_descendants(properties["homeont:DeviceCapabilityProperty"]))) == 19
         assert len(list(_descendants(properties["homeont:DeviceStateProperty"]))) == 47 + 1
-        assert len(list(_descendants(properties["homeont:ActuatableDeviceProperty"]))) == 93 + 5
+        assert len(list(_descendants(properties["homeont:ActuatableDeviceProperty"]))) == 93 + 5 + 4   # + OperationalState and its 3 appliance leaves
         assert len(list(_descendants(properties["sosa:ObservableProperty"]))) == 10
         assert len(list(_descendants(
             context["environment_variables"]["sosa:ObservableProperty"]))) == 8

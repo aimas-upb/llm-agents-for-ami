@@ -31,6 +31,14 @@ from .affordance_nodes import (
     WaitPropertyConditionNode,
 )
 from .compute_node import BlackboardComputeNode, COMPUTE_OPS
+from .dependency_nodes import (
+    COMBINERS,
+    OPERATORS,
+    ClockTimer,
+    CompareBlackboardKeys,
+    StampTime,
+    WaitUntilTime,
+)
 
 # A compiler turns a single (child) spec dict into a runnable py_trees node.
 ChildCompiler = Callable[[dict], py_trees.behaviour.Behaviour]
@@ -110,13 +118,18 @@ def _name(spec: dict) -> str:
 
 
 def _compile_sequence(spec, compile_child):
+    # `memory` (default True): resume at the running child; False re-checks the
+    # earlier children every tick.
     children = [compile_child(c) for c in spec.get("children", [])]
-    return py_trees.composites.Sequence(name=_name(spec), memory=True, children=children)
+    return py_trees.composites.Sequence(name=_name(spec), memory=bool(spec.get("memory", True)),
+                                        children=children)
 
 
 def _compile_selector(spec, compile_child):
+    # `memory` (default False): re-try the earlier children every tick.
     children = [compile_child(c) for c in spec.get("children", [])]
-    return py_trees.composites.Selector(name=_name(spec), memory=False, children=children)
+    return py_trees.composites.Selector(name=_name(spec), memory=bool(spec.get("memory", False)),
+                                        children=children)
 
 
 def _compile_parallel(spec, compile_child):
@@ -124,7 +137,10 @@ def _compile_parallel(spec, compile_child):
     if spec.get("policy") == "success_on_one":
         policy = py_trees.common.ParallelPolicy.SuccessOnOne()
     else:
-        policy = py_trees.common.ParallelPolicy.SuccessOnAll()
+        # `synchronise`: a child that has succeeded is not ticked again while
+        # the others finish.
+        policy = py_trees.common.ParallelPolicy.SuccessOnAll(
+            synchronise=bool(spec.get("synchronise", False)))
     return py_trees.composites.Parallel(name=_name(spec), policy=policy, children=children)
 
 
@@ -341,5 +357,152 @@ register_node_type("wait_condition", compile=_compile_wait_condition,
 register_node_type("compute", compile=_compile_compute, validate=_validate_compute)
 register_node_type("settle", compile=_compile_settle, validate=_validate_settle)
 register_node_type("read", compile=_compile_read, validate=_validate_read)
+
+# ---------------------------------------------------------------------------
+# Dependency-plan types (`interaction_solver/utils/dependency_compiler.py`).
+# Each compiles to a py_trees built-in, or to one of the few nodes py_trees
+# lacks (`dependency_nodes.py`). Decorators take their one child in
+# `children`, like composites, so every tree walker still finds it. Operators
+# travel by name: "eq ne gt ge lt le" and "and_ or_".
+# ---------------------------------------------------------------------------
+
+def _expressions(spec):
+    return [py_trees.common.ComparisonExpression(c["key"], c.get("value"), OPERATORS[c["op"]])
+            for c in spec["checks"]]
+
+
+def _compile_check(spec, compile_child):
+    """SUCCESS / FAILURE now: one key, or several combined with and_ / or_."""
+    expressions = _expressions(spec)
+    if len(expressions) == 1:
+        return py_trees.behaviours.CheckBlackboardVariableValue(
+            name=_name(spec), check=expressions[0])
+    return py_trees.behaviours.CheckBlackboardVariableValues(
+        name=_name(spec), checks=expressions,
+        operator=COMBINERS[spec.get("combine", "and_")])
+
+
+def _compile_wait_for(spec, compile_child):
+    """RUNNING until the check holds (never FAILURE)."""
+    expressions = _expressions(spec)
+    if len(expressions) == 1:
+        return py_trees.behaviours.WaitForBlackboardVariableValue(
+            name=_name(spec), check=expressions[0])
+    return py_trees.decorators.Condition(
+        name=_name(spec), status=py_trees.common.Status.SUCCESS,
+        child=_compile_check(spec, compile_child))
+
+
+def _compile_compare(spec, compile_child):
+    return CompareBlackboardKeys(_name(spec), spec["key1"], spec["key2"],
+                                 OPERATORS[spec["op"]])
+
+
+def _only_child(spec, compile_child):
+    (child,) = spec["children"]
+    return compile_child(child)
+
+
+def _compile_await(spec, compile_child):
+    """Turn any check into a wait: RUNNING until the child succeeds."""
+    return py_trees.decorators.Condition(name=_name(spec), status=py_trees.common.Status.SUCCESS,
+                                         child=_only_child(spec, compile_child))
+
+
+def _compile_repeat(spec, compile_child):
+    """Re-run the child for ever; ends only when the child fails (or is stopped)."""
+    return py_trees.decorators.Repeat(name=_name(spec), num_success=-1,
+                                      child=_only_child(spec, compile_child))
+
+
+def _compile_inverter(spec, compile_child):
+    return py_trees.decorators.Inverter(name=_name(spec),
+                                        child=_only_child(spec, compile_child))
+
+
+def _compile_running(spec, compile_child):
+    return py_trees.behaviours.Running(name=_name(spec))
+
+
+def _compile_set_variable(spec, compile_child):
+    return py_trees.behaviours.SetBlackboardVariable(
+        name=_name(spec), variable_name=spec["key"], variable_value=spec.get("value"),
+        overwrite=True)
+
+
+def _compile_timer(spec, compile_child):
+    return ClockTimer(_name(spec), spec["seconds"])
+
+
+def _compile_wait_until(spec, compile_child):
+    return WaitUntilTime(_name(spec), spec["time_of_day"])
+
+
+def _compile_stamp(spec, compile_child):
+    return StampTime(_name(spec), spec["key"])
+
+
+def _validate_checks(spec, path, validate_child):
+    checks = spec.get("checks")
+    if not isinstance(checks, list) or not checks:
+        return [f"{path}: needs a non-empty 'checks' list"]
+    errors = [f"{path}.checks[{i}]: needs 'key' and an 'op' in {sorted(OPERATORS)}"
+              for i, c in enumerate(checks)
+              if not isinstance(c, dict) or not c.get("key") or c.get("op") not in OPERATORS]
+    if len(checks) > 1 and spec.get("combine", "and_") not in COMBINERS:
+        errors.append(f"{path}: 'combine' must be one of {sorted(COMBINERS)}")
+    return errors
+
+
+def _validate_compare(spec, path, validate_child):
+    if not spec.get("key1") or not spec.get("key2") or spec.get("op") not in OPERATORS:
+        return [f"{path}: compare needs 'key1', 'key2' and an 'op' in {sorted(OPERATORS)}"]
+    return []
+
+
+def _validate_one_child(spec, path, validate_child):
+    children = spec.get("children")
+    if not isinstance(children, list) or len(children) != 1:
+        return [f"{path}: needs exactly one entry in 'children'"]
+    return validate_child(children[0], f"{path}.children[0]")
+
+
+def _validate_nothing(spec, path, validate_child):
+    return []
+
+
+def _validate_key(spec, path, validate_child):
+    return [] if spec.get("key") else [f"{path}: needs a blackboard 'key'"]
+
+
+def _validate_timer(spec, path, validate_child):
+    seconds = spec.get("seconds")
+    if not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds < 0:
+        return [f"{path}: timer needs 'seconds' >= 0"]
+    return []
+
+
+def _validate_wait_until(spec, path, validate_child):
+    try:
+        parts = [int(p) for p in str(spec.get("time_of_day")).split(":")]
+        ok = len(parts) in (2, 3) and 0 <= parts[0] < 24 and 0 <= parts[1] < 60
+    except ValueError:
+        ok = False
+    return [] if ok else [f"{path}: wait_until needs 'time_of_day' as HH:MM[:SS]"]
+
+
+for _type, _compile, _validate in (
+        ("check", _compile_check, _validate_checks),
+        ("wait_for", _compile_wait_for, _validate_checks),
+        ("compare", _compile_compare, _validate_compare),
+        ("await", _compile_await, _validate_one_child),
+        ("repeat", _compile_repeat, _validate_one_child),
+        ("inverter", _compile_inverter, _validate_one_child),
+        ("running", _compile_running, _validate_nothing),
+        ("set_variable", _compile_set_variable, _validate_key),
+        ("timer", _compile_timer, _validate_timer),
+        ("wait_until", _compile_wait_until, _validate_wait_until),
+        ("stamp", _compile_stamp, _validate_key)):
+    register_node_type(_type, compile=_compile, validate=_validate)
 register_node_type("ignore_failure", compile=_compile_ignore_failure,
                    validate=_validate_ignore_failure)

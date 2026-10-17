@@ -56,6 +56,22 @@ ISA  before an LLM call -> SIGNIFIER_MATCH_REQUEST {kind, key} -> EnvExplorer,
 
 Change key fields only in `signifier_key`.
 
+## Comments — COMMENT CODE BLOCKS (MUST follow)
+
+Code that is not commented by block is not finished. For every file you create
+and every function you add or edit (tests included):
+- a module docstring with the module's purpose and flow (one concrete example
+  where the flow is not obvious);
+- a docstring on every function: what it returns, in which cases, and why;
+- a short comment heading every major block inside a function, numbered when
+  the blocks are steps; a function over ~10 lines with no block comments is
+  not done;
+- `# -- name ----` separators between groups of functions;
+- comments say *why*, not what the code already says.
+
+Write them with the code, and re-check every touched function before calling
+the change done.
+
 ## Style / commits
 
 - Imperative-mood commit messages: `Refactor X into ...`,
@@ -77,6 +93,7 @@ Change key fields only in `signifier_key`.
 6. Use `--no-verify` on commits.
 7. Build a signifier key anywhere but `signifier_key`.
 8. Launch a long-running or paid job yourself — hand over the command.
+9. Leave a function you wrote or edited without its docstring and block comments.
 
 ## Long-running and paid jobs — hand over the command
 

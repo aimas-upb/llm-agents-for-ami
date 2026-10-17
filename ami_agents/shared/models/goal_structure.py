@@ -175,7 +175,14 @@ def _env_vars(value: Any) -> List[EnvironmentVar]:
 @dataclass
 class GoalTiming:
     """When a goal starts, relative to time or to other goals, and -- if the
-    user bounded it by time -- when it ends."""
+    user bounded it by time -- when it ends.
+
+    `starts` / `ends` (or a termination predicate) hold the description the
+    plan executes. When the user ALSO stated a clock time for a start or an end
+    described relative to an anchor ("at 5:48 PM, which is 23 minutes before
+    washer 1 finishes"), that clock time is kept as written in
+    `stated_start_time_text` / `stated_end_time_text`, so the planner can check
+    that the two name the same moment."""
 
     starts: Optional[str] = None
     time_text: Optional[str] = None
@@ -184,6 +191,8 @@ class GoalTiming:
     ref: Optional[str] = None
     ends_kind: Optional[str] = None
     ends_text: Optional[str] = None
+    stated_start_time_text: Optional[str] = None
+    stated_end_time_text: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Any) -> Optional["GoalTiming"]:
@@ -199,6 +208,8 @@ class GoalTiming:
             ref=_text(data.get("ref")),
             ends_kind=_choice(ends.get("kind"), END_KINDS),
             ends_text=_text(ends.get("text")),
+            stated_start_time_text=_text(data.get("stated_start_time_text")),
+            stated_end_time_text=_text(data.get("stated_end_time_text")),
         )
 
     def to_wire_dict(self) -> Dict[str, Any]:
@@ -208,6 +219,8 @@ class GoalTiming:
             "offset_text": self.offset_text,
             "ref_goal": self.ref_goal,
             "ref": self.ref,
+            "stated_start_time_text": self.stated_start_time_text,
+            "stated_end_time_text": self.stated_end_time_text,
         }, keep=("starts",))
         if self.ends_kind:
             out["ends"] = {"kind": self.ends_kind, "text": self.ends_text}
@@ -286,9 +299,6 @@ class GoalSpec:
         out: Dict[str, Any] = {
             "goal_specificity": self.goal_specificity,
             "goal_kind": self.goal_kind,
-            # Dependencies are stated on the request's predicates and timing,
-            # never inside a goal.
-            "goal_dependency_structure": None,
             "intent_text": self.intent_text,
         }
         if self.goal_specificity == "ambiguous":

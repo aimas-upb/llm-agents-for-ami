@@ -8,7 +8,7 @@ generator:
   table: attribute_map
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-08-29T16:29:56.494141+00:00'
+  generated_at_utc: '2026-10-14T19:50:08.680185+00:00'
 rows:
 - key: '6.0'
   yaml_path: OnOff.OnOff
@@ -1721,8 +1721,8 @@ rows:
     attribute_name: OperationalState
     type: OperationalStateEnum
   writable: false
-  affordance: observable
-  mechanism: read
+  affordance: actuatable
+  mechanism: command
   role: affordance
   sosa_role: device_state
   quantity: null

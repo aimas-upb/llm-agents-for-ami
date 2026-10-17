@@ -1,0 +1,9 @@
+# The agents' own models (agents.yaml defaults).
+name: default
+segmentation:  {model: gpt-5-nano, reasoning_effort: low}
+structuring:   {model: gpt-5-nano, reasoning_effort: low}
+planning:
+  explicit:    {model: gpt-5-nano, reasoning_effort: low}
+  general:     {model: gpt-5-nano, reasoning_effort: medium}
+response:      {model: gpt-5-nano, reasoning_effort: low}
+judge:         {model: gpt-4o-mini, temperature: 0.5}

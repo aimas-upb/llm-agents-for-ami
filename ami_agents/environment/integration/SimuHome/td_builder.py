@@ -217,6 +217,19 @@ def report_value(matter_type: Optional[str], value: Any) -> Any:
     return value
 
 
+def wire_value(matter_type: Optional[str], value: Any) -> Any:
+    """The inverse of `report_value`: a value in the TD's human unit, as the
+    simulator stores it (21.5 C -> 2150; 80 % -> 8000). Writes must go through
+    this, or the simulator reads 21 as 0.21 C."""
+    scale = SCALED_TYPES.get(str(matter_type or ""))
+    if scale and not isinstance(value, bool):
+        try:
+            return int(round(float(value) * scale))
+        except (TypeError, ValueError):
+            return value
+    return value
+
+
 def _no_security(g: Graph, subject: URIRef) -> None:
     sec = BNode()
     g.add((subject, TD.hasSecurityConfiguration, sec))

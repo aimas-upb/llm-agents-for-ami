@@ -48,7 +48,9 @@ from ....shared.models.messages import (
     META_PLAN_ID,
     MessageType,
 )
+from ....bt_planning.runtime import PlanRuntime
 from ....shared.models.plan import PlanStatus
+from ....shared.utils.clock import make_clock
 from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
 from ..signifiers import (
@@ -466,3 +468,48 @@ class MaintenancePlanBehaviour(PlanExecutionBehaviour):
     @staticmethod
     def _now() -> float:
         return asyncio.get_event_loop().time()
+
+
+class DependencyPlanBehaviour(PlanExecutionBehaviour):
+    """A plan of goals with conditions and timing ("23 minutes before the washer
+    finishes", "keep it at 22 degrees while the light is on").
+
+    It waits on purpose -- for a time, an event, a state -- so it has no tick
+    budget: it ticks every `tick_period` until the tree concludes or the plan is
+    cancelled. Before every tick its runtime refreshes what the tree waits on
+    (`bt_planning/runtime.py`): the properties it reads, the plan clock's time
+    (system or simulated, `environment.clock`), the values derived from them.
+    """
+
+    def __init__(self, *args, runtime: Optional[Dict[str, Any]] = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._runtime_spec = runtime or {}
+        self.runtime = None
+
+    async def on_start(self) -> None:
+        await super().on_start()
+        self.runtime = PlanRuntime(
+            self._runtime_spec,
+            clock=make_clock((self.agent.config or {}).get("environment")))
+
+    async def run(self) -> None:
+        await self._drain_control_messages()
+
+        if self._cancelled:
+            self._finish(PlanStatus.CANCELLED)
+            return
+        if self.agent.plans.get(self.plan_id) is None:
+            self.kill()
+            return
+
+        if self.runtime is not None:
+            self.runtime.before_tick()
+        self.tree.tick_once()
+        status = self.tree.status
+        self.agent.plans.bump_tick(self.plan_id, status.name)
+
+        if status is Status.RUNNING:
+            await asyncio.sleep(self.tick_period)
+            return
+        self._finish(PlanStatus.COMPLETED if status is Status.SUCCESS
+                     else PlanStatus.FAILED)

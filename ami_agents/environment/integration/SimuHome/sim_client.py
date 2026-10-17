@@ -101,6 +101,10 @@ class SimuHomeClient:
 
     # -- observation -------------------------------------------------------
 
+    def current_time(self) -> Any:
+        """The simulator's virtual clock: {"now": "YYYY-MM-DD HH:MM:SS"}."""
+        return self._request("GET", "/time")
+
     def home_state(self) -> Dict[str, Any]:
         """The whole world: clock, rooms, room aggregates, devices + attributes."""
         return self._request("GET", "/home/state")

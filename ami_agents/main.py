@@ -169,7 +169,7 @@ class AMIAgentsOrchestrator:
 
         # Add shared config sections to each agent
         shared_configs = {
-            "llm": self.config.get("llm", {}),
+            "default_llm": self.config.get("default_llm", {}),
             "timeouts": self.config.get("timeouts", {}),
             "environment": self.config.get("environment", {}),
             "bt_execution": self.config.get("bt_execution", {}),

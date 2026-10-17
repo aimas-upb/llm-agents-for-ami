@@ -1,0 +1,57 @@
+# Restrictions and guidelines for planning, per device class or manufacturer.
+#
+# Each entry is an instruction for one guard: a check placed in front of a
+# command, and what to do first when the check fails. Every text has the form
+#
+#   Before <command>: check that <condition>. If not, <what to do first>.
+#
+#   kind                      restriction: the command is refused when the check
+#                             fails; guideline: the command may be refused
+#   applies_to.classes        artifact classes; a device of a subclass matches too
+#   applies_to.manufacturers  the TD's manufacturer (schema:manufacturer), an
+#                             exact literal match
+#   text                      the instruction, in plain language
+#
+# Read by the InteractionSolver (`planning.guidelines.path` in agents.yaml points
+# here):
+#   power_on_first   applied deterministically to every plan
+#                    (`interaction_solver/utils/power_on_guard.py`): in front of
+#                    a mode, level or operational-state command on a matching
+#                    device, check its on/off state and switch it on -- unless
+#                    the plan already switched that device on before it.
+#                    Manufacturers match literally (exact string).
+#   the other entries are not read yet.
+#
+# Which device classes have these conditions was determined from the Matter
+# Application Cluster and Device Library specifications (see
+# docs/plans/planning_guidelines.md).
+
+entries:
+  - id: power_on_first
+    kind: restriction
+    applies_to:
+      classes: [homeont:LaundryWasher, homeont:LaundryDryer, homeont:Dishwasher,
+                homeont:AirConditioner]
+      manufacturers: []
+    text: >-
+      Before any command other than switching the device on or off: check that
+      the device is switched on. If not, switch it on first.
+
+  - id: settings_before_start
+    kind: guideline
+    applies_to:
+      classes: [homeont:LaundryWasher, homeont:LaundryDryer, homeont:Dishwasher]
+      manufacturers: []
+    text: >-
+      Before starting a cycle: check that the mode and settings the request asks
+      for (e.g. programme, dryness, spin, rinses, temperature) are already set. If
+      not, set them first.
+
+  - id: pause_only_running
+    kind: restriction
+    applies_to:
+      classes: [homeont:LaundryWasher, homeont:LaundryDryer, homeont:Dishwasher]
+      manufacturers: []
+    text: >-
+      Before pausing or resuming a cycle: check that the cycle is running or
+      paused. If not, do not send the command.

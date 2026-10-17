@@ -648,6 +648,27 @@ COMMAND_TARGETS: Dict[Tuple[str, str], Dict[str, Any]] = {
         "attribute": "CurrentMode", "status": APPROVED,
         "evidence": "as Mode Base; refrigerator/freezer cabinet mode",
     },
+    # The Operational State cluster: Start, Pause, Resume and Stop are its only
+    # commands, and each writes OperationalState (Running 1, Paused 2, Stopped
+    # 0). The benchmark starts and pauses appliances this way ("start it
+    # running", "pause dryer 1 when washer 1 finishes"); the attribute is
+    # read-only, so without these links no appliance cycle can be started.
+    ("OperationalState", "Start"): {
+        "attribute": "OperationalState", "status": APPROVED,
+        "evidence": "no input fields; moves OperationalState to Running (1)",
+    },
+    ("OperationalState", "Pause"): {
+        "attribute": "OperationalState", "status": APPROVED,
+        "evidence": "no input fields; moves OperationalState to Paused (2)",
+    },
+    ("OperationalState", "Resume"): {
+        "attribute": "OperationalState", "status": APPROVED,
+        "evidence": "no input fields; moves a paused OperationalState back to Running (1)",
+    },
+    ("OperationalState", "Stop"): {
+        "attribute": "OperationalState", "status": APPROVED,
+        "evidence": "no input fields; moves OperationalState to Stopped (0)",
+    },
     # FanControl.Step is deliberately absent. Home Assistant's `fan` domain
     # exposes no step service, so no TD form could invoke it, and no query in the
     # 600-episode benchmark asks for a relative fan change: of 174 fan-mentioning
@@ -714,6 +735,8 @@ def _command_targets(cluster_token: str) -> Set[str]:
         "RVCRunMode": {"CurrentMode"},
         "RVCCleanMode": {"CurrentMode"},
         "RTCCMode": {"CurrentMode"},
+        # Start / Pause / Resume / Stop write OperationalState.
+        "OperationalState": {"OperationalState"},
     }.get(cluster_token, set())
 
 

@@ -5,10 +5,8 @@ signifier-only fast-path response so downstream consumers (UserAssistant,
 tests, the demo dashboard) can rely on a stable contract.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
-from ....shared.models.intents import Intent
-from ....shared.models.intents import ImplicitGoalIntent, ExplicitGoalIntent
 
 
 PLAN_TYPE_BT = "behavior_tree"
@@ -29,7 +27,7 @@ def envelope_missing_intents(intent_type: Optional[str]) -> Dict[str, Any]:
 def envelope_error(
     error_code: str,
     detail: str,
-    intents: List[Union[ImplicitGoalIntent, ExplicitGoalIntent, Intent]],
+    intents: List[Any],
 ) -> Dict[str, Any]:
     """Reply when a planning stage fails (context or LLM)."""
     return {
@@ -46,7 +44,7 @@ def envelope_error(
 
 def envelope_llm_plan(
     result: Dict[str, Any],
-    intents: List[Union[ImplicitGoalIntent, ExplicitGoalIntent, Intent]],
+    intents: List[Any],
     workspace_id: Optional[str],
 ) -> Dict[str, Any]:
     """Reply for an LLM-generated plan (BTPlanGenerationBehaviour output)."""
@@ -67,7 +65,7 @@ def envelope_llm_plan(
 
 def envelope_llm_plans(
     plans_by_intent: Dict[str, Dict[str, Any]],
-    intents: List[Union[ImplicitGoalIntent, ExplicitGoalIntent, Intent]],
+    intents: List[Any],
     workspace_id: Optional[str],
 ) -> Dict[str, Any]:
     """Reply for multiple LLM-generated plans (one per atomic intent).

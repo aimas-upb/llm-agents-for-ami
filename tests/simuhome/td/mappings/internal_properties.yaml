@@ -8,7 +8,7 @@ generator:
   table: internal_properties
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-08-29T16:29:56.809355+00:00'
+  generated_at_utc: '2026-10-14T19:50:08.983818+00:00'
 rows:
 - key: '8.2'
   yaml_path: LevelControl.MinLevel
@@ -534,28 +534,6 @@ rows:
     attribute_id_hex: '0x0003'
     attribute_name: OperationalStateList
     type: list
-  category: device_internal
-  sosa_role: device_state
-  quantity: null
-  ssn_predicate: null
-  sosa_type: sosa:ObservableProperty
-  emit_in_td: true
-  used_by_families:
-  - Dishwasher
-  - LaundryDryer
-  - LaundryWasher
-  unit: null
-  status: auto
-- key: '96.4'
-  yaml_path: OperationalState.OperationalState
-  matter:
-    cluster_id: 96
-    cluster_id_hex: '0x0060'
-    cluster_name: Operational State
-    attribute_id: 4
-    attribute_id_hex: '0x0004'
-    attribute_name: OperationalState
-    type: OperationalStateEnum
   category: device_internal
   sosa_role: device_state
   quantity: null
@@ -1235,3 +1213,26 @@ rows:
   - Humidifier
   unit: '%'
   status: auto
+- key: '96.4'
+  yaml_path: OperationalState.OperationalState
+  matter:
+    cluster_id: 96
+    cluster_id_hex: '0x0060'
+    cluster_name: Operational State
+    attribute_id: 4
+    attribute_id_hex: '0x0004'
+    attribute_name: OperationalState
+    type: OperationalStateEnum
+  category: device_internal
+  sosa_role: device_state
+  quantity: null
+  ssn_predicate: null
+  sosa_type: sosa:ObservableProperty
+  emit_in_td: true
+  used_by_families:
+  - Dishwasher
+  - LaundryDryer
+  - LaundryWasher
+  unit: null
+  status: auto
+  _orphaned: true

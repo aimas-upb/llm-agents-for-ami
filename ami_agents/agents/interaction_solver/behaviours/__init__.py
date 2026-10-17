@@ -8,6 +8,7 @@ lookup, BT plan generation).
 
 from .ambiguous_goal_planning import AmbiguousGoalPlanningBehaviour
 from .bt_plan_generation import BTPlanGenerationBehaviour
+from .dependency_goal_planning import DependencyGoalPlanningBehaviour
 from .env_context_query import EnvContextQueryBehaviour
 from .environment_ready import EnvironmentReadyBehaviour
 from .explicit_goal_llm_planning import ExplicitGoalLLMPlanningBehaviour
@@ -15,10 +16,12 @@ from .explicit_goal_planning import ExplicitGoalPlanningBehaviour
 from .goal_request import GoalRequestBehaviour
 from .incomplete_goal_planning import IncompleteGoalPlanningBehaviour
 from .planning_workflow import PlanningWorkflowBehaviour
+from .power_on_guard import PowerOnGuardBehaviour
 
 __all__ = [
     "AmbiguousGoalPlanningBehaviour",
     "BTPlanGenerationBehaviour",
+    "DependencyGoalPlanningBehaviour",
     "EnvContextQueryBehaviour",
     "EnvironmentReadyBehaviour",
     "ExplicitGoalLLMPlanningBehaviour",
@@ -26,4 +29,5 @@ __all__ = [
     "GoalRequestBehaviour",
     "IncompleteGoalPlanningBehaviour",
     "PlanningWorkflowBehaviour",
+    "PowerOnGuardBehaviour",
 ]

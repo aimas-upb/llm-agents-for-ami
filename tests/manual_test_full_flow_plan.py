@@ -1267,7 +1267,7 @@ async def main():
 
     # Use already loaded configuration for provider settings
     try:
-        llm_config = config.get("llm", {})
+        llm_config = config.get("default_llm", {})
         provider_name = llm_config.get("default_provider", "openai")
         provider_cfg = llm_config.get("providers", {}).get(provider_name, {})
     except:
@@ -1275,7 +1275,7 @@ async def main():
         provider_cfg = {"temperature": 0.7, "max_tokens": 1500}
 
     llm_cfg = {
-        "llm": {
+        "default_llm": {
             "default_provider": "openai",
             "providers": {
                 "openai": {

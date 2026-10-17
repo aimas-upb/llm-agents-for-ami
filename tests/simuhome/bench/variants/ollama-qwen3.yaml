@@ -1,0 +1,9 @@
+# Every reasoning step on a local model served by Ollama (judge stays fixed).
+name: ollama-qwen3
+segmentation:  {model: "qwen3:8b", base_url: "http://localhost:11434/v1", temperature: 0}
+structuring:   {model: "qwen3:8b", base_url: "http://localhost:11434/v1", temperature: 0}
+planning:
+  explicit:    {model: "qwen3:8b", base_url: "http://localhost:11434/v1", temperature: 0}
+  general:     {model: "qwen3:8b", base_url: "http://localhost:11434/v1", temperature: 0}
+response:      {model: "qwen3:8b", base_url: "http://localhost:11434/v1", temperature: 0}
+judge:         {model: gpt-4o-mini, temperature: 0.5}

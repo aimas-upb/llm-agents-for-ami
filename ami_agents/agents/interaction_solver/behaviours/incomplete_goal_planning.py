@@ -57,14 +57,18 @@ class IncompleteGoalPlanningBehaviour(OneShotBehaviour):
     """Plan each given goal; ``results`` holds one plan entry per goal, in order
     (a tree, impossible, a clarification request, or an error)."""
 
-    def __init__(self, goals: List[GoalSpec], logger=None) -> None:
+    def __init__(self, goals: List[GoalSpec], logger=None, graph=None) -> None:
         super().__init__()
         self.goals = goals
+        # Given when the caller has fetched the TD graph already.
+        self.graph = graph
         self.logger = logger or LoggerFactory.get_logger("InteractionSolver")
         self.results: List[Dict[str, Any]] = []
 
     async def run(self) -> None:
-        graph = await fetch_environment_graph(self.agent, self.logger)
+        graph = self.graph
+        if graph is None:
+            graph = await fetch_environment_graph(self.agent, self.logger)
         for goal in self.goals:
             self.results.append(await self._plan(graph, goal))
 

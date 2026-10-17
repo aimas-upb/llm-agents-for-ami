@@ -1,0 +1,17 @@
+# Planning models swept under fixed segmentation and structuring.
+name: planning-models
+base: tests/simuhome/bench/variants/default.yaml
+vary:
+  planning.explicit:
+    - {model: gpt-5-nano, reasoning_effort: low}
+    - {model: gpt-4o-mini, temperature: 0}
+    - {model: "qwen3:8b", base_url: "http://localhost:11434/v1", temperature: 0}
+  planning.general:
+    - {model: gpt-5-mini, reasoning_effort: medium}
+    - {model: gpt-4o-mini, temperature: 0}
+combine: product
+run:
+  episodes: "qt2_*,qt3_*,qt4-1_*"
+  limit: 10
+  workers: 2
+evaluate: {judge: true}

@@ -118,7 +118,28 @@ Rules:
   the `DEFAULT` as a module-level constant so unit tests stay self-contained.
 - Never hardcode timeouts/URLs/models inside agents — push them to yaml.
 
-### 3.4 Logging
+### 3.4 Comments — COMMENT CODE BLOCKS
+
+The team lead reviews code by reading it. Code that is not commented by block
+is not finished. This applies to every file you create **and every function you
+touch** in an existing file, including tests and code you only extend:
+
+- **Module docstring**: what the module is for, and its flow, walked through one
+  concrete example where the flow is not obvious.
+- **Every function / method docstring**: what it returns, in which cases, and
+  why it exists.
+- **Every major block inside a function** gets a short comment heading it,
+  saying what the block does and why — numbered (`# 1. ...`, `# 2. ...`) when
+  the blocks are a sequence of steps. A function of more than ~10 lines with
+  no block comments is not done.
+- **Section separators** (`# -- name ----`) between groups of functions.
+- Comments say *why*, not a restatement of the code.
+
+Write the comments while writing the code, not afterwards and not on request.
+Before reporting a change as done, re-read every function you added or edited
+and check each block has its comment.
+
+### 3.5 Logging
 
 Use `LoggerFactory.get_logger(name, logging_config)` from
 `ami_agents.shared.utils.logger`. Each agent constructs its logger in
@@ -131,7 +152,7 @@ in the live demo log filter.
 Do not use `print()` inside `ami_agents/`. (Tests under `tests/` may
 keep `print()` for now.)
 
-### 3.5 Inter-agent messages
+### 3.6 Inter-agent messages
 
 All inter-agent traffic uses the `MessageType` enum from
 `ami_agents.shared.models.messages`. Send replies that reuse the
@@ -142,7 +163,7 @@ message — `rpc_call` / `rpc_call_response` in
 Request-type taxonomy (also listed in `agents.yaml > request_types`):
 `ENV_CAPABILITIES, ENV_STATE, GOAL_REQUEST, PLAN_MANAGEMENT, PREFERENCE_MANAGEMENT`.
 
-### 3.6 LLM clients
+### 3.7 LLM clients
 
 There are two LLM clients (UA and ISA), both built by their respective
 `utils/llm_client.py:build_llm_client(config)` returning an
@@ -156,7 +177,7 @@ There are two LLM clients (UA and ISA), both built by their respective
 If you add a new agent that needs an LLM, copy this pattern; do NOT
 re-implement client construction inline.
 
-### 3.7 Memory (signifiers)
+### 3.8 Memory (signifiers)
 
 Goals are remembered under an exact key built by
 `shared/utils/goal_signifiers.py:signifier_key` (kinds: `explicit`,
@@ -247,9 +268,11 @@ conda run -n ami-agents python tests/manual_test_full_flow_plan.py --sequence 3 
 7. **Never call `print()` inside `ami_agents/`.** Use the logger.
 8. **Never build a signifier key outside `signifier_key`**
    (`shared/utils/goal_signifiers.py`). Recording and recall must use the
-   same key (§3.7).
+   same key (§3.8).
 9. **Never launch a long-running or paid job yourself.** Print the exact
    command line and let the human run it. See §5.1.
+10. **Never leave a function you wrote or edited without its docstring and
+    block comments.** See §3.4.
 
 ### 5.1 Long-running and paid jobs — hand over the command
 

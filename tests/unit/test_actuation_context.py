@@ -489,9 +489,18 @@ class TestWrittenProperties:
     def test_a_state_keeps_its_gloss(self, graph):
         text = render_actuation_context(
             build_actuation_context(graph, with_properties=True))
-        assert re.search(r'name: "operationalState"\n\s+property class: \S+\n'
+        assert re.search(r'name: "playbackState"\n\s+property class: \S+\n'
                          r'\s+kind: state\n'
                          r'\s+output: direct value; type: \S+; description: ', text)
+
+    def test_an_appliance_cycle_is_an_action_with_its_states_named(self, graph):
+        # Start / Pause / Resume / Stop, as one action by the state reached.
+        text = render_actuation_context(
+            build_actuation_context(graph, with_properties=True))
+        assert re.search(r'Action\n\s+name: "operationalState"\n'
+                         r'\s+command class: homeont:SetOperationalStateCommand\n'
+                         r'\s+input: direct value; type: js:IntegerSchema; '
+                         r'description: 0 = Stopped .*1 = Running .*2 = Paused', text)
 
     def test_an_action_keeps_its_gloss(self, graph):
         text = render_actuation_context(

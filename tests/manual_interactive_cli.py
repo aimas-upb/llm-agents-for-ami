@@ -400,31 +400,31 @@ async def main():
     }
 
     # Override LLM configuration with CLI/environment settings
-    if "llm" not in config:
-        config["llm"] = {}
-    if "providers" not in config["llm"]:
-        config["llm"]["providers"] = {}
-    if "openai" not in config["llm"]["providers"]:
-        config["llm"]["providers"]["openai"] = {}
+    if "default_llm" not in config:
+        config["default_llm"] = {}
+    if "providers" not in config["default_llm"]:
+        config["default_llm"]["providers"] = {}
+    if "openai" not in config["default_llm"]["providers"]:
+        config["default_llm"]["providers"]["openai"] = {}
 
-    config["llm"]["providers"]["openai"].update({
+    config["default_llm"]["providers"]["openai"].update({
         "api_key": os.getenv("OPENAI_API_KEY"),
         "base_url": base_url,
         "model": model,
     })
     if not model.startswith("o"):
-        config["llm"]["providers"]["openai"].update({
+        config["default_llm"]["providers"]["openai"].update({
             "temperature": float(os.getenv("OPENAI_TEMPERATURE") or
-                               str(config["llm"]["providers"]["openai"].get("temperature", 0.7))),
+                               str(config["default_llm"]["providers"]["openai"].get("temperature", 0.7))),
             "max_tokens": int(os.getenv("OPENAI_MAX_TOKENS") or
-                             str(config["llm"]["providers"]["openai"].get("max_tokens", 1500))),
+                             str(config["default_llm"]["providers"]["openai"].get("max_tokens", 1500))),
         })
     if reasoning_effort:
-        config["llm"]["providers"]["openai"]["reasoning_effort"] = reasoning_effort
+        config["default_llm"]["providers"]["openai"]["reasoning_effort"] = reasoning_effort
 
-    if "retry" not in config["llm"]:
-        config["llm"]["retry"] = {}
-    config["llm"]["retry"]["timeout"] = api_timeout_s
+    if "retry" not in config["default_llm"]:
+        config["default_llm"]["retry"] = {}
+    config["default_llm"]["retry"]["timeout"] = api_timeout_s
 
     # Override planning timeout
     if "planning" not in config:

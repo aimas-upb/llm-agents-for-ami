@@ -12,13 +12,15 @@ TREE_PARAMETER_SCHEMA = {
         "name": {"type": "string"},
         "type": {
             "type": "string",
-            "enum": ["sequence", "selector", "parallel", "action", "condition", "wait_condition"],
+            "enum": ["sequence", "selector", "parallel", "ignore_failure", "action",
+                     "condition", "wait_condition"],
         },
         "children": {
             "type": "array",
             "minItems": 1,
             "items": {"type": "object"},
-            "description": "Child nodes (required for sequence/selector/parallel).",
+            "description": "Child nodes (required for sequence/selector/parallel; "
+                           "exactly one for ignore_failure).",
         },
         "policy": {
             "type": "string",
@@ -75,6 +77,12 @@ TREE_PARAMETER_SCHEMA = {
         {
             "title": "Parallel",
             "properties": {"type": {"const": "parallel"}},
+            "required": ["children"],
+        },
+        {
+            "title": "IgnoreFailure",
+            "properties": {"type": {"const": "ignore_failure"},
+                           "children": {"maxItems": 1}},
             "required": ["children"],
         },
         {

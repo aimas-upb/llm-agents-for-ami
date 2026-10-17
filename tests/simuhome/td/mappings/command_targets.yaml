@@ -8,7 +8,7 @@ generator:
   table: command_targets
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-08-29T16:29:56.606036+00:00'
+  generated_at_utc: '2026-10-14T19:50:08.787995+00:00'
 rows:
 - key: '89.0'
   cluster: Dishwasher Mode
@@ -85,6 +85,50 @@ rows:
   attribute_writable: false
   evidence:
     why: no input fields; inverts the attribute it is named after
+    note: the Matter XML states no command->attribute relation; this link is curated and the evidence
+      derived
+  status: approved
+- key: '96.0'
+  cluster: Operational State
+  command: Pause
+  writes_attribute: OperationalState
+  attribute_type: OperationalStateEnum
+  attribute_writable: false
+  evidence:
+    why: no input fields; moves OperationalState to Paused (2)
+    note: the Matter XML states no command->attribute relation; this link is curated and the evidence
+      derived
+  status: approved
+- key: '96.3'
+  cluster: Operational State
+  command: Resume
+  writes_attribute: OperationalState
+  attribute_type: OperationalStateEnum
+  attribute_writable: false
+  evidence:
+    why: no input fields; moves a paused OperationalState back to Running (1)
+    note: the Matter XML states no command->attribute relation; this link is curated and the evidence
+      derived
+  status: approved
+- key: '96.2'
+  cluster: Operational State
+  command: Start
+  writes_attribute: OperationalState
+  attribute_type: OperationalStateEnum
+  attribute_writable: false
+  evidence:
+    why: no input fields; moves OperationalState to Running (1)
+    note: the Matter XML states no command->attribute relation; this link is curated and the evidence
+      derived
+  status: approved
+- key: '96.1'
+  cluster: Operational State
+  command: Stop
+  writes_attribute: OperationalState
+  attribute_type: OperationalStateEnum
+  attribute_writable: false
+  evidence:
+    why: no input fields; moves OperationalState to Stopped (0)
     note: the Matter XML states no command->attribute relation; this link is curated and the evidence
       derived
   status: approved

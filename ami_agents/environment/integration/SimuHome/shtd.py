@@ -43,13 +43,13 @@ try:
     from .classify import classify_device
     from .mappings import load_mappings
     from .sim_client import SimuHomeClient, SimuHomeError
-    from .td_builder import SimuHomeTD, report_value, serialize
+    from .td_builder import SimuHomeTD, report_value, serialize, wire_value
     from . import notifications as notify
 except ImportError:  # pragma: no cover - direct script use
     from classify import classify_device  # type: ignore
     from mappings import load_mappings  # type: ignore
     from sim_client import SimuHomeClient, SimuHomeError  # type: ignore
-    from td_builder import SimuHomeTD, report_value, serialize  # type: ignore
+    from td_builder import SimuHomeTD, report_value, serialize, wire_value  # type: ignore
     import notifications as notify  # type: ignore
 
 TURTLE = "text/turtle"
@@ -276,7 +276,8 @@ _COMMAND_ARGS = {
     # Centi-degrees, as the attribute is stored and as the TD reports its
     # min/max. A caller sending 21.5 means 21.5 C.
     "SetTemperature": lambda v: {"target_temperature": int(round(float(v) * 100))},
-    "GoToLiftPercentage": lambda v: {"lift_percent_100ths": int(v)},
+    # The TD serves the lift in percent; the simulator takes hundredths of one.
+    "GoToLiftPercentage": lambda v: {"lift_percent_100ths": wire_value("percent100ths", v)},
     "ChangeToMode": lambda v: {"new_mode": int(v)},
 }
 
@@ -287,6 +288,26 @@ _COMMAND_ARGS_BY_CLUSTER = {
     ("RTCCMode", "ChangeToMode"): lambda v: {"mode": int(v)},
     ("RVCCleanMode", "ChangeToMode"): lambda v: {"mode": int(v)},
 }
+
+
+# OperationalState values (Matter OperationalStateEnum) and their labels.
+_OPERATIONAL_STATES = {"stopped": 0, "running": 1, "paused": 2}
+
+
+def _operational_state_command(value: Any, current: Any) -> Optional[str]:
+    """The Operational State command reaching ``value`` from ``current``:
+    Running is Start, or Resume from Paused; Paused is Pause; Stopped is Stop.
+    None for anything else (Error is reported, never commanded)."""
+    if isinstance(value, str) and value.strip().lower() in _OPERATIONAL_STATES:
+        target = _OPERATIONAL_STATES[value.strip().lower()]
+    else:
+        try:
+            target = int(value)
+        except (TypeError, ValueError):
+            return None
+    if target == 1:
+        return "Resume" if current == 2 else "Start"
+    return {2: "Pause", 0: "Stop"}.get(target)
 
 
 def _truthy(value: Any) -> bool:
@@ -327,13 +348,22 @@ async def invoke_action(home: str, room: str, device: str, name: str,
                 raise HTTPException(
                     status_code=400,
                     detail=f"action '{name}' requires a value")
-            result = client.write_attribute(device, cluster, attribute, value,
+            # The TD's value is in human units; the simulator stores some
+            # types scaled (temperatures in 0.01 C).
+            result = client.write_attribute(device, cluster, attribute,
+                                            wire_value(record.get("type"), value),
                                             endpoint_id=endpoint)
             dispatched = {"call": "write_attribute", "cluster": cluster,
                           "attribute": attribute, "value": value}
         else:
-            chooser = _COMMAND_FOR.get((cluster, attribute))
-            command = chooser(value) if chooser else None
+            if (cluster, attribute) == ("OperationalState", "OperationalState"):
+                # Which command depends on the state the cycle is in now.
+                current = (td.find_device(room, device) or {}).get(
+                    "attributes", {}).get(f"{endpoint}.OperationalState.OperationalState")
+                command = _operational_state_command(value, current)
+            else:
+                chooser = _COMMAND_FOR.get((cluster, attribute))
+                command = chooser(value) if chooser else None
             if command is None:
                 raise HTTPException(
                     status_code=400,
@@ -575,6 +605,19 @@ def status(request: Request) -> JSONResponse:
         "unsettledMappingRows": load_mappings().unsettled(),
         "phase": 3,
     })
+
+
+@app.get("/_shtd/time")
+def virtual_time() -> JSONResponse:
+    """The simulator's virtual clock, so that agents configured with
+    `environment.clock.source: http` wait in simulated time without knowing the
+    simulator's address (`shared/utils/clock.py`)."""
+    try:
+        answer = get_client().current_time()
+    except SimuHomeError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=502)
+    now = answer.get("now") if isinstance(answer, dict) else answer
+    return JSONResponse({"now": now})
 
 
 def main() -> None:

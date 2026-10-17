@@ -8,7 +8,7 @@ generator:
   table: property_classes
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-08-29T16:29:56.636649+00:00'
+  generated_at_utc: '2026-10-14T19:50:08.818833+00:00'
 rows:
 - key: homeont:DishwasherModeCurrentMode
   homeont_class: homeont:DishwasherModeCurrentMode
@@ -451,6 +451,30 @@ rows:
   - homeont:DimmableLightStartUpOnOff
   evidence:
     rationale: Matter clusters name processes, not things; this class is what 1 device family have in
+      common
+    approving_this: promotes every leaf below it to `auto`
+  status: auto
+- key: homeont:OperationalState
+  homeont_class: homeont:OperationalState
+  subClassOf: sosa:ActuatableProperty
+  affordance_name: operationalState
+  yaml_path: OperationalState.OperationalState
+  matter:
+    cluster_id: 96
+    cluster_id_hex: '0x0060'
+    cluster_name: Operational State
+    attribute_id: 4
+    attribute_id_hex: '0x0004'
+    attribute_name: OperationalState
+    type: OperationalStateEnum
+  unit: null
+  carries_constraints: false
+  specialised_by:
+  - homeont:DishwasherOperationalState
+  - homeont:LaundryDryerOperationalState
+  - homeont:LaundryWasherOperationalState
+  evidence:
+    rationale: Matter clusters name processes, not things; this class is what 3 device families have in
       common
     approving_this: promotes every leaf below it to `auto`
   status: auto

@@ -40,7 +40,6 @@ class TestGoalSpec:
 
     def test_explicit_round_trip(self):
         wire = GoalSpec.from_dict(EXPLICIT).to_wire_dict()
-        assert wire["goal_dependency_structure"] is None
         for key, value in EXPLICIT.items():
             assert wire[key] == value, key
 

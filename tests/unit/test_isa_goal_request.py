@@ -26,6 +26,23 @@ def _structure(text, **fields):
                                    structure="simple")
 
 
+class _NoGuard:
+    """Stands in for the power-on guard step (tested in test_power_on_guard.py):
+    leaves the entries as planned."""
+
+    def __init__(self, entries, logger=None, graph=None):
+        pass
+
+    async def join(self):
+        return None
+
+
+@pytest.fixture(autouse=True)
+def no_power_on_guard():
+    with patch(f"{MODULE}.PowerOnGuardBehaviour", _NoGuard):
+        yield
+
+
 class _FakeExplicit:
     def __init__(self, goals, logger=None):
         self.results = [{"tree": {"type": "action", "name": g.artifact_name},

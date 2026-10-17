@@ -45,7 +45,7 @@ def test_model():
             ConfigLoader.load_with_env_vars("ami_agents/config/environment.yaml")
         )
 
-        llm_config = config.get("llm", {})
+        llm_config = config.get("default_llm", {})
         provider_name = llm_config.get("default_provider", "openai")
         provider_cfg = llm_config.get("providers", {}).get(provider_name, {})
 

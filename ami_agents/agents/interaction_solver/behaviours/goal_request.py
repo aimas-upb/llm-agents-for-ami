@@ -15,9 +15,9 @@ from ....shared.models.messages import META_CORRELATION_ID, MessageType
 from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
 from ....shared.models.goal_structure import GoalStructure
-from ....shared.models.intents import ImplicitGoalIntent, ExplicitGoalIntent, goal_intent_from_dict
 from ....shared.models.intents import Intent
 from ..utils.ambiguous_goal_plan import ambiguous_goal
+from ..utils.dependency_context import dependency_structure
 from ..utils.explicit_goal_plan import deterministic_goal
 from ..utils.incomplete_goal_plan import incomplete_goal
 from ..utils.plan_envelope import (
@@ -26,9 +26,35 @@ from ..utils.plan_envelope import (
     plan_entries_from_envelope,
 )
 from .ambiguous_goal_planning import AmbiguousGoalPlanningBehaviour
+from .dependency_goal_planning import DependencyGoalPlanningBehaviour
 from .explicit_goal_planning import ExplicitGoalPlanningBehaviour
 from .incomplete_goal_planning import IncompleteGoalPlanningBehaviour
 from .planning_workflow import PlanningWorkflowBehaviour
+from .power_on_guard import PowerOnGuardBehaviour
+
+
+# Each planning path: its name, the selector that accepts a structure for it,
+# and the name of the behaviour that plans the selected goals (looked up when
+# planning). Order is the planning order.
+ROUTES = (
+    ("explicit", deterministic_goal, "ExplicitGoalPlanningBehaviour"),
+    ("incomplete", incomplete_goal, "IncompleteGoalPlanningBehaviour"),
+    ("ambiguous", ambiguous_goal, "AmbiguousGoalPlanningBehaviour"),
+    ("dependency", dependency_structure, "DependencyGoalPlanningBehaviour"),
+)
+
+
+def route(items) -> dict:
+    """{route name: [(index, selected goal or structure), ...]} for the
+    structured items; an item no selector accepts is in no list (it goes to
+    the planning workflow, from its words)."""
+    return {name: GoalRequestBehaviour._select(items, selector)
+            for name, selector, _ in ROUTES}
+
+
+def route_behaviour(name: str):
+    """The behaviour class that plans the goals of route ``name``."""
+    return globals()[next(cls for route_name, _, cls in ROUTES if route_name == name)]
 
 
 class GoalRequestBehaviour(CyclicBehaviour):
@@ -66,15 +92,15 @@ class GoalRequestBehaviour(CyclicBehaviour):
             await self._reply(msg, MessageType.PLAN_CREATED.value, envelope)
             return
 
-        # Explicit, incomplete and ambiguous achievement goals are planned on
-        # their own paths -- from the TD graph alone, or by an LLM against a
-        # context cut to the goal; everything else goes through the workflow.
-        explicit = self._select(intent_objects, deterministic_goal)
-        incomplete = self._select(intent_objects, incomplete_goal)
-        ambiguous = self._select(intent_objects, ambiguous_goal)
-        if explicit or incomplete or ambiguous:
+        # Structured goals are planned on their own paths: explicit, incomplete
+        # and ambiguous achievement goals from the TD graph or by an LLM against
+        # a context cut to the goal; dependency structures (conditions, timing,
+        # maintenance) by templates. Only plain-text intents reach the workflow.
+        routes = route(intent_objects)
+        if any(routes.values()):
             envelope = await self._plan_mixed(
-                intent_objects, explicit, incomplete, workspace_id, ambiguous)
+                intent_objects, routes["explicit"], routes["incomplete"], workspace_id,
+                routes["ambiguous"], routes["dependency"])
         else:
             envelope = await self._run_workflow(
                 [self._planner_intent(i) for i in intent_objects], workspace_id)
@@ -103,26 +129,32 @@ class GoalRequestBehaviour(CyclicBehaviour):
                 and (goal := selector(item)) is not None]
 
     async def _plan_mixed(self, items, explicit, incomplete, workspace_id,
-                          ambiguous=()) -> dict:
+                          ambiguous=(), dependency=()) -> dict:
         """Explicit goals (``ExplicitGoalPlanningBehaviour``), incomplete ones
-        (``IncompleteGoalPlanningBehaviour``) and ambiguous ones
-        (``AmbiguousGoalPlanningBehaviour``) on their own paths, the workflow
-        for the rest, merged into one multi-plan reply in the request's order."""
+        (``IncompleteGoalPlanningBehaviour``), ambiguous ones
+        (``AmbiguousGoalPlanningBehaviour``) and dependency structures
+        (``DependencyGoalPlanningBehaviour``) on their own paths, the workflow
+        for the rest, merged into one multi-plan reply in the request's order.
+        Entries outside dependency structures then get the power-on guard."""
         entries = {}
 
-        # Every explicit, incomplete and ambiguous goal gets an entry here: a
-        # tree, impossible, a clarification request, or an error.
-        for selected, cls in ((explicit, ExplicitGoalPlanningBehaviour),
-                              (incomplete, IncompleteGoalPlanningBehaviour),
-                              (ambiguous, AmbiguousGoalPlanningBehaviour)):
+        # 1. Every routed goal or structure gets an entry here: a tree,
+        #    impossible, a clarification request, or an error. One behaviour
+        #    per route, in ROUTES order.
+        selections = {"explicit": explicit, "incomplete": incomplete,
+                      "ambiguous": ambiguous, "dependency": dependency}
+        for name, _, _ in ROUTES:
+            selected = selections[name]
             if not selected:
                 continue
+            cls = route_behaviour(name)
             behaviour = cls([goal for _, goal in selected], logger=self.logger)
             self.agent.add_behaviour(behaviour)
             await behaviour.join()
             for (index, _), result in zip(selected, behaviour.results):
                 entries[index] = [{**result, "intent": items[index].to_wire_dict()}]
 
+        # 2. Whatever no route took: the planning workflow, from its words.
         rest = [index for index in range(len(items)) if index not in entries]
         if rest:
             rest_intents = [self._planner_intent(items[i]) for i in rest]
@@ -136,6 +168,18 @@ class GoalRequestBehaviour(CyclicBehaviour):
                 # One tree for several intents: it stands where the first was.
                 entries[rest[0]] = rest_entries
 
+        # 3. Every entry outside a dependency structure: switch the device on
+        #    before setting it, where the guidelines say so (dependency
+        #    structures, and the steps planned inside them, are left alone).
+        dependent = {index for index, _ in selections["dependency"]}
+        simple = [entry for index, group in entries.items() if index not in dependent
+                  for entry in group]
+        if simple:
+            guard = PowerOnGuardBehaviour(simple, logger=self.logger)
+            self.agent.add_behaviour(guard)
+            await guard.join()
+
+        # 4. One reply, entries in the order the user asked for them.
         ordered = [entry for index in sorted(entries) for entry in entries[index]]
         return envelope_plan_entries(ordered, workspace_id)
 
@@ -153,9 +197,10 @@ class GoalRequestBehaviour(CyclicBehaviour):
     def _parse_request(msg):
         """Extract intents and workspace from the GOAL_REQUEST body.
 
-        Each intent carries its own type (implicit/explicit) via its dataclass.
+        A structured goal (`{"goals": ...}`) becomes a GoalStructure; anything
+        else is kept as its words.
         """
-        intent_objects: List[Union[ImplicitGoalIntent, ExplicitGoalIntent, Intent]] = []
+        intent_objects: List[Union[GoalStructure, Intent]] = []
         workspace_id: Optional[str] = None
         try:
             payload = json.loads(msg.body or "{}")
@@ -170,8 +215,6 @@ class GoalRequestBehaviour(CyclicBehaviour):
                         if isinstance(item.get("goals"), dict):
                             # A structured goal from the UA's goal structuring.
                             intent_objects.append(GoalStructure.from_dict(item))
-                        elif item.get("category") in ("implicit", "explicit"):
-                            intent_objects.append(goal_intent_from_dict(item))
                         else:
                             # Fallback for other intent types
                             intent_objects.append(Intent(intent_text=item.get("text_intent", str(item))))

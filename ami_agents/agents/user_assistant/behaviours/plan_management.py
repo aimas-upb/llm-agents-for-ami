@@ -38,6 +38,7 @@ from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
 from .plan_execution import (
     AchievementPlanBehaviour,
+    DependencyPlanBehaviour,
     MaintenancePlanBehaviour,
     PlanExecutionBehaviour,
 )
@@ -96,7 +97,7 @@ class PlanManagementBehaviour(CyclicBehaviour):
                 continue
             plan = Plan(
                 plan_id=plan_id,
-                plan_type=self._classify_type(plan_obj, intent),
+                plan_type=self._classify_type(plan_obj, intent, entry),
                 # noqa: the intent dict is the plan's own, one per tree
                 status=PlanStatus.CREATED,
                 # The user's own words, so an explanation can answer in them.
@@ -115,12 +116,19 @@ class PlanManagementBehaviour(CyclicBehaviour):
             # The lifecycle decides the behaviour: a plan that finishes and a
             # plan that keeps watching are not the same thing wearing a flag.
             options: Dict[str, Any] = {}
+            tick_period = self.agent.bt_min_tick_yield
             if plan.plan_type is PlanType.MAINTENANCE:
                 executor_class = MaintenancePlanBehaviour
                 options["maintenance_interval"] = \
                     self.agent.bt_maintenance_interval
                 options["trigger_poll"] = \
                     self.agent.bt_maintenance_trigger_poll
+            elif plan.plan_type is PlanType.DEPENDENCY:
+                # Waits for times and events: no tick budget, a slower cadence,
+                # and the runtime that keeps what it waits on current.
+                executor_class = DependencyPlanBehaviour
+                options["runtime"] = entry.get("runtime")
+                tick_period = self.agent.bt_dependency_tick_period
             else:
                 executor_class = AchievementPlanBehaviour
 
@@ -128,7 +136,7 @@ class PlanManagementBehaviour(CyclicBehaviour):
                 plan_id=plan_id,
                 tree_spec=tree_spec,
                 max_ticks=self.agent.bt_max_ticks,
-                tick_period=self.agent.bt_min_tick_yield,
+                tick_period=tick_period,
                 logger=self.logger,
                 **options,
                 # Everything recording needs that only the envelope knows. The
@@ -185,7 +193,8 @@ class PlanManagementBehaviour(CyclicBehaviour):
         return str(intent or "")
 
     @staticmethod
-    def _classify_type(plan_obj: Dict[str, Any], intent: Any) -> PlanType:
+    def _classify_type(plan_obj: Dict[str, Any], intent: Any,
+                       entry: Optional[Dict[str, Any]] = None) -> PlanType:
         """Achievement unless the plan says otherwise.
 
         Nothing produces a maintenance signal yet -- `plan_type` in the IR is a
@@ -193,7 +202,10 @@ class PlanManagementBehaviour(CyclicBehaviour):
         is `execution_mode`, which segmentation will set once maintenance goals
         are classified upstream.
         """
-        mode = str(plan_obj.get("execution_mode") or "").lower()
+        mode = str((entry or {}).get("execution_mode")
+                   or plan_obj.get("execution_mode") or "").lower()
+        if mode == "dependency":
+            return PlanType.DEPENDENCY
         if mode in ("maintenance", "persistent", "maintain"):
             return PlanType.MAINTENANCE
         return PlanType.IMMEDIATE

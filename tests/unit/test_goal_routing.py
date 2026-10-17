@@ -11,6 +11,7 @@ from ami_agents.agents.user_assistant.utils.goal_routing import route_goal
     (["ambiguous", "achievement"], "simple", False, True),
     (["explicit", "temporal_dependency", "achievement"], "dependency", True, True),
     (["explicit", "logical_dependency", "achievement"], "dependency", True, True),
+    (["explicit", "sequential_dependency", "achievement"], "dependency", True, True),
     (["explicit", "maintenance"], "dependency", True, True),
     (["ambiguous", "maintenance"], "dependency", True, True),
 ])

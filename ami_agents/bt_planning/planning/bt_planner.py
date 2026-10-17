@@ -730,11 +730,18 @@ class AsyncBTPlanner:
             errors.append(f"{path}: missing 'name'")
 
         node_type = spec.get("type")
-        valid_types = {"sequence", "selector", "parallel", "action", "condition", "wait_condition"}
+        valid_types = {"sequence", "selector", "parallel", "ignore_failure", "action",
+                       "condition", "wait_condition"}
         if node_type not in valid_types:
             errors.append(f"{path}: missing or invalid 'type'")
 
-        if node_type in {"sequence", "selector", "parallel"}:
+        if node_type == "ignore_failure":
+            children = spec.get("children")
+            if not isinstance(children, list) or len(children) != 1:
+                errors.append(f"{path}: ignore_failure nodes require exactly one child")
+            else:
+                errors.extend(self._validate_tree(children[0], path=f"{path}.children[0]"))
+        elif node_type in {"sequence", "selector", "parallel"}:
             children = spec.get("children")
             if not isinstance(children, list) or not children:
                 errors.append(f"{path}: composite nodes require non-empty 'children'")

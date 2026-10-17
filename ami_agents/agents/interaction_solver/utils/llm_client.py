@@ -3,7 +3,7 @@
 Differs from the UserAssistant's equivalent in two ways:
 
 1. A ``planning.llm_planning`` yaml section can override the shared
-   ``llm.providers.openai`` settings (planning-specific model/temperature).
+   ``default_llm.providers.openai`` settings (planning-specific model/temperature).
 2. ``max_tokens`` is supported for non-reasoning models, since BT-JSON
    plans can be long. Reasoning models (o-series) still only use
    ``max_completion_tokens``.
@@ -34,9 +34,9 @@ def build_llm_client(config: Dict[str, Any],
 
     `llm_planning` is the general BT planner; `explicit_planning` the lightweight
     model that plans an explicit goal against one device. A section's keys
-    override the shared `llm.providers.<provider>` settings.
+    override the shared `default_llm.providers.<provider>` settings.
     """
-    llm_root = config.get("llm", {}) or {}
+    llm_root = config.get("default_llm", {}) or {}
     provider_name = llm_root.get("default_provider", "openai")
     provider_cfg = (llm_root.get("providers", {}) or {}).get(provider_name, {}) or {}
     planning_llm = (config.get("planning", {}) or {}).get(section, {}) or {}

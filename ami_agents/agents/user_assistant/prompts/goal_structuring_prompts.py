@@ -88,6 +88,8 @@ PREDICATE_SPEC_RULES = """\
 
 A predicate is a condition the request depends on: the state of a device, or of a room's environment. It names what is read, not how it is read.
 
+A predicate is something the plan must **check, wait for or stop on**. Words that only describe the state a device ends up in — the outcome of a goal, or of its own run ("… finish with it stopped", "be done by then", "leave it closed") — are not predicates: they say what the goal achieves, not a condition on it. Do not create a predicate for them.
+
 - **predicate_specificity**: "explicit" | "incomplete" | "ambiguous" (below).
 - **predicate_subject**: "device_property" (a device's own property) or "environment_property" (a room's environment variable).
 - **predicate_text**: the part of the request stating the condition, verbatim.
@@ -134,28 +136,52 @@ State a trigger or termination as the condition that BECOMES TRUE: "after I clos
   - "now" — no time given, or "now".
   - "at_time" + **time_text** — "at 1:39 PM".
   - "after_delay" + **offset_text** — "in 13 minutes", "13 minutes from now".
-  - "after_goal" + **ref_goal** + **offset_text** — "then", "after that", "8 minutes after the previous action" (ref_goal is the goal referred to; offset_text null if none).
-  - "with_goal" + **ref_goal** — at the same moment as another goal: "and set it to …", "while keeping it powered on", several devices under one trigger.
+  - "after_goal" + **ref_goal** + **offset_text** — "then", "after that", "8 minutes after the previous action", and the next instruction to the same device (ref_goal is the goal referred to; offset_text null if none).
+  - "with_goal" + **ref_goal** — at the same moment as another goal: "while keeping it powered on", several devices under one trigger.
   - "on_trigger" — the goal has a trigger or recurrence predicate; that predicate carries the details.
   - "completes_with" + **ref** — "time it so A and B finish at the same time": ref is the goal or trigger predicate whose completion this goal's run must coincide with.
   - optional **ends**: {"kind": "duration" | "at_time", "text": …} — "for the next 5 hours", "until 6 PM".
+  - optional **stated_start_time_text** / **stated_end_time_text** — see "Absolute and relative timing together" below.
 - **rationale** (optional): the words giving a purpose or occasion ("so the laundry area is lit", "I'm clearing the table").
+
+### Absolute and relative timing together
+When the user describes the start of a goal with a concrete clock time AND ALSO relative to an anchor — another moment in time ("20 minutes from now"), another goal ("5 minutes after the lights go off") or another event ("23 minutes before washer 1 finishes", "when the dryer stops") — record BOTH:
+- **starts** (with its fields, and any trigger predicate) records the RELATIVE description;
+- **stated_start_time_text** records the ABSOLUTE clock time, exactly as the user wrote it.
+
+The same holds for the end of a goal: when the user gives a clock time for the end AND describes the end relative to an anchor ("for 2 hours, until 8 PM"; "until 6 PM, when the dryer finishes"), **ends** (or the termination predicate) records the RELATIVE description and **stated_end_time_text** records the ABSOLUTE clock time.
+
+Never choose one of the two, drop one, or reconcile them — even when they seem to disagree; checking them is a later step's job. A clock time given ALONE, with no relative description of the same moment, is still "at_time" + time_text (or ends {"kind": "at_time"}), and the stated_* fields stay absent.
 
 ### Three uses of "while" that are NOT scope predicates
 - "while keeping it powered on" — a second goal on the same device: starts "with_goal".
 - "while I'm at the washer", "while I am working" — the user's activity, which no device observes: a rationale, never a predicate.
 - A purpose or occasion clause: a rationale.
 
-### One goal per affordance
-Several actions on one device at one moment ("power on and set fan 30%") are several goals, the later ones starting "with_goal" the first.
+### One goal per instruction to the same device
+Several instructions to one device ("switch it on, put it in heating mode and set the fan to 40 percent") are several explicit achievement goals, one per instruction, carried out in sequence: each later one starts "after_goal" the one before it, offset_text null. The first starts as the request says ("now", a time, a trigger).
 """
 
 DEPENDENCY_EXAMPLES = """\
 ## Examples (home-specific fields abbreviated)
 
+"Switch on heat pump 1 in the bedroom, put it in heating mode and set the fan to 40 percent."
+- G1 switch on: timing {"starts": "now"}
+- G2 heating mode: timing {"starts": "after_goal", "ref_goal": "G1", "offset_text": null}
+- G3 fan 40 percent: timing {"starts": "after_goal", "ref_goal": "G2", "offset_text": null}
+- no predicates.
+
+"At 7:40 PM, that is 25 minutes from now, switch on the bedroom heater, and keep it on for an hour, until 8:40 PM."
+- G1 heater on: timing {"starts": "after_delay", "offset_text": "25 minutes", "stated_start_time_text": "7:40 PM", "ends": {"kind": "duration", "text": "an hour"}, "stated_end_time_text": "8:40 PM"}
+- no predicates.
+
+"At 9:10 PM, which is 5 minutes after the dryer 1 in the laundry room finishes, turn on hallway light 2."
+- P1 dryer 1 finished: role "trigger", applies_to ["G1"], offset_text "5 minutes", offset_direction "after".
+- G1 hallway light on: timing {"starts": "on_trigger", "stated_start_time_text": "9:10 PM"}
+
 "Set dimmer light 1 in the living room to power on at level 30 at 13 minutes from now, and 8 minutes after the previous action drop it to level 20 while keeping it powered on."
 - G1 power on: timing {"starts": "after_delay", "offset_text": "13 minutes"}
-- G2 level 30: timing {"starts": "with_goal", "ref_goal": "G1"}
+- G2 level 30: timing {"starts": "after_goal", "ref_goal": "G1", "offset_text": null}
 - G3 level 20: timing {"starts": "after_goal", "ref_goal": "G1", "offset_text": "8 minutes"}
 - G4 stays powered on: timing {"starts": "with_goal", "ref_goal": "G3"}
 - no predicates.
@@ -165,7 +191,7 @@ DEPENDENCY_EXAMPLES = """\
 - G1 refrigerator setpoint, G2 dimmer on, G3 dimmer level 60: timing {"starts": "on_trigger"} for each.
 
 "Start dryer 1 in the utility room now on Max dryness level and pause dryer 1 in the utility room when washer 1 in the utility room finishes."
-- G1 start: {"starts": "now"}; G2 Max dryness: {"starts": "with_goal", "ref_goal": "G1"}
+- G1 start: {"starts": "now"}; G2 Max dryness: {"starts": "after_goal", "ref_goal": "G1", "offset_text": null}
 - P1 washer 1 finished: role "trigger", applies_to ["G3"], offset_text null, offset_direction "after".
 - G3 pause: {"starts": "on_trigger"}
 

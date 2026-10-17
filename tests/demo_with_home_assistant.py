@@ -1626,6 +1626,7 @@ async def main():
     # Create merged config that respects agents.yaml structure
     # (Each agent gets its own section + shared sections like timeouts, logging, http)
     shared_config = {
+        "default_llm": agent_config.get("default_llm", {}),
         "logging": agent_config.get("logging", {}),
         "timeouts": agent_config.get("timeouts", {}),
         "bt_execution": agent_config.get("bt_execution", {}),

@@ -1,0 +1,28 @@
+# SimuHome bench: our agents' reasoning, step by step
+
+Runs SimuHome episodes through the steps the agents run (segmentation, structuring,
+planning, execution, response) in one process, without SPADE. Each step is timed and its
+LLM calls are counted, and every episode is scored. Design:
+[docs/plans/simuhome_reasoning_harness.md](../../../docs/plans/simuhome_reasoning_harness.md).
+
+| Command | What it does | Cost |
+|---|---|---|
+| `python -m tests.simuhome.bench.run --episode qt4-2_feasible_seed_1` | one episode, every step printed, scored at once | ~5 LLM calls (+3 judge calls if infeasible) |
+| `python -m tests.simuhome.bench.run --variant V --episodes qt3_*,qt4-1_* --limit 10 --workers 2` | episodes → `<out>/<variant>/<episode>.json` | ~3–6 calls per episode |
+| `python -m tests.simuhome.bench.evaluate --records <out>/<variant> [--no-judge]` | scores → `<episode>.eval.json` | 3 judge calls per infeasible episode |
+| `python -m tests.simuhome.bench.report --root <out>` | `rates.csv`, `steps.csv`, `outcomes.csv`, `report.md` | none |
+| `python -m tests.simuhome.bench.sweep --grid variants/sweep.example.yaml [--dry-run]` | run + evaluate + report per variant | per variant as above |
+
+Prefix each command with `conda run -n ami-agents`.
+
+- **Variants** (`variants/*.yaml`) set one model per step, including local Ollama models
+  via `base_url`. A step a variant doesn't name uses the agents' default.
+- **Servers.** Each worker starts its own simulator and SHTD and stops them at the end. Use
+  `--sim/--shtd` to run against servers you already have.
+- **Timed episodes (qt4)** run in lockstep: the bench advances the simulator clock in
+  10-second virtual steps (`--step-seconds`), so a 40-minute plan finishes in seconds.
+- **Discovery** is timed separately and kept out of every statistic, since it happens
+  offline in a deployment.
+- **Scoring.** Feasible qt2, qt3 and qt4 episodes are scored by SimuHome's own evaluators.
+  qt1 uses our value check. Infeasible episodes get our execution check (nothing run on
+  the impossible part) plus SimuHome's judge on the UA's reply.

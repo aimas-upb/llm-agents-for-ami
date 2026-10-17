@@ -77,10 +77,10 @@ environment:
 
 ## LLM Configuration (`agents.yaml`)
 
-The LLM provider is configured under the `llm` key. API keys should be set via environment variables, not hardcoded.
+The shared LLM defaults (provider, default model, retry timeout) live under the top-level `default_llm` key. An agent's own `llm:` section (e.g. `user_assistant.llm.atomic_segmentation`) sets per-behaviour models and falls back to `default_llm` for anything it omits. API keys should be set via environment variables, not hardcoded.
 
 ```yaml
-llm:
+default_llm:
   default_provider: "openai"
   providers:
     openai:
@@ -103,6 +103,27 @@ interaction_solver:
       max_tokens: 2000
       max_planning_attempts: 3
 ```
+
+Dependency structures (conditions, timing, maintenance) are planned by templates, with these
+settings under `planning.dependency`:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `poll_seconds` | 30 | how often a regulated maintenance goal reads its value and acts again |
+| `default_tolerance` | 0.5 | allowed deviation from a numeric target when the device states none |
+| `stated_time_tolerance_seconds` | 60 | a start / end the user gave both as a clock time and relative to an anchor ("at 5:48 PM, which is 23 minutes before washer 1 finishes"): how far apart the two may be before the user is asked which one they mean |
+
+Planning restrictions and guidelines live in their own file,
+[`ami_agents/config/planning_guidelines.yaml`](../ami_agents/config/planning_guidelines.yaml):
+plain-language operating conditions per device class or manufacturer ("while switched
+off, other commands may be refused"). `planning.guidelines.path` (`PLANNING_GUIDELINES_PATH`)
+points to another file; empty uses the default one. Only `power_on_first` is applied so
+far, deterministically, to every plan (`interaction_solver/utils/power_on_guard.py`): in
+front of a mode, level or operational-state command on a device the entry lists (by
+class, or by exact manufacturer), the plan checks the device's on/off state and switches
+it on first -- unless the plan already switches that device on before the command, in
+execution order (dependency plans included). A device without a single on/off command is
+left unguarded, with a note.
 
 ---
 

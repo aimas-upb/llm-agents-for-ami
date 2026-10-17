@@ -11,14 +11,9 @@ from typing import Any, Dict, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
-# Import intent types from shared models. `Intent` is re-exported here because
-# several modules still import it from this location; it lives in shared because
-# the InteractionSolver uses it too.
-from ...shared.models.intents import (  # noqa: F401
-    ExplicitGoalIntent,
-    ImplicitGoalIntent,
-    Intent,
-)
+# `Intent` is re-exported here because some tests still import it from this
+# location; it lives in shared because the InteractionSolver uses it too.
+from ...shared.models.intents import Intent  # noqa: F401
 from ...shared.models.goal_structure import GoalStructure
 
 
@@ -46,7 +41,8 @@ class AtomicIntent:
     reason: str  # LLM justification for the typing
     # Descriptive labels on a GOAL_REQUEST: one specificity label
     # (explicit|incomplete|ambiguous), one goal kind (achievement|maintenance),
-    # and any of logical_dependency / temporal_dependency. Empty for queries.
+    # and any of logical_dependency / temporal_dependency / sequential_dependency.
+    # Empty for queries.
     qualifiers: List[str] = field(default_factory=list)
 
 

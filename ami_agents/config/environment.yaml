@@ -5,6 +5,16 @@ environment:
   # Discovery method: 'direct', 'well_known', 'mdns'
   discovery_method: "${ENV_DISCOVERY_METHOD:-mdns}"
 
+  # Where plans read the time from (shared/utils/clock.py): the system clock, or
+  # a clock read over HTTP -- e.g. SimuHome's virtual time through SHTD:
+  #   CLOCK_SOURCE=http CLOCK_URL=http://localhost:8097/_shtd/time
+  clock:
+    source: "${CLOCK_SOURCE:-system}"
+    http:
+      url: "${CLOCK_URL:-}"
+      field: "now"
+      format: "%Y-%m-%d %H:%M:%S"
+
   # Current environment to use (from environments section below)
   current_environment: "${CURRENT_ENVIRONMENT:-lab308}"
 

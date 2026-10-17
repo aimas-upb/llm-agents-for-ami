@@ -568,6 +568,17 @@ saref:Command. The permitted values come from the device's matching capability
 property."""@en ;
     rdfs:subClassOf saref:Command .
 
+:SetOperationalStateCommand a owl:Class ;
+    rdfs:label "Set Operational State Command"@en ;
+    rdfs:comment """Starts, pauses, resumes or stops an appliance's cycle -- a
+dishwasher, a washer, a dryer -- by the operational state it is to reach.
+
+Like SetOnOffCommand, one action stands for several commands: invoked with
+Running it is a StartCommand (or a resume, from Paused), with Paused a
+PauseCommand, with Stopped a StopCommand. It specialises the three SAREF
+lifecycle commands rather than falling back to a bare saref:Command."""@en ;
+    rdfs:subClassOf saref:StartCommand, saref:PauseCommand, saref:StopCommand .
+
 ################################################################################
 # 3. Actuatable properties -- generic  (sosa:ActuatableProperty)
 #
@@ -605,6 +616,11 @@ property."""@en ;
 :LaundryWasherControlsSpinSpeedCurrent a owl:Class ;
     rdfs:label "Laundry Washer Controls Spin Speed Current"@en ;
     rdfs:comment """The selected spin speed of a washer, chosen from the speeds that washer supports."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
+
+:OperationalState a owl:Class ;
+    rdfs:label "Operational State"@en ;
+    rdfs:comment """Whether an appliance's cycle is running, paused or stopped. Driven by Start, Pause, Resume and Stop; the states it can take are listed by the appliance's operational state list."""@en ;
     rdfs:subClassOf :ActuatableDeviceProperty .
 
 :LaundryWasherModeCurrentMode a owl:Class ;
@@ -899,6 +915,21 @@ property."""@en ;
     rdfs:label "Laundry Dryer Selected Dryness Level"@en ;
     rdfs:comment """How dry the dryer should leave the load, on a laundry dryer."""@en ;
     rdfs:subClassOf :LaundryDryerControlsSelectedDrynessLevel .
+
+:DishwasherOperationalState a owl:Class ;
+    rdfs:label "Dishwasher Operational State"@en ;
+    rdfs:comment """Whether a dishwasher's cycle is running, paused or stopped."""@en ;
+    rdfs:subClassOf :OperationalState .
+
+:LaundryDryerOperationalState a owl:Class ;
+    rdfs:label "Laundry Dryer Operational State"@en ;
+    rdfs:comment """Whether a laundry dryer's cycle is running, paused or stopped."""@en ;
+    rdfs:subClassOf :OperationalState .
+
+:LaundryWasherOperationalState a owl:Class ;
+    rdfs:label "Laundry Washer Operational State"@en ;
+    rdfs:comment """Whether a laundry washer's cycle is running, paused or stopped."""@en ;
+    rdfs:subClassOf :OperationalState .
 
 :LaundryWasherCurrentMode a owl:Class ;
     rdfs:label "Laundry Washer Current Mode"@en ;

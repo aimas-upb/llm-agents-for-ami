@@ -1,31 +1,25 @@
-"""Per-request planning workflow: orchestrates the four sub-Behaviours.
+"""Per-request planning workflow: context, then one LLM plan per intent.
 
-Spawned by ``GoalRequestBehaviour`` once per GOAL_REQUEST. It runs the
-context queries, plans with the LLM, and writes the final reply onto ``self.reply_envelope``. The
-caller (GoalRequestBehaviour) sends the SPADE reply, so the workflow
-doesn't need access to the original message envelope itself.
+Spawned by ``GoalRequestBehaviour`` for what the structured-goal paths do not
+take (dependency structures, maintenance goals, plain-text intents). It gathers
+the environment context from EnvExplorer, plans each intent with the general
+LLM planner, and writes the reply onto ``self.reply_envelope``. The caller
+sends the SPADE reply.
+
+Memory is not consulted here: it is recalled by exact key on the
+structured-goal paths (`utils/signifier_memory.py`).
 """
 
 from typing import Any, Dict, List, Optional
 
-from rdflib import Graph
 from spade.behaviour import OneShotBehaviour
 
+from ....shared.models.intents import Intent
 from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
-from ....shared.models.intents import ImplicitGoalIntent, ExplicitGoalIntent
-from ....shared.models.messages import MessageType
-from ....shared.models.intents import Intent
-from ..utils.plan_envelope import (
-    envelope_error,
-    envelope_llm_plan,
-    envelope_llm_plans,
-)
-from ..utils.environment_graph import fetch_environment_graph
-from ....bt_planning import explicit_intent_handler
+from ..utils.plan_envelope import envelope_error, envelope_llm_plans
 from .bt_plan_generation import BTPlanGenerationBehaviour
 from .env_context_query import EnvContextQueryBehaviour
-from .implicit_goal_desire import ImplicitGoalDesireInferenceBehaviour
 
 
 class PlanningWorkflowBehaviour(OneShotBehaviour):
@@ -45,181 +39,19 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
         self.reply_envelope: Optional[Dict[str, Any]] = None
 
     async def run(self) -> None:
-        intent_strings = [i.to_query_string() for i in self.intents]
-        intent_details = []
-        for i in self.intents:
-            if isinstance(i, ExplicitGoalIntent):
-                intent_details.append(f"EXPLICIT({i.target.artifact_type}:{i.action.affordance_type}:{i.action.verb})")
-            elif isinstance(i, ImplicitGoalIntent):
-                intent_details.append(f"IMPLICIT({i.subtype}:{i.text_intent[:30]}...)" if len(i.text_intent) > 30 else f"IMPLICIT({i.subtype}:{i.text_intent})")
-            else:
-                intent_details.append(str(type(i).__name__))
-        self.logger.info(
-            demo(f"PlanningWorkflow starting: intents={intent_details} workspace_id={self.workspace_id!r}")
-        )
+        self.logger.info(demo(
+            f"PlanningWorkflow starting: {len(self.intents)} intent(s) "
+            f"workspace_id={self.workspace_id!r}"))
 
-        # Step 0 — Infer affected environment variables for implicit_intent subtypes
-        self.logger.info(demo("Step 0: Inferring environment variables for implicit_intent subtypes"))
-        affected_env_vars_by_intent: Dict[str, Optional[List[Dict[str, str]]]] = {}
-        inferred_count = 0
-        skipped_count = 0
-        failed_count = 0
-        inferred_vars = []
-
-        for intent_obj in self.intents:
-            intent_str = intent_obj.to_query_string()
-
-            # Explicit intents: skip env var inference, skip signifier matching
-            if isinstance(intent_obj, ExplicitGoalIntent):
-                affected_env_vars_by_intent[intent_str] = None
-                skipped_count += 1
-                self.logger.debug(demo(f"Step 0: EXPLICIT intent ({intent_obj.target.artifact_type}:{intent_obj.action.affordance_type}), skipping env var inference"))
-            # Implicit intents with subtype != "implicit_intent": skip env var inference, skip signifier matching
-            elif isinstance(intent_obj, ImplicitGoalIntent) and intent_obj.subtype != "implicit_intent":
-                affected_env_vars_by_intent[intent_str] = None
-                skipped_count += 1
-                self.logger.debug(demo(f"Step 0: IMPLICIT {intent_obj.subtype}, skipping env var inference: {intent_str}"))
-            # Implicit intents with subtype == "implicit_intent": infer env vars
-            elif isinstance(intent_obj, ImplicitGoalIntent) and intent_obj.subtype == "implicit_intent":
-                self.logger.debug(demo(f"Step 0: Running env var inference for implicit_intent: {intent_str}"))
-                inference = ImplicitGoalDesireInferenceBehaviour(
-                    intent_text=intent_obj.text_intent,
-                    logger=self.logger,
-                )
-                self.agent.add_behaviour(inference)
-                await inference.join()
-
-                if inference.error:
-                    self.logger.warning(demo(f"Step 0: Env var inference failed for {intent_str}: {inference.error}"))
-                    affected_env_vars_by_intent[intent_str] = None
-                    failed_count += 1
-                else:
-                    env_vars = inference.result.get("affected_env_vars")
-                    # Check if result is only unknown pairs
-                    if env_vars == [{"variable": "unknown", "direction": "unknown"}]:
-                        self.logger.debug(demo(f"Step 0: Env var inference found only unknown pairs for {intent_str}"))
-                        affected_env_vars_by_intent[intent_str] = None
-                    else:
-                        formatted_vars = " | ".join([f"{v['variable']}({v['direction']})" for v in (env_vars or [])])
-                        self.logger.info(demo(f"Step 0: Inferred env vars for {intent_str}: [{formatted_vars}]"))
-                        affected_env_vars_by_intent[intent_str] = env_vars
-                        inferred_vars.append(formatted_vars)
-                        inferred_count += 1
-
-        self.logger.info(demo(f"Step 0 complete: inferred={inferred_count} [{', '.join(inferred_vars) if inferred_vars else 'none'}] skipped={skipped_count} failed={failed_count}"))
-
-        # Step 0.5 — EXPLICIT intent SPARQL path
-        self.logger.info(demo("Step 0.5: Processing EXPLICIT intents via SPARQL path"))
-        explicit_intents = [i for i in self.intents if isinstance(i, ExplicitGoalIntent)]
-        implicit_intents = [i for i in self.intents if not isinstance(i, ExplicitGoalIntent)]
-        explicit_results = {}
-        # Track candidate affordances for ambiguous EXPLICIT intents
-        explicit_intent_affordance_constraints: Dict[str, List[Dict[str, Any]]] = {}
-
-        if explicit_intents:
-            explicit_details = []
-            for e in explicit_intents:
-                explicit_details.append(
-                    f"{e.target.workspace_type}::{e.target.artifact_type}::{e.action.affordance_type}[{e.action.verb}]"
-                )
-            self.logger.info(demo(f"Step 0.5: Found {len(explicit_intents)} EXPLICIT intent(s): [{', '.join(explicit_details)}]"))
-            self.logger.debug(demo(f"Step 0.5: Fetching RDF graph from EnvExplorer"))
-            graph = await self._get_environment_rdf_graph()
-            self.logger.debug(demo(f"Step 0.5: RDF graph fetched, processing intents via SPARQL"))
-
-            deterministic_count = 0
-            ambiguous_count = 0
-            impossible_count = 0
-            deterministic_intents = []
-            ambiguous_intents = []
-
-            for intent in explicit_intents:
-                intent_str = intent.to_query_string()
-                intent_detail = f"{intent.target.artifact_type}@{intent.action.verb}"
-                self.logger.debug(demo(f"Step 0.5: SPARQL query for {intent_detail}"))
-                try:
-                    result = await explicit_intent_handler.handle_explicit_intent(
-                        intent, graph, logger=self.logger
-                    )
-
-                    if result.get("tree"):
-                        # Deterministic BT succeeded
-                        self.logger.info(demo(f"Step 0.5: {intent_detail} → DETERMINISTIC BT (source={result.get('source')})"))
-                        explicit_results[intent_str] = result
-                        deterministic_count += 1
-                        deterministic_intents.append(intent_detail)
-                    elif result.get("impossible"):
-                        # Return error envelope
-                        reason = result.get("reason", "Unknown reason")
-                        self.logger.error(demo(f"Step 0.5: {intent_detail} → IMPOSSIBLE ({result.get('source')}): {reason}"))
-                        self.reply_envelope = envelope_error(
-                            "explicit_intent_impossible",
-                            reason,
-                            [intent],
-                        )
-                        impossible_count += 1
-                        return
-                    else:
-                        # Ambiguous: fall back to LLM planning with filtered context
-                        context = result.get("context", {})
-                        candidates = len(context.get("candidate_affordances", []))
-                        self.logger.info(demo(f"Step 0.5: {intent_detail} → AMBIGUOUS ({result.get('source')}, {candidates} candidates)"))
-                        implicit_intents.append(intent)
-                        explicit_results[intent_str] = result.get("context")
-                        ambiguous_count += 1
-                        ambiguous_intents.append(intent_detail)
-                        # Store candidate affordances for context filtering later
-                        candidate_affordances = context.get("candidate_affordances", [])
-                        if candidate_affordances:
-                            self.logger.debug(demo(f"Step 0.5: Storing {len(candidate_affordances)} candidate affordances for LLM filtering"))
-                            explicit_intent_affordance_constraints[intent_str] = candidate_affordances
-
-                except Exception as e:
-                    self.logger.warning(demo(f"Step 0.5: {intent_detail} → SPARQL ERROR: {e}, falling back to implicit flow"))
-                    implicit_intents.append(intent)
-
-            self.logger.info(demo(f"Step 0.5 complete: deterministic={deterministic_count} [{', '.join(deterministic_intents)}] ambiguous={ambiguous_count} [{', '.join(ambiguous_intents)}] impossible={impossible_count}"))
-        else:
-            self.logger.debug(demo("Step 0.5: No EXPLICIT intents, skipping SPARQL path"))
-
-        # Update intent_strings to the implicit-only list
-        intent_strings = [i.to_query_string() for i in implicit_intents]
-
-        # If no implicit intents remain and we have explicit results, build reply (early exit optimization)
-        if not implicit_intents and explicit_results:
-            # All intents were EXPLICIT and succeeded deterministically
-            # Keep the result dicts intact (not just the trees) for envelope_llm_plans
-            plans_by_intent = {k: v for k, v in explicit_results.items() if v.get("tree")}
-            if plans_by_intent:
-                self.logger.info(demo(f"All intents were EXPLICIT and resolved deterministically, skipping remaining steps"))
-                self.reply_envelope = envelope_llm_plans(
-                    plans_by_intent=plans_by_intent,
-                    intents=explicit_intents,
-                    workspace_id=self.workspace_id,
-                )
-                self.logger.info(demo(f"PlanningWorkflow complete: all EXPLICIT intents produced deterministic BTs"))
-                return
-
-        # No signifier matching here: memory is consulted by the structured-goal
-        # paths, by exact key (`utils/signifier_memory.py`). This workflow plans
-        # what those paths do not take, from the environment alone.
-
-        # Step 3 — LLM path: gather context, then generate.
-        self.logger.info(demo(f"Step 3: Gathering environment context from EnvExplorer (workspace_id={self.workspace_id!r})"))
+        # 1. The environment context.
+        self.logger.info(demo(f"Step 1: Gathering environment context from EnvExplorer (workspace_id={self.workspace_id!r})"))
         ctx = EnvContextQueryBehaviour(
             workspace_id=self.workspace_id, logger=self.logger
         )
         self.agent.add_behaviour(ctx)
         await ctx.join()
         if ctx.error:
-            self.logger.error(demo(f"Step 3: Context gathering failed: {ctx.error}"))
-            # Populate affected_env_vars even on error for complete intent structure
-            for intent_obj in self.intents:
-                if isinstance(intent_obj, ImplicitGoalIntent):
-                    intent_str = intent_obj.to_query_string()
-                    if intent_str in affected_env_vars_by_intent:
-                        intent_obj.affected_env_vars = affected_env_vars_by_intent[intent_str]
-
+            self.logger.error(demo(f"Step 1: Context gathering failed: {ctx.error}"))
             self.reply_envelope = envelope_error(
                 "context_gathering_failed",
                 ctx.error,
@@ -227,10 +59,10 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
             )
             return
 
-        self.logger.info(demo(f"Step 3: Context gathered - affordances={len(ctx.affordances)} artifact_count={len(ctx.state_payload.get('artifacts', {})) if isinstance(ctx.state_payload, dict) else 0}"))
+        self.logger.info(demo(f"Step 1: Context gathered - affordances={len(ctx.affordances)} artifact_count={len(ctx.state_payload.get('artifacts', {})) if isinstance(ctx.state_payload, dict) else 0}"))
 
-        # Step 4 — Plan each atomic intent separately
-        self.logger.info(demo(f"Step 4: LLM-based planning for {len(self.intents)} intent(s)"))
+        # 2. Plan each atomic intent separately.
+        self.logger.info(demo(f"Step 2: LLM-based planning for {len(self.intents)} intent(s)"))
         plans_by_intent = {}
         plan_success_count = 0
         plan_error_count = 0
@@ -239,63 +71,27 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
 
         for intent_obj in self.intents:
             intent_str = intent_obj.to_query_string()
-            intent_type_str = "EXPLICIT" if isinstance(intent_obj, ExplicitGoalIntent) else "IMPLICIT"
-            intent_label = f"{intent_type_str}({intent_str[:40]}...)" if len(intent_str) > 40 else f"{intent_type_str}({intent_str})"
-
-            # Convert affected_env_vars to only populated entries for BT planner
-            affected_env_vars_for_planner = {}
-            has_env_vars = False
-            if intent_str in affected_env_vars_by_intent and affected_env_vars_by_intent[intent_str] is not None:
-                affected_env_vars_for_planner[intent_str] = affected_env_vars_by_intent[intent_str]
-                has_env_vars = True
-
-            # Filter affordances for constrained EXPLICIT intents (ambiguous cases)
-            # Keep entire artifacts (both action AND property affordances)
-            affordances_for_planner = ctx.affordances
-            affordance_filtering_applied = False
-            if intent_str in explicit_intent_affordance_constraints:
-                candidate_affordances = explicit_intent_affordance_constraints[intent_str]
-                # Extract artifact URIs from SPARQL results
-                candidate_artifact_uris = {
-                    str(a.get("artifact", "")).strip()
-                    for a in candidate_affordances
-                    if a.get("artifact")
-                }
-                if candidate_artifact_uris:
-                    # Filter to include all affordances (action + property) from candidate artifacts
-                    # artifact_id in ctx.affordances is an RDF URI that matches SPARQL ?artifact
-                    affordances_for_planner = [
-                        a for a in ctx.affordances
-                        if str(a.get("artifact_id", "")).strip() in candidate_artifact_uris
-                    ]
-                    affordance_filtering_applied = True
-                    self.logger.info(
-                        demo(
-                            f"Step 4: {intent_label} filtered affordances: "
-                            f"{len(affordances_for_planner)} out of {len(ctx.affordances)} "
-                            f"(candidate artifacts: {len(candidate_artifact_uris)})"
-                        )
-                    )
-
-            self.logger.debug(demo(f"Step 4: {intent_label} BT planner input: affordances={len(affordances_for_planner)} env_vars={has_env_vars} filtered={affordance_filtering_applied}"))
+            intent_label = f"({intent_str[:40]}...)" if len(intent_str) > 40 else f"({intent_str})"
+            self.logger.debug(demo(f"Step 2: {intent_label} BT planner input: "
+                                   f"affordances={len(ctx.affordances)}"))
 
             plan_gen = BTPlanGenerationBehaviour(
                 intent_strings=[intent_str],  # Plan single intent at a time
-                affordances=affordances_for_planner,
+                affordances=ctx.affordances,
                 state=(
                     ctx.state_payload.get("state")
                     if isinstance(ctx.state_payload, dict)
                     else ctx.state_payload
                 ),
                 signifier_hints=None,
-                affected_env_vars=affected_env_vars_for_planner if affected_env_vars_for_planner else None,
+                affected_env_vars=None,
                 logger=self.logger,
             )
             self.agent.add_behaviour(plan_gen)
             await plan_gen.join()
 
             if plan_gen.error:
-                self.logger.error(demo(f"Step 4: {intent_label} planning failed: {plan_gen.error}"))
+                self.logger.error(demo(f"Step 2: {intent_label} planning failed: {plan_gen.error}"))
                 self.reply_envelope = envelope_error(
                     "plan_generation_failed",
                     plan_gen.error,
@@ -319,36 +115,18 @@ class PlanningWorkflowBehaviour(OneShotBehaviour):
                     return count
                 node_count = count_nodes(bt_result)
 
-            self.logger.info(demo(f"Step 4: {intent_label} planning succeeded (nodes={node_count})"))
+            self.logger.info(demo(f"Step 2: {intent_label} planning succeeded (nodes={node_count})"))
             plans_by_intent[intent_str] = bt_result
             successful_intents.append(f"{intent_label}[{node_count}]")
             plan_success_count += 1
 
-        self.logger.info(demo(f"Step 4 complete: successful={plan_success_count} [{', '.join(successful_intents)}] failed={plan_error_count} [{', '.join(failed_intents)}]"))
-
-        # Populate affected_env_vars back into intent objects for storage in signifiers
-        for intent_obj in self.intents:
-            if isinstance(intent_obj, ImplicitGoalIntent):
-                intent_str = intent_obj.to_query_string()
-                if intent_str in affected_env_vars_by_intent:
-                    intent_obj.affected_env_vars = affected_env_vars_by_intent[intent_str]
-        self.logger.debug(demo(f"Step 4: Populated affected_env_vars for {len([i for i in self.intents if isinstance(i, ImplicitGoalIntent)])} implicit intent(s)"))
+        self.logger.info(demo(f"Step 2 complete: successful={plan_success_count} [{', '.join(successful_intents)}] failed={plan_error_count} [{', '.join(failed_intents)}]"))
 
         # Combine all plans into a single tree with parallel execution
-        self.logger.info(demo(f"Step 4: Combining {len(plans_by_intent)} LLM-generated plan(s) with parallel execution"))
+        self.logger.info(demo(f"Step 2: Combining {len(plans_by_intent)} LLM-generated plan(s) with parallel execution"))
         self.reply_envelope = envelope_llm_plans(
             plans_by_intent=plans_by_intent,
             intents=self.intents,
             workspace_id=self.workspace_id,
         )
         self.logger.info(demo(f"PlanningWorkflow complete: {len(plans_by_intent)} plan(s) generated successfully via LLM path"))
-
-    async def _get_environment_rdf_graph(self) -> Graph:
-        """
-        Fetch RDF graph from EnvExplorer using ENV_CAPABILITIES_REQUEST with detail_level="detailed".
-        Cache it to avoid redundant RPC calls within a single planning workflow.
-        """
-        if not hasattr(self, "_cached_rdf_graph"):
-            self._cached_rdf_graph = await fetch_environment_graph(self.agent, self.logger)
-        return self._cached_rdf_graph
-

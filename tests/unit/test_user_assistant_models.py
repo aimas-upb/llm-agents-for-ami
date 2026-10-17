@@ -63,10 +63,10 @@ class TestConversationState:
         assert conv.is_query is False
 
     def test_clear_plan(self):
-        from ami_agents.shared.models.intents import ImplicitGoalIntent
+        from ami_agents.shared.models.goal_structure import GoalStructure
         conv = ConversationState(
             phase=ConversationPhase.AWAITING_CONFIRMATION,
-            intents=[ImplicitGoalIntent(text_intent="turn on the light", reason="User wants to turn on light")],
+            intents=[GoalStructure(intent_text="turn on the light")],
             workspace_id="lab308",
             plan_json='{"tree": {}}',
             plan_hash="abc123",

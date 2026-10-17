@@ -47,7 +47,7 @@ A phrase that raises a **different** concern is different. If it is about anothe
    - a step is timed from a previous step: "move blinds 1 to 80% closed 11 minutes from now and adjust it to 65% 19 minutes after the previous action";
    - a step waits on another device's cycle: "wait for washer 1 to finish, then after 19 minutes start dryer 2";
    - a device is paused or stopped by another device's cycle; that step stays with the device's other actions: "start washer 1 now and pause it when washer 2 finishes".
-5. **Drop any split between actions on the same device at the same moment that serve one outcome**, as in "turn on, set to max and start running now".
+5. **Drop any split between several instructions to the same device given together**, as in "turn on, set to max and start running now". They are one intent, qualified `sequential_dependency`: its instructions are carried out one after another on that device.
 6. **Keep all remaining splits.** Requests on different devices or rooms with no shared trigger and no chaining, and concerns about different places or conditions, are separate intents.
 
 Final check: every intent must be actionable without knowing the outcome of any other. If one depends on another, merge them.
@@ -80,7 +80,7 @@ Final check: every intent must be actionable without knowing the outcome of any 
 
 **No split: several actions on one device at one moment**
 
-- "Okay utility room dryer 2, turn on, set to max and start running now" → **1**. Same device, same moment, one outcome.
+- "Okay utility room dryer 2, turn on, set to max and start running now" → **1**, qualified `sequential_dependency`. Three instructions to the same device, carried out one after another.
 
 **No split: a reason, occasion or wish stays with its command**
 
@@ -137,6 +137,7 @@ For a GOAL_REQUEST, emit exactly one label from axis A, exactly one from axis C,
 **Axis B — structure (zero or more):**
 - `logical_dependency` — the intent covers one or more subgoals related to each other in a dependent manner: the execution of one depends on another, or one is a verification/trigger and the other an execution/action.
 - `temporal_dependency` — the intent covers subgoals whose execution is temporally conditioned: delayed until a specified time, planned after a relative delay, or planned a relative time after a state is verified or a goal achieved.
+- `sequential_dependency` — the intent gives several instructions to the same device, carried out one after another on it: "turn on washer 2 and start it", "switch on heat pump 1 in the bedroom, put it in heating mode and set the fan to 40 percent". One instruction per device does not carry it.
 
 **Axis C — goal kind (exactly one):**
 - `achievement` — the goal is considered performed once its actions have been executed, or it has a time-bounded objective.
@@ -147,8 +148,9 @@ Worked assignments:
 - "It is getting a bit dim in the living room this afternoon, can you turn on living room light 2." → `["explicit", "achievement"]`.
 - "Man the bathroom air feels kinda dusty my throat is a bit scratchy" → `["ambiguous", "achievement"]`.
 - "turn on the fan" (no room, no setting) → `["incomplete", "achievement"]`.
-- "At 4:47 PM, that is 17 minutes from now, turn on air purifier 1 in the bathroom and set the fan to 80 percent" → `["explicit", "temporal_dependency", "achievement"]`.
-- "Wait for washer 1 in the utility room to finish. Then after 19 minutes start dryer 2 in the utility room and set it to Running state and Normal dryness level." → `["explicit", "logical_dependency", "temporal_dependency", "achievement"]`.
+- "Okay utility room dryer 2, turn on, set to max and start running now" → `["explicit", "sequential_dependency", "achievement"]`.
+- "At 4:47 PM, that is 17 minutes from now, turn on air purifier 1 in the bathroom and set the fan to 80 percent" → `["explicit", "temporal_dependency", "sequential_dependency", "achievement"]`.
+- "Wait for washer 1 in the utility room to finish. Then after 19 minutes start dryer 2 in the utility room and set it to Running state and Normal dryness level." → `["explicit", "logical_dependency", "temporal_dependency", "sequential_dependency", "achievement"]`.
 - "keep the living room at 22 degrees while I am working" → `["explicit", "maintenance"]`.
 
 ## Output
@@ -171,7 +173,7 @@ Field requirements:
 - **intents**: an array of atomic intent objects, at least one, ordered as the intents appear in the user's input.
 - **text**: a non-empty, self-contained string, built per "Writing the intent text" above.
 - **type**: exactly one of the three string literals. No other value is permitted.
-- **qualifiers**: an array of strings drawn only from the seven labels defined above. For a GOAL_REQUEST: exactly one of `explicit` / `incomplete` / `ambiguous`, exactly one of `achievement` / `maintenance`, and any applicable structural labels. Empty for the other two types.
+- **qualifiers**: an array of strings drawn only from the eight labels defined above. For a GOAL_REQUEST: exactly one of `explicit` / `incomplete` / `ambiguous`, exactly one of `achievement` / `maintenance`, and any applicable structural labels. Empty for the other two types.
 - **reason**: a non-empty string, required for every intent. It must justify both the assigned type and why this was treated as a single atomic intent. If the text repeated shared context from elsewhere in the phrase, the reason must name the substring that was repeated.
 
 Output nothing outside the JSON object — no device/command parsing, no resolved values, no commentary.

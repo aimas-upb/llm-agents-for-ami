@@ -52,10 +52,11 @@ from .utils import build_llm_client, build_llm_call_kwargs, build_behaviour_llm_
 _DEFAULT_GOAL_REQUEST_TIMEOUT_S = 60.0
 _DEFAULT_RPC_CALL_TIMEOUT_S = 15.0
 _DEFAULT_SIGNIFIER_MATCH_TIMEOUT_S = 10.0
-_DEFAULT_BT_MAX_TICKS = 50
+_DEFAULT_BT_MAX_TICKS = 100
 _DEFAULT_BT_MIN_TICK_YIELD_S = 0.01
 _DEFAULT_BT_MAINTENANCE_INTERVAL_S = 180.0
 _DEFAULT_BT_MAINTENANCE_TRIGGER_POLL_S = 5.0
+_DEFAULT_BT_DEPENDENCY_TICK_PERIOD_S = 1.0
 # How long an action plan waits for a yes/no before assuming confirmation.
 # Read-only plans do not wait at all.
 _DEFAULT_CONFIRMATION_TIMEOUT_S = 5.0
@@ -137,6 +138,10 @@ class UserAssistantAgent(Agent, IAgent):
             config.get("bt_execution", {})
             .get("maintenance_trigger_poll",
                  _DEFAULT_BT_MAINTENANCE_TRIGGER_POLL_S)
+        )
+        self.bt_dependency_tick_period: float = float(
+            config.get("bt_execution", {})
+            .get("dependency_tick_period", _DEFAULT_BT_DEPENDENCY_TICK_PERIOD_S)
         )
 
         # ── Execution engine ────────────────────────────────────────

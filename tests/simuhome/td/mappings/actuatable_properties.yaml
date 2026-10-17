@@ -8,7 +8,7 @@ generator:
   table: actuatable_properties
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-08-29T16:29:56.722023+00:00'
+  generated_at_utc: '2026-10-14T19:50:08.901285+00:00'
 rows:
 - key: AirConditioner:6.0
   family: AirConditioner
@@ -1196,6 +1196,88 @@ rows:
     status_source: inherited from approved homeont:DishwasherModeCurrentMode
   status: auto
   action_class: homeont:SetModeCommand
+- key: Dishwasher:96.4
+  family: Dishwasher
+  yaml_path: OperationalState.OperationalState
+  affordance_name: operationalState
+  td_name: dishwasherOperationalState
+  sosa_type: sosa:ActuatableProperty
+  sosa_role: device_state
+  property_node: anonymous
+  property_type: homeont:DishwasherOperationalState
+  subClassOf: homeont:OperationalState
+  constraints_source: per-instance, from the device's HA entity
+  has_immediate_effect: true
+  no_effect_reason: null
+  quantity: null
+  mechanism: command
+  writable: false
+  matter: &id012
+    cluster_id: 96
+    cluster_id_hex: '0x0060'
+    cluster_name: Operational State
+    attribute_id: 4
+    attribute_id_hex: '0x0004'
+    attribute_name: OperationalState
+    type: OperationalStateEnum
+  unit: null
+  evidence:
+    rationale: read-only in the spec but driven by cluster commands
+    hierarchy: family leaf under homeont:OperationalState, which generalises the Matter process cluster
+      across families
+    status_source: inherited from approved homeont:OperationalState
+  status: auto
+  action_class: homeont:SetOperationalStateCommand
+- key: LaundryDryer:96.4
+  family: LaundryDryer
+  yaml_path: OperationalState.OperationalState
+  affordance_name: operationalState
+  td_name: laundryDryerOperationalState
+  sosa_type: sosa:ActuatableProperty
+  sosa_role: device_state
+  property_node: anonymous
+  property_type: homeont:LaundryDryerOperationalState
+  subClassOf: homeont:OperationalState
+  constraints_source: per-instance, from the device's HA entity
+  has_immediate_effect: true
+  no_effect_reason: null
+  quantity: null
+  mechanism: command
+  writable: false
+  matter: *id012
+  unit: null
+  evidence:
+    rationale: read-only in the spec but driven by cluster commands
+    hierarchy: family leaf under homeont:OperationalState, which generalises the Matter process cluster
+      across families
+    status_source: inherited from approved homeont:OperationalState
+  status: auto
+  action_class: homeont:SetOperationalStateCommand
+- key: LaundryWasher:96.4
+  family: LaundryWasher
+  yaml_path: OperationalState.OperationalState
+  affordance_name: operationalState
+  td_name: laundryWasherOperationalState
+  sosa_type: sosa:ActuatableProperty
+  sosa_role: device_state
+  property_node: anonymous
+  property_type: homeont:LaundryWasherOperationalState
+  subClassOf: homeont:OperationalState
+  constraints_source: per-instance, from the device's HA entity
+  has_immediate_effect: true
+  no_effect_reason: null
+  quantity: null
+  mechanism: command
+  writable: false
+  matter: *id012
+  unit: null
+  evidence:
+    rationale: read-only in the spec but driven by cluster commands
+    hierarchy: family leaf under homeont:OperationalState, which generalises the Matter process cluster
+      across families
+    status_source: inherited from approved homeont:OperationalState
+  status: auto
+  action_class: homeont:SetOperationalStateCommand
 - key: WindowCoveringController:258.11
   family: WindowCoveringController
   yaml_path: WindowCovering.TargetPositionLiftPercent100ths
@@ -1308,7 +1390,7 @@ rows:
   quantity: air_temperature
   mechanism: attribute_write
   writable: true
-  matter: &id012
+  matter: &id013
     cluster_id: 513
     cluster_id_hex: '0x0201'
     cluster_name: Thermostat
@@ -1339,7 +1421,7 @@ rows:
   quantity: air_temperature
   mechanism: attribute_write
   writable: true
-  matter: *id012
+  matter: *id013
   unit: °C
   evidence:
     rationale: spec declares write access
@@ -1363,7 +1445,7 @@ rows:
   quantity: air_temperature
   mechanism: attribute_write
   writable: true
-  matter: &id013
+  matter: &id014
     cluster_id: 513
     cluster_id_hex: '0x0201'
     cluster_name: Thermostat
@@ -1394,7 +1476,7 @@ rows:
   quantity: air_temperature
   mechanism: attribute_write
   writable: true
-  matter: *id013
+  matter: *id014
   unit: °C
   evidence:
     rationale: spec declares write access
@@ -1418,7 +1500,7 @@ rows:
   quantity: null
   mechanism: attribute_write
   writable: true
-  matter: &id014
+  matter: &id015
     cluster_id: 513
     cluster_id_hex: '0x0201'
     cluster_name: Thermostat
@@ -1450,7 +1532,7 @@ rows:
   quantity: null
   mechanism: attribute_write
   writable: true
-  matter: *id014
+  matter: *id015
   unit: null
   evidence:
     rationale: spec declares write access
@@ -1475,7 +1557,7 @@ rows:
   quantity: null
   mechanism: attribute_write
   writable: true
-  matter: &id015
+  matter: &id016
     cluster_id: 513
     cluster_id_hex: '0x0201'
     cluster_name: Thermostat
@@ -1507,7 +1589,7 @@ rows:
   quantity: null
   mechanism: attribute_write
   writable: true
-  matter: *id015
+  matter: *id016
   unit: null
   evidence:
     rationale: spec declares write access
@@ -1532,7 +1614,7 @@ rows:
   quantity: null
   mechanism: attribute_write
   writable: true
-  matter: &id016
+  matter: &id017
     cluster_id: 514
     cluster_id_hex: '0x0202'
     cluster_name: Fan Control
@@ -1564,7 +1646,7 @@ rows:
   quantity: null
   mechanism: attribute_write
   writable: true
-  matter: *id016
+  matter: *id017
   unit: null
   evidence:
     rationale: spec declares write access
@@ -1589,7 +1671,7 @@ rows:
   quantity: null
   mechanism: attribute_write
   writable: true
-  matter: *id016
+  matter: *id017
   unit: null
   evidence:
     rationale: spec declares write access
@@ -1614,7 +1696,7 @@ rows:
   quantity: null
   mechanism: attribute_write
   writable: true
-  matter: *id016
+  matter: *id017
   unit: null
   evidence:
     rationale: spec declares write access
@@ -1639,7 +1721,7 @@ rows:
   quantity: null
   mechanism: attribute_write
   writable: true
-  matter: *id016
+  matter: *id017
   unit: null
   evidence:
     rationale: spec declares write access
@@ -1664,7 +1746,7 @@ rows:
   quantity: null
   mechanism: attribute_write
   writable: true
-  matter: &id017
+  matter: &id018
     cluster_id: 514
     cluster_id_hex: '0x0202'
     cluster_name: Fan Control
@@ -1696,7 +1778,7 @@ rows:
   quantity: null
   mechanism: attribute_write
   writable: true
-  matter: *id017
+  matter: *id018
   unit: '%'
   evidence:
     rationale: spec declares write access
@@ -1721,7 +1803,7 @@ rows:
   quantity: null
   mechanism: attribute_write
   writable: true
-  matter: *id017
+  matter: *id018
   unit: '%'
   evidence:
     rationale: spec declares write access
@@ -1746,7 +1828,7 @@ rows:
   quantity: null
   mechanism: attribute_write
   writable: true
-  matter: *id017
+  matter: *id018
   unit: '%'
   evidence:
     rationale: spec declares write access
@@ -1771,7 +1853,7 @@ rows:
   quantity: null
   mechanism: attribute_write
   writable: true
-  matter: *id017
+  matter: *id018
   unit: '%'
   evidence:
     rationale: spec declares write access

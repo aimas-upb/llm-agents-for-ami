@@ -106,7 +106,7 @@ def _default_config():
     if not LLM_API_KEY:
         raise RuntimeError("Missing OPENAI_API_KEY environment variable.")
     return {
-        "llm": {
+        "default_llm": {
             "default_provider": "openai",
             "providers": {
                 "openai": {

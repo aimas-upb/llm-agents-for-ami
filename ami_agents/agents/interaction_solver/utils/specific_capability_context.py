@@ -310,6 +310,14 @@ def property_affordance(graph: Graph, artifact: Any, prop: Any) -> Dict[str, Any
         "artifact_name": _title(graph, artifact),
         "semantic_types": _homeont_types(graph, prop),
     }
+    # The affordance's own kind (tdsosa:ActuatablePropertyAffordance, ...): whether
+    # the device regulates to it is what a maintenance profile asks.
+    kinds = sorted(shorten(t) for t in graph.objects(prop, RDF.type) if in_namespace(t, TDSOSA))
+    if kinds:
+        aff["affordance_kinds"] = kinds
+    unit = graph.value(prop, QUDT.unit)
+    if unit is not None:
+        aff["unit"] = shorten(unit)
     output = graph.value(prop, TD.hasOutputSchema)
     if output is not None:
         aff["output_schema"] = json_schema(graph, output)
@@ -485,7 +493,10 @@ DIRECTION_INSTRUCTIONS = (
     "the variable: decide from the action and its input which value moves it the "
     "wanted way (turn a dehumidifier on; lower a cooling setpoint). Read the current "
     "value first when the value to set depends on it. If nothing can move a variable "
-    "the wanted way, answer impossible.")
+    "the wanted way, answer impossible. Wrap each step that only helps -- a setpoint, a "
+    "fan speed, a level that strengthens the effect -- in ignore_failure, so a device "
+    "rejecting it does not stop the other steps; leave unwrapped the steps without "
+    "which nothing moves the variable (switching the device on, setting its mode).")
 
 
 def _direction(graph: Graph, actuation: Any) -> str:
