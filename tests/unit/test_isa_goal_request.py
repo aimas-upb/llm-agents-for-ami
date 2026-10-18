@@ -1,7 +1,7 @@
 """GoalRequestBehaviour: structured goals in, deterministic or workflow plans out."""
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -27,8 +27,9 @@ def _structure(text, **fields):
 
 
 class _NoGuard:
-    """Stands in for the power-on guard step (tested in test_power_on_guard.py):
-    leaves the entries as planned."""
+    """Stands in for the guard steps -- the condition-guard check and the
+    power-on guard (tested in test_condition_guard.py and
+    test_power_on_guard.py): leaves the entries as planned."""
 
     def __init__(self, entries, logger=None, graph=None):
         pass
@@ -38,8 +39,11 @@ class _NoGuard:
 
 
 @pytest.fixture(autouse=True)
-def no_power_on_guard():
-    with patch(f"{MODULE}.PowerOnGuardBehaviour", _NoGuard):
+def no_guards():
+    """Both guard steps stubbed, and the TD graph they share not fetched."""
+    with patch(f"{MODULE}.PowerOnGuardBehaviour", _NoGuard), \
+         patch(f"{MODULE}.ConditionGuardBehaviour", _NoGuard), \
+         patch(f"{MODULE}.fetch_environment_graph", AsyncMock(return_value=None)):
         yield
 
 

@@ -1,6 +1,13 @@
 """
 Prompts for BehaviorTree planning with signifier hint injection.
+
+The model names every affordance by its device, its td:title and its class,
+exactly as the device list shows them -- never by an id or a URL. Code finds
+the URL (`affordance_refs.AffordanceCatalog`). The hint sections name
+affordances the same way.
 """
+
+from .affordance_refs import AffordanceCatalog
 
 
 BT_PLANNING_SYSTEM_PROMPT = """\
@@ -12,9 +19,11 @@ You generate executable behavior tree specifications in JSON format using the ge
 1. **sequence**: Executes children left-to-right. Fails on first failure. Use for ordered steps.
 2. **selector**: Tries children left-to-right. Succeeds on first success. Use for alternatives/fallbacks.
 3. **parallel**: Runs all children concurrently. Policy: "success_on_all" or "success_on_one".
-4. **action**: Leaf node that invokes an action affordance. Requires "affordance_id" (an [action] id from the affordances list) and optional "parameters".
-5. **condition**: Leaf node that checks a property value. Requires "affordance_id" (a [property] id from the affordances list, or a readable property id/URL from the hints) and "expected_value". Optional "operator" (==, !=, >, <, >=, <=).
-6. **wait_condition**: Leaf node that repeatedly checks a property value until it matches or times out. Requires "affordance_id", "expected_value"; optional "operator", "timeout_seconds", "poll_interval_seconds".
+4. **action**: Leaf node that invokes an action. Requires "artifact", "affordance" and "affordance_class" naming one entry under a device's `actions:`, and optional "parameters".
+5. **condition**: Leaf node that checks a property value. Requires "artifact", "affordance" and "affordance_class" naming one entry under a device's `properties:`, and "expected_value". Optional "operator" (==, !=, >, <, >=, <=).
+6. **wait_condition**: Leaf node that repeatedly checks a property value until it matches or times out. Requires "artifact", "affordance" and "affordance_class" naming one entry under a device's `properties:`, and "expected_value"; optional "operator", "timeout_seconds", "poll_interval_seconds".
+
+How to name an affordance: "artifact" is the device's name as listed, "affordance" the entry's name, "affordance_class" its class -- all copied exactly from the device list. An action and a property may have the same name (a device's "currentMode" can be both): an action node names the one under `actions:`, a condition or wait_condition the one under `properties:`, with that entry's class.
 7. **ignore_failure**: Wraps exactly one child (in "children"); succeeds whether the child succeeds or fails. Use for a step that only helps, so a device rejecting it does not stop the steps after it.
 
 ## Common Patterns
@@ -49,9 +58,9 @@ Behavior trees have no native if/else. To encode "if X then do A, else do B," us
 The sequence here is doing its proper job: the action runs ONLY when its guarding condition succeeds. Do not try to express this with a flat selector of [condition, actionA, actionB] — that means something completely different (it would run actionA whenever X is false, and never run actionB at all unless actionA also fails).
 
 ## Environment Interaction
-- Actions are invoked via HTTP POST to action_url with JSON parameters
-- Properties are read via HTTP GET from property_url returning JSON values
-- All URLs come from the affordances list provided below
+- Actions are invoked with the JSON "parameters" you give, as their input describes
+- Properties are read and compared with "expected_value"
+- Only the devices, actions and properties in the device list below exist
 
 ## Feasibility Check (run this FIRST, before any planning)
 
@@ -71,8 +80,8 @@ When in doubt about whether an affordance genuinely affects the desired state, t
 ## Rules
 - If a requested action is impossible (no matching affordance exists, or no affordance affects the desired state per the Feasibility Check), set "impossible": true and explain why.
 - If partial actions are possible, generate a tree for the possible ones and explain what's missing.
-- Always use exact affordance ids from the provided affordances list (or readable property ids/URLs from the hints). Never invent ids or URLs.
-- Never use a semantic environment property ID such as `/workspaces/.../environment/...` as a condition `affordance_id` unless it is explicitly marked as readable.
+- Always name devices, actions and properties exactly as the device list shows them. Never invent a name, and never write a URL.
+- An environment variable named in the observable-property hints is not a property you can read: check it through a readable sensor property the hints name, which is in the device list.
 - Use appropriate BT control patterns based on command relationships.
 - Never start a sequence with an equality condition on the current value of a property before an action: if the value differs, the action never runs. Use the selector idempotent pattern or a range operator instead.
 - Every numeric threshold or expected_value in a condition MUST be copied verbatim from the Current State section, an observable-property hint target band, or an explicit value in the user request. NEVER invent a threshold (e.g. do not assume "warm" means 30 degrees -- read the actual current value).
@@ -84,7 +93,7 @@ When in doubt about whether an affordance genuinely affects the desired state, t
 - If an observable property hint provides only `target_max`, generate a condition with operator `<=` and `expected_value = target_max`.
 - If an observable property hint provides only `target_min`, generate a condition with operator `>=` and `expected_value = target_min`.
 - If an observable property hint provides both `target_min` and `target_max`, treat that as an acceptable band and use `>= target_min`, `<= target_max`, or both as separate conditions. Do not turn range hints into exact equality checks.
-- If an observable property hint lists a settling time for an action and provides a readable sensor property id/URL, use a `wait_condition` after that action to verify the target band after the delayed effect.
+- If an observable property hint lists a settling time for an action and names a readable sensor property, use a `wait_condition` on that property after the action to verify the target band after the delayed effect.
 - Set `wait_condition.timeout_seconds` to at least the listed settling time, preferably settling time plus a small margin. Use `poll_interval_seconds` around 1-5 seconds.
 - Do not put immediate post-action `condition` nodes after actions whose relevant effect has a settling time; use `wait_condition` for the post-action verification instead.
 
@@ -104,139 +113,29 @@ When signifier hints are provided below, treat them as the authoritative guide f
 """
 
 
-def _affordance_target(aff: dict) -> str:
-    """Return the callable URL (hctl:hasTarget) of an affordance dict."""
-    return str(aff.get("target") or aff.get("affordance_uri") or aff.get("href") or "")
-
-
-def _artifact_short_name(aff: dict) -> str:
-    """Derive a short artifact label from an affordance dict."""
-    name = aff.get("artifact_name")
-    if isinstance(name, str) and name.strip():
-        return name.strip()
-    artifact = str(aff.get("artifact_id") or aff.get("artifact_uri") or "")
-    artifact = artifact.split("#")[0].rstrip("/")
-    return artifact.rsplit("/", 1)[-1] if artifact else "env"
-
-
-def build_affordance_index(affordances: list[dict]) -> dict[str, dict]:
-    """
-    Assign short, deterministic ids (``artifact/name``) to affordances.
-
-    The ids are shown to the LLM instead of URLs/schemas and resolved back to
-    target URLs by the planner after generation. Collisions get a ``-N`` suffix.
-    """
-    index: dict[str, dict] = {}
-    for aff in affordances or []:
-        if not isinstance(aff, dict):
-            continue
-        name = aff.get("action_name") or aff.get("name") or "affordance"
-        base_ref = f"{_artifact_short_name(aff)}/{name}"
-        ref = base_ref
-        counter = 2
-        while ref in index:
-            ref = f"{base_ref}-{counter}"
-            counter += 1
-        index[ref] = aff
-    return index
-
-
-def build_url_to_ref(index: dict[str, dict]) -> dict[str, str]:
-    """Map normalized affordance target URLs back to their short ids."""
-    url_to_ref: dict[str, str] = {}
-    for ref, aff in index.items():
-        target = _affordance_target(aff).rstrip("/")
-        if target and target not in url_to_ref:
-            url_to_ref[target] = ref
-    return url_to_ref
-
-
-def _short_type(param_type) -> str:
-    """Shorten schema type IRIs like ``...json-schema#NumberSchema`` to ``number``."""
-    text = str(param_type or "")
-    if "#" in text:
-        text = text.rsplit("#", 1)[-1]
-    if text.endswith("Schema"):
-        text = text[: -len("Schema")]
-    return text.lower()
-
-
-def _schema_param_summary(schema) -> str:
-    """Summarise a JSON Schema as compact ``name:type*`` parameter labels."""
-    if not isinstance(schema, dict):
-        return ""
-    props = schema.get("properties")
-    if not isinstance(props, dict) or not props:
-        return ""
-    required = set(schema.get("required") or [])
-    parts = []
-    for key, sub in props.items():
-        param_type = _short_type(sub.get("type")) if isinstance(sub, dict) else ""
-        label = f"{key}:{param_type}" if param_type else str(key)
-        if key in required:
-            label += "*"
-        parts.append(label)
-    return ", ".join(parts)
-
-
 def format_capability_context(
-    affordances: list[dict],
+    catalog: AffordanceCatalog,
     state: dict | None = None,
-    index: dict[str, dict] | None = None,
 ) -> str:
-    """
-    Format affordances and state into a context string for the planning prompt.
-
-    Handles both BT-repo field names (affordance_uri, artifact_uri) and
-    EnvExplorer field names (affordance_id, artifact_id, target, form).
-
-    Args:
-        affordances: List of affordance dicts from EnvExplorer
-        state: Optional state dict (artifact_uri -> properties)
-        index: Optional precomputed id index from ``build_affordance_index``
-
-    Returns:
-        Formatted context string
-    """
+    """The device list (each device's actions and properties, by name and
+    class, `AffordanceCatalog.render`) and the current state, for the
+    planning prompt. No URLs, no ids."""
     lines = []
 
-    if affordances:
-        lines.append("### Affordances")
-        lines.append("Use the target URL as action_url (for action nodes) or property_url (for condition nodes).")
+    # 1. The devices, their actions and their properties.
+    if catalog.devices:
+        lines.append("### Devices")
+        lines.append("Each entry: name | class | input (actions) or what it reads "
+                     "(properties) | what it acts upon.")
         lines.append("")
-        for aff in affordances:
-            name = aff.get("action_name") or aff.get("name", "unknown")
-            aff_type = aff.get("type", "unknown").replace("_affordance", "")
+        lines.append(catalog.render())
 
-            # Extract URL from various possible locations (hierarchical JSON has form.href)
-            form = aff.get("form")
-            if isinstance(form, dict):
-                target = form.get("href", "")
-                method = form.get("method", "POST")
-            else:
-                # Fallback to flat field names
-                target = aff.get("target") or aff.get("affordance_uri") or aff.get("href", "")
-                method = aff.get("method", "POST")
-
-            artifact = aff.get("artifact_id") or aff.get("artifact_uri", "")
-            input_schema = aff.get("input_schema")
-            semantic_types = aff.get("semantic_types", [])
-            description = aff.get("description", "")
-
-            lines.append(f"- **{name}** ({aff_type.upper()}: {method} {target})")
-            if artifact:
-                lines.append(f"  Artifact: {artifact}")
-            if semantic_types:
-                lines.append(f"  Types: {', '.join(semantic_types)}")
-            if description:
-                lines.append(f"  Description: {description}")
-            if input_schema:
-                lines.append(f"  Input: {input_schema}")
-
+    # 2. The current state, by device and property name.
     if state:
         lines.append("")
         lines.append("### Current State")
-        lines.append("(short ids; use affordance ids from the list above to act on or check these)")
+        lines.append("(by device and property name; to check one, name that property "
+                     "from the device list)")
         # Handle both flat dict and nested {artifacts: {...}} structure
         state_items = state
         if isinstance(state, dict) and "artifacts" in state and isinstance(state["artifacts"], dict):
@@ -301,7 +200,7 @@ def _short_state_key(key) -> str:
 
 def format_signifier_hints(
     signifier_hints: dict | None,
-    url_to_ref: dict[str, str] | None = None,
+    catalog: AffordanceCatalog | None = None,
 ) -> str:
     """A remembered plan for exactly this situation, as hints for the planner.
 
@@ -310,8 +209,9 @@ def format_signifier_hints(
     successful plan for the same variables actually used --
     ``{"used": {"actions": [{url, artifact, action, parameters}],
     "properties": [{url, artifact, property}]}, "intent_text", "signifier_id"}``.
-    Only what was used is shown, not the environment as it was then. The system
-    prompt's Source Priority makes these authoritative over the context.
+    Only what was used is shown, not the environment as it was then, each
+    affordance named as the device list names it. The system prompt's Source
+    Priority makes these authoritative over the context.
     """
     if not isinstance(signifier_hints, dict):
         return ""
@@ -320,10 +220,7 @@ def format_signifier_hints(
     properties = [p for p in used.get("properties") or [] if isinstance(p, dict)]
     if not actions and not properties:
         return ""
-    url_to_ref = url_to_ref or {}
-
-    def ref(url) -> str:
-        return url_to_ref.get(str(url or "").rstrip("/"), str(url or ""))
+    catalog = catalog or AffordanceCatalog([])
 
     lines = ["## Past Successful Plan (Signifier Hints)", ""]
     lines.append(
@@ -332,24 +229,23 @@ def format_signifier_hints(
         f"they are in the affordances list; set values for the current state.")
     for action in actions:
         parameters = action.get("parameters")
-        lines.append(f"- action {ref(action.get('url'))} "
-                     f"({action.get('artifact')}.{action.get('action')})"
+        lines.append(f"- {catalog.name_of(action.get('url'))}"
                      + (f" with parameters {parameters}" if parameters else ""))
     for prop in properties:
-        lines.append(f"- read {ref(prop.get('url'))} "
-                     f"({prop.get('artifact')}.{prop.get('property')})")
+        lines.append(f"- read {catalog.name_of(prop.get('url'))}")
     lines.append("")
     return "\n".join(lines)
 
 
 def format_observable_property_hints(
     observable_property_matches: dict | None,
-    url_to_ref: dict[str, str] | None = None,
+    catalog: AffordanceCatalog | None = None,
 ) -> str:
-    """Format observable-property effect queries for the planning prompt."""
+    """Format observable-property effect queries for the planning prompt; each
+    action and readable property named as the device list names it."""
     if not observable_property_matches:
         return ""
-    url_to_ref = url_to_ref or {}
+    catalog = catalog or AffordanceCatalog([])
 
     results = observable_property_matches.get("results")
     if not isinstance(results, list) or not results:
@@ -367,7 +263,7 @@ def format_observable_property_hints(
             continue
         prop_uri = result.get("property_uri") or result.get("observable_property") or "unknown"
         actions = result.get("actions")
-        lines.append(f"Semantic property id (not a readable endpoint): {prop_uri}")
+        lines.append(f"Environment variable (not readable itself): {prop_uri}")
         target_min = result.get("target_min")
         target_max = result.get("target_max")
         target_unit = str(result.get("target_unit") or "").strip()
@@ -395,10 +291,9 @@ def format_observable_property_hints(
                 )
         readable_property_urls = result.get("readable_property_urls")
         if isinstance(readable_property_urls, list) and readable_property_urls:
-            lines.append("  Readable sensor property ids/URLs for condition affordance_id:")
+            lines.append("  Readable sensor properties (check the variable through these):")
             for property_url in readable_property_urls:
-                ref = url_to_ref.get(str(property_url).rstrip("/"), property_url)
-                lines.append(f"  - {ref}")
+                lines.append(f"  - {catalog.name_of(property_url)}")
         if not isinstance(actions, list) or not actions:
             lines.append("  No affecting artifacts were found.")
             lines.append("")
@@ -406,17 +301,13 @@ def format_observable_property_hints(
         for action in actions:
             if not isinstance(action, dict):
                 continue
-            title = action.get("artifact_title") or action.get("artifact_uri") or "unknown artifact"
             direction = action.get("direction") or "affects"
-            action_name = action.get("action_name") or "unknown_action"
-            action_target = str(action.get("action_target") or "")
-            action_ref = url_to_ref.get(action_target.rstrip("/"), action_target)
             settling_time = action.get("settling_time_seconds")
             settling_text = ""
             if settling_time is not None:
                 settling_text = f"; settling_time={settling_time}s"
             lines.append(
-                f"  - {title}: {action_name} -> {direction} (affordance_id: {action_ref}{settling_text})"
+                f"  - {catalog.name_of(action.get('action_target'))} -> {direction}{settling_text}"
             )
         lines.append("")
 

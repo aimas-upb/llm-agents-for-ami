@@ -1011,6 +1011,63 @@ class SimuHomeTD:
             parts.append(label)
         return ". ".join(parts) + "."
 
+    @staticmethod
+    def _tag_value(tag: Any) -> Optional[int]:
+        """A ModeTagStruct's value: a bare integer, or {"value" | "Value": n}."""
+        if isinstance(tag, dict):
+            tag = tag.get("value", tag.get("Value"))
+        try:
+            return int(tag)
+        except (TypeError, ValueError):
+            return None
+
+    def _mode_items(self, cluster: str, attribute: str,
+                    siblings: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """The device's own modes, for a Mode cluster's CurrentMode:
+        [{value, name, tags}], from its SupportedModes; [] for anything else.
+
+        Matter types CurrentMode as a plain uint8: which number is which mode
+        is the device's own declaration, in the mandatory, fixed-quality
+        SupportedModes list ({Label, Mode, ModeTags}). It cannot change while
+        the device runs, so it is stated here like the device's declared
+        limits. The tags are Matter's ModeTag enum (0x4002 = Heavy, for a
+        washer), named from the spec."""
+        if attribute != "CurrentMode":
+            return []
+        options = siblings.get("SupportedModes")
+        if not isinstance(options, list):
+            return []
+        # 1. The spec's tag names for this cluster (common and derived).
+        cluster_def = load_registry().cluster_by_name(cluster) or {}
+        tag_names = {int(item["value"]): str(item["name"])
+                     for item in (cluster_def.get("enums") or {}).get("ModeTag") or []}
+        # 2. Each mode: its number, its label, the names of its tags.
+        items = []
+        for option in options:
+            if not isinstance(option, dict):
+                continue
+            mode = option.get("mode", option.get("Mode"))
+            label = option.get("label", option.get("Label"))
+            if not isinstance(mode, int) or isinstance(mode, bool) or not label:
+                continue
+            tags = [tag_names.get(v, str(v)) for v in
+                    (self._tag_value(t) for t in option.get("ModeTags") or option.get("modeTags") or [])
+                    if v is not None]
+            items.append({"value": mode, "name": str(label), "tags": tags})
+        return sorted(items, key=lambda item: item["value"])
+
+    @staticmethod
+    def _mode_description(items: List[Dict[str, Any]]) -> str:
+        """The device's modes in one sentence, as `_enum_description` spells
+        out an enum: "2 = Heavy (mode tags: Heavy)."."""
+        parts = []
+        for item in items:
+            label = f"{item['value']} = {item['name']}"
+            if item["tags"]:
+                label += f" (mode tags: {', '.join(item['tags'])})"
+            parts.append(label)
+        return ". ".join(parts) + "."
+
     def _add_limits(self, g: Graph, schema: BNode, cluster: str, attribute: str,
                     siblings: Dict[str, Any]) -> None:
         """Attach this device's permitted range as a schema RESTRICTION.
@@ -1113,8 +1170,8 @@ class SimuHomeTD:
             _add_unit(g, schema, unit)
 
         # What the value MEANS, for an LLM planner that has to choose one.
-        # Two sources, both machine-derived: the spec's enum items, and the
-        # device's own declared limits.
+        # Three sources, all machine-derived: the spec's enum items, a Mode
+        # cluster's own declared modes, and the device's own declared limits.
         # A struct's keys, so "object" is not all the planner is told. Field
         # types come from the registry; nested structs/enums are named by their
         # Matter type rather than expanded, which keeps the graph finite.
@@ -1146,6 +1203,14 @@ class SimuHomeTD:
             for item in enum_items:
                 g.add((schema, JS.enum, _literal(item["value"])))
             sentences.append(self._enum_description(cluster_name, attribute_name) or "")
+        else:
+            # A Mode cluster's CurrentMode: no spec enum, the device's own
+            # modes instead -- stated the same way.
+            mode_items = self._mode_items(cluster_name, attribute_name, siblings or {})
+            for item in mode_items:
+                g.add((schema, JS.enum, _literal(item["value"])))
+            if mode_items:
+                sentences.append(self._mode_description(mode_items))
 
         self._add_limits(g, schema, cluster_name, attribute_name, siblings or {})
 

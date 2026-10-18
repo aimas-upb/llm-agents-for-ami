@@ -70,6 +70,11 @@ Never pick one of several fitting devices or actions to keep a goal explicit: le
 
 For an **incomplete** goal fill everything the request and the home context support, and leave the rest null. Do not guess a device or a room the request does not point to.
 
+### "Start" on an appliance with a cycle
+This applies to every device that runs cycles, that is, every device with an operational-state action (`homeont:SetOperationalStateCommand`), e.g. washers, dryers. On such a device, words like "start", "run", "begin" or "get it going" mean starting its cycle: the operational-state action, with the value for Running. They never mean the on/off action alone. Starting a cycle may also imply switching the device on first, and choosing the settings the request names with it, for example "on Heavy mode", "at Max dryness" or "with 1200 rpm spin".
+- When the request may hold several goals (a request with conditions, timing or several instructions): make one goal per instruction, in this order: switch on, then each setting the request names, then the start of the cycle (Running). Each later goal starts "after_goal" the one before it. Settings come before the start, because a running cycle may refuse them.
+- When the request holds exactly one goal: that goal is the start of the cycle (the operational-state action, Running), not switching the device on.
+
 ### ambiguous goals
 The request expresses a desired change of the environment — a complaint, sensation or wish — without naming what to actuate or how.
 - **goal_specificity**: "ambiguous"; **goal_kind**; **intent_text** as above.
@@ -191,9 +196,9 @@ DEPENDENCY_EXAMPLES = """\
 - G1 refrigerator setpoint, G2 dimmer on, G3 dimmer level 60: timing {"starts": "on_trigger"} for each.
 
 "Start dryer 1 in the utility room now on Max dryness level and pause dryer 1 in the utility room when washer 1 in the utility room finishes."
-- G1 start: {"starts": "now"}; G2 Max dryness: {"starts": "after_goal", "ref_goal": "G1", "offset_text": null}
-- P1 washer 1 finished: role "trigger", applies_to ["G3"], offset_text null, offset_direction "after".
-- G3 pause: {"starts": "on_trigger"}
+- G1 switch on: {"starts": "now"}; G2 Max dryness: {"starts": "after_goal", "ref_goal": "G1", "offset_text": null}; G3 start the cycle (operational state Running): {"starts": "after_goal", "ref_goal": "G2", "offset_text": null}
+- P1 washer 1 finished: role "trigger", applies_to ["G4"], offset_text null, offset_direction "after".
+- G4 pause: {"starts": "on_trigger"}
 
 "Start dryer 1 in the utility room at the right time … time it so dishwasher 1 in the kitchen and dryer 1 finish at the same time."
 - P1 dishwasher 1 finished: role "trigger", applies_to ["G1"].

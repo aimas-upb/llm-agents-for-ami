@@ -12,9 +12,26 @@ correctly.
         async with meter.step("segmentation"):
             ...                                  # LLM calls booked here
     meter.summary()   -> {step: {seconds, calls, llm_seconds, tokens_in, tokens_out}}
+    meter.stages()    -> the same per processing stage (STAGES), each counted once
 
 Steps are named with dots for nesting ("planning.dependency.profiling"); each
 records its own wall time, so a parent's time includes its children's.
+
+The stages are what `run.py` reports at the end of a run:
+
+    segmentation   the "segmentation" step
+    structuring    the "structuring" step (its per-intent children are inside it)
+    planning       the "planning" steps, without the profiling and guarding
+                   timed inside them (a dependency plan's own steps, added with
+                   `within="planning"`)
+    profiling      a dependency plan's profiling
+    guarding       the condition-guard check and the power-on guard: their own
+                   steps for simple plans, the dependency planner's for its plans
+    execution      the "execution" step
+    other          anything else (state reads, the reply)
+
+A step replayed from the step cache (`cached`) took no time in this run: it is
+left out, as are its calls.
 """
 
 from __future__ import annotations
@@ -29,6 +46,21 @@ from openai.resources.chat.completions import AsyncCompletions
 _STEP: contextvars.ContextVar[Optional["Meter"]] = contextvars.ContextVar("bench_meter",
                                                                           default=None)
 _NAME: contextvars.ContextVar[str] = contextvars.ContextVar("bench_step", default="other")
+
+
+# The processing stages, in pipeline order; anything else is "other".
+STAGES = ("segmentation", "structuring", "planning", "profiling", "guarding", "execution")
+
+
+def _stage(name: str) -> str:
+    """The stage a step or a call's booking belongs to: its first dotted part
+    when that is a stage ("planning.achievement" -> planning), else other."""
+    head = name.split(".", 1)[0]
+    return head if head in STAGES else "other"
+
+
+def _empty() -> Dict[str, Any]:
+    return {"seconds": 0.0, "calls": 0, "llm_seconds": 0.0, "tokens_in": 0, "tokens_out": 0}
 
 
 class Meter:
@@ -138,5 +170,35 @@ class Meter:
             entry["tokens_out"] += call["tokens_out"] or 0
         return out
 
+    def stages(self) -> Dict[str, Dict[str, Any]]:
+        """Per stage (STAGES, then "other"): wall seconds, LLM calls, their
+        seconds and tokens -- each second counted once (see the module
+        docstring)."""
+        out = {name: _empty() for name in (*STAGES, "other")}
+        # 1. Wall time: only top-level steps ("structuring", not its
+        #    "structuring.intent" children), and a step timed inside another
+        #    taken out of that one.
+        for record in self.steps:
+            if record.get("cached"):
+                continue
+            name = record["step"]
+            stage = _stage(name)
+            if "." in name and record.get("within") is None:
+                continue                                # inside its parent already
+            out[stage]["seconds"] += record["seconds"]
+            if record.get("within"):
+                out[_stage(record["within"])]["seconds"] -= record["seconds"]
+        # 2. The calls, to the stage they were booked to.
+        for call in self.calls:
+            if call.get("cached"):
+                continue
+            entry = out[_stage(call["step"])]
+            entry["calls"] += 1
+            entry["llm_seconds"] += call["seconds"]
+            entry["tokens_in"] += call["tokens_in"] or 0
+            entry["tokens_out"] += call["tokens_out"] or 0
+        return out
+
     def as_dict(self) -> Dict[str, Any]:
-        return {"steps": self.steps, "calls": self.calls, "summary": self.summary()}
+        return {"steps": self.steps, "calls": self.calls, "summary": self.summary(),
+                "stages": self.stages()}

@@ -23,19 +23,29 @@ accepts. Fetches the TD graph once, then per structure:
                            (`utils/time_consistency.py`, the clock and each
                            anchor's remaining time read once); a disagreement
                            -> a clarification entry, no plan.
+    3c. condition guards   each goal's steps on devices with a condition
+                           (`config/planning_guidelines.yaml`): memory, then
+                           one small-model call with the whole structure; each
+                           guarded step wrapped in its subtree
+                           (`utils/condition_check.py`, `condition_guard.py`).
     4. compile             the templates (`utils/dependency_compiler.py`) -> one
                            tree plus the runtime that keeps its keys current.
-    4b. power on first     the compiled tree walked in execution order: a mode,
+    4b. guards in order    the compiled tree walked in execution order, where
+                           "before" is real across goals: first the condition
+                           guards the plan already satisfies are removed
+                           (`condition_guard.drop_satisfied`); then a mode,
                            level or operational-state command on a device the
-                           `power_on_first` guideline lists gets the power-on
+                           `power_on_first` condition lists gets the power-on
                            guard, unless the plan switched that device on
                            before it (`utils/power_on_guard.py`).
 
 The entry: {tree, runtime, explanation, source: "dependency", execution_mode:
-"dependency", long_running, profile, profile_call?, llm?}.
+"dependency", long_running, profile, profile_call?, guards?, condition_call?, llm?}.
     profile        per question id: question, target, the answer used, its source
     profile_call   the profiling call: model, questions sent, raw answer text,
                    finish reason -- to trace a fallback to what came back
+    guards         per conditioned step, its decision (`condition_guard.guards_wire`)
+    condition_call the condition-guard call, as profile_call
 ``timings`` holds, per structure, how long each step took (seconds), for
 measurement; the entry does not carry it. The entry runs on the UserAssistant
 as a dependency plan: no tick budget, the runtime refreshed before every tick,
@@ -76,6 +86,9 @@ from ..utils.dependency_context import (
 from ..utils.environment_graph import fetch_environment_graph
 from ..utils.explicit_goal_plan import deterministic_goal
 from ..utils.goal_profile import InconsistentStructure, build_checklist
+from ..utils.condition_check import guard_trees
+from ..utils.condition_guard import drop_satisfied, guards_wire
+from ..utils.planning_conditions import load_conditions
 from ..utils.power_on_guard import guard_tree, guidelines_path, load_applies_to
 from ..utils.profiling import ask_profile
 from ..utils.incomplete_goal_plan import as_explicit, candidates, incomplete_goal
@@ -124,8 +137,9 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
         self.structures = structures
         self.logger = logger or LoggerFactory.get_logger("InteractionSolver")
         self.results: List[Dict[str, Any]] = []
-        # Per structure: {"achievement", "predicates", "profiling", "compile"}
-        # in seconds, each present once its step has run.
+        # Per structure: {"achievement", "predicates", "profiling", "guarding",
+        # "compile"} in seconds, each present once its step has run. "guarding"
+        # is 3c and 4b together; "compile" is 3b and 4 (without the guards).
         self.timings: List[Dict[str, float]] = []
 
     async def run(self) -> None:
@@ -190,6 +204,14 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
         planning = (self.agent.config.get("planning", {}) or {}).get("dependency", {}) or {}
         checked = await self._check_stated_times(graph, structure, profile, planning)
 
+        # 3c. The condition guards of each goal's steps, decided for the
+        #     whole structure at once and wrapped in the goals' subtrees.
+        condition_trace: Dict[str, Any] = {}
+        guarding_started = time.perf_counter()
+        decisions, condition_notes = await self._condition_guards(
+            graph, structure, subtrees, per_device, condition_trace)
+        guarding = time.perf_counter() - guarding_started
+
         # 4. The tree.
         try:
             compiled = compile_dependency(
@@ -199,17 +221,23 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
         except CompileError as exc:
             raise _Stop({"tree": None, "error": "dependency_compile_failed",
                          "explanation": str(exc)})
-        # 4b. Switch devices on before setting them, where the guidelines say
-        #     so -- on the compiled tree, so "before" is the plan's real order.
+        compiled_at = time.perf_counter()
+        # 4b. On the compiled tree, so "before" is the plan's real order: drop
+        #     the condition guards the plan already satisfies, then switch
+        #     devices on before setting them, where the conditions say so.
+        compiled.tree, dropped = drop_satisfied(graph, compiled.tree) if decisions \
+            else (compiled.tree, [])
         guard_notes: List[str] = []
         applies_to = load_applies_to(guidelines_path(self.agent.config))
         if applies_to is not None:
             compiled.tree, guard_notes = guard_tree(graph, compiled.tree, applies_to, goal=None)
-        self._timed("compile", started)
+        # The two guard steps are timed apart from the compile they surround.
+        self.timings[-1]["guarding"] = guarding + (time.perf_counter() - compiled_at)
+        self.timings[-1]["compile"] = compiled_at - started - guarding
 
         # 5. The entry: the tree, its runtime, and everything needed to explain
-        #    it -- the profile, the call behind it, the notes.
-        notes = fallbacks + checked + compiled.notes + guard_notes
+        #    it -- the profile, the guards, the calls behind them, the notes.
+        notes = fallbacks + checked + condition_notes + compiled.notes + dropped + guard_notes
         self.logger.info(demo(
             f"Dependency plan for {structure.intent_text!r}: {len(structure.goals)} goal(s), "
             f"{len(structure.predicates)} predicate(s), {len(checklist)} question(s), "
@@ -220,8 +248,42 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
                 "profile": {qid: {k: item[k] for k in ("question", "target", "answer", "source")}
                             for qid, item in profile.items()},
                 **({"profile_call": trace} if trace else {}),
+                **({"guards": guards_wire(decisions, compiled.tree)} if decisions else {}),
+                **({"condition_call": condition_trace} if condition_trace else {}),
                 "explanation": "; ".join(notes) or "Planned from the goals' dependencies.",
                 **({"llm": True} if llm else {})}
+
+    async def _condition_guards(self, graph: Graph, structure: GoalStructure,
+                                subtrees: Dict[str, Dict[str, Any]],
+                                per_device: Dict[str, List[Tuple[str, Dict[str, Any]]]],
+                                trace: Dict[str, Any]):
+        """(decisions, notes): every goal's steps checked against the device
+        conditions in one call, the guarded steps wrapped in place --
+        ``subtrees`` and ``per_device`` are updated. No conditions (or no
+        file): nothing to check. A failure leaves the steps unguarded: the
+        check never stops a plan."""
+        # 1. The conditions; none -> no check.
+        conditions = load_conditions(guidelines_path(self.agent.config))
+        if not conditions:
+            return {}, []
+        # 2. Every tree the compiler will use, with its goal: one per goal,
+        #    and one per candidate device of a filtered goal.
+        trees = [(gid, tree) for gid, tree in subtrees.items()]
+        trees += [(gid, tree) for gid, pairs in per_device.items() for _, tree in pairs]
+        try:
+            guarded, decisions, notes = await guard_trees(
+                self.agent, self.logger, graph, trees, structure.to_wire_dict(),
+                conditions, trace)
+        except Exception as exc:  # noqa: BLE001 - the plan stands unguarded
+            self.logger.warning(f"Condition check skipped for {structure.intent_text!r}: {exc}")
+            return {}, []
+        # 3. The wrapped trees back where they came from, in the same order.
+        out = iter(guarded)
+        for gid in subtrees:
+            subtrees[gid] = next(out)
+        for gid, pairs in per_device.items():
+            per_device[gid] = [(title, next(out)) for title, _ in pairs]
+        return decisions, notes
 
     async def _check_stated_times(self, graph: Graph, structure: GoalStructure,
                                   profile: Dict[str, Any], planning: Dict[str, Any]) -> List[str]:

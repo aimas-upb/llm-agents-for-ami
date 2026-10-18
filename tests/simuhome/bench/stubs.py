@@ -243,6 +243,12 @@ class Explorer:
             self.observations.append({"query": "memory", "kind": (body or {}).get("kind"),
                                       "hit": record is not None})
             return json.dumps({"ok": True, "match": record})
+        if message_type == MessageType.GUARD_MATCH_REQUEST.value:
+            record = None
+            if self.memory is not None and isinstance(body, dict):
+                record = self.memory.match_guard(body.get("key"))
+            self.observations.append({"query": "guard_memory", "hit": record is not None})
+            return json.dumps({"ok": True, "match": record})
         return json.dumps({"ok": False, "error": f"not served in the bench: {message_type}"})
 
 

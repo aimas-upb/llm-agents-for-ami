@@ -25,7 +25,9 @@ from ..utils.plan_envelope import (
     envelope_plan_entries,
     plan_entries_from_envelope,
 )
+from ..utils.environment_graph import fetch_environment_graph
 from .ambiguous_goal_planning import AmbiguousGoalPlanningBehaviour
+from .condition_guard import ConditionGuardBehaviour
 from .dependency_goal_planning import DependencyGoalPlanningBehaviour
 from .explicit_goal_planning import ExplicitGoalPlanningBehaviour
 from .incomplete_goal_planning import IncompleteGoalPlanningBehaviour
@@ -135,7 +137,8 @@ class GoalRequestBehaviour(CyclicBehaviour):
         (``AmbiguousGoalPlanningBehaviour``) and dependency structures
         (``DependencyGoalPlanningBehaviour``) on their own paths, the workflow
         for the rest, merged into one multi-plan reply in the request's order.
-        Entries outside dependency structures then get the power-on guard."""
+        Entries outside dependency structures then get the condition-guard
+        check and the power-on guard."""
         entries = {}
 
         # 1. Every routed goal or structure gets an entry here: a tree,
@@ -168,16 +171,20 @@ class GoalRequestBehaviour(CyclicBehaviour):
                 # One tree for several intents: it stands where the first was.
                 entries[rest[0]] = rest_entries
 
-        # 3. Every entry outside a dependency structure: switch the device on
-        #    before setting it, where the guidelines say so (dependency
-        #    structures, and the steps planned inside them, are left alone).
+        # 3. Every entry outside a dependency structure (dependency structures
+        #    guard their own steps): first the condition-guard check, then
+        #    switch the device on before setting it -- in that order, so the
+        #    power-on guard also covers the condition guards' own actions. The
+        #    TD graph is fetched once, for both.
         dependent = {index for index, _ in selections["dependency"]}
         simple = [entry for index, group in entries.items() if index not in dependent
                   for entry in group]
         if simple:
-            guard = PowerOnGuardBehaviour(simple, logger=self.logger)
-            self.agent.add_behaviour(guard)
-            await guard.join()
+            graph = await fetch_environment_graph(self.agent, self.logger)
+            for cls in (ConditionGuardBehaviour, PowerOnGuardBehaviour):
+                guard = cls(simple, logger=self.logger, graph=graph)
+                self.agent.add_behaviour(guard)
+                await guard.join()
 
         # 4. One reply, entries in the order the user asked for them.
         ordered = [entry for index in sorted(entries) for entry in entries[index]]

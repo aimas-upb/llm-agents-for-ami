@@ -1,12 +1,19 @@
 """The guard store: remembered protection decisions for device actions.
 
 Some device actions are refused unless the device is in a certain state: a
-dryer refuses a new dryness level while its cycle runs, an appliance in "dead
-front" (switched off) refuses most commands. A *protection guard* sits in front
-of such an action in a plan: check a property, and when it does not hold, run a
-protecting action first. Whether an action needs one is decided once -- by the
-profiling model, resolved against the TD graph -- and remembered here, for that
-exact action of that exact device, so later plans apply it without asking.
+dryer refuses a new dryness level while its cycle runs. A *condition guard*
+sits in front of such an action in a plan: check a property, and when it does
+not hold, run a protecting action first (and, after a pause, stop or
+switch-off, the matching resume, start or switch-on -- derived by the
+InteractionSolver each time, never stored). Whether an action needs one is
+decided once -- by the condition-guard model, resolved against the TD graph --
+and remembered here, for that exact action of that exact device, so later plans
+apply it without asking.
+
+The store decides nothing: `match` is an exact lookup. Whether a remembered
+guard is needed in a given plan (the plan may already establish the state) is
+decided by the InteractionSolver when it applies the hit
+(`interaction_solver/utils/condition_guard.py`).
 
 Separate from the goal signifiers (`memory_store.py`): its own records, its own
 key, its own directory. Nothing is shared with signifier recall.
@@ -17,19 +24,22 @@ Worked example -- the dryness level of the utility-room dryer:
              "affordance_class": "saref:SetAbsoluteLevelCommand",
              "device_name": "utility_room_laundry_dryer_1",
              "device_class": "homeont:LaundryDryer",
-             "room_class": "homeont:UtilityRoom"}
+             "room_class": "homeont:UtilityRoom",
+             "invocation_value": null}
 
     record  {"guard_id": "grd-3f2a9c01b7de", "key": {...as above...},
              "key_digest": "<sha256 of the key>",
              "protection": true,
              "check":  {"title": "operationalState", "class": "...", "target": "<read URL>",
-                        "value": 0},           # proceed only while Stopped ...
+                        "operator": "!=", "value": 1},   # proceed unless Running ...
              "action": {"title": "operationalState", "class": "...", "target": "<invoke URL>",
-                        "value": 0},           # ... else stop the cycle first
+                        "value": 2},                     # ... else pause it first
              "created_at": "2026-10-16T19:20:00+00:00"}
 
-A "no protection needed" decision is the same record with `"protection": false`
-and no check / action: it is remembered too, so the question is not asked again.
+A "no protection needed" decision is the same record with `"protection": false`,
+its `why` ("not_applicable") and no check / action: it is remembered too, so
+the question is not asked again. ("established_by_plan" is never sent here: it
+depends on one plan, not on the device.)
 
 Flow:
     1. The UserAssistant, after a plan ran successfully, sends each decision the
@@ -62,17 +72,19 @@ logger = logging.getLogger(__name__)
 
 # The fields a decision is remembered under. The same action name on another
 # device, or the same device moved to another kind of room, is another key: a
-# decision is only reused where it was made.
+# decision is only reused where it was made. `invocation_value` is set only
+# for commands whose value says which command they are (one operationalState
+# action starts, pauses or stops), and None otherwise.
 KEY_FIELDS = ("affordance_name", "affordance_class", "device_name", "device_class",
-              "room_class")
+              "room_class", "invocation_value")
 
 
 def guard_key_digest(key: Dict[str, Any]) -> str:
     """The digest a key is indexed under.
 
-    Only the five KEY_FIELDS count, in a fixed order; extra fields are ignored
-    and a missing field counts as None. Two keys with the same five values give
-    the same digest, whatever else they carry."""
+    Only the KEY_FIELDS count, in a fixed order; extra fields are ignored and a
+    missing field counts as None. Two keys with the same values give the same
+    digest, whatever else they carry."""
     canonical = {field: (key or {}).get(field) for field in KEY_FIELDS}
     return hashlib.sha256(json.dumps(canonical, sort_keys=True).encode()).hexdigest()
 
@@ -129,16 +141,18 @@ class GuardStore:
                                         and isinstance(guard.get("action"), dict)):
             raise ValueError("a protecting guard needs its 'check' and 'action'")
 
-        # 2. Build the record: only the key's five fields are kept, and check /
-        #    action only for a guard. An id and a timestamp given by the caller
-        #    are kept (a record copied from elsewhere); otherwise new ones.
+        # 2. Build the record: only the key's fields are kept, check / action
+        #    only for a guard, `why` only for a decision without one. An id and
+        #    a timestamp given by the caller are kept (a record copied from
+        #    elsewhere); otherwise new ones.
         record = {
             "guard_id": guard.get("guard_id") or f"grd-{uuid.uuid4().hex[:12]}",
             "key": {field: guard["key"].get(field) for field in KEY_FIELDS},
             "key_digest": guard_key_digest(guard["key"]),
             "protection": guard["protection"],
             **({"check": guard["check"], "action": guard["action"]}
-               if guard["protection"] else {}),
+               if guard["protection"] else
+               ({"why": guard["why"]} if guard.get("why") else {})),
             "created_at": guard.get("created_at") or datetime.now(timezone.utc).isoformat(),
         }
 
@@ -164,7 +178,7 @@ class GuardStore:
     def match(self, key: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """The latest decision stored under exactly this key, or None.
 
-        Exact: all five key fields must be equal; there is no partial or
+        Exact: every key field must be equal; there is no partial or
         similarity match."""
         record_id = self._by_key.get(guard_key_digest(key))
         return self._records.get(record_id) if record_id else None

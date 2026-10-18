@@ -31,6 +31,8 @@ from .behaviors import (
     EventProcessingBehaviour,
     SignifierMatchBehaviour,
     SignifierRecordBehaviour,
+    GuardMatchBehaviour,
+    GuardRecordBehaviour,
     SignifierListBehaviour,
     EnvironmentCapabilitiesBehaviour,
     EnvironmentStateBehaviour,
@@ -108,6 +110,8 @@ class EnvExplorerAgent(Agent, IAgent):
         self._experience_engine_storage_dir: Optional[str] = None
         # The memory engine (`shared/memory`), opened by ensure_experience_engine_ready.
         self._experience_engine_store = None
+        # Its guard store (condition-guard decisions), opened with it.
+        self._experience_engine_guard_store = None
         self._experience_engine_context_builder = None
         self._experience_engine_shacl_validator = None
         # SHACL context validation is kept but not used for matching yet.
@@ -153,6 +157,13 @@ class EnvExplorerAgent(Agent, IAgent):
         sign_list_template = Template()
         sign_list_template.set_metadata("type", MessageType.SIGNIFIER_LIST_REQUEST.value)
 
+        # Guard memory requests (condition-guard decisions)
+        guard_match_template = Template()
+        guard_match_template.set_metadata("type", MessageType.GUARD_MATCH_REQUEST.value)
+
+        guard_record_template = Template()
+        guard_record_template.set_metadata("type", MessageType.GUARD_RECORD_REQUEST.value)
+
         # Bootstrap the Experience Engine explicitly during setup so engine
         # readiness is a discrete, observable lifecycle event rather than a
         # side-effect of the first incoming SIGNIFIER_MATCH_REQUEST.
@@ -168,6 +179,8 @@ class EnvExplorerAgent(Agent, IAgent):
         self.add_behaviour(SignifierMatchBehaviour(), template=sign_match_template)
         self.add_behaviour(SignifierRecordBehaviour(), template=sign_record_template)
         self.add_behaviour(SignifierListBehaviour(), template=sign_list_template)
+        self.add_behaviour(GuardMatchBehaviour(), template=guard_match_template)
+        self.add_behaviour(GuardRecordBehaviour(), template=guard_record_template)
         self.add_behaviour(EventProcessingBehaviour(self.integration_engine))
 
     # Agent lifecycle methods

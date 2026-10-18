@@ -213,8 +213,11 @@ class TestWhichDevices:
 
 class TestConfig:
     def test_the_repo_file_lists_the_power_on_entry(self):
+        """Under `conditions:`; the dead-front appliances and, through Level
+        Control's ExecuteIfOff, the dimmable lights (ColorLight among them)."""
         applies_to = load_applies_to(None)
         assert "homeont:LaundryDryer" in applies_to["classes"]
+        assert "homeont:DimmableLight" in applies_to["classes"]
 
     def test_a_missing_file_turns_the_guard_off(self, tmp_path):
         assert load_applies_to(str(tmp_path / "none.yaml")) is None
@@ -294,19 +297,28 @@ class _FakeRoute:
 
 
 class _FakeGuard:
-    """Stands in for the guard step: records which entries it was given."""
+    """Stands in for a guard step: records which step ran, in order, and which
+    entries it was given."""
 
     seen = []
+    step = "power_on"
 
     def __init__(self, entries, logger=None, graph=None):
-        type(self).seen.append([e["tree"]["name"] for e in entries])
+        type(self).seen.append((self.step, [e["tree"]["name"] for e in entries]))
 
     async def join(self):
         return None
 
 
+class _FakeConditionGuard(_FakeGuard):
+    step = "condition"
+
+
 @pytest.mark.asyncio
 async def test_the_guard_step_gets_every_entry_except_the_dependency_ones():
+    """The condition-guard check runs first, then the power-on guard -- which
+    then also covers the condition guards' own actions -- both on the same
+    entries: every one except the dependency structure's."""
     # 1. Four routed items, one per route; every route planned by the fake.
     items = [SimpleNamespace(to_wire_dict=lambda i=i: {"i": i}) for i in range(4)]
     behaviour = GoalRequestBehaviour()
@@ -314,9 +326,13 @@ async def test_the_guard_step_gets_every_entry_except_the_dependency_ones():
     behaviour.logger = SimpleNamespace(info=lambda *a, **k: None)
     _FakeGuard.seen = []
     with patch(f"{MODULE}.route_behaviour", lambda name: _FakeRoute), \
-         patch(f"{MODULE}.PowerOnGuardBehaviour", _FakeGuard):
+         patch(f"{MODULE}.PowerOnGuardBehaviour", _FakeGuard), \
+         patch(f"{MODULE}.ConditionGuardBehaviour", _FakeConditionGuard), \
+         patch(f"{MODULE}.fetch_environment_graph", AsyncMock(return_value=None)):
         await behaviour._plan_mixed(items, [(0, "explicit")], [(1, "incomplete")], None,
                                     ambiguous=[(2, "ambiguous")],
                                     dependency=[(3, "dependency")])
-    # 2. One guard step, with the three simple entries and not the dependency one.
-    assert _FakeGuard.seen == [["explicit", "incomplete", "ambiguous"]]
+    # 2. The two guard steps, in that order, each with the three simple
+    #    entries and not the dependency one.
+    simple = ["explicit", "incomplete", "ambiguous"]
+    assert _FakeGuard.seen == [("condition", simple), ("power_on", simple)]

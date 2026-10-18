@@ -16,7 +16,10 @@ blackboard is never shared. `--sim/--shtd` use servers you already run instead
 (one worker; SHTD keeps the home id it was started with).
 
 Output: <out>/<variant>/<episode>.json per episode, and run.json. Score them
-with `evaluate.py`; summarise with `report.py`.
+with `evaluate.py`; summarise with `report.py`. The run itself ends with a
+table of the time spent per processing stage (segmentation, structuring,
+planning, profiling, guarding, execution), summed over its episodes
+(`meter.Meter.stages`).
 
 Costs: about 3-6 LLM calls per episode for the steps (segmentation, structuring
 per intent, planning when an LLM is needed, the reply), none with local models.
@@ -88,6 +91,49 @@ def select_episodes(benchmark: Path, patterns: str, seeds: Optional[str],
         per_group[group] = per_group.get(group, 0) + 1
         chosen.append(name)
     return chosen
+
+
+# --------------------------------------------------------------------------
+# The stage summary, printed at the end of a run
+# --------------------------------------------------------------------------
+
+def stage_summary(paths: List[str]) -> str:
+    """The time per processing stage over the records at ``paths``: total and
+    mean wall seconds, share of the pipeline's time, LLM calls, their seconds
+    and tokens. Read back from the records, so workers in other processes
+    count too; a record without stages (an older one) is skipped."""
+    from .meter import STAGES
+
+    # 1. Each record's stages, summed.
+    totals = {name: {"seconds": 0.0, "calls": 0, "llm_seconds": 0.0, "tokens_in": 0,
+                     "tokens_out": 0} for name in (*STAGES, "other")}
+    episodes = 0
+    for path in paths:
+        try:
+            stages = json.loads(Path(path).read_text(encoding="utf-8"))["meter"]["stages"]
+        except (OSError, KeyError, TypeError, ValueError):
+            continue
+        episodes += 1
+        for name, entry in stages.items():
+            for field, value in entry.items():
+                totals.setdefault(name, dict.fromkeys(entry, 0))[field] += value
+    if not episodes:
+        return "no stage timings recorded"
+
+    # 2. The table: one row per stage that ran, then the total.
+    pipeline = sum(t["seconds"] for t in totals.values()) or 1.0
+    lines = [f"== time per stage ({episodes} episode(s)) ==",
+             f"{'stage':<13}{'total s':>9}{'mean s':>9}{'share':>7}{'LLM calls':>11}"
+             f"{'LLM s':>8}{'tokens in/out':>17}"]
+    for name, t in totals.items():
+        if not t["seconds"] and not t["calls"]:
+            continue
+        lines.append(f"{name:<13}{t['seconds']:>9.1f}{t['seconds'] / episodes:>9.2f}"
+                     f"{100 * t['seconds'] / pipeline:>6.0f}%{t['calls']:>11}"
+                     f"{t['llm_seconds']:>8.1f}{t['tokens_in']:>9}/{t['tokens_out']:<7}")
+    calls = sum(t["calls"] for t in totals.values())
+    lines.append(f"{'total':<13}{pipeline:>9.1f}{pipeline / episodes:>9.2f}{'':>7}{calls:>11}")
+    return "\n".join(lines)
 
 
 # --------------------------------------------------------------------------
@@ -252,6 +298,9 @@ def main() -> int:
         # Scored at once, in its own process (SimuHome's evaluator imports as `src`).
         subprocess.run([sys.executable, "-m", "tests.simuhome.bench.evaluate",
                         "--records", written[0], "--explain"], cwd=PROJECT_ROOT)
+
+    # The time per stage, last, so it ends the output.
+    print("\n" + stage_summary(written), flush=True)
     return 0
 
 

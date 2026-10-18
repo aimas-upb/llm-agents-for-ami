@@ -1,16 +1,21 @@
-# Restrictions and guidelines for planning, per device class or manufacturer.
+# Conditions for planning, per device class or manufacturer.
 #
-# Each entry is an instruction for one guard: a check placed in front of a
-# command, and what to do first when the check fails. Every text has the form
+# Each condition is the device state that must hold before a command is sent,
+# and how to bring the device into it when it does not. Every text has the form
 #
-#   Before <command>: check that <condition>. If not, <what to do first>.
+#   Before <command>: <the state that must hold>. If not, <what to do first>.
 #
-#   kind                      restriction: the command is refused when the check
-#                             fails; guideline: the command may be refused
+#   id                        names the condition (and, in the guard notes, the guard)
 #   applies_to.classes        artifact classes; a device of a subclass matches too
 #   applies_to.manufacturers  the TD's manufacturer (schema:manufacturer), an
 #                             exact literal match
-#   text                      the instruction, in plain language
+#   commands                  the action command classes the condition constrains
+#                             (an action of a subclass matches too)
+#   acts_upon                 optional: only actions that `saref:actsUpon` a
+#                             property of one of these classes; absent: any action
+#                             of the listed commands
+#   text                      the condition, in plain language -- what the
+#                             condition-guard model reads
 #
 # Read by the InteractionSolver (`planning.guidelines.path` in agents.yaml points
 # here):
@@ -18,40 +23,152 @@
 #                    (`interaction_solver/utils/power_on_guard.py`): in front of
 #                    a mode, level or operational-state command on a matching
 #                    device, check its on/off state and switch it on -- unless
-#                    the plan already switched that device on before it.
-#                    Manufacturers match literally (exact string).
-#   the other entries are not read yet.
+#                    the plan already switched that device on before it. It
+#                    has no `commands`: the guard's own command list
+#                    (GUARDED_COMMANDS) decides.
+#   every other      the condition-guard check (`utils/planning_conditions.py`
+#                    selects the steps, `utils/condition_check.py` asks the small
+#                    model, `utils/condition_guard.py` builds the guard). A guard
+#                    that pauses, stops or switches off is followed by the
+#                    resume / start / switch-on, added by code -- the texts
+#                    never mention it.
 #
-# Which device classes have these conditions was determined from the Matter
-# Application Cluster and Device Library specifications (see
-# docs/plans/planning_guidelines.md).
+# Every condition comes from the Matter Application Cluster and Device Library
+# specifications (see docs/plans/planning_guidelines.md). Device classes for
+# which Matter states no condition have no entry.
 
-entries:
+conditions:
+  # -- Switched on (dead front) ---------------------------------------------
+  # On/Off cluster, DeadFrontBehavior (App. Cluster R1.2 §1.5.4.2): while off,
+  # other clusters MAY refuse with INVALID_IN_STATE; DF is mandatory for these
+  # four device types (Device Library 1.4.2 §13.1/.3/.5/.6, vendored 1.5.1 XML).
+  # Level Control, Options.ExecuteIfOff (App. Cluster §1.6): with the bit at its
+  # default 0, a level command on a light that is off SHALL NOT be executed;
+  # Color Control has the same rule. ColorLight is a DimmableLight.
   - id: power_on_first
-    kind: restriction
     applies_to:
       classes: [homeont:LaundryWasher, homeont:LaundryDryer, homeont:Dishwasher,
-                homeont:AirConditioner]
+                homeont:AirConditioner, homeont:DimmableLight]
       manufacturers: []
     text: >-
-      Before any command other than switching the device on or off: check that
-      the device is switched on. If not, switch it on first.
+      Before any command other than switching the device on or off: the device
+      must be switched on. If not, switch it on first.
 
-  - id: settings_before_start
-    kind: guideline
+  # -- Settings while a cycle runs ------------------------------------------
+  # Laundry Washer Controls R1.2 §8.6.6.3 (NumberOfRinses: INVALID_IN_STATE when
+  # "not in a compatible state"); Mode Base ChangeToMode status InvalidInMode;
+  # Temperature Control R1.3 §8.2.6.1.3 (a setpoint may be refused "after it has
+  # begun operation"). Matter leaves the compatible states to the manufacturer;
+  # a cycle that is not running is the state never refused for this reason.
+  - id: laundry_washer_settings_not_running
+    applies_to: {classes: [homeont:LaundryWasher], manufacturers: []}
+    commands: [homeont:SetModeCommand, saref:SetAbsoluteLevelCommand]
+    acts_upon: [homeont:LaundryWasherModeCurrentMode,
+                homeont:LaundryWasherControlsSpinSpeedCurrent,
+                homeont:LaundryWasherControlsNumberOfRinses,
+                homeont:TemperatureControlTemperatureSetpoint]
+    text: >-
+      Before changing the wash programme, the spin speed, the number of rinses
+      or the temperature: the operational state must not be Running (Stopped or
+      Paused). If it is Running, pause the cycle first.
+
+  # Laundry Dryer Controls R1.3 §8.9.5.2 (SelectedDrynessLevel: INVALID_IN_STATE
+  # "while the device is not in a state that supports modifying the dryness
+  # level"); Temperature Control as above. Matter dryers use the Laundry Washer
+  # Mode cluster for their programme.
+  - id: laundry_dryer_settings_not_running
+    applies_to: {classes: [homeont:LaundryDryer], manufacturers: []}
+    commands: [homeont:SetModeCommand, saref:SetAbsoluteLevelCommand]
+    acts_upon: [homeont:LaundryDryerControlsSelectedDrynessLevel,
+                homeont:LaundryWasherModeCurrentMode,
+                homeont:TemperatureControlTemperatureSetpoint]
+    text: >-
+      Before changing the dryness level, the drying programme or the
+      temperature: the operational state must not be Running (Stopped or
+      Paused). If it is Running, pause the cycle first.
+
+  # Dishwasher Mode (Mode Base InvalidInMode); Temperature Control as above.
+  - id: dishwasher_settings_not_running
+    applies_to: {classes: [homeont:Dishwasher], manufacturers: []}
+    commands: [homeont:SetModeCommand, saref:SetAbsoluteLevelCommand]
+    acts_upon: [homeont:DishwasherModeCurrentMode,
+                homeont:TemperatureControlTemperatureSetpoint]
+    text: >-
+      Before changing the wash programme or the temperature: the operational
+      state must not be Running (Stopped or Paused). If it is Running, pause the
+      cycle first.
+
+  # -- The cycle's own commands ---------------------------------------------
+  # Operational State R1.3, Table 3 (Pause) and Table 4 (Resume): compatible
+  # only in Running or Paused, else CommandInvalidInState. Start (R1.2
+  # §1.13.6.3): only "if it is safe to do so and the device is in an operational
+  # state from which it can be started"; being switched on is power_on_first's.
+  - id: appliance_cycle_commands
     applies_to:
       classes: [homeont:LaundryWasher, homeont:LaundryDryer, homeont:Dishwasher]
       manufacturers: []
+    commands: [homeont:SetOperationalStateCommand]
     text: >-
-      Before starting a cycle: check that the mode and settings the request asks
-      for (e.g. programme, dryness, spin, rinses, temperature) are already set. If
-      not, set them first.
+      Before pausing the cycle (operational state Paused) or resuming it
+      (Running, from Paused): the operational state must be Running or Paused.
+      If it is Stopped there is no cycle to pause or resume, and no command can
+      make one: do not guard. Before starting a cycle (Running, from Stopped):
+      the programme and settings the request asks for must already be set -- if
+      the plan sets them, it must do so before the start; nothing needs
+      guarding.
 
-  - id: pause_only_running
-    kind: restriction
+  # -- Thermostat setpoints and the HVAC mode -------------------------------
+  # Thermostat cluster: the OccupiedCoolingSetpoint drives the device only in a
+  # SystemMode that cools (Cool, Auto), the OccupiedHeatingSetpoint only in one
+  # that heats (Heat, Auto); outside them the setpoint is stored but has no
+  # effect.
+  - id: thermostat_cooling_setpoint_mode
     applies_to:
-      classes: [homeont:LaundryWasher, homeont:LaundryDryer, homeont:Dishwasher]
+      classes: [homeont:AirConditioner, homeont:HeatPump]
       manufacturers: []
+    commands: [saref:SetAbsoluteLevelCommand]
+    acts_upon: [homeont:AirConditionerCoolingSetpoint, homeont:HeatPumpCoolingSetpoint]
     text: >-
-      Before pausing or resuming a cycle: check that the cycle is running or
-      paused. If not, do not send the command.
+      Before setting the cooling setpoint: the HVAC mode must be Cool or Auto
+      (in any other mode the cooling setpoint has no effect). If not, set the
+      HVAC mode to Cool first.
+
+  - id: thermostat_heating_setpoint_mode
+    applies_to:
+      classes: [homeont:AirConditioner, homeont:HeatPump, homeont:Heater]
+      manufacturers: []
+    commands: [saref:SetAbsoluteLevelCommand]
+    acts_upon: [homeont:AirConditionerHeatingSetpoint, homeont:HeatPumpHeatingSetpoint,
+                homeont:HeaterHeatingSetpoint]
+    text: >-
+      Before setting the heating setpoint: the HVAC mode must be Heat or Auto
+      (in any other mode the heating setpoint has no effect). If not, set the
+      HVAC mode to Heat first.
+
+  # -- Window coverings ------------------------------------------------------
+  # Window Covering cluster, Mode attribute: bit 1 CalibrationMode ("perform a
+  # calibration"), bit 2 MaintenanceMode ("freeze all motions for
+  # maintenance"); while either is set the covering does not move.
+  - id: window_covering_not_in_maintenance
+    applies_to: {classes: [homeont:WindowCoveringController], manufacturers: []}
+    commands: [saref:SetAbsoluteLevelCommand]
+    acts_upon: [homeont:WindowCoveringTargetPosition]
+    text: >-
+      Before setting the target position: the window covering mode must have
+      neither its calibration nor its maintenance bit set (mode 0, normal
+      operation), since either freezes all motion. If it does, set the mode to
+      0 first.
+
+  # -- Robot vacuums ----------------------------------------------------------
+  # RVC Clean Mode and RVC Run Mode (rev. 3, vendored 1.5.1 XML): a device
+  # without the DirectModeChange feature may answer InvalidInMode to a mode
+  # change while its run mode is not Idle.
+  - id: rvc_mode_change_when_idle
+    applies_to: {classes: [homeont:Rvc], manufacturers: []}
+    commands: [homeont:SetModeCommand]
+    acts_upon: [homeont:RVCCleanModeCurrentMode, homeont:RVCCleanModeCleanCurrentMode,
+                homeont:RVCRunModeCurrentMode, homeont:RVCRunModeRunCurrentMode]
+    text: >-
+      Before changing the cleaning mode, or changing the run mode from one
+      non-Idle mode to another: the run mode must be Idle. If it is not, set the
+      run mode to Idle first. Changing the run mode from Idle needs no guard.

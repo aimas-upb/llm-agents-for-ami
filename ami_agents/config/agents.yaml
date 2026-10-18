@@ -96,9 +96,10 @@ interaction_solver:
       model: "${EXPLICIT_PLANNING_MODEL:-gpt-5-nano}"
       reasoning_effort: "${EXPLICIT_PLANNING_REASONING_EFFORT:-low}"
       max_planning_attempts: "${EXPLICIT_PLANNING_ATTEMPTS:-2}"
-    # Restrictions and guidelines per device class / manufacturer, in plain text:
-    # an action they apply to gets a protection question at profiling
-    # (`interaction_solver/utils/planning_guidelines.py`). Empty: the default file.
+    # Device conditions per device class / manufacturer (`conditions:`): the
+    # deterministic power-on guard (`utils/power_on_guard.py`), and the
+    # condition-guard check on every plan (`utils/planning_conditions.py`,
+    # `utils/condition_check.py`). Empty: the repo's planning_guidelines.yaml.
     guidelines:
       path: "${PLANNING_GUIDELINES_PATH:-}"
     # Dependency plans (goals with conditions, timing, maintenance).

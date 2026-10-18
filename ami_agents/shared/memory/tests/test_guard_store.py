@@ -7,11 +7,12 @@ from src.storage.guard_store import GuardStore, guard_key_digest
 KEY = {"affordance_name": "selectedDrynessLevel",
        "affordance_class": "saref:SetAbsoluteLevelCommand",
        "device_name": "dryer_1", "device_class": "homeont:LaundryDryer",
-       "room_class": "homeont:UtilityRoom"}
+       "room_class": "homeont:UtilityRoom", "invocation_value": None}
+# Proceed unless the cycle runs; else pause it (the resume is never stored).
 CHECK = {"title": "operationalState", "class": "homeont:OperationalState",
-         "target": "http://h/dryer_1/properties/operationalState", "value": 0}
+         "target": "http://h/dryer_1/properties/operationalState", "operator": "!=", "value": 1}
 ACTION = {"title": "operationalState", "class": "homeont:SetOperationalStateCommand",
-          "target": "http://h/dryer_1/actions/operationalState", "value": 0}
+          "target": "http://h/dryer_1/actions/operationalState", "value": 2}
 
 
 def _guard(**fields):
@@ -27,8 +28,9 @@ class TestGuardStore:
         assert store.match(dict(KEY))["check"] == CHECK
 
     def test_any_difference_in_the_key_misses(self, tmp_path):
-        """Each of the five key fields counts: another device, another room
-        class, another action is another key."""
+        """Each key field counts: another device, another room class, another
+        action -- or, for a command its value selects, another value -- is
+        another key."""
         store = GuardStore(tmp_path)
         store.record(_guard())
         for field in KEY:
@@ -41,10 +43,21 @@ class TestGuardStore:
         assert guard_key_digest({**KEY, "note": "x"}) == guard_key_digest(KEY)
 
     def test_no_protection_is_remembered_without_check_or_action(self, tmp_path):
+        """The decision keeps why no guard is needed; a guard keeps its check's
+        operator."""
         store = GuardStore(tmp_path)
-        store.record({"key": KEY, "protection": False})
+        store.record({"key": KEY, "protection": False, "why": "not_applicable"})
         record = store.match(KEY)
         assert record["protection"] is False and "check" not in record
+        assert record["why"] == "not_applicable"
+        assert store.record(_guard())["check"]["operator"] == "!="
+
+    def test_a_pause_and_a_start_are_two_keys(self, tmp_path):
+        """One operationalState action, two commands: decided apart."""
+        store = GuardStore(tmp_path)
+        store.record(_guard(key={**KEY, "invocation_value": "2"}))
+        assert store.match({**KEY, "invocation_value": "2"}) is not None
+        assert store.match({**KEY, "invocation_value": "1"}) is None
 
     def test_a_newer_decision_supersedes_the_older(self, tmp_path):
         store = GuardStore(tmp_path)

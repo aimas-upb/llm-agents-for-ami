@@ -24,7 +24,7 @@ from hasp_utils import (HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST,
                         validate_service_payload_for_entity)
 from hasp_cache import HASPGraphCache
 import hasp_semantics
-from hasp_utils import state_property_names
+from hasp_utils import entity_field_options, state_property_names
 
 # Re-read semantic_mappings.yaml and the home's SEMANTIC_CONFIG.
 reload_semantics = hasp_semantics.reload
@@ -1237,7 +1237,10 @@ def _build_cached_artifact_ttl(
             # explicit input fields. Those should still be exposed as actions.
             if not supported_fields and not (legacy_applies or modern_applies):
                 continue
-            input_schema = rdf._build_input_schema_from_fields(supported_fields)
+            # The entity's own accepted values (its modes, presets, options)
+            # go into the schema; the service definition cannot know them.
+            input_schema = rdf._build_input_schema_from_fields(
+                supported_fields, entity_field_options(domain, svc_name, domain_entity_attrs))
             action_affordance = rdf._add_action(
                 art,
                 action_name,

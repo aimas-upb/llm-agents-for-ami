@@ -147,166 +147,89 @@ SOSA recommendation (2017).
   - Neither SAREF core nor SSN covers prerequisites, so a TD-level model would need one of
     these or a new property.
 
-## Part 2 — protection guards, decided at profiling and remembered
+## Part 2 — condition guards, decided after planning and remembered
 
 ### What it does
 
-Some actions are refused unless the device is in a certain state. Three examples:
-- a dryness level can't be changed while a cycle runs;
-- a cycle can't start while the device is off;
-- a pause is refused unless the cycle is running.
+Every entry of `config/planning_guidelines.yaml` is now a **condition**: the device state
+that must hold before a command, per device class (and command class, and optionally the
+property the command writes). There is no `kind`; restriction and guideline are one thing.
+The conditions are listed in the file, each with its Matter source in a comment.
 
-For each such action, the plan should be able to put a guard in front of it:
-**check a property; if it is not the expected value, first do a protecting action**. Then
-the action follows:
-```
-sequence
-  selector                                   (the idempotent guard)
-    condition: protection_check_property == protection_check_value
-    action:    protection_check_action (with its value)
-  achieve(G)                                 (the goal's own action, unchanged)
-```
-Whether a goal needs a guard, and which one, is decided **during profiling**. That is the
-step where the devices and the commands are known. The ISA then **remembers** the decision
-for that exact action of that exact device, so later plans apply it without asking.
+| Device class | Command | Condition | Established by |
+|---|---|---|---|
+| LaundryWasher, LaundryDryer, Dishwasher, AirConditioner, DimmableLight (ColorLight) | mode / level / op-state | switched on | the deterministic power-on guard |
+| LaundryWasher, LaundryDryer, Dishwasher | programme, spin, rinses, dryness, temperature | operational state ≠ Running | pause, then resume after |
+| LaundryWasher, LaundryDryer, Dishwasher | pause / resume / start | Running or Paused (pause, resume); settings set before a start | no guard can establish it |
+| AirConditioner, HeatPump (cooling); + Heater (heating) | the setpoint | HVAC mode Cool / Heat or Auto | set the HVAC mode |
+| WindowCoveringController | target position | Mode 0 (no calibration / maintenance bit) | set the mode to 0 |
+| Rvc | clean mode, run mode non-Idle → non-Idle | run mode Idle | set the run mode to Idle |
 
-### Settled with you
+`power_on_first` stays deterministic (`utils/power_on_guard.py`). Every other condition goes
+through the **condition-guard check**, on simple and dependency plans:
 
-| Topic | Decision |
-|---|---|
-| Guidelines file | entries keyed by **device class** (artifact class name, e.g. `homeont:LaundryDryer`, matched with its subclasses) or by **manufacturer** (the TD's `manufacturer`); each holds plain-language text |
-| Which goals are asked | goals whose action is a `homeont:SetModeCommand`, `saref:SetAbsoluteLevelCommand` or `homeont:SetOperationalStateCommand`, on a device matching an entry |
-| Which structures | both dependency **and simple** structures (simple ones are routed through profiling for this question only) |
-| Memory | its own store in the memory engine (not signifiers), hosted by the EnvExplorer |
-| When recorded | after the plan ran successfully (the UA records it, as for signifiers) |
-| What is recorded | both decisions: a guard, and "no protection needed" |
+1. **Steps** (`utils/planning_conditions.py`): each action of the plan whose device, command
+   and written property match a condition. Actions inside a guard already there (a
+   replayed tree) are skipped.
+2. **Memory** (`utils/guard_memory.py`, `GuardStore` in the EnvExplorer): each step's exact
+   key (action title and class, device title and class, room class, and the value for
+   commands whose value selects the command). A hit is never applied blindly
+   (`condition_guard.apply_remembered`): its property and action are found again on
+   today's TD by title and class, its values re-typed, its restore derived again. If that
+   fails, the hit counts as a miss.
+3. **The model** (`utils/condition_check.py`, `CONDITION_GUARD_PROMPT`): one call to the
+   profiling model for all misses. It gets the request, the plan's actions in execution
+   order, the steps with their condition texts, and the devices' TDs. Per step it answers
+   a guard (check property, `==` / `!=`, value; establishing action and value) or no
+   guard (`not_applicable`, or `established_by_plan`, which skips the guard). The answer is
+   resolved against the step's own device; anything wrong means no guard, with a note.
+4. **Restore** (`condition_guard.restore_action`): a guard that switches off, pauses or
+   stops is followed by the switch-on, resume or start. That is the same combined action
+   with the opposite value, or the device's one separate on / start command (a tie is
+   broken by name). If none is found, the step is not guarded.
+5. **Wrap** (`condition_guard.wrap_steps`):
+   ```
+   selector "<step>: <condition> condition guard"
+     sequence holds      condition(check), step
+     sequence establish  condition(not check), guard action, step, [restore]
+   ```
+6. **Drop** (`condition_guard.drop_satisfied`): a guard whose check an earlier step of the
+   plan already establishes, in execution order, is removed again. The walk is
+   `utils/plan_order.walk_in_order`, shared with the power-on guard:
+   - a sequence carries facts from child to child;
+   - selectors, parallels and decorators don't carry facts past themselves;
+   - a repeat's body starts without the keys it writes;
+   - timers and waits pass facts through. The plan is trusted, which is an accepted risk:
+     a change from outside the plan during a wait is not seen.
 
-### 1. The guidelines file — `ami_agents/config/planning_guidelines.yaml`
+   For dependency plans the drop runs on the compiled tree, where "earlier" is the real
+   order across goals.
 
-The path is in `agents.yaml` (`interaction_solver.planning.guidelines.path`).
-```yaml
-entries:
-  - id: settings_before_start
-    applies_to:
-      classes: [homeont:LaundryDryer, homeont:LaundryWasher, homeont:Dishwasher]
-      manufacturers: []
-    text: >-
-      Choose mode and settings (programme, dryness, spin, rinses) before starting a cycle;
-      while a cycle runs they may be refused.
-  - id: power_on_first          # classes: washer, dryer, dishwasher, room air conditioner
-  - id: pause_only_running      # classes: every appliance with a cycle
-```
-- The three draft entries come from Part 1. `pause_only_running` is new.
-- **Loader:** `interaction_solver/utils/planning_guidelines.py` reads the file once, with a
-  module default path. `guidelines_for(graph, artifact)` returns the texts whose class (or a
-  superclass of the device's class) or manufacturer matches the device.
+### Where it runs
 
-### 2. Which goals get the question — `goal_profile.build_checklist` (deterministic)
+- **Simple plans:** `ConditionGuardBehaviour`, spawned by `GoalRequestBehaviour._plan_mixed`
+  before `PowerOnGuardBehaviour`, which then also covers the guards' own actions. Both
+  share one TD graph.
+- **Dependency plans:** step 3c of `DependencyGoalPlanningBehaviour`, after profiling, on
+  every goal subtree and per-device tree. Step 4b then drops the satisfied guards on the
+  compiled tree, before the power-on guard.
+- **The entry:** `guards`, with one decision per step (`dropped` marks a guard the plan
+  didn't need), and `condition_call`, the model call.
 
-A new question, `protection`, with target `G`, is asked for every goal that meets all of:
-- its action's command class is one of the three above (read from the planned subtree's
-  action, in the TD);
-- its device matches at least one guideline entry;
-- the guard memory has no record for its key (§5). A hit is applied as recorded, and no
-  question is asked.
+### Learning
 
-The key is: `affordance_name`, `affordance_class`, `device_name` (artifact title),
-`device_class` (most specific class), `room_class` (its workspace's class), all taken from the
-TD of the device the subtree acts on.
-
-### 3. The profiling prompt — a new `protection` section in `GOAL_PROFILE_PROMPT`
-
-This adds a section to your profiling prompt. Its context, per target goal:
-- the device's actions and properties (as today);
-- the matching guideline texts;
-- the goal's action and value.
-
-The answer names the property and the action by their `td:title` **and their class**, as
-they appear in the goal's context:
-```json
-{"protection": false}
-{"protection": true,
- "protection_check_property": {"title": "<td:title>", "class": "<property class>"},
- "protection_check_value": "<value as text>",
- "protection_check_action": {"title": "<td:title>", "class": "<command class>",
-                             "value_text": "<value as text>"}}
-```
-
-**Resolution — deterministic, against the real graph** (`resolve_profile` +
-`utils/dependency_context.py`):
-- **The property:** a SPARQL query on the TD graph looks for a property affordance of the
-  goal's device that has that `td:title` and is of that class (`rdf:type/rdfs:subClassOf*`).
-- **The action:** the same query, for an action affordance of the same device with that title
-  and command class.
-- **Both found:** the guard is created, from the property's read target and the action's
-  invoke target (their `hctl:hasTarget`). Values are typed from the property's output schema
-  and the action's input schema.
-- **Either missing, or the answer has the wrong shape:** the question resolves to
-  `{"protection": false}`, with a note naming what was not found.
-
-**The memory** stores the resolved guard: title, class and target of the property and of the
-action, plus both values. It is applied from there without another query.
-
-### 4. Applying the guard
-
-- **Dependency structures:** the compiler wraps `achieve(G)` in the pattern above, where the
-  profile (or the memory) says so. Values are typed from the property and action schemas, as
-  the existing `_typed` does.
-- **Simple structures:** after the explicit / incomplete planners have planned them, a new
-  OneShot behaviour applies the same step to the plan entry:
-  - `ProtectionBehaviour(entries, graph)` in `interaction_solver/behaviours/protection.py`;
-  - it builds the checklist (protection questions only), asks the small model once per
-    structure, and wraps each tree.
-  - It is spawned from `GoalRequestBehaviour._plan_mixed` after the route behaviours.
-  - Ambiguous (LLM-built) trees have no single goal action and are not covered.
-- **The entry** carries `guards: [{key, protection, check?, action?}]` for every goal decided,
-  from the memory or from the model, so the UA can record them.
-
-### 5. The guard memory — its own store, exact key
-
-- **`GuardStore`** in `ami_agents/shared/memory/src/storage/guard_store.py`:
-  - records on disk under `<storage>/guards/`, the same way as `MemoryStore`;
-  - `match(key) -> record | None`, `record(record) -> id`, `list`, `clear`;
-  - the key is the five fields above, digested exactly;
-  - the record holds `protection`, plus for a guard the check property (URL, name, value)
-    and the action (URL, name, value).
-- **Messages** (`shared/models/messages.py`): `GUARD_MATCH_REQUEST` / `RESPONSE` and
-  `GUARD_RECORD_REQUEST` / `RESPONSE`.
-- **EnvExplorer:** `GuardMatchBehaviour` and `GuardRecordBehaviour`, mirroring the signifier
-  match / record behaviours but sharing no code with them.
-- **ISA:** `utils/guard_memory.py`, `recall_guard(agent, key)` over RPC, used by the checklist
-  step.
-- **UA:** after a plan entry with `guards` executed successfully, sends one
-  `GUARD_RECORD_REQUEST` per guard decided by the model; guards that came from the memory are
-  not re-recorded. "Successfully" means the plan concluded with success, and the guard's own
-  check / action did not fail.
-- **Bench:** the in-process explorer answers the two messages from a `GuardStore` in the run
-  directory (`--memory run`), like signifiers.
-
-### Files
-
-| Area | Files |
-|---|---|
-| config | `config/planning_guidelines.yaml` (new); `agents.yaml` (path key); `docs/configuration.md` |
-| ISA | `utils/planning_guidelines.py` (new); `utils/goal_profile.py` (question, shape check, fallback); `prompts.py` (protection section); `utils/dependency_compiler.py` (guard wrap); `behaviours/protection.py` (new); `behaviours/goal_request.py` (spawn it); `utils/guard_memory.py` (new) |
-| memory | `shared/memory/src/storage/guard_store.py` (new) |
-| messages | `shared/models/messages.py` |
-| EnvExplorer | `behaviors/guard_match_behaviour.py`, `behaviors/guard_record_behaviour.py` (new), registered in the agent |
-| UA | recording after a successful plan, next to the signifier recording (`plan_execution.py` / `signifiers.py` call site) |
-| bench | `stubs.Explorer.query` (two messages), `memory.py` |
-
-### Tests (unit, files touched only)
-
-- guideline matching by class, subclass and manufacturer;
-- checklist: asked only for the three command kinds on matched devices, and not on a memory hit;
-- `resolve_profile`: protection shapes; malformed answers fall back to false;
-- compiler and `ProtectionBehaviour`: the wrap pattern, and no wrap for false;
-- `GuardStore` round trip and exact key;
-- EnvExplorer match / record;
-- UA records only after success, both true and false, never re-recording memory hits.
+- **Messages:** `GUARD_MATCH_REQUEST` / `RESPONSE` and `GUARD_RECORD_REQUEST` / `RESPONSE`.
+- **EnvExplorer:** `GuardMatchBehaviour` and `GuardRecordBehaviour`. The `GuardStore` is
+  opened with the `MemoryStore`.
+- **UA:** `user_assistant/guards.py`. After a successful plan it records the model's
+  guards that stayed in the tree, and its `not_applicable` answers. It never records
+  memory hits, dropped guards or `established_by_plan`, which depends on one plan, not on
+  the device. The restore is not stored.
+- **Bench:** `stubs.Explorer.query` answers `GUARD_MATCH` from the run's `GuardStore`, and
+  `_remember` records the decisions by the UA's rule.
 
 ### Verification (handed over)
 
-- `run --episode qt4-3_feasible_seed_41 --memory run --context prepend`: the dryness-level goal
-  should get a protection question; the guard should be recorded after a successful run.
-- Re-running with the same memory: the guard is applied without a question.
+- `run --episode qt4-3_feasible_seed_41 --memory run`: the dryness-level step should get a
+  condition question, and the guard should be recorded after a successful run.
+- Re-running with the same memory: the guard is applied with no question.

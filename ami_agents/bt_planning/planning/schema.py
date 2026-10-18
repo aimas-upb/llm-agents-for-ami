@@ -2,6 +2,10 @@
 JSON IR schema and tool definition for BehaviorTree generation.
 
 Extracted from behaviortree-planning-for-ami-agents src/planning/output/json_ir.py.
+
+Leaves name their affordance by device, td:title and class (`artifact`,
+`affordance`, `affordance_class`), copied from the device list; the planner
+resolves them to URLs (`affordance_refs.AffordanceCatalog`).
 """
 
 # JSON schema for behavior tree nodes
@@ -27,13 +31,21 @@ TREE_PARAMETER_SCHEMA = {
             "enum": ["success_on_all", "success_on_one"],
             "description": "Policy for parallel nodes.",
         },
-        "affordance_id": {
+        "artifact": {
+            "type": "string",
+            "description": "The device's name, exactly as the device list shows it.",
+        },
+        "affordance": {
             "type": "string",
             "description": (
-                "Exact affordance id from the affordances list "
-                "(e.g. 'light308/setBrightness'). For condition nodes a readable "
-                "property URL from the hints or current state is also accepted."
+                "The affordance's name, as listed under that device: under "
+                "`actions:` for an action node, under `properties:` for a "
+                "condition or wait_condition."
             ),
+        },
+        "affordance_class": {
+            "type": "string",
+            "description": "That entry's class, exactly as listed.",
         },
         "parameters": {
             "type": "object",
@@ -88,17 +100,17 @@ TREE_PARAMETER_SCHEMA = {
         {
             "title": "Action",
             "properties": {"type": {"const": "action"}},
-            "required": ["affordance_id"],
+            "required": ["artifact", "affordance", "affordance_class"],
         },
         {
             "title": "Condition",
             "properties": {"type": {"const": "condition"}},
-            "required": ["affordance_id", "expected_value"],
+            "required": ["artifact", "affordance", "affordance_class", "expected_value"],
         },
         {
             "title": "WaitCondition",
             "properties": {"type": {"const": "wait_condition"}},
-            "required": ["affordance_id", "expected_value"],
+            "required": ["artifact", "affordance", "affordance_class", "expected_value"],
         },
     ],
     "description": (

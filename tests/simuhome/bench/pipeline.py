@@ -43,7 +43,10 @@ from ami_agents.agents.interaction_solver.behaviours.goal_request import (
     route,
     route_behaviour,
 )
+from ami_agents.agents.interaction_solver.behaviours.condition_guard import ConditionGuardBehaviour
 from ami_agents.agents.interaction_solver.behaviours.power_on_guard import PowerOnGuardBehaviour
+from ami_agents.agents.interaction_solver.utils.environment_graph import fetch_environment_graph
+from ami_agents.agents.user_assistant.guards import guards_to_record
 from ami_agents.agents.interaction_solver.utils.plan_envelope import envelope_plan_entries
 from ami_agents.agents.user_assistant import pipeline as ua_pipeline
 from ami_agents.agents.user_assistant import queries
@@ -298,14 +301,18 @@ async def _run(name, episode, variant, config, target, options, logger, record, 
             for (index, _), result in zip(selected, behaviour.results):
                 entries[index] = {**result, "route": route_name,
                                   "intent": structures[index].to_wire_dict()}
-        # The power-on guard on every entry outside a dependency structure, as
-        # the ISA's GoalRequestBehaviour does after its routes.
+        # The condition-guard check, then the power-on guard, on every entry
+        # outside a dependency structure, as the ISA's GoalRequestBehaviour
+        # does after its routes (one TD graph for both).
         simple = [e for e in entries.values() if e["route"] != "dependency"]
         if simple:
-            guard = PowerOnGuardBehaviour(simple, logger=logger)
-            guard.agent = isa
-            async with meter.step("planning", route="power_on_guard", goals=len(simple)):
-                await guard.run()
+            graph = await fetch_environment_graph(isa, logger)
+            for name, cls in (("condition_guard", ConditionGuardBehaviour),
+                              ("power_on_guard", PowerOnGuardBehaviour)):
+                guard = cls(simple, logger=logger, graph=graph)
+                guard.agent = isa
+                async with meter.step("guarding", kind=name, goals=len(simple)):
+                    await guard.run()
         for index, structure in enumerate(structures):
             if index not in entries:
                 # The agents would send it to the planning workflow, from its words.
@@ -474,24 +481,38 @@ class StepCache:
 
 async def _run_dependency(behaviour, meter: Meter) -> None:
     """A dependency behaviour, with its LLM calls booked to the achievement
-    steps or to the dependency planning; its own timings become the steps."""
-    steps, profile = behaviour._steps, behaviour._profile
+    steps, to profiling, to guarding or to the rest of the dependency
+    planning; its own timings become the steps. Profiling and guarding are
+    added as stages of their own, timed inside the "planning" step that runs
+    this behaviour (`within="planning"`: the stage summary takes them out of
+    planning)."""
+    steps, profile, guards = behaviour._steps, behaviour._profile, behaviour._condition_guards
 
+    # 1. Each part's LLM calls booked to its stage.
     async def booked_steps(*args, **kwargs):
         with meter.tag("planning.achievement"):
             return await steps(*args, **kwargs)
 
     async def booked_profile(*args, **kwargs):
-        with meter.tag("planning.dependency"):
+        with meter.tag("profiling"):
             return await profile(*args, **kwargs)
 
+    async def booked_guards(*args, **kwargs):
+        with meter.tag("guarding"):
+            return await guards(*args, **kwargs)
+
     behaviour._steps, behaviour._profile = booked_steps, booked_profile
+    behaviour._condition_guards = booked_guards
     await behaviour.run()
+
+    # 2. The behaviour's own timings, per structure, as steps.
     for timing in behaviour.timings:
         if "achievement" in timing:
             meter.add("planning.achievement", timing["achievement"])
-        dependency = {k: timing[k] for k in ("predicates", "profiling", "compile")
-                      if k in timing}
+        for stage in ("profiling", "guarding"):
+            if stage in timing:
+                meter.add(stage, timing[stage], within="planning", route="dependency")
+        dependency = {k: timing[k] for k in ("predicates", "compile") if k in timing}
         if dependency:
             meter.add("planning.dependency", sum(dependency.values()), parts=dependency)
 
@@ -511,14 +532,16 @@ def _execute(runnable, tools, sim, config, options, home_config, episode, timed)
 
 
 def _remember(memory, contexts, plans) -> List[str]:
-    """Record the signifier of each successful plan the UA would remember;
-    returns the ids recorded."""
+    """Record the signifier and the condition-guard decisions of each
+    successful plan the UA would remember; returns the ids recorded."""
     recorded = []
     for context, plan in zip(contexts, plans):
         # 1. Nothing is remembered from a plan that did not succeed.
         if plan.get("status") != "SUCCESS":
             continue
-        # 2. The signifier, under the UA's recording rules.
+        # 2. The guard decisions, under the UA's rules (`guards_to_record`).
+        recorded.extend(memory.record_guard(g) for g in guards_to_record(context.entry))
+        # 3. The signifier, under the UA's recording rules.
         if not context.should_record:
             continue
         signifier = build_signifier(context)

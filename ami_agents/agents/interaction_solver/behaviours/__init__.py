@@ -8,6 +8,7 @@ lookup, BT plan generation).
 
 from .ambiguous_goal_planning import AmbiguousGoalPlanningBehaviour
 from .bt_plan_generation import BTPlanGenerationBehaviour
+from .condition_guard import ConditionGuardBehaviour
 from .dependency_goal_planning import DependencyGoalPlanningBehaviour
 from .env_context_query import EnvContextQueryBehaviour
 from .environment_ready import EnvironmentReadyBehaviour
@@ -21,6 +22,7 @@ from .power_on_guard import PowerOnGuardBehaviour
 __all__ = [
     "AmbiguousGoalPlanningBehaviour",
     "BTPlanGenerationBehaviour",
+    "ConditionGuardBehaviour",
     "DependencyGoalPlanningBehaviour",
     "EnvContextQueryBehaviour",
     "EnvironmentReadyBehaviour",

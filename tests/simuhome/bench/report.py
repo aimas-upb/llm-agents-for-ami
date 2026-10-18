@@ -18,7 +18,9 @@ Reads every <root>/<variant>/<episode>.json with its .eval.json and writes, in
 
 Steps: segmentation, structuring, state_read, planning (with
 planning.achievement and planning.dependency for dependency structures),
-execution (real seconds; virtual seconds alongside), response. Discovery is
+profiling and guarding (a dependency plan's, timed inside its planning; the
+simple plans' guard steps), execution (real seconds; virtual seconds
+alongside), response. Discovery is
 listed apart: it is offline in a deployment. A step's LLM calls include its
 sub-steps' (structuring.intent under structuring).
 
@@ -37,7 +39,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 STEPS = ("segmentation", "structuring", "state_read", "planning", "planning.achievement",
-         "planning.dependency", "execution", "response")
+         "planning.dependency", "profiling", "guarding", "execution", "response")
 
 
 def _p95(values: List[float]) -> float:

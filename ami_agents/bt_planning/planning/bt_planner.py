@@ -5,7 +5,6 @@ Generates JSON IR behavior trees using async OpenAI API,
 adapted for the SPADE multi-agent context in the AAMAS 2026 demo.
 """
 
-import difflib
 import json
 import logging
 import re
@@ -13,11 +12,10 @@ from typing import Any, Optional
 
 from openai import AsyncOpenAI
 
+from .affordance_refs import CLASS_FIELD, DEVICE_FIELD, READING_NODES, TITLE_FIELD, AffordanceCatalog
 from .schema import GENERATE_BT_TOOL
 from .prompts import (
     BT_PLANNING_SYSTEM_PROMPT,
-    build_affordance_index,
-    build_url_to_ref,
     format_capability_context,
     format_observable_property_hints,
     format_signifier_hints,
@@ -98,13 +96,13 @@ class AsyncBTPlanner:
         if client is None:
             raise ValueError("AsyncOpenAI client is required")
 
-        # Build the planning prompt.  Affordances are shown as short ids and
-        # resolved back to target URLs after generation.
-        affordance_index = build_affordance_index(affordances)
-        url_to_ref = build_url_to_ref(affordance_index)
-        capability_context = format_capability_context(affordances, state, index=affordance_index)
-        sig_hints_text = format_signifier_hints(signifier_hints, url_to_ref=url_to_ref)
-        obs_hints_text = format_observable_property_hints(observable_property_hints, url_to_ref=url_to_ref)
+        # Build the planning prompt. Affordances are shown by device, name and
+        # class -- no URLs, no ids -- and the tree's references to them are
+        # resolved to URLs after generation, by the same catalog.
+        catalog = AffordanceCatalog(affordances)
+        capability_context = format_capability_context(catalog, state)
+        sig_hints_text = format_signifier_hints(signifier_hints, catalog)
+        obs_hints_text = format_observable_property_hints(observable_property_hints, catalog)
 
         system_prompt = BT_PLANNING_SYSTEM_PROMPT.format(
             capability_context=capability_context,
@@ -220,9 +218,9 @@ class AsyncBTPlanner:
                         "intents": intents,
                     }
 
-                # Resolve short affordance ids back to target URLs so the final
-                # IR is executable and downstream consumers stay URL-based.
-                resolution_errors = self._resolve_affordance_refs(tree_spec, affordance_index)
+                # Resolve each leaf's (device, name, class) to its URL so the
+                # final IR is executable and downstream consumers stay URL-based.
+                resolution_errors = self._resolve_affordance_refs(tree_spec, catalog)
 
                 # Normalize tree (fill in missing optional fields like 'name')
                 tree_spec = self._normalize_tree(tree_spec)
@@ -367,91 +365,56 @@ class AsyncBTPlanner:
         return kwargs
 
     def _resolve_affordance_refs(
-        self, spec: dict, index: dict[str, dict], path: str = "tree"
+        self, spec: dict, catalog: AffordanceCatalog, path: str = "tree"
     ) -> list[str]:
         """
-        Resolve short ``affordance_id`` references to target URLs in-place.
+        Resolve each leaf's affordance reference to its URL, in place.
 
-        Action nodes get ``action_url``; condition/wait_condition nodes get
-        ``property_url``. Unknown ids become validation errors so the LLM
-        retry loop can correct them. Literal http(s) URLs are passed through
-        for condition nodes fed by state keys or observable-property hints,
-        and for legacy trees that already carry URLs.
+        A leaf names its affordance by device, td:title and class (`artifact`,
+        `affordance`, `affordance_class`). Action nodes are looked up among the
+        device's actions and get ``action_url``; condition / wait_condition
+        nodes among its properties and get ``property_url``. Anything that does
+        not resolve becomes a validation error naming what the device does have,
+        so the retry loop can correct it.
         """
         errors: list[str] = []
         if not isinstance(spec, dict) or not spec:
             return errors
 
+        # 1. This node, when it is a leaf that names an affordance.
         node_type = spec.get("type")
-        if node_type == "action":
-            errors.extend(self._resolve_node_ref(spec, index, "action_url", path))
-        elif node_type in {"condition", "wait_condition"}:
-            errors.extend(self._resolve_node_ref(spec, index, "property_url", path))
+        if node_type == "action" or node_type in READING_NODES:
+            errors.extend(self._resolve_node_ref(spec, catalog, path))
 
+        # 2. Its children.
         children = spec.get("children")
         if isinstance(children, list):
             for idx, child in enumerate(children):
                 errors.extend(
-                    self._resolve_affordance_refs(child, index, path=f"{path}.children[{idx}]")
+                    self._resolve_affordance_refs(child, catalog, path=f"{path}.children[{idx}]")
                 )
         return errors
 
-    def _resolve_node_ref(
-        self, spec: dict, index: dict[str, dict], url_field: str, path: str
-    ) -> list[str]:
+    def _resolve_node_ref(self, spec: dict, catalog: AffordanceCatalog, path: str) -> list[str]:
+        """Resolve one leaf; [] when it resolved, else its errors."""
         node_type = spec.get("type")
-        ref = spec.get("affordance_id")
-
-        if not ref or not isinstance(ref, str):
-            legacy_url = spec.get(url_field)
-            if isinstance(legacy_url, str) and legacy_url:
-                return []
-            return [f"{path}: {node_type} nodes require 'affordance_id'"]
-
-        aff = index.get(ref)
-        if aff is not None:
-            aff_type = str(aff.get("affordance_type") or "action")
-            if node_type == "action" and aff_type != "action":
-                return [
-                    f"{path}: affordance '{ref}' is a {aff_type} affordance; "
-                    "action nodes require an [action] affordance id"
-                ]
-            target = aff.get("target") or aff.get("affordance_uri") or aff.get("href")
-            if not isinstance(target, str) or not target:
-                return [f"{path}: affordance '{ref}' has no target URL"]
-            spec[url_field] = target
-            if node_type == "action":
-                return self._validate_action_parameters(spec, aff, path)
-            return []
-
-        if ref.startswith("http://") or ref.startswith("https://"):
-            spec[url_field] = ref
-            return []
-
-        # Models often drop long artifact-id prefixes (e.g.
-        # 'utility_room_environment/x' for 'qt2_feasible_seed_1_utility_room_environment/x');
-        # accept the ref when it is an unambiguous token-boundary suffix.
-        suffix_matches = self._suffix_matches(ref, index)
-        if len(suffix_matches) == 1:
-            resolved = suffix_matches[0]
-            logger.info("Resolved affordance_id '%s' via unique suffix match '%s'", ref, resolved)
-            spec["affordance_id"] = resolved
-            return self._resolve_node_ref(spec, index, url_field, path)
-        if len(suffix_matches) > 1:
-            return [
-                f"{path}: affordance_id '{ref}' is ambiguous -- matches: "
-                + ", ".join(suffix_matches[:4])
-            ]
-
-        # Models tend to repeat a hallucinated id verbatim across retries when
-        # only told it is unknown; suggesting close matches breaks that loop.
-        suggestions = difflib.get_close_matches(ref, index.keys(), n=3, cutoff=0.6)
-        message = f"{path}: unknown affordance_id '{ref}'"
-        if suggestions:
-            message += " -- did you mean: " + ", ".join(suggestions) + "?"
-        else:
-            message += " (use an exact id from the affordances list)"
-        return [message]
+        # 1. The reference must be complete.
+        missing = [f for f in (DEVICE_FIELD, TITLE_FIELD, CLASS_FIELD) if not spec.get(f)]
+        if missing:
+            return [f"{path}: {node_type} nodes require " + ", ".join(f"'{f}'" for f in missing)]
+        # 2. Look it up on the right side of the device: actions or properties.
+        entry, error = catalog.resolve(node_type, spec[DEVICE_FIELD], spec[TITLE_FIELD],
+                                       spec[CLASS_FIELD])
+        if entry is None:
+            return [f"{path}: {error}"]
+        if not entry.url:
+            return [f"{path}: {entry.device} {entry.kind} {entry.title!r} has no URL"]
+        # 3. The URL; an action's parameters checked against its input.
+        if node_type == "action":
+            spec["action_url"] = entry.url
+            return self._validate_action_parameters(spec, entry.affordance, path)
+        spec["property_url"] = entry.url
+        return []
 
     @staticmethod
     def _validate_action_parameters(spec: dict, aff: dict, path: str) -> list[str]:
@@ -504,22 +467,6 @@ class AsyncBTPlanner:
                 )
         return errors
 
-    @staticmethod
-    def _suffix_matches(ref: str, index: dict[str, dict]) -> list[str]:
-        """Index keys for which ``ref`` is a token-boundary suffix."""
-        matches = []
-        ref_lower = ref.lower()
-        for key in index:
-            key_lower = key.lower()
-            if key_lower == ref_lower:
-                matches.append(key)
-                continue
-            if key_lower.endswith(ref_lower):
-                boundary = key_lower[-len(ref_lower) - 1]
-                if boundary in "_/.-:":
-                    matches.append(key)
-        return matches
-
     def _normalize_tree(self, spec: dict, _counter: list | None = None) -> dict:
         """
         Normalize a tree spec by filling in default values for optional fields.
@@ -537,11 +484,11 @@ class AsyncBTPlanner:
         if not spec.get("name") or not isinstance(spec.get("name"), str):
             node_type = spec.get("type", "node")
             if node_type == "action":
-                url = spec.get("affordance_id") or spec.get("action_url", "")
+                url = spec.get(TITLE_FIELD) or spec.get("action_url", "")
                 action_name = url.rstrip("/").rsplit("/", 1)[-1] if url else "action"
                 spec["name"] = action_name.replace("_", " ").title().replace(" ", "")
             elif node_type in {"condition", "wait_condition"}:
-                prop = spec.get("affordance_id") or spec.get("property_url", "")
+                prop = spec.get(TITLE_FIELD) or spec.get("property_url", "")
                 prop_name = prop.rstrip("/").rsplit("/", 1)[-1] if prop else "check"
                 expected = spec.get("expected_value", "")
                 prefix = "WaitFor" if node_type == "wait_condition" else "Check"
@@ -753,11 +700,13 @@ class AsyncBTPlanner:
         elif node_type == "action":
             action_url = spec.get("action_url")
             if not action_url or not isinstance(action_url, str):
-                errors.append(f"{path}: action nodes require a resolvable 'affordance_id'")
+                errors.append(f"{path}: action nodes require a resolvable "
+                              "'artifact' / 'affordance' / 'affordance_class'")
         elif node_type in {"condition", "wait_condition"}:
             property_url = spec.get("property_url")
             if not property_url or not isinstance(property_url, str):
-                errors.append(f"{path}: {node_type} nodes require a resolvable 'affordance_id'")
+                errors.append(f"{path}: {node_type} nodes require a resolvable "
+                              "'artifact' / 'affordance' / 'affordance_class'")
             if "expected_value" not in spec:
                 errors.append(f"{path}: {node_type} nodes require 'expected_value'")
             if node_type == "wait_condition":

@@ -252,3 +252,87 @@ specific_goal_context:
 checklist:
 {checklist}
 """
+
+
+# The condition-guard check (`utils/condition_check.py`), run on every plan after
+# its steps are planned (after profiling, for dependency plans): for each step on
+# a device that has a condition in `config/planning_guidelines.yaml`, the small
+# model says which check and which protecting action guard it -- or that no
+# guard is needed. The InteractionSolver resolves the answer against the TDs and
+# builds the guard; a pause, stop or switch-off it names is followed by the
+# matching resume, start or switch-on, added by code. The four inputs are put
+# in by plain replacement (`condition_check.render_condition_guard_prompt`).
+CONDITION_GUARD_PROMPT = """
+You check a smart-home plan against the conditions its devices impose. A plan has already been made; some of its steps send a command to a device that only accepts that command, or only acts on it, when the device is in a certain state. For each such step you decide whether the plan must check that state first, and how to establish it when it does not hold.
+
+You do not change the plan. You never remove, reorder or reword its steps. You only answer, for each listed step, with a guard or with "no guard".
+
+## Inputs
+
+- `request`: the user's request as structured goals (goal ids G1, G2, … with their timing, when there are several).
+- `plan_actions`: every action of the plan, in execution order, with its step id where it has conditions: the goal it serves, the device, the action and the value it sends.
+- `steps`: the steps to decide. Each has an `id`, the device (`device_name`, `device_class`), the action (`action_name`, `action_class`), the `value` it sends, and the `conditions` that apply to it, in plain language.
+- `devices`: every device a step acts on, by name, with its affordances. Each affordance has a `kind` ("action" or "property"), a `name`, its classes (`semantic_types`), a `description`, and its `input_schema` (actions) or `output_schema` (properties). A check names a property; a guard action names an action — even when an action and a property share a name, pick by `kind`.
+
+## How to decide
+
+Read each condition literally, against the step's action and value. A condition often covers several commands (start, pause, resume; programme, spin, rinses); only the part about this step's command and value counts.
+
+Interpret the plan exactly as it is. If the user changes a setting while a cycle runs, the plan changes it during the run: the guard pauses the cycle so the change is accepted. The plan's own steps are never the guard.
+
+Answer **no guard** when:
+- the condition does not concern this command or this value (`"why": "not_applicable"`), or the condition itself says not to guard it;
+- an earlier action in `plan_actions` already puts the device in the required state before this step runs, in execution order (`"why": "established_by_plan"`) — for example the plan pauses the cycle, then changes the spin.
+
+Otherwise answer **a guard**:
+- `check`: the property of the step's own device that tells whether the condition holds, the comparison (`==` or `!=`) and the value. Choose the comparison that states the condition exactly: "must not be Running" is `!=` Running; "must be Cool or Auto" cannot be one comparison, so check the value you will set (`==` Cool).
+- `action`: the action of the same device that makes the check hold, and the value to send. Prefer a pause to a stop: a paused cycle can be resumed. Never name the step's own action.
+
+Values are written as the TD gives them: if the property's or action's schema is a number, give the number (an operational state is 0 Stopped, 1 Running, 2 Paused, as in Matter); if it is an enum of names, give the name; booleans as `true` / `false`.
+
+Copy every name from the `devices` TDs: the property's and the action's `name` and one of their homeont / SAREF classes. Never invent a name. If the device has no property or no action that can express the condition, answer no guard with `"why": "not_applicable"` and say so in `reason`.
+
+## Output
+
+Return one JSON object, one answer per step id, no others. Every answer has all six fields: a guard has `"why": null`; no guard has `"check": null, "action": null`:
+
+```json
+{"answers": [
+  {"id": "S1", "guard": true,
+   "check":  {"property": "<property name>", "property_class": "<its class>", "operator": "!=", "value": 1},
+   "action": {"action": "<action name>", "action_class": "<its class>", "value": 2},
+   "why": null, "reason": "<one sentence>"},
+  {"id": "S2", "guard": false, "check": null, "action": null,
+   "why": "established_by_plan", "reason": "<one sentence>"}]}
+```
+
+### Example
+
+Request: "set the washer's spin speed to 1200". `plan_actions`: S1 washer_1 spinSpeedCurrent 1200. Condition: "Before changing the wash programme, the spin speed, … : the operational state must not be Running (Stopped or Paused). If it is Running, pause the cycle first." The washer has a property `operationalState` (homeont:LaundryWasherOperationalState, integer) and an action `operationalState` (homeont:SetOperationalStateCommand).
+
+```json
+{"answers": [
+  {"id": "S1", "guard": true,
+   "check":  {"property": "operationalState", "property_class": "homeont:LaundryWasherOperationalState", "operator": "!=", "value": 1},
+   "action": {"action": "operationalState", "action_class": "homeont:SetOperationalStateCommand", "value": 2},
+   "why": null, "reason": "the spin speed is refused while the cycle runs; pausing it lets the change through"}]}
+```
+
+Same washer, request "pause the washer, then set the spin to 1200": S2 (the spin) follows "washer_1 operationalState 2" in `plan_actions`, so `{"id": "S2", "guard": false, "check": null, "action": null, "why": "established_by_plan", …}`.
+
+A step whose condition says not to guard it — pausing or resuming a cycle — is `"guard": false, "why": "not_applicable"`. Never guard a step with its own action.
+
+## Input
+
+request:
+{request}
+
+plan_actions:
+{plan_actions}
+
+steps:
+{steps}
+
+devices:
+{devices}
+"""

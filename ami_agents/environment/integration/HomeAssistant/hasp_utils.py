@@ -237,10 +237,20 @@ class HomeAssistantRDF:
         return obj
 
     # ---- Dynamic schema builders for HA services ----
-    def _build_input_schema_from_fields(self, fields: Dict[str, Any]) -> Optional[BNode]:
-        """Build JSON Schema from HA service field definitions."""
+    def _build_input_schema_from_fields(self, fields: Dict[str, Any],
+                                        entity_options: Optional[Dict[str, List[str]]] = None
+                                        ) -> Optional[BNode]:
+        """Build JSON Schema from HA service field definitions.
+
+        ``entity_options`` maps a field to the values this entity accepts for
+        it, read from the entity's own state attributes (`entity_field_options`):
+        a service definition is shared by every entity of its domain, so it
+        cannot say which modes this one has. Such a field -- and a select
+        field with static options -- gets them as `js:enum` and as its
+        description, the way an enum is described."""
         if not fields:
             return None
+        entity_options = entity_options or {}
 
         # Filter out entity_id as it's implicit
         filtered_fields = {k: v for k, v in fields.items() if k != "entity_id"}
@@ -254,10 +264,15 @@ class HomeAssistantRDF:
             prop = BNode()
             self.g.add((obj, JS.properties, prop))
             self.g.add((prop, JS.propertyName, Literal(field_name)))
+            allowed: List[str] = []         # the values the field accepts, if listed
 
-            # Map HA field types to JSON Schema types
+            # Map HA field types to JSON Schema types; a field the entity
+            # lists its own values for is those values, whatever its selector.
             selector = field_def.get("selector", {})
-            if "number" in selector:
+            if field_name in entity_options:
+                self.g.add((prop, RDF.type, JS.StringSchema))
+                allowed = [str(v) for v in entity_options[field_name]]
+            elif "number" in selector:
                 self.g.add((prop, RDF.type, JS.NumberSchema))
                 num_def = selector["number"]
                 if "min" in num_def:
@@ -275,7 +290,7 @@ class HomeAssistantRDF:
                     # Handle both string options and dict options
                     opt_value = opt if isinstance(opt, str) else opt.get("value", opt.get("label"))
                     if opt_value:
-                        self.g.add((prop, JS.enum, Literal(opt_value)))
+                        allowed.append(str(opt_value))
             elif "boolean" in selector:
                 self.g.add((prop, RDF.type, JS.BooleanSchema))
             elif "color_rgb" in selector:
@@ -299,9 +314,16 @@ class HomeAssistantRDF:
                 # Default to string for unknown types
                 self.g.add((prop, RDF.type, JS.StringSchema))
 
-            # Add description if available
-            if "description" in field_def:
-                self.g.add((prop, JS.description, Literal(field_def["description"])))
+            # The accepted values, as an enum and in the description (which
+            # is what the agents read), after the service's own description.
+            for value in allowed:
+                self.g.add((prop, JS.enum, Literal(value)))
+            sentences = [str(field_def["description"]).strip().rstrip(".") + "."] \
+                if field_def.get("description") else []
+            if allowed:
+                sentences.append("Values on this device: " + ", ".join(allowed) + ".")
+            if sentences:
+                self.g.add((prop, JS.description, Literal(" ".join(sentences))))
 
             # Mark as required if specified
             if field_def.get("required"):
@@ -826,6 +848,41 @@ def get_operational_attributes(domain: str, attributes: Dict[str, Any],
             operational[key] = value
 
     return operational
+
+
+# Service fields whose accepted values are listed per entity, in a state
+# attribute -- (domain, service, field) -> attribute. The service definition is
+# shared by the whole domain; only the entity knows its own modes or options.
+ENTITY_OPTION_ATTRIBUTES = {
+    ("select", "select_option", "option"): "options",
+    ("input_select", "select_option", "option"): "options",
+    ("climate", "set_hvac_mode", "hvac_mode"): "hvac_modes",
+    ("climate", "set_preset_mode", "preset_mode"): "preset_modes",
+    ("climate", "set_fan_mode", "fan_mode"): "fan_modes",
+    ("climate", "set_swing_mode", "swing_mode"): "swing_modes",
+    ("fan", "set_preset_mode", "preset_mode"): "preset_modes",
+    ("humidifier", "set_mode", "mode"): "available_modes",
+    ("water_heater", "set_operation_mode", "operation_mode"): "operation_list",
+    ("vacuum", "set_fan_speed", "fan_speed"): "fan_speed_list",
+    ("light", "turn_on", "effect"): "effect_list",
+    ("media_player", "select_source", "source"): "source_list",
+    ("media_player", "select_sound_mode", "sound_mode"): "sound_mode_list",
+}
+
+
+def entity_field_options(domain: str, service: str,
+                         entity_attributes: Dict[str, Any]) -> Dict[str, List[str]]:
+    """{field: the values this entity accepts for it}, for the service's
+    fields listed in ENTITY_OPTION_ATTRIBUTES whose attribute the entity
+    reports as a non-empty list. Read from the entity's state, so no lookup
+    or model is involved."""
+    out: Dict[str, List[str]] = {}
+    for (dom, svc, field), attribute in ENTITY_OPTION_ATTRIBUTES.items():
+        if dom == domain and svc == service:
+            values = (entity_attributes or {}).get(attribute)
+            if isinstance(values, (list, tuple)) and values:
+                out[field] = [str(v) for v in values]
+    return out
 
 
 def get_supported_service_fields(domain: str, entity_attributes: Dict[str, Any],

@@ -8,6 +8,8 @@ from .experience_engine_init_behaviour import InitializeExperienceEngineBehaviou
 from .signifier_match_behaviour import SignifierMatchBehaviour
 from .signifier_record_behaviour import SignifierRecordBehaviour
 from .signifier_list_behaviour import SignifierListBehaviour
+from .guard_match_behaviour import GuardMatchBehaviour
+from .guard_record_behaviour import GuardRecordBehaviour
 from .environment_capabilities_behaviour import EnvironmentCapabilitiesBehaviour
 from .environment_state_behaviour import EnvironmentStateBehaviour
 from .environment_snapshot_behaviour import EnvironmentSnapshotBehaviour
@@ -23,6 +25,8 @@ __all__ = [
     'SignifierMatchBehaviour',
     'SignifierRecordBehaviour',
     'SignifierListBehaviour',
+    'GuardMatchBehaviour',
+    'GuardRecordBehaviour',
     'EnvironmentCapabilitiesBehaviour',
     'EnvironmentStateBehaviour',
     'EnvironmentSnapshotBehaviour',

@@ -168,6 +168,13 @@ class MessageType(Enum):
     SIGNIFIER_LIST_REQUEST = "signifier_list_request"
     SIGNIFIER_LIST_RESPONSE = "signifier_list_response"
 
+    # Guard memory (condition-guard decisions, embedded in EnvExplorer next to
+    # the signifiers but sharing nothing with them)
+    GUARD_MATCH_REQUEST = "guard_match_request"
+    GUARD_MATCH_RESPONSE = "guard_match_response"
+    GUARD_RECORD_REQUEST = "guard_record_request"
+    GUARD_RECORD_RESPONSE = "guard_record_response"
+
 
 class MessageClassification(Enum):
     """Classification categories for user messages."""

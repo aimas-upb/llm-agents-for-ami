@@ -2,9 +2,11 @@
 
 The engine (`ami_agents/shared/memory`) is a separate component -- also served
 on its own as the community memory -- that this agent manages: it opens the
-engine's `MemoryStore` once and keeps the SHACL tools ready alongside it.
+engine's `MemoryStore` once and keeps the SHACL tools ready alongside it. The
+engine's `GuardStore` (condition-guard decisions) is opened with it, in the
+same storage directory, under its own `guards/` subdirectory.
 
-    ensure_experience_engine_ready(agent)   open the store (idempotent, locked)
+    ensure_experience_engine_ready(agent)   open the stores (idempotent, locked)
     list_experience_engine_signifiers(...)  the stored records, newest first
 
 The SHACL validator and context builder are set up but not used for matching:
@@ -21,7 +23,8 @@ DEFAULT_SIGNIFIER_LIMIT = 10000
 
 
 async def ensure_experience_engine_ready(agent_instance) -> bool:
-    """Open the memory store and the SHACL tools, once. True when ready."""
+    """Open the memory store, the guard store and the SHACL tools, once. True
+    when ready."""
     if agent_instance._experience_engine_ready:
         return True
 
@@ -33,6 +36,7 @@ async def ensure_experience_engine_ready(agent_instance) -> bool:
 
             experience_engine_memory.ensure_engine_on_path()
 
+            from src.storage.guard_store import GuardStore  # type: ignore[import-not-found]
             from src.storage.memory_store import MemoryStore  # type: ignore[import-not-found]
             from src.validation.context_builder import ContextGraphBuilder  # type: ignore[import-not-found]
             from src.validation.shacl_validator import SHACLValidator  # type: ignore[import-not-found]
@@ -43,6 +47,7 @@ async def ensure_experience_engine_ready(agent_instance) -> bool:
 
             agent_instance._experience_engine_storage_dir = str(storage_dir)
             agent_instance._experience_engine_store = MemoryStore(storage_dir)
+            agent_instance._experience_engine_guard_store = GuardStore(storage_dir)
             agent_instance._experience_engine_context_builder = ContextGraphBuilder()
             agent_instance._experience_engine_shacl_validator = SHACLValidator(
                 enable_caching=str(cfg.get("enable_shacl_cache", "false")).lower() == "true")
@@ -50,7 +55,8 @@ async def ensure_experience_engine_ready(agent_instance) -> bool:
             agent_instance._experience_engine_ready = True
             agent_instance.logger.info(demo(
                 f"Memory engine ready (storage_dir={storage_dir}, "
-                f"records={len(agent_instance._experience_engine_store)})"))
+                f"records={len(agent_instance._experience_engine_store)}, "
+                f"guards={len(agent_instance._experience_engine_guard_store)})"))
             return True
         except Exception as e:
             agent_instance.logger.error(f"Failed to initialize the memory engine: {e}",

@@ -21,7 +21,8 @@ are different behaviours:
   explicit cancel ends it.
 
 What they share -- compiling the tree, capturing the recording context,
-answering status/cancel/explain, recording signifiers, finishing -- lives on
+answering status/cancel/explain, recording signifiers and condition-guard
+decisions, finishing -- lives on
 `PlanExecutionBehaviour`. What differs is `run()`, and nothing else.
 """
 
@@ -53,6 +54,7 @@ from ....shared.models.plan import PlanStatus
 from ....shared.utils.clock import make_clock
 from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
+from ..guards import GuardRecordingBehaviour
 from ..signifiers import (
     ExecutionOutcome,
     SignifierRecordingBehaviour,
@@ -127,6 +129,7 @@ class PlanExecutionBehaviour(CyclicBehaviour):
         if self.tree is not None and self._setup_done:
             self.tree.shutdown()
         self._record_signifiers(status)
+        self._record_guards(status)
         asyncio.ensure_future(self._announce(status))
         self.kill()
 
@@ -148,6 +151,20 @@ class PlanExecutionBehaviour(CyclicBehaviour):
         self.agent.add_behaviour(
             SignifierRecordingBehaviour(self._context, outcome,
                                         logger=self.logger))
+
+    def _record_guards(self, status: PlanStatus) -> None:
+        """Hand the plan's condition-guard decisions to a recording behaviour
+        of their own (`user_assistant/guards.py` decides which are kept).
+
+        Spawned, not awaited, for the same reason as the signifiers: a slow or
+        failing EnvExplorer must not touch a plan that has finished."""
+        if self._context is None or not self._context.entry.get("guards"):
+            return
+        outcome = ExecutionOutcome(success=status is PlanStatus.COMPLETED,
+                                   final_status=status.value, ticks=self._ticks_taken(),
+                                   executed_actions=[])
+        self.agent.add_behaviour(
+            GuardRecordingBehaviour(self._context, outcome, logger=self.logger))
 
     def _ticks_taken(self) -> int:
         record = self.agent.plans.get(self.plan_id)

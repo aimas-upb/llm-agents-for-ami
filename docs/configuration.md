@@ -113,17 +113,32 @@ settings under `planning.dependency`:
 | `default_tolerance` | 0.5 | allowed deviation from a numeric target when the device states none |
 | `stated_time_tolerance_seconds` | 60 | a start / end the user gave both as a clock time and relative to an anchor ("at 5:48 PM, which is 23 minutes before washer 1 finishes"): how far apart the two may be before the user is asked which one they mean |
 
-Planning restrictions and guidelines live in their own file,
-[`ami_agents/config/planning_guidelines.yaml`](../ami_agents/config/planning_guidelines.yaml):
-plain-language operating conditions per device class or manufacturer ("while switched
-off, other commands may be refused"). `planning.guidelines.path` (`PLANNING_GUIDELINES_PATH`)
-points to another file; empty uses the default one. Only `power_on_first` is applied so
-far, deterministically, to every plan (`interaction_solver/utils/power_on_guard.py`): in
-front of a mode, level or operational-state command on a device the entry lists (by
-class, or by exact manufacturer), the plan checks the device's on/off state and switches
-it on first -- unless the plan already switches that device on before the command, in
-execution order (dependency plans included). A device without a single on/off command is
-left unguarded, with a note.
+Device conditions live in their own file,
+[`ami_agents/config/planning_guidelines.yaml`](../ami_agents/config/planning_guidelines.yaml),
+under `conditions:`. Each one is the device state that must hold before a command,
+per device class or manufacturer, taken from the Matter specifications ("the
+operational state must not be Running before the spin speed changes"). An entry has an
+`id`, `applies_to` (`classes`, matched with their subclasses, and `manufacturers`, an
+exact match), `commands` (the action command classes it constrains), optional
+`acts_upon` (only actions writing a property of these classes) and its `text`.
+`planning.guidelines.path` (`PLANNING_GUIDELINES_PATH`) points to another file; empty
+uses the default one.
+
+- `power_on_first` is applied deterministically to every plan
+  (`interaction_solver/utils/power_on_guard.py`). In front of a mode, level or
+  operational-state command on a device the entry lists, the plan checks the device's
+  on/off state and switches it on first, unless the plan already switches that device
+  on before the command, in execution order (dependency plans included). A device
+  without a single on/off command is left unguarded, with a note.
+- Every other condition goes through the condition-guard check, on simple and dependency
+  plans alike (`utils/planning_conditions.py`, `utils/condition_check.py`,
+  `utils/condition_guard.py`). Each step on a device with a condition is decided from
+  the guard memory first, then by one small-model call (the profiling model). The
+  answer is a check (property, `==` / `!=`, value) and the action that establishes it,
+  or "no guard". A guard that pauses, stops or switches off is followed by the matching
+  resume, start or switch-on; if none is found, the step is left unguarded. A guard the
+  plan already satisfies, earlier in execution order, is removed again. The model's
+  device-level decisions are remembered in the guard store after a successful run.
 
 ---
 
