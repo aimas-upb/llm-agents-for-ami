@@ -78,14 +78,15 @@ class TestDeviceProperty:
         assert bounds == {"minimum": 1, "maximum": 254}
 
     def test_an_enum_carries_its_meaning(self, graph):
-        """"What fan modes does the purifier have?" -- the codes and their gloss."""
+        """"What fan modes does the purifier have?" -- the codes and their gloss,
+        only those the purifier declares (FanModeSequence 1: Off, Low, High)."""
         result = resolve_capability_request(
             graph, device_class="homeont:AirPurifier",
             device_property={"class": "homeont:FanControlFanMode"})
         assert result.outcome is CapabilityOutcome.FOUND
         values = result.entries[0].permitted_values
-        assert values["enum"] == [0, 1, 2, 3, 4, 5, 6]
-        assert "1 = Low" in values["meaning"]
+        assert values["enum"] == [0, 1, 3]
+        assert "1 = Low" in values["meaning"] and "2 = Medium" not in values["meaning"]
 
     def test_a_capability_class_is_reported_as_supported(self, graph):
         result = resolve_capability_request(

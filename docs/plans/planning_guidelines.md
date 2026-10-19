@@ -160,7 +160,7 @@ The conditions are listed in the file, each with its Matter source in a comment.
 |---|---|---|---|
 | LaundryWasher, LaundryDryer, Dishwasher, AirConditioner, DimmableLight (ColorLight) | mode / level / op-state | switched on | the deterministic power-on guard |
 | LaundryWasher, LaundryDryer, Dishwasher | programme, spin, rinses, dryness, temperature | operational state ≠ Running | pause, then resume after |
-| LaundryWasher, LaundryDryer, Dishwasher | pause / resume / start | Running or Paused (pause, resume); settings set before a start | no guard can establish it |
+| any device with a `homeont:SetOperationalStateCommand` action (for example LaundryWasher, LaundryDryer, Dishwasher) | start / pause / resume / stop | pause: Running; start: Stopped; resume: Paused; never from Error | nothing can establish it without inventing a cycle: a **check-only guard in code** (`utils/cycle_guard.py`), not a condition for the model. Already in the target state: done; allowed: sent; otherwise the step fails without sending |
 | AirConditioner, HeatPump (cooling); + Heater (heating) | the setpoint | HVAC mode Cool / Heat or Auto | set the HVAC mode |
 | WindowCoveringController | target position | Mode 0 (no calibration / maintenance bit) | set the mode to 0 |
 | Rvc | clean mode, run mode non-Idle → non-Idle | run mode Idle | set the run mode to Idle |

@@ -988,7 +988,32 @@ class SimuHomeTD:
             ("MinMeasuredValue", "MaxMeasuredValue"),
     }
 
-    def _enum_description(self, cluster: str, attribute: str) -> Optional[str]:
+    # Matter Fan Control, FanModeSequence (App. Cluster R1.4 §4.4.6.2): the
+    # fixed list of FanMode values a fan supports, by sequence value. The spec
+    # states the sequences only as names ("OffLowHigh"), so the table is the
+    # spec's, written out: Off 0, Low 1, Medium 2, High 3, Auto 5.
+    _FAN_MODE_SEQUENCES = {0: (0, 1, 2, 3), 1: (0, 1, 3), 2: (0, 1, 2, 3, 5),
+                           3: (0, 1, 3, 5), 4: (0, 3, 5), 5: (0, 3)}
+
+    def _device_enum_items(self, cluster: str, attribute: str,
+                           siblings: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """The spec's enum items for an attribute, narrowed to the ones this
+        device declares it supports, where Matter has it declare them.
+
+        A fan's FanMode is typed by the full FanModeEnum (Off .. Smart), but
+        the fan states its own, fixed subset in FanModeSequence: a fan with
+        sequence 1 (OffLowHigh) has Off, Low and High, nothing else. The
+        description must say what THIS device can do, as for a Mode cluster's
+        SupportedModes. Anything else: the spec's items unchanged."""
+        items = load_registry().enum_items(cluster, attribute)
+        if (cluster, attribute) == ("FanControl", "FanMode"):
+            allowed = self._FAN_MODE_SEQUENCES.get(siblings.get("FanModeSequence"))
+            if allowed is not None:
+                items = [item for item in items if item["value"] in allowed]
+        return items
+
+    def _enum_description(self, cluster: str, attribute: str,
+                          items: Optional[List[Dict[str, Any]]] = None) -> Optional[str]:
         """Spell out what each permitted integer means, in one sentence.
 
         `SystemMode = 3` is opaque; "3 = Cool (cooling demand only)" is not. The
@@ -997,9 +1022,10 @@ class SimuHomeTD:
 
         The gloss is included where the spec has one that says something the
         name does not. Items whose summary is a bare cross-reference into the
-        PDF spec were already dropped by the normalizer.
+        PDF spec were already dropped by the normalizer. ``items`` narrows the
+        spec's items to the device's own (`_device_enum_items`).
         """
-        items = load_registry().enum_items(cluster, attribute)
+        items = load_registry().enum_items(cluster, attribute) if items is None else items
         if not items:
             return None
         parts = []
@@ -1200,9 +1226,13 @@ class SimuHomeTD:
 
         sentences = []
         if enum_items:
+            # The spec's values, narrowed to the device's own where it
+            # declares them (a fan's FanModeSequence).
+            enum_items = self._device_enum_items(cluster_name, attribute_name, siblings or {})
             for item in enum_items:
                 g.add((schema, JS.enum, _literal(item["value"])))
-            sentences.append(self._enum_description(cluster_name, attribute_name) or "")
+            sentences.append(self._enum_description(cluster_name, attribute_name,
+                                                    enum_items) or "")
         else:
             # A Mode cluster's CurrentMode: no spec enum, the device's own
             # modes instead -- stated the same way.

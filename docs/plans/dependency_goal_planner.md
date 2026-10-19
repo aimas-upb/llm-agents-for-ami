@@ -70,6 +70,19 @@ Predicates (§2), goal bodies with filter / native / regulated / unobserved main
 (§6), placement of after / with / completes_with followers and the assembly into heads and
 groups (§7) — exactly as specified. The worked example (§8) is a test.
 
+`completes_with` is a timing field of its own, not a value of `starts` ("so A and B finish
+together"):
+- **No `starts`:** the plan chooses the start. It waits until the ref's time left is no
+  more than the goal's run length (`completion_timing`).
+- **A `starts` the user gave:** the goal is placed by that start. `completes_with` is only
+  checked before planning, and adds nothing to the tree.
+
+Either way, the planner reads the run length and the event's time left once
+(`time_consistency.check_completion`). If either is unknown, or the two don't fit, it asks
+the user instead of guessing a start. A time with no time in it ("soon") is also a question
+(`VagueTime`). A trigger predicate that no goal waits for is a compile error: the structure
+lost a link, which is our failure, not the user's.
+
 The templates are written as py_trees built-ins; the tree still has to cross from the ISA
 to the UA as JSON IR, so each built-in gets an IR type in `bt_planning/nodes/registry.py`
 compiling to that built-in (no new behaviour classes, except the clock-aware ones in §5):

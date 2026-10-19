@@ -388,6 +388,48 @@ class TestClarificationEntries:
         assert agent.requests.get("req-1").outcome == "clarification_needed"
 
 
+class TestUnplannedEntries:
+    """Entries that are not plans (impossible, or a planning error) are told
+    as such -- never summarised with "Does this plan look good?"."""
+
+    PLAN = {"type": "action", "name": "a", "action_url": "http://h/a"}
+
+    def _fsm_with(self, *entries):
+        fsm, agent = make_fsm()
+        fsm.plan_body = json.dumps({"plan_type": "bt", "plans": list(entries)})
+        return fsm, agent
+
+    @pytest.mark.asyncio
+    async def test_the_reason_is_told_and_the_rest_is_summarised(self):
+        fsm, _ = self._fsm_with(
+            {"tree": None, "error": "dependency_compile_failed", "explanation": "P2 is unused",
+             "intent": {"text_intent": "start the dryer"}},
+            {"tree": None, "impossible": True, "explanation": "no oven here",
+             "intent": {"text_intent": "preheat the oven"}},
+            {"tree": self.PLAN, "intent": {"text_intent": "x"}})
+        sent = []
+        fsm.send = AsyncMock(side_effect=lambda msg: sent.append(msg.body))
+        state = fsm._states[SUMMARIZING]
+        with patch(f"{FSM_MODULE}.pipeline.summarize_plan",
+                   AsyncMock(return_value="I will do x.")) as summarize:
+            await state.run()
+        assert sent == ['I couldn\'t plan "start the dryer": P2 is unused\n'
+                        'I can\'t do "preheat the oven": no oven here',
+                        "I will do x."]
+        summarised = json.loads(summarize.await_args[0][2])
+        assert [p["intent"]["text_intent"] for p in summarised["plans"]] == ["x"]
+
+    @pytest.mark.asyncio
+    async def test_nothing_planned_ends_the_request_unsummarised(self):
+        fsm, agent = self._fsm_with({"tree": None, "error": "x", "explanation": "y"})
+        state = fsm._states[SUMMARIZING]
+        with patch(f"{FSM_MODULE}.pipeline.summarize_plan", AsyncMock()) as summarize:
+            await state.run()
+        summarize.assert_not_awaited()
+        assert state.next_state == DONE
+        assert agent.requests.get("req-1").outcome == "failed"
+
+
 class TestAwaitingPlan:
     @pytest.mark.asyncio
     async def test_goal_request_carries_the_structures(self):

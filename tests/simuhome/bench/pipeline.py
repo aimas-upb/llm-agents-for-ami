@@ -59,7 +59,10 @@ from ami_agents.agents.user_assistant.behaviours.env_state_structuring import (
 from ami_agents.agents.user_assistant.behaviours.goal_structuring import (
     GoalStructuringBehaviour,
 )
-from ami_agents.agents.user_assistant.behaviours.user_request import split_clarifications
+from ami_agents.agents.user_assistant.behaviours.user_request import (
+    split_clarifications,
+    split_unplanned,
+)
 from ami_agents.agents.user_assistant.signifiers import (
     build_signifier,
     capture_execution_context,
@@ -72,6 +75,7 @@ from ami_agents.agents.user_assistant.utils.plan import (
 )
 
 from . import execution as bench_execution
+from . import scheduling as bench_scheduling
 from .meter import Meter
 from .models import Variant
 from .stubs import (
@@ -97,6 +101,9 @@ class Options:
     memory: Any = None                    # memory.Memory, or None
     cache: Any = None                     # StepCache, or None (sweeps)
     debug: bool = False
+    execution: str = "ticks"              # ticks (immediate / lockstep) | scheduled
+    dry_step_seconds: float = 1.0         # scheduled: the dry run's step (virtual seconds)
+    real_read_seconds: float = 10.0       # scheduled: how long a simulator reading is reused
 
 
 @dataclass
@@ -346,7 +353,7 @@ async def _run(name, episode, variant, config, target, options, logger, record, 
             async with meter.step("execution") as step:
                 result = await asyncio.to_thread(
                     _execute, runnable, tools, sim, config, options,
-                    home_config, episode, timed)
+                    home_config, episode, timed, home.turtle)
                 step.update(mode=result.mode, virtual_seconds=result.virtual_seconds,
                             lockstep_steps=result.steps)
             record["execution"] = result.as_dict()
@@ -378,6 +385,9 @@ async def _run(name, episode, variant, config, target, options, logger, record, 
                 plan_obj = coerce_plan_dict(json.dumps(envelope)) or {}
                 plan_obj, questions = split_clarifications(plan_obj)
                 ua_questions += questions
+                # Entries that are not plans are told as such, not summarised.
+                plan_obj, unplanned = split_unplanned(plan_obj)
+                answers += unplanned
                 if plan_obj.get("plans") or plan_obj.get("tree"):
                     canonical, _ = canonicalize_plan_for_hash(plan_obj)
                     summary = await ua_pipeline.summarize_plan(
@@ -517,9 +527,20 @@ async def _run_dependency(behaviour, meter: Meter) -> None:
             meter.add("planning.dependency", sum(dependency.values()), parts=dependency)
 
 
-def _execute(runnable, tools, sim, config, options, home_config, episode, timed):
-    """Execution in a thread (it blocks): lockstep or the UA's loop."""
+def _execute(runnable, tools, sim, config, options, home_config, episode, timed,
+             turtle: str = ""):
+    """Execution in a thread (it blocks): scheduled workflows from a dry run
+    (`--execution scheduled`), else lockstep or the UA's loop."""
     bt = config.get("bt_execution", {}) or {}
+    # 1. Scheduled: every episode, timed or not, through the dry run.
+    if options.execution == "scheduled":
+        return bench_scheduling.run_scheduled(
+            runnable, tools, sim, turtle=turtle,
+            tick_interval=float(home_config.get("tick_interval", 0.1)),
+            eval_goals=(episode.get("eval") or {}).get("goals") or [],
+            dry_step_seconds=options.dry_step_seconds,
+            real_read_seconds=options.real_read_seconds)
+    # 2. Ticks: lockstep for timed or waiting plans, the UA's loop otherwise.
     if timed or bench_execution.needs_lockstep(runnable):
         return bench_execution.run_lockstep(
             runnable, tools, sim, step_seconds=options.step_seconds,

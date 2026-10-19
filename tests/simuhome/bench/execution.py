@@ -72,7 +72,7 @@ class Plan:
 class Execution:
     """What execution amounted to."""
 
-    mode: str                                   # immediate | lockstep | none
+    mode: str                                   # immediate | lockstep | scheduled | none
     plans: List[Dict[str, Any]] = field(default_factory=list)
     actions: List[Dict[str, Any]] = field(default_factory=list)
     snapshots: List[Dict[str, Any]] = field(default_factory=list)   # lockstep
@@ -85,12 +85,15 @@ class Execution:
     steps: int = 0
     horizon_tick: Optional[int] = None
     end_tick: Optional[int] = None
+    # Mode-specific facts (scheduled: the workflows, syncs, real reads).
+    details: Dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> Dict[str, Any]:
         return {"mode": self.mode, "plans": self.plans, "actions": self.actions,
                 "real_seconds": self.real_seconds, "virtual_seconds": self.virtual_seconds,
                 "steps": self.steps, "horizon_tick": self.horizon_tick,
-                "end_tick": self.end_tick, "snapshot_ticks": [s["tick"] for s in self.snapshots]}
+                "end_tick": self.end_tick, "snapshot_ticks": [s["tick"] for s in self.snapshots],
+                **({"details": self.details} if self.details else {})}
 
 
 class StateClock:

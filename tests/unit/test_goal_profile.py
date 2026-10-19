@@ -29,7 +29,7 @@ class TestChecklist:
                                                                      "text": "1 hour"}}},
              "G2": {**ACHIEVE, "timing": {"starts": "now"}},
              "G3": {**ACHIEVE, "timing": {"starts": "after_goal", "ref_goal": "G2"}},
-             "G4": {**ACHIEVE, "timing": {"starts": "completes_with", "ref": "G2"}},
+             "G4": {**ACHIEVE, "timing": {"completes_with": "G2"}},
              "G5": {**ACHIEVE, "timing": {"starts": "after_goal", "ref_goal": "G1"}},
              "G6": {**ACHIEVE, "timing": {"starts": "on_trigger"}}},
             {"P1": {"predicate_subject": "device_property", "role": "trigger",
@@ -41,6 +41,17 @@ class TestChecklist:
             ("completion_timing", "G4", "G2"),
             ("time_to_event", "P1", None)]
         assert [c["id"] for c in checklist] == ["Q1", "Q2", "Q3", "Q4"]
+
+    def test_completing_with_an_event_with_a_start_given(self):
+        """Seed 46: "start dryer 1 now so it and dishwasher 1 finish
+        together". The start is the user's, but the run length and the
+        event's time left are still asked, for the check before planning."""
+        checklist = build_checklist(_structure(
+            {"G1": {**ACHIEVE, "timing": {"starts": "now", "completes_with": "P1"}}},
+            {"P1": {"predicate_subject": "device_property", "role": "trigger",
+                    "applies_to": ["G1"]}}))
+        assert [(c["question"], c["target"], c.get("ref")) for c in checklist] == [
+            ("completion_timing", "G1", "P1"), ("time_to_event", "P1", None)]
 
     def test_the_next_instruction_to_the_same_device_asks_nothing(self):
         same = {**ACHIEVE, "artifact_name": "ac_1"}
@@ -128,8 +139,10 @@ class TestResolve:
          "ref_remaining"),
     ])
     def test_a_malformed_answer_falls_back(self, answer, reason):
+        """completion_timing has no fallback start: its answer is empty, and
+        the planner asks the user instead."""
         checklist = [{"id": "Q1", "question": "completion_timing", "target": "G1", "ref": "P1"}]
         resolved, log = resolve_profile(checklist, {"answers": [{"id": "Q1", "answer": answer}]})
         assert resolved["Q1"]["source"] == "fallback" and reason in resolved["Q1"]["reason"]
-        assert resolved["Q1"]["answer"] == {"start_with_ref": True}
+        assert resolved["Q1"]["answer"] == {}
 

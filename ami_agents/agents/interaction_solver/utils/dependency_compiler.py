@@ -18,13 +18,22 @@ Every construct of a dependency `GoalStructure` maps to a fixed pattern
     guard           Selector[not X, unit] -- a false guard skips the goal
     start           now / at_time / after_delay / on_trigger (trigger, offset
                     after or -- profiled -- before; recurrence)
-    placement       after_goal / with_goal / completes_with followers hang off
-                    their referenced goal; heads run side by side under the root;
-                    a goal completes_with a PREDICATE (finish when an event does)
-                    is a head: it starts once the event's remaining time is no
-                    more than its own run (completion_timing), else now;
-                    a with_goal follower on the SAME device runs right after its
-                    goal instead of beside it (one device, one setting at a time)
+    placement       after_goal / with_goal followers, and goals that complete
+                    with a goal and have no start of their own, hang off their
+                    referenced goal; heads run side by side under the root;
+                    a goal that completes_with a PREDICATE (finish when an event
+                    does) and has no start of its own is a head: it starts once
+                    the event's remaining time is no more than its own run
+                    (completion_timing); a goal that completes_with something
+                    AND has a start the user gave is placed by that start --
+                    `completes_with` was checked before planning and adds nothing
+                    to the tree; a with_goal follower on the SAME device runs
+                    right after its goal instead of beside it (one device, one
+                    setting at a time)
+    checks          a trigger predicate that none of its goals waits for
+                    (on_trigger, or completes_with it) -> CompileError; a time
+                    text with no time in it ("soon") -> VagueTime, which the
+                    planner turns into a question for the user
 
 The tree is JSON IR (it travels from the InteractionSolver to the UserAssistant):
 each template node is an IR type compiling to a py_trees built-in
@@ -72,6 +81,16 @@ HEAD_STARTS = (None, "now", "at_time", "after_delay", "on_trigger")
 
 class CompileError(ValueError):
     """The structure cannot be compiled; the message says what is missing."""
+
+
+class VagueTime(CompileError):
+    """A goal's time is words with no time in them ("soon", "later"): only the
+    user can say what they mean, so the planner asks instead of failing."""
+
+    def __init__(self, gid: str, text: str, reason: str) -> None:
+        super().__init__(f"{gid}: {reason}")
+        self.gid = gid
+        self.text = text
 
 
 @dataclass
@@ -397,16 +416,20 @@ class _Compiler:
     # -- start (§6) -------------------------------------------------------
 
     def _span(self, text: Optional[str], gid: str) -> float:
+        """Seconds in a span of time ("13 minutes"); VagueTime when the words
+        hold none ("soon")."""
         try:
             return span_seconds(text or "")
         except TimeTextError as exc:
-            raise CompileError(f"{gid}: {exc}")
+            raise VagueTime(gid, text or "", str(exc))
 
     def _time(self, text: Optional[str], gid: str) -> str:
+        """A clock time ("1:39 PM") as HH:MM[:SS]; VagueTime when the words
+        hold none."""
         try:
             return time_of_day(text or "")
         except TimeTextError as exc:
-            raise CompileError(f"{gid}: {exc}")
+            raise VagueTime(gid, text or "", str(exc))
 
     def _started(self, gid: str, unit: Dict[str, Any]) -> Dict[str, Any]:
         """Record the goal's start time first, when a completes_with follower
@@ -433,18 +456,20 @@ class _Compiler:
                 inner])
         if starts == "on_trigger":
             return self._triggered(gid, inner)
-        if starts == "completes_with" and self._finishes_with_event(gid):
-            # Finish together with an event (dishwasher 1 finishing): start once
-            # the event's remaining time is no more than this goal's own run.
-            wait = self._completes_wait(timing.ref, gid)
-            return _seq(f"{gid}: finish with {timing.ref}", [wait, inner]) if wait else inner
+        if self._finishes_with_event(gid):
+            # Finish together with an event (dishwasher 1 finishing), the start
+            # left to us: start once the event's remaining time is no more than
+            # this goal's own run.
+            ref = timing.completes_with
+            wait = self._completes_wait(ref, gid)
+            return _seq(f"{gid}: finish with {ref}", [wait, inner]) if wait else inner
         return inner
 
     def _finishes_with_event(self, gid: str) -> bool:
-        """G starts completes_with a predicate, not a goal: nothing else places
-        it, so it heads its own group."""
+        """G completes with a predicate, not a goal, and has no start of its
+        own: nothing else places it, so it heads its own group."""
         timing = self.goals[gid].timing
-        return bool(timing and timing.starts == "completes_with" and timing.ref in self.preds)
+        return bool(timing and timing.start_chosen and timing.completes_with in self.preds)
 
     def _triggered(self, gid: str, inner: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         triggers = self._role(gid, "trigger")
@@ -506,11 +531,19 @@ class _Compiler:
     # -- placement and assembly (§7) ---------------------------------------
 
     def _followers(self, gid: str, starts: str) -> List[str]:
+        """The goals placed by goal ``gid``: those starting ``starts``
+        ("after_goal" / "with_goal") it, or, for "completes_with", those
+        completing with it whose start is left to us."""
         out = []
         for fid, goal in self.goals.items():
             timing = goal.timing
-            if timing and timing.starts == starts and \
-                    (timing.ref_goal if starts != "completes_with" else timing.ref) == gid:
+            if timing is None:
+                continue
+            if starts == "completes_with":
+                follows = timing.start_chosen and timing.completes_with == gid
+            else:
+                follows = timing.starts == starts and timing.ref_goal == gid
+            if follows:
                 out.append(fid)
         return out
 
@@ -544,20 +577,25 @@ class _Compiler:
                             "value": _typed(condition.get("target_value_text"), info.schema)}]}
 
     def _completes_wait(self, ref: str, cid: str) -> Optional[Dict[str, Any]]:
-        """Start C once R's remaining time is no more than C's duration; None
-        when that cannot be known, and C starts with R (a goal) or now (R an
-        event's predicate) -- the fallback."""
-        answer = self._answer("completion_timing", cid) or {"start_with_ref": True}
-        if answer.get("start_with_ref") or not answer.get("target_duration"):
+        """Start C once R's remaining time is no more than C's duration. The
+        planner asks the user before compiling when the durations cannot be
+        known (`time_consistency.check_completion`), so None -- C starts with
+        R (a goal) or now (R an event's predicate), noted -- is reached only
+        when the compiler is called without that check."""
+        # 1. C's own run length: nothing to time against without it.
+        answer = self._answer("completion_timing", cid) or {}
+        if not answer.get("target_duration"):
             self.notes.append(f"{cid}: no timing to finish with {ref} -> "
                               f"{'starts now' if ref in self.preds else 'starts with it'}")
             return None
+        # 2. C's duration, read when the tree runs.
         self.clock = True
         target = answer["target_duration"]
         t_info = self._ref_info(target["ref"])
         duration = self._derive(self._goal_key(cid, "duration"), "to_seconds",
                                 [self._read(t_info, target["ref"].get("property_field"))],
                                 factor=t_info.seconds_per_unit)
+        # 3. R's time left: read directly, or counted down from R's start.
         remaining_key = self._goal_key(ref, "remaining")
         if answer.get("ref_remaining"):
             source = answer["ref_remaining"]
@@ -584,6 +622,7 @@ class _Compiler:
             self.notes.append(f"{cid}: nothing gives {ref}'s remaining time -> "
                               f"{'starts now' if ref in self.preds else 'starts with it'}")
             return None
+        # 4. Wait until R's time left is no more than C's run.
         return _one("await", f"{cid}: finish with {ref}", {
             "type": "compare", "name": f"{cid}: {ref} remaining <= {cid} duration",
             "key1": remaining_key, "key2": duration, "op": "le"})
@@ -637,12 +676,36 @@ class _Compiler:
         name = self.goals[gid].artifact_name
         return bool(name) and name == self.goals[other].artifact_name
 
+    def _unused_triggers(self) -> None:
+        """CompileError for a trigger predicate none of its goals waits for --
+        neither starting on_trigger nor completing with it: the structure lost
+        the link between the event and the goal, and running the goal without
+        it would ignore part of the request."""
+        for pid, pred in self.preds.items():
+            if pred.role != "trigger":
+                continue
+            goals = [self.goals[g] for g in pred.applies_to or [] if g in self.goals]
+            if goals and not any(g.timing and (g.timing.starts == "on_trigger"
+                                               or g.timing.completes_with == pid)
+                                 for g in goals):
+                raise CompileError(f"{pid} is a trigger of {', '.join(pred.applies_to)}, "
+                                   f"but none of them waits for it")
+
     def compile(self) -> CompiledPlan:
+        """The tree, its runtime and notes (module docstring); CompileError
+        when the structure cannot be built."""
+        # 1. The structure's own consistency, before anything is built.
+        self._unused_triggers()
+        # 2. The heads: goals that start on their own. A goal that completes
+        #    with another goal, its start left to us, is placed by that goal.
         heads = [gid for gid, goal in self.goals.items()
-                 if (goal.timing.starts if goal.timing else None) in HEAD_STARTS
+                 if ((goal.timing.starts if goal.timing else None) in HEAD_STARTS
+                     and not (goal.timing and goal.timing.start_chosen))
                  or self._finishes_with_event(gid)]
         if not heads:
             raise CompileError("no goal starts on its own (every goal waits for another)")
+        # 3. Each head's group, then the tree and the runtime that keeps its
+        #    keys current.
         groups = [g for g in (self._group(gid) for gid in heads) if g is not None]
         if not groups:
             raise CompileError("every goal was left out")

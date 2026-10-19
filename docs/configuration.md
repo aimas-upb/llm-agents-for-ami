@@ -130,6 +130,15 @@ uses the default one.
   on/off state and switches it on first, unless the plan already switches that device
   on before the command, in execution order (dependency plans included). A device
   without a single on/off command is left unguarded, with a note.
+- The cycle commands (start, pause, resume, stop: every action of class
+  `homeont:SetOperationalStateCommand`, on any device whose operational state it acts
+  upon, for example laundry washers, dryers and dishwashers) are not in the file. Matter
+  allows them only from certain states (Operational State, Tables 3 and 4), and no action
+  can establish those states without inventing a cycle. So `utils/cycle_guard.py` adds a
+  check-only guard in code, before the power-on guard: a pause is sent only while
+  Running, a start or resume only when not in Error, a stop only when not already
+  Stopped. A command already in its target state is skipped as done; otherwise the step
+  fails without sending.
 - Every other condition goes through the condition-guard check, on simple and dependency
   plans alike (`utils/planning_conditions.py`, `utils/condition_check.py`,
   `utils/condition_guard.py`). Each step on a device with a condition is decided from

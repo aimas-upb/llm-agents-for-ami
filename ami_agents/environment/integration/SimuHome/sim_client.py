@@ -27,7 +27,7 @@ import json
 import os
 import urllib.error
 import urllib.request
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8000/api"
 BASE_URL_ENV_VAR = "SIMULATOR_API_BASE_URL"
@@ -166,6 +166,23 @@ class SimuHomeClient:
                 "value": value,
             },
         )
+
+    # -- scheduled workflows -----------------------------------------------
+
+    def schedule_workflow(self, start_time: str, steps: List[Dict[str, Any]],
+                          description: Optional[str] = None) -> Any:
+        """Schedule steps ({"tool": "execute_command" | "write_attribute",
+        "args": {...}}) to run in order at a virtual time ("YYYY-MM-DD
+        HH:MM:SS", strictly after now); returns {"workflow_id": ...}."""
+        payload: Dict[str, Any] = {"start_time": start_time, "steps": steps}
+        if description:
+            payload["description"] = description
+        return self._request("POST", "/schedule/workflow", payload)
+
+    def workflow_list(self) -> Any:
+        """Every workflow with its status (pending / running / completed /
+        failed / cancelled) and error."""
+        return self._request("GET", "/schedule/workflows")
 
     # -- evaluator contract ------------------------------------------------
     #

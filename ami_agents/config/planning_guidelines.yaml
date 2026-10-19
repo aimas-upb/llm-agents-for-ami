@@ -26,6 +26,8 @@
 #                    the plan already switched that device on before it. It
 #                    has no `commands`: the guard's own command list
 #                    (GUARDED_COMMANDS) decides.
+#   cycle commands   (start / pause / resume / stop) are not listed: a
+#                    deterministic check, see "The cycle's own commands" below.
 #   every other      the condition-guard check (`utils/planning_conditions.py`
 #                    selects the steps, `utils/condition_check.py` asks the small
 #                    model, `utils/condition_guard.py` builds the guard). A guard
@@ -98,24 +100,22 @@ conditions:
       state must not be Running (Stopped or Paused). If it is Running, pause the
       cycle first.
 
-  # -- The cycle's own commands ---------------------------------------------
+  # -- The cycle's own commands: not here, checked in code ---------------------
   # Operational State R1.3, Table 3 (Pause) and Table 4 (Resume): compatible
-  # only in Running or Paused, else CommandInvalidInState. Start (R1.2
-  # §1.13.6.3): only "if it is safe to do so and the device is in an operational
-  # state from which it can be started"; being switched on is power_on_first's.
-  - id: appliance_cycle_commands
-    applies_to:
-      classes: [homeont:LaundryWasher, homeont:LaundryDryer, homeont:Dishwasher]
-      manufacturers: []
-    commands: [homeont:SetOperationalStateCommand]
-    text: >-
-      Before pausing the cycle (operational state Paused) or resuming it
-      (Running, from Paused): the operational state must be Running or Paused.
-      If it is Stopped there is no cycle to pause or resume, and no command can
-      make one: do not guard. Before starting a cycle (Running, from Stopped):
-      the programme and settings the request asks for must already be set -- if
-      the plan sets them, it must do so before the start; nothing needs
-      guarding.
+  # only in Running or Paused, else CommandInvalidInState; Start only "from an
+  # operational state from which it can be started", never from Error. No action
+  # can establish these states without inventing a cycle (pausing a stopped
+  # washer would mean starting it), so they are not conditions for the guard
+  # model: `interaction_solver/utils/cycle_guard.py` adds a check-only guard to
+  # every action of class homeont:SetOperationalStateCommand, on any device
+  # whose operational state it acts upon -- for example laundry washers, laundry
+  # dryers and dishwashers (Matter's Operational State cluster):
+  #   sends Paused    already Paused: done; Running: send; else the step fails
+  #   sends Running   already Running: done; Stopped (start) or Paused (resume):
+  #                   send; Error: the step fails
+  #   sends Stopped   already Stopped: done; else send
+  # Not covered: lifecycle commands exposed as separate actions with their own
+  # state values (a Home Assistant vacuum's start / pause).
 
   # -- Thermostat setpoints and the HVAC mode -------------------------------
   # Thermostat cluster: the OccupiedCoolingSetpoint drives the device only in a

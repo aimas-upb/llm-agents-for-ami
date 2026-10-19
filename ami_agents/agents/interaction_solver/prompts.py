@@ -128,9 +128,9 @@ You do not give a unit. The unit comes with the property's homeont class.
 
 ### `completion_timing`
 
-**Asked for:** every goal with `timing.starts: "completes_with"`.
+**Asked for:** every goal with `timing.completes_with`; its `ref` is the goal or event named there.
 
-**Means:** the target goal must start late enough that it finishes at the same moment as its `ref` goal. On every tick, the plan reads how long the ref goal still needs and how long the target goal will take, and starts the target goal once the first is no more than the second. You name the properties it reads; you do not supply the times.
+**Means:** the target goal's run must finish at the same moment as its `ref`. When the goal's timing has no `starts`, the plan chooses the start: on every tick it reads how long the ref still needs and how long the target goal will take, and starts the target goal once the first is no more than the second. When the timing has a `starts`, the start is the user's, and the same two values are read once to check that the two runs finish together. Either way, you name the properties that are read; you do not supply the times.
 
 **Answer:**
 
@@ -148,9 +148,9 @@ The `ref` may also be an event instead of a goal — a trigger predicate such as
 
 ### `time_to_event`
 
-**Asked for:** every predicate with `role: "trigger"` and `offset_direction: "before"` ("1 minute before the light switches off").
+**Asked for:** every predicate with `role: "trigger"` and `offset_direction: "before"` ("1 minute before the light switches off"); a trigger or termination predicate on a goal whose start or end the user also gave as a clock time; and every predicate a goal's `timing.completes_with` names.
 
-**Means:** the plan cannot wait for the event and then go back in time. It can only act early if a property tells it, ahead of time, when the event will happen. You name that property.
+**Means:** the plan cannot wait for the event and then go back in time. It can only act early if a property tells it, ahead of time, when the event will happen. You name that property. For the other two cases the property is read once, before planning, to check the user's times against when the event will happen.
 
 **Answer:**
 
@@ -320,7 +320,7 @@ Request: "set the washer's spin speed to 1200". `plan_actions`: S1 washer_1 spin
 
 Same washer, request "pause the washer, then set the spin to 1200": S2 (the spin) follows "washer_1 operationalState 2" in `plan_actions`, so `{"id": "S2", "guard": false, "check": null, "action": null, "why": "established_by_plan", …}`.
 
-A step whose condition says not to guard it — pausing or resuming a cycle — is `"guard": false, "why": "not_applicable"`. Never guard a step with its own action.
+A step whose condition says not to guard it is `"guard": false, "why": "not_applicable"`. Never guard a step with its own action.
 
 ## Input
 

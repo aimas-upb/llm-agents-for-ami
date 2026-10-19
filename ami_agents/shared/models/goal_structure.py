@@ -43,8 +43,7 @@ CHANGE_DIRECTIONS = ("increase", "decrease")
 ROLES = ("guard", "trigger", "scope", "recurrence", "termination", "filter")
 CONNECTIVES = ("and", "or")
 OFFSET_DIRECTIONS = ("after", "before")
-STARTS = ("now", "at_time", "after_delay", "after_goal", "with_goal",
-          "on_trigger", "completes_with")
+STARTS = ("now", "at_time", "after_delay", "after_goal", "with_goal", "on_trigger")
 END_KINDS = ("duration", "at_time")
 
 
@@ -177,6 +176,15 @@ class GoalTiming:
     """When a goal starts, relative to time or to other goals, and -- if the
     user bounded it by time -- when it ends.
 
+    `completes_with` (a predicate or goal id) is the goal's run -- a cycle it
+    starts, which then ends by itself -- asked to complete when that event
+    happens or that goal's run completes ("start washer 1 so it and dryer 1
+    finish together"). It never stops the goal (`ends` and termination
+    predicates do that). With no `starts` the planner chooses the start (when
+    the time left before the event equals the run's length); with a `starts`
+    the user gave ("now", after another goal), the planner only checks that the
+    two agree.
+
     `starts` / `ends` (or a termination predicate) hold the description the
     plan executes. When the user ALSO stated a clock time for a start or an end
     described relative to an anchor ("at 5:48 PM, which is 23 minutes before
@@ -188,7 +196,7 @@ class GoalTiming:
     time_text: Optional[str] = None
     offset_text: Optional[str] = None
     ref_goal: Optional[str] = None
-    ref: Optional[str] = None
+    completes_with: Optional[str] = None
     ends_kind: Optional[str] = None
     ends_text: Optional[str] = None
     stated_start_time_text: Optional[str] = None
@@ -205,7 +213,7 @@ class GoalTiming:
             time_text=_text(data.get("time_text")),
             offset_text=_text(data.get("offset_text")),
             ref_goal=_text(data.get("ref_goal")),
-            ref=_text(data.get("ref")),
+            completes_with=_text(data.get("completes_with")),
             ends_kind=_choice(ends.get("kind"), END_KINDS),
             ends_text=_text(ends.get("text")),
             stated_start_time_text=_text(data.get("stated_start_time_text")),
@@ -218,13 +226,20 @@ class GoalTiming:
             "time_text": self.time_text,
             "offset_text": self.offset_text,
             "ref_goal": self.ref_goal,
-            "ref": self.ref,
+            "completes_with": self.completes_with,
             "stated_start_time_text": self.stated_start_time_text,
             "stated_end_time_text": self.stated_end_time_text,
         }, keep=("starts",))
         if self.ends_kind:
             out["ends"] = {"kind": self.ends_kind, "text": self.ends_text}
         return out
+
+    @property
+    def start_chosen(self) -> bool:
+        """True when the planner chooses the start: the goal completes with
+        something and the user gave no start. Such a goal never starts "now"
+        by default."""
+        return bool(self.completes_with) and self.starts is None
 
 
 # --------------------------------------------------------------------------

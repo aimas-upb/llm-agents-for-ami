@@ -10,7 +10,11 @@ Each record gets an `evaluation` written next to it (<episode>.eval.json).
 
     type      feasible                              infeasible
     qt1       tools + the values we read match       tools; nothing read from a stand-in
-              `current_value` (ours)                 for the missing device; room states
+              `current_value` (ours); a device       for the missing device; room states
+              attribute that declares another's
+              values (FanModeSequence,
+              SupportedModes): a capability answer
+              listing exactly those values (ours)
                                                      read correctly (ours) + judge
     qt2       SimuHome qt2.feasible (needs a         nothing executed on the infeasible
               simulator: started here, stopped)      part, answered impossible/clarify
@@ -178,6 +182,47 @@ def _reads(record: Dict[str, Any]) -> List[Dict[str, Any]]:
     return out
 
 
+# Matter Fan Control, FanModeSequence (App. Cluster R1.4 §4.4.6.2): the FanMode
+# values each sequence allows (Off 0, Low 1, Medium 2, High 3, Auto 5). Kept
+# here apart from the TD builder's copy, so the check does not inherit a
+# mistake of the code it checks.
+FAN_MODE_SEQUENCES = {0: {0, 1, 2, 3}, 1: {0, 1, 3}, 2: {0, 1, 2, 3, 5},
+                      3: {0, 1, 3, 5}, 4: {0, 3, 5}, 5: {0, 3}}
+
+
+def _capabilities(record: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Every capability answer's entry: {device, name, values}, `values` the
+    permitted values it listed (an empty set when it listed none)."""
+    out = []
+    for query in record.get("queries") or []:
+        if query.get("kind") != "capabilities":
+            continue
+        for entry in (query.get("response") or {}).get("entries") or []:
+            permitted = entry.get("permitted_values") or {}
+            out.append({"device": entry.get("artifact_name"),
+                        "name": entry.get("affordance_name"),
+                        "values": set(permitted.get("enum") or [])})
+    return out
+
+
+def _declared_values(attribute: str, attributes: Dict[str, Any]) -> Optional[set]:
+    """The values a device declares another of its attributes may take, when
+    ``attribute`` (e.g. "1.FanControl.FanModeSequence") is such a
+    declaration: a fan's FanModeSequence (its FanMode values), a Mode
+    cluster's SupportedModes (its CurrentMode values). None for any other
+    attribute: a question about it is answered by reading it."""
+    parts = attribute.split(".")
+    if len(parts) < 2:
+        return None
+    cluster, name = parts[-2], parts[-1]
+    value = attributes.get(attribute)
+    if (cluster, name) == ("FanControl", "FanModeSequence"):
+        return FAN_MODE_SEQUENCES.get(value)
+    if name == "SupportedModes" and isinstance(value, list):
+        return {m.get("mode", m.get("Mode")) for m in value if isinstance(m, dict)}
+    return None
+
+
 def _close(read: Any, expected: Any) -> bool:
     try:
         read, expected = float(read), float(expected)
@@ -196,10 +241,16 @@ def _room_state_ok(goal: Dict[str, Any], reads: List[Dict[str, Any]]) -> bool:
 
 def check_qt1(record, episode, payload, feasible: bool) -> Dict[str, Any]:
     """Tools, and the values we read against the episode's goals."""
+    # 1. What was read, what capabilities were answered, and the home as the
+    #    episode set it up.
     tools_ok, required = required_actions(payload)
     reads = _reads(record)
-    home = {d["device_id"]: room for room, data in episode["initial_home_config"]["rooms"].items()
-            for d in data.get("devices", [])}
+    capabilities = _capabilities(record)
+    devices = [d for data in episode["initial_home_config"]["rooms"].values()
+               for d in data.get("devices", [])]
+    home = {d["device_id"] for d in devices}
+    attributes = {d["device_id"]: d.get("attributes") or {} for d in devices}
+    # 2. Each goal against them.
     goals = []
     for goal in episode["eval"]["goals"]:
         read = None
@@ -209,8 +260,18 @@ def check_qt1(record, episode, payload, feasible: bool) -> Dict[str, Any]:
             read = any(r["room"] == goal["room_id"] and (not r["device"] or r["sensor"])
                        and r["name"] == name and r["has_value"] for r in reads)
         elif goal.get("device_id") in home:
-            ok = any(r["device"] == goal["device_id"] and r["has_value"] for r in reads)
-            read = ok
+            device = goal["device_id"]
+            declared = _declared_values(goal.get("attribute") or "", attributes[device])
+            if declared is not None:
+                # "Which fan speeds does it have": answered by the device's own
+                # declaration -- exactly those values, not the spec's full enum.
+                listed = [c for c in capabilities if c["device"] == device]
+                ok = any(c["values"] == declared for c in listed)
+                read = bool(listed) or any(r["device"] == device and r["has_value"]
+                                           for r in reads)
+            else:
+                ok = any(r["device"] == device and r["has_value"] for r in reads)
+                read = ok
         else:
             # The device does not exist: nothing read from a device of its kind in
             # its room may stand in for it.

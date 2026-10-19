@@ -297,12 +297,12 @@ class TestDecide:
         tree = _seq(act("washer_1", "operationalState", 2),
                     act("washer_1", "spinSpeedCurrent", 1200))
         steps = conditioned_steps(graph, tree, conditions)
-        agent = _agent({"answers": [
-            {"id": "S1", "guard": False, "why": "not_applicable"},
-            {"id": "S2", "guard": False, "why": ESTABLISHED_BY_PLAN}]})
+        # The pause is no step (cycle commands are checked in code); the spin is S1.
+        agent = _agent({"answers": [{"id": "S1", "guard": False, "why": ESTABLISHED_BY_PLAN}]})
         trace = {}
         decisions, notes = await decide(agent, LOG, graph, steps, {}, [], trace)
-        assert decisions["S2"].why == ESTABLISHED_BY_PLAN and decisions["S2"].guard is None
+        assert list(decisions) == ["S1"]
+        assert decisions["S1"].why == ESTABLISHED_BY_PLAN and decisions["S1"].guard is None
         assert trace["answer"] and trace["model"] == "gpt-4o-mini" and notes == []
 
     @pytest.mark.asyncio
@@ -371,11 +371,10 @@ class TestSimplePlans:
         entry = {"tree": _seq(act("washer_1", "operationalState", 2),
                               act("washer_1", "spinSpeedCurrent", 1200))}
         behaviour = ConditionGuardBehaviour([entry], logger=LOG, graph=graph)
-        behaviour.agent = _agent({"answers": [
-            {"id": "S1", "guard": False, "why": "not_applicable"}, {"id": "S2", **PAUSE_FIRST}]})
+        behaviour.agent = _agent({"answers": [{"id": "S1", **PAUSE_FIRST}]})
         await behaviour.run()
         assert guard_names(entry["tree"]) == []
-        assert [g.get("dropped") for g in entry["guards"]] == [None, True]
+        assert [g.get("dropped") for g in entry["guards"]] == [True]
         assert "not guarded" in entry["explanation"]
 
     @pytest.mark.asyncio
@@ -440,13 +439,12 @@ class TestDependencyPlans:
     @pytest.mark.asyncio
     async def test_a_pause_in_an_earlier_goal_drops_the_guard(self, graph):
         """G1 pauses, G2 sets the spin after G1: real order is the compiled tree's."""
-        agent = _agent({"answers": [{"id": "S1", "guard": False, "why": "not_applicable"},
-                                    {"id": "S2", **PAUSE_FIRST}]})
+        agent = _agent({"answers": [{"id": "S1", **PAUSE_FIRST}]})
         entry = await _dependency_entry(graph, {
             "G1": {**PAUSE, "timing": {"starts": "now"}},
             "G2": {**SPIN, "timing": {"starts": "after_goal", "ref_goal": "G1"}}}, agent)
         assert guard_names(entry["tree"]) == []
-        assert entry["guards"][1]["dropped"] is True
+        assert entry["guards"][0]["dropped"] is True
 
 
 # --------------------------------------------------------------------------

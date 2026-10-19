@@ -24,13 +24,16 @@ Checklist rules:
                                                        end (ends, scope or
                                                        termination), else
                                                        InconsistentStructure
-    a goal starting completes_with                     completion_timing (ref)
+    a goal with completes_with (start given or not)    completion_timing (ref)
     a trigger predicate with offset_direction before   time_to_event
     a trigger / termination predicate on a goal with   time_to_event (for the
       a stated start / end clock time                  stated-time check)
+    a predicate a goal completes_with                  time_to_event (for the
+                                                       completion check)
 
 Unresolved means the model could not name, from the TDs, the property a
-question needs. It does not stop the plan; the question gets a fallback:
+question needs. The question gets a fallback, and only completion_timing's
+may stop the plan (with a question for the user):
 
     question             fallback (what the compiler builds)
     dependency_anchor    anchor on goal_success: start once the referenced
@@ -38,7 +41,9 @@ question needs. It does not stop the plan; the question gets a fallback:
     maintenance_profile  mode "unobserved": actuate once, no check-and-repeat
                          loop; the goal still runs until its scope,
                          termination or ends stops it
-    completion_timing    start the target goal together with the ref goal
+    completion_timing    none: an empty answer. The planner asks the user
+                         instead of guessing a start
+                         (`time_consistency.check_completion`)
     time_to_event        TIME_TO_EVENT_FALLBACK: "at_event" fires the trigger
                          when the event happens (offset dropped); "skip"
                          leaves the goal out
@@ -63,7 +68,7 @@ TIME_TO_EVENT_FALLBACK = "at_event"
 _FALLBACKS = {
     "dependency_anchor": lambda: {"anchor": "goal_success", "basis": "fallback"},
     "maintenance_profile": lambda: {"mode": "unobserved"},
-    "completion_timing": lambda: {"start_with_ref": True},
+    "completion_timing": lambda: {},
     "time_to_event": lambda: {"fallback": TIME_TO_EVENT_FALLBACK},
 }
 
@@ -131,19 +136,26 @@ def build_checklist(structure: GoalStructure) -> List[Dict[str, Any]]:
                     f"{gid} starts after {ref_id}, a maintenance goal with no scope, "
                     f"termination or ends")
 
-        if starts == "completes_with":
-            add("completion_timing", gid, timing.ref)
+        # Completing with a goal or event, the start chosen or given: how long
+        # this goal runs, and how long the ref has left.
+        if timing and timing.completes_with:
+            add("completion_timing", gid, timing.completes_with)
 
     # A goal whose start or end the user also stated as a clock time is checked
     # against its anchor before planning (`utils/time_consistency.py`), which
     # needs the anchor's remaining time: whatever the offset's direction, its
-    # trigger or termination predicate is asked about.
+    # trigger or termination predicate is asked about. So is an event a goal
+    # completes with: the completion check reads its time left before planning.
     stated = {gid for gid, goal in goals.items() if goal.timing and (
         goal.timing.stated_start_time_text or goal.timing.stated_end_time_text)}
+    completed_with = {goal.timing.completes_with for goal in goals.values()
+                      if goal.timing and goal.timing.completes_with}
     for pid, pred in predicates.items():
         if pred.role == "trigger" and pred.offset_direction == "before":
             add("time_to_event", pid)
         elif pred.role in ("trigger", "termination") and stated & set(pred.applies_to or []):
+            add("time_to_event", pid)
+        elif pid in completed_with:
             add("time_to_event", pid)
 
     return items

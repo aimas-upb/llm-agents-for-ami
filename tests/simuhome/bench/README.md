@@ -9,6 +9,7 @@ LLM calls are counted, and every episode is scored. Design:
 |---|---|---|
 | `python -m tests.simuhome.bench.run --episode qt4-2_feasible_seed_1` | one episode, every step printed, scored at once | ~5 LLM calls (+3 judge calls if infeasible) |
 | `python -m tests.simuhome.bench.run --variant V --episodes qt3_*,qt4-1_* --limit 10 --workers 2` | episodes → `<out>/<variant>/<episode>.json` | ~3–6 calls per episode |
+| `python -m tests.simuhome.bench.run_scheduled --episode qt4-3_feasible_seed_45` | the same, with execution as SimuHome scheduled workflows from a dry run of the trees (`scheduling.py`) instead of lockstep ticks; records → `results/bench_scheduled/` | as `run` |
 | `python -m tests.simuhome.bench.evaluate --records <out>/<variant> [--no-judge]` | scores → `<episode>.eval.json` | 3 judge calls per infeasible episode |
 | `python -m tests.simuhome.bench.report --root <out>` | `rates.csv`, `steps.csv`, `outcomes.csv`, `report.md` | none |
 | `python -m tests.simuhome.bench.sweep --grid variants/sweep.example.yaml [--dry-run]` | run + evaluate + report per variant | per variant as above |

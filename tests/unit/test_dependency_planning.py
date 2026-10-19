@@ -251,3 +251,34 @@ class TestStatedTimes:
         else:
             assert entry["tree"] and "agrees" in entry["explanation"]
         assert seen == {}                                  # no model decided it
+
+
+class TestFinishTogether:
+    """A goal that completes with an event, and words with no time in them:
+    questions for the user, never a guessed plan."""
+
+    @pytest.mark.asyncio
+    async def test_an_unknown_run_length_is_a_question_not_a_plan(self, graph):
+        """Seed 45's shape: nothing reports the run length or the event's time
+        left (the model names no property), so no start is guessed."""
+        from datetime import datetime
+        agent, _ = _agent(model_answer={"answers": [], "unresolved": []})
+        clock = MagicMock(now=MagicMock(return_value=datetime(2025, 8, 23, 11, 0, 0)))
+        with patch(f"{MODULE}.make_clock", return_value=clock):
+            entry = await _plan(graph, _structure(
+                {"G1": _goal(intent_text="start dimmer light 1", timing={"completes_with": "P1"},
+                             **NAMED)},
+                {"P1": {**WASHER_DONE, "role": "trigger", "applies_to": ["G1"]}}), agent)
+        assert entry["tree"] is None and entry["requires_clarification"]
+        assert entry["error"] == "completion_unverifiable"
+        assert "start dimmer light 1" in entry["explanation"]
+
+    @pytest.mark.asyncio
+    async def test_a_vague_time_is_a_question_not_an_error(self, graph):
+        """Seed 45 as it was structured: after_delay "soon"."""
+        agent, _ = _agent()
+        entry = await _plan(graph, _structure({"G1": _goal(
+            intent_text="start dimmer light 1",
+            timing={"starts": "after_delay", "offset_text": "soon"}, **NAMED)}), agent)
+        assert entry["tree"] is None and entry["requires_clarification"]
+        assert entry["error"] == "vague_time" and '"soon"' in entry["explanation"]

@@ -318,6 +318,61 @@ def _truthy(value: Any) -> bool:
     return str(value).strip().lower() in {"true", "on", "1", "yes"}
 
 
+def _dispatch_call(td: SimuHomeTD, room: str, device: str, name: str, value: Any,
+                   current_state: Optional[Any] = None) -> Dict[str, Any]:
+    """The Matter call an action invocation becomes, without executing it:
+    {"tool": "write_attribute" | "execute_command", "args": {...}} with
+    SimuHome's argument names -- the shape a scheduled workflow's step takes.
+
+    `current_state` is the device's operational state the call is made from
+    (it picks Start or Resume); None reads it from the home as it is now.
+    Raises HTTPException (404 / 400) when the action cannot be dispatched."""
+    # 1. The Matter coordinates of the action.
+    record, cluster, attribute, endpoint = _resolve_action(td, room, device, name)
+
+    # 2. An attribute write: the value in the simulator's units.
+    if str(record.get("mechanism")) == "attribute_write":
+        if value is None:
+            raise HTTPException(status_code=400, detail=f"action '{name}' requires a value")
+        return {"tool": "write_attribute",
+                "args": {"device_id": device, "endpoint_id": endpoint, "cluster_id": cluster,
+                         "attribute_id": attribute,
+                         "value": wire_value(record.get("type"), value)}}
+
+    # 3. A command: which one, and its arguments.
+    if (cluster, attribute) == ("OperationalState", "OperationalState"):
+        # Which command depends on the state the cycle is in when it is sent.
+        if current_state is None:
+            current_state = (td.find_device(room, device) or {}).get(
+                "attributes", {}).get(f"{endpoint}.OperationalState.OperationalState")
+        command = _operational_state_command(value, current_state)
+    else:
+        chooser = _COMMAND_FOR.get((cluster, attribute))
+        command = chooser(value) if chooser else None
+    if command is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(f"'{name}' on {device} is command-driven but no "
+                    f"command is mapped for {cluster}.{attribute}"))
+    builder = (_COMMAND_ARGS_BY_CLUSTER.get((cluster, command))
+               or _COMMAND_ARGS.get(command))
+    return {"tool": "execute_command",
+            "args": {"device_id": device, "endpoint_id": endpoint, "cluster_id": cluster,
+                     "command_id": command, "args": builder(value) if builder else {}}}
+
+
+async def _action_value(request: Request) -> Tuple[Dict[str, Any], Any]:
+    """(the request body, the value it carries): {"value": ...} or
+    {"input": ...} (or {"payload": ...})."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    return body, body.get("value", body.get("input", body.get("payload")))
+
+
 @app.post("/workspaces/{home}/{room}/artifacts/{device}/actions/{name}")
 async def invoke_action(home: str, room: str, device: str, name: str,
                         request: Request) -> JSONResponse:
@@ -328,54 +383,26 @@ async def invoke_action(home: str, room: str, device: str, name: str,
     observed value may not have moved yet; a plan confirms with a verification
     node reading the property back.
     """
+    # 1. The call, from the home as it is now.
     td = build(request)
     _check_home(td, home)
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-    if not isinstance(body, dict):
-        body = {}
-    value = body.get("value", body.get("input", body.get("payload")))
+    _body, value = await _action_value(request)
+    call = _dispatch_call(td, room, device, name, value)
+    args = call["args"]
 
-    record, cluster, attribute, endpoint = _resolve_action(td, room, device, name)
-    mechanism = str(record.get("mechanism"))
+    # 2. Execute it.
     client = get_client()
-
     try:
-        if mechanism == "attribute_write":
-            if value is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"action '{name}' requires a value")
-            # The TD's value is in human units; the simulator stores some
-            # types scaled (temperatures in 0.01 C).
-            result = client.write_attribute(device, cluster, attribute,
-                                            wire_value(record.get("type"), value),
-                                            endpoint_id=endpoint)
-            dispatched = {"call": "write_attribute", "cluster": cluster,
-                          "attribute": attribute, "value": value}
+        if call["tool"] == "write_attribute":
+            result = client.write_attribute(device, args["cluster_id"], args["attribute_id"],
+                                            args["value"], endpoint_id=args["endpoint_id"])
+            dispatched = {"call": "write_attribute", "cluster": args["cluster_id"],
+                          "attribute": args["attribute_id"], "value": value}
         else:
-            if (cluster, attribute) == ("OperationalState", "OperationalState"):
-                # Which command depends on the state the cycle is in now.
-                current = (td.find_device(room, device) or {}).get(
-                    "attributes", {}).get(f"{endpoint}.OperationalState.OperationalState")
-                command = _operational_state_command(value, current)
-            else:
-                chooser = _COMMAND_FOR.get((cluster, attribute))
-                command = chooser(value) if chooser else None
-            if command is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(f"'{name}' on {device} is command-driven but no "
-                            f"command is mapped for {cluster}.{attribute}"))
-            builder = (_COMMAND_ARGS_BY_CLUSTER.get((cluster, command))
-                       or _COMMAND_ARGS.get(command))
-            args = builder(value) if builder else {}
-            result = client.execute_command(device, cluster, command, args,
-                                            endpoint_id=endpoint)
-            dispatched = {"call": "execute_command", "cluster": cluster,
-                          "command": command, "args": args}
+            result = client.execute_command(device, args["cluster_id"], args["command_id"],
+                                            args["args"], endpoint_id=args["endpoint_id"])
+            dispatched = {"call": "execute_command", "cluster": args["cluster_id"],
+                          "command": args["command_id"], "args": args["args"]}
     except SimuHomeError as exc:
         # The simulator enforces device rules (e.g. writing while powered off
         # returns 400). Surface that: a verification-node planner needs it.
@@ -390,6 +417,23 @@ async def invoke_action(home: str, room: str, device: str, name: str,
         "result": result,
         "note": "acknowledgement only; read the property back to confirm",
     })
+
+
+@app.post("/workspaces/{home}/{room}/artifacts/{device}/actions/{name}/dispatch")
+async def dispatch_action(home: str, room: str, device: str, name: str,
+                          request: Request) -> JSONResponse:
+    """The Matter call invoking this action would make -- not executed.
+
+    Body: {"value": ..., "current": {"operational_state": n}?}. `current` is
+    the operational state the call will be made from, when it is not now: a
+    caller scheduling the call for later (a SimuHome workflow step) knows the
+    state it predicts there. The answer is that step: {"tool", "args"}."""
+    td = build(request)
+    _check_home(td, home)
+    body, value = await _action_value(request)
+    current = (body.get("current") or {}).get("operational_state") \
+        if isinstance(body.get("current"), dict) else None
+    return JSONResponse(_dispatch_call(td, room, device, name, value, current))
 
 
 # -- subscriptions ---------------------------------------------------------

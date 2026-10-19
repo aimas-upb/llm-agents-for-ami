@@ -21,6 +21,7 @@ from rdflib import Graph, URIRef
 
 from ami_agents.agents.interaction_solver.utils.planning_conditions import (
     conditioned_steps,
+    guard_key,
     load_conditions,
     matching,
 )
@@ -117,7 +118,9 @@ class TestLoading:
     def test_the_repo_file_has_explicit_conditions_and_no_power_on(self, conditions):
         ids = {c.id for c in conditions}
         assert "power_on_first" not in ids
-        assert {"laundry_washer_settings_not_running", "appliance_cycle_commands",
+        # The cycle commands' own rule is a check in code (cycle_guard.py).
+        assert "appliance_cycle_commands" not in ids
+        assert {"laundry_washer_settings_not_running",
                 "thermostat_cooling_setpoint_mode", "rvc_mode_change_when_idle"} <= ids
         assert all(c.commands and c.text for c in conditions)
 
@@ -147,9 +150,9 @@ class TestMatching:
         assert self._ids(graph, conditions, "washer_1", "spinSpeedCurrent") == \
             ["laundry_washer_settings_not_running"]
 
-    def test_the_cycle_command_has_the_cycle_condition(self, graph, conditions):
-        assert self._ids(graph, conditions, "washer_1", "operationalState") == \
-            ["appliance_cycle_commands"]
+    def test_the_cycle_command_has_no_condition_for_the_model(self, graph, conditions):
+        """Start / pause / resume are checked in code (`cycle_guard.py`)."""
+        assert self._ids(graph, conditions, "washer_1", "operationalState") == []
 
     def test_switching_on_has_none(self, graph, conditions):
         assert self._ids(graph, conditions, "washer_1", "onOff") == []
@@ -168,7 +171,7 @@ class TestMatching:
 class TestSteps:
     def test_steps_are_numbered_in_tree_order_with_their_paths(self, graph, conditions):
         tree = {"type": "sequence", "name": "s", "children": [
-            act("light_1", "brightness", 40), act("washer_1", "operationalState", 2),
+            act("light_1", "brightness", 40), act("ac_1", "coolingSetpoint", 22),
             {"type": "sequence", "name": "inner", "children": [
                 act("washer_1", "spinSpeedCurrent", 1200)]}]}
         steps = conditioned_steps(graph, tree, conditions, goal="G2", first=3)
@@ -178,9 +181,10 @@ class TestSteps:
     def test_the_key_carries_the_value_only_when_it_selects_the_command(self, graph, conditions):
         """A pause and a start of one operationalState action are two keys; a
         spin speed is one key whatever the speed."""
-        (cycle,) = conditioned_steps(graph, act("washer_1", "operationalState", 2), conditions)
+        cycle = guard_key(graph, _artifact("washer_1"), _action_node("washer_1", "operationalState"),
+                          {"value": 2})
         (spin,) = conditioned_steps(graph, act("washer_1", "spinSpeedCurrent", 1200), conditions)
-        assert cycle.key["invocation_value"] == "2" and spin.key["invocation_value"] is None
+        assert cycle["invocation_value"] == "2" and spin.key["invocation_value"] is None
         assert spin.key == {"affordance_name": "spinSpeedCurrent",
                             "affordance_class": "saref:SetAbsoluteLevelCommand",
                             "device_name": "washer_1", "device_class": "homeont:LaundryWasher",

@@ -11,6 +11,7 @@ Matter's ModeTag enum:
 
     _mode_items       the device's modes from its SupportedModes, tags named;
                       nothing for any other attribute
+    fan modes         a fan's FanMode values narrowed to its FanModeSequence
     the washer's TD   both the currentMode action's input and the property's
                       output carry them (a benchmark home, built offline)
 """
@@ -54,6 +55,21 @@ class TestModeItems:
         assert td_class._mode_items(td_class, "LaundryWasherMode", "SupportedModes",
                                     {"SupportedModes": SUPPORTED}) == []
         assert td_class._mode_items(td_class, "LaundryWasherMode", "CurrentMode", {}) == []
+
+
+class TestFanModes:
+    """A fan's FanMode is typed by the full FanModeEnum, but the fan declares
+    its own subset in FanModeSequence (fixed): sequence 1 is Off, Low, High."""
+
+    def test_the_sequence_narrows_the_modes(self, td_class):
+        items = td_class._device_enum_items(td_class, "FanControl", "FanMode",
+                                            {"FanModeSequence": 1})
+        assert [i["name"] for i in items] == ["Off", "Low", "High"]
+        assert td_class._enum_description(td_class, "FanControl", "FanMode", items) == \
+            "0 = Off (fan is off). 1 = Low (fan using low speed). 3 = High (fan using high speed)."
+
+    def test_without_a_sequence_the_spec_enum_stands(self, td_class):
+        assert len(td_class._device_enum_items(td_class, "FanControl", "FanMode", {})) == 7
 
 
 @pytest.mark.skipif(not EPISODE.is_file(), reason="SimuHome benchmark corpus not available")

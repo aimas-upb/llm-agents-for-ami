@@ -15,23 +15,23 @@ user_assistant:
   llm:
     # LLM for atomic intent splitting and per-span intent parsing
     atomic_segmentation:
-      model: "gpt-5-mini"
+      model: "gpt-6-luna"
       reasoning_effort: "low"
     intent_parsing:
-      model: "gpt-5-mini"
-      reasoning_effort: "medium"
+      model: "gpt-6-luna"
+      reasoning_effort: "low"
     plan_summarization:
       model: "gpt-4o-mini"
       temperature: 0.5
       max_tokens: 4096
     capabilities_analysis:
-      model: "gpt-5-mini"
-      reasoning_effort: "medium"
+      model: "gpt-6-luna"
+      reasoning_effort: "low"
     # Phrasing one state answer: choosing a field out of a structured reading,
     # or telling a collective question from a single-device one. Small job,
     # small model.
     state_answer:
-      model: "gpt-5-nano"
+      model: "gpt-6-luna"
       reasoning_effort: "low"
 
   planning:
@@ -82,8 +82,8 @@ interaction_solver:
       timeout: "${COMMUNITY_API_TIMEOUT:-10.0}"
 
     llm_planning:
-      model: "gpt-5-mini"
-      reasoning_effort: "medium"
+      model: "gpt-6-luna"
+      reasoning_effort: "low"
       # max_completion_tokens: 8192
       # model: "gpt-4o-mini"
       # temperature: 0.0
@@ -93,7 +93,7 @@ interaction_solver:
     # Lightweight model for an explicit goal whose action needs a value the
     # goal did not determine: planned against that one device's affordances.
     explicit_planning:
-      model: "${EXPLICIT_PLANNING_MODEL:-gpt-5-nano}"
+      model: "${EXPLICIT_PLANNING_MODEL:-gpt-6-luna}"
       reasoning_effort: "${EXPLICIT_PLANNING_REASONING_EFFORT:-low}"
       max_planning_attempts: "${EXPLICIT_PLANNING_ATTEMPTS:-2}"
     # Device conditions per device class / manufacturer (`conditions:`): the

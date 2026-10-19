@@ -198,12 +198,21 @@ class Explorer:
         return payload.get("text") or ""
 
     async def resolve_candidates(self, agent, logger, payload) -> Dict[str, Any]:
+        """A capability / candidate lookup, answered from the discovered home.
+        It looks at the devices of every room it answers about: the room the
+        request names -- also when it finds nothing there ("there is no
+        humidifier in the bathroom" is an answer about the bathroom) -- and
+        the room of each device it found."""
+        # 1. The lookup itself.
         response = capability_response(resolve_capability_payload(self.home.agent, payload),
                                         payload)
+        # 2. The rooms it answered about, as SimuHome's get_room_devices.
         names = [e.get("artifact_name") for e in response.get("entries") or []]
-        for room in dict.fromkeys(self.home.device_room[n] for n in names
-                                  if n in self.home.device_room):
+        rooms = self.home.rooms_of_location(payload.get("location_class"))
+        rooms += [self.home.device_room[n] for n in names if n in self.home.device_room]
+        for room in dict.fromkeys(rooms):
             self.tools.room_devices(room, "candidates")
+        # 3. The observation, for the record and the judge's steps.
         self.observations.append({"query": "candidates",
                                   "payload": {k: v for k, v in payload.items()
                                               if k != "text_intent"},

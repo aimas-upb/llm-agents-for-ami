@@ -349,6 +349,36 @@ def split_clarifications(plan_obj: Dict[str, Any]):
     return rest, questions
 
 
+def split_unplanned(plan_obj: Dict[str, Any]):
+    """The plan without its tree-less impossible / error entries, and one line
+    per such entry saying it was not planned and why. Those entries are not
+    plans, so they are told to the user as such -- never summarised and put
+    up for confirmation. A single-tree plan has none."""
+    plans = plan_obj.get("plans")
+    if not isinstance(plans, list):
+        return plan_obj, []
+    keep, lines = [], []
+    for entry in plans:
+        # 1. Planned, or a question (split_clarifications' job): kept.
+        if not isinstance(entry, dict) or entry.get("tree") or \
+                entry.get("requires_clarification") or \
+                not (entry.get("impossible") or entry.get("error")):
+            keep.append(entry)
+            continue
+        # 2. Not planned: impossible as asked, or our own failure.
+        intent = entry.get("intent") or {}
+        text = intent.get("text_intent") if isinstance(intent, dict) else None
+        why = entry.get("explanation") or entry.get("error") or "no reason was given"
+        about = f" \"{text}\"" if text else " this"
+        lines.append(f"I can't do{about}: {why}" if entry.get("impossible")
+                     else f"I couldn't plan{about}: {why}")
+    if not lines:
+        return plan_obj, []
+    rest = {k: v for k, v in plan_obj.items() if k != "impossible"}
+    rest["plans"] = keep
+    return rest, lines
+
+
 class SummarizingState(_RequestState):
     """Store the plan, hash it, and tell the user what it will do."""
 
@@ -372,6 +402,17 @@ class SummarizingState(_RequestState):
             await self.reply("\n".join(questions))
             if not plan_obj.get("plans"):
                 request.finish("clarification_needed")
+                self.set_next_state(DONE)
+                return
+
+        # Goals that could not be planned (impossible as asked, or a planning
+        # error): say so, and go on with the rest.
+        plan_obj, unplanned = split_unplanned(plan_obj)
+        if unplanned:
+            self.logger.info(demo(f"[PLAN] {len(unplanned)} goal(s) not planned"))
+            await self.reply("\n".join(unplanned))
+            if not plan_obj.get("plans"):
+                request.finish("failed")
                 self.set_next_state(DONE)
                 return
 

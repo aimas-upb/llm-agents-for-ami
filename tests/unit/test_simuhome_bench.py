@@ -69,6 +69,26 @@ class TestToolLog:
         assert home.sensors["utility_room_light_sensor_1"] == "utility_room"
         assert "utility_room_light_sensor_1" in home.agent.artifacts
 
+    def test_a_capability_lookup_that_finds_nothing_still_looked_in_its_room(self):
+        """qt1_infeasible_seed_25: "fan speeds of humidifier 1 in the bathroom",
+        with no humidifier there. Answering "there is none" is an answer about
+        the bathroom's devices: get_room_devices {bathroom}."""
+        import logging
+        from tests.simuhome.bench.stubs import Explorer, Home
+        if not (BENCHMARK / "qt1_infeasible_seed_25.json").is_file():
+            pytest.skip("SimuHome benchmark absent")
+        config = json.loads((BENCHMARK / "qt1_infeasible_seed_25.json").read_text())
+        home = Home("http://127.0.0.1:9", "h", {"rooms": config["initial_home_config"]["rooms"]},
+                    {}, logging.getLogger("t"))
+        log = ToolLog()
+        explorer = Explorer(home, log)
+        response = asyncio.run(explorer.resolve_candidates(None, None, {
+            "location_class": "homeont:Bathroom", "device_class": "homeont:Humidifier",
+            "device_property": {"class": "homeont:FanControlFanModeSequence"}}))
+        assert response["entries"] == []
+        assert ("get_room_devices", {"room_id": "bathroom"}) in [
+            (e["tool"], e["params"]) for e in log.tools_invoked()]
+
     def test_parse_url(self):
         assert parse_url(f"{SHTD}/office/properties/air_temperature") == {
             "home": "home", "room": "office", "device": None, "kind": "properties",
@@ -399,3 +419,33 @@ class TestBreakdown:
         # Stated as a level, it means the level.
         episode["query"] = "set dimmer light 1 to level 60"
         assert _readings(episode, "d", "1.LevelControl.CurrentLevel", 60) == {"simuhome": 60}
+
+
+class TestQt1DeclaredValues:
+    """qt1_feasible_seed_25: "what fan speeds are available on humidifier 1".
+    The goal names the fan's FanModeSequence (1 = Off, Low, High): a capability
+    answer counts when it lists exactly those values, not the spec's full
+    FanMode enum."""
+
+    EPISODE = {"initial_home_config": {"rooms": {"bathroom": {"devices": [
+        {"device_id": "bathroom_humidifier_1",
+         "attributes": {"1.FanControl.FanModeSequence": 1}}]}}},
+        "eval": {"goals": [{"variant": "device_attribute", "room_id": "bathroom",
+                            "device_id": "bathroom_humidifier_1",
+                            "attribute": "1.FanControl.FanModeSequence"}]}}
+
+    def _check(self, values):
+        """The qt1 check on a record whose capability answer lists ``values``."""
+        from tests.simuhome.bench import evaluate
+        record = {"queries": [{"kind": "capabilities", "response": {"entries": [
+            {"artifact_name": "bathroom_humidifier_1", "affordance_name": "fanMode",
+             "permitted_values": {"enum": values}}]}}]}
+        with patch.object(evaluate, "required_actions", return_value=(True, [])):
+            return evaluate.check_qt1(record, self.EPISODE, {}, feasible=True)
+
+    def test_the_devices_own_modes_pass(self):
+        assert self._check([0, 1, 3])["score"] == 1
+
+    def test_the_specs_full_enum_is_a_wrong_value(self):
+        result = self._check([0, 1, 2, 3, 4, 5, 6])
+        assert result["score"] == 0 and result["goals"][0]["read"] is True

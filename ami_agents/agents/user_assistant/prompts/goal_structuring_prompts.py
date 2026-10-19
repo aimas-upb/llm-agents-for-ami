@@ -136,15 +136,17 @@ Give every goal an id G1, G2, … and every predicate an id P1, P2, … in the o
 
 State a trigger or termination as the condition that BECOMES TRUE: "after I close it" is a trigger on "the light is off".
 
+A trigger predicate is used only by a goal that starts "on_trigger", or that names it in **completes_with**. The event in a "finish together" request is such a trigger: its applies_to is the goal that completes with it.
+
 ### Each goal
 - **timing**: {"starts": …, plus the field it needs}
-  - "now" — no time given, or "now".
+  - "now" — no time given, or "now". (Except a goal with **completes_with** and no start given: leave starts out, see below.)
   - "at_time" + **time_text** — "at 1:39 PM".
   - "after_delay" + **offset_text** — "in 13 minutes", "13 minutes from now".
   - "after_goal" + **ref_goal** + **offset_text** — "then", "after that", "8 minutes after the previous action", and the next instruction to the same device (ref_goal is the goal referred to; offset_text null if none).
   - "with_goal" + **ref_goal** — at the same moment as another goal: "while keeping it powered on", several devices under one trigger.
   - "on_trigger" — the goal has a trigger or recurrence predicate; that predicate carries the details.
-  - "completes_with" + **ref** — "time it so A and B finish at the same time": ref is the goal or trigger predicate whose completion this goal's run must coincide with.
+  - optional **completes_with**: the id of a goal or trigger predicate this goal's run must finish together with — "so A and B finish at the same time", "time it so it's done when the dishwasher is". It is about a run that ends by itself (a wash or drying cycle): nothing is stopped. Record **starts** only for a start the user actually gave ("now", "at 10:30", after another goal). When the start is left to the system ("at the right time", "soon", or no start said), leave **starts** out: the system chooses the start so both finish together.
   - optional **ends**: {"kind": "duration" | "at_time", "text": …} — "for the next 5 hours", "until 6 PM".
   - optional **stated_start_time_text** / **stated_end_time_text** — see "Absolute and relative timing together" below.
 - **rationale** (optional): the words giving a purpose or occasion ("so the laundry area is lit", "I'm clearing the table").
@@ -154,9 +156,13 @@ When the user describes the start of a goal with a concrete clock time AND ALSO 
 - **starts** (with its fields, and any trigger predicate) records the RELATIVE description;
 - **stated_start_time_text** records the ABSOLUTE clock time, exactly as the user wrote it.
 
-The same holds for the end of a goal: when the user gives a clock time for the end AND describes the end relative to an anchor ("for 2 hours, until 8 PM"; "until 6 PM, when the dryer finishes"), **ends** (or the termination predicate) records the RELATIVE description and **stated_end_time_text** records the ABSOLUTE clock time.
+The same holds for the end of a goal: when the user gives a clock time for the end AND describes the end relative to an anchor ("for 2 hours, until 8 PM"; "until 6 PM, when the dryer finishes"), **ends** (or the termination predicate, or **completes_with** when the end is the moment another device's run finishes: "so both finish together by 11:39") records the RELATIVE description and **stated_end_time_text** records the ABSOLUTE clock time.
 
 Never choose one of the two, drop one, or reconcile them — even when they seem to disagree; checking them is a later step's job. A clock time given ALONE, with no relative description of the same moment, is still "at_time" + time_text (or ends {"kind": "at_time"}), and the stated_* fields stay absent.
+
+### "Until X" is not "finish together with X"
+- "Until X" asks for the goal to be ended when X happens: "keep the fan on until the dryer finishes" is a termination predicate on "the dryer is finished"; "heat the room until 6 PM" is ends {"kind": "at_time"}. The goal is stopped then, even for a device with a cycle ("run washer 1 until dryer 1 finishes" stops the washer).
+- "Finish together with X", "at the same time as X", "be done when X is" ask for no stop: the goal's run should end by itself when X does. That is **completes_with**.
 
 ### Three uses of "while" that are NOT scope predicates
 - "while keeping it powered on" — a second goal on the same device: starts "with_goal".
@@ -200,9 +206,19 @@ DEPENDENCY_EXAMPLES = """\
 - P1 washer 1 finished: role "trigger", applies_to ["G4"], offset_text null, offset_direction "after".
 - G4 pause: {"starts": "on_trigger"}
 
-"Start dryer 1 in the utility room at the right time … time it so dishwasher 1 in the kitchen and dryer 1 finish at the same time."
+For example, "Start dryer 1 in the utility room at the right time … time it so dishwasher 1 in the kitchen and dryer 1 finish at the same time." (the start is left to the system):
 - P1 dishwasher 1 finished: role "trigger", applies_to ["G1"].
-- G1 run dryer 1: timing {"starts": "completes_with", "ref": "P1"}
+- G1 run dryer 1: timing {"completes_with": "P1"} — no starts.
+
+For example, "Start washer 1 in the utility room soon so it and dryer 1 in the utility room finish together." ("soon" leaves the start to the system):
+- P1 dryer 1 finished: role "trigger", applies_to ["G1"].
+- G1 start the washer's cycle: timing {"completes_with": "P1"} — no starts.
+
+For example, "Dishwasher 1 in the kitchen is running; start dryer 1 in the bathroom on Normal dryness now so both finish together by 11:39 AM." (the user gave the start, and a clock time for the end):
+- P1 dishwasher 1 finished: role "trigger", applies_to ["G3"].
+- G1 switch on dryer 1: timing {"starts": "now"}
+- G2 Normal dryness: timing {"starts": "after_goal", "ref_goal": "G1", "offset_text": null}
+- G3 start the cycle (operational state Running): timing {"starts": "after_goal", "ref_goal": "G2", "offset_text": null, "completes_with": "P1", "stated_end_time_text": "11:39 AM"}
 
 "Keep the living room at 22 degrees Celsius while the light is on, then 2 minutes after that set the heating pump level to 20 degrees."
 - P1 a living room light is on: predicate_subject "device_property", predicate_specificity "incomplete", quantifier "any", role "scope", applies_to ["G1"].

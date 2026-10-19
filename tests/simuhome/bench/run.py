@@ -185,7 +185,10 @@ def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> Li
 
     options = Options(context=settings["context"], step_seconds=settings["step_seconds"],
                       exec_timeout=settings["exec_timeout"], stop_after=settings["stop_after"],
-                      memory=memory, cache=cache, debug=settings["debug"])
+                      memory=memory, cache=cache, debug=settings["debug"],
+                      execution=settings.get("execution", "ticks"),
+                      dry_step_seconds=float(settings.get("dry_step_seconds", 1.0)),
+                      real_read_seconds=float(settings.get("real_read_seconds", 10.0)))
 
     written = []
     worker = None
@@ -225,7 +228,10 @@ def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> Li
     return written
 
 
-def main() -> int:
+def main(execution: str = "ticks", out: Optional[Path] = None) -> int:
+    """The bench CLI. ``execution`` and ``out`` are the defaults of
+    `--execution` and `--out`: `run_scheduled.py` calls this with
+    "scheduled" and its own results directory."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--variant", help="variant YAML (default: the agents' models)")
     parser.add_argument("--episodes", default="qt*",
@@ -240,6 +246,14 @@ def main() -> int:
                              "before the query (test-only)")
     parser.add_argument("--step-seconds", type=float, default=10.0,
                         help="lockstep step, virtual seconds")
+    parser.add_argument("--execution", choices=("ticks", "scheduled"), default=execution,
+                        help="ticks: the trees ticked against the simulator (immediate / "
+                             "lockstep); scheduled: a dry run of the trees submitted as "
+                             "SimuHome workflows (scheduling.py)")
+    parser.add_argument("--dry-step-seconds", type=float, default=1.0,
+                        help="scheduled: the dry run's step, virtual seconds")
+    parser.add_argument("--real-read-seconds", type=float, default=10.0,
+                        help="scheduled: how long a value read from the simulator is reused")
     parser.add_argument("--exec-timeout", type=float, default=60.0,
                         help="immediate plans: real seconds before they count as failed")
     parser.add_argument("--stop-after", choices=("segmentation", "structuring", "planning"))
@@ -247,7 +261,7 @@ def main() -> int:
     parser.add_argument("--sim", help="an already running simulator API, e.g. "
                                       "http://127.0.0.1:14000/api")
     parser.add_argument("--shtd", help="its SHTD, e.g. http://localhost:8097")
-    parser.add_argument("--out", default=str(DEFAULT_OUT))
+    parser.add_argument("--out", default=str(out or DEFAULT_OUT))
     parser.add_argument("--benchmark", default=str(DEFAULT_BENCHMARK))
     parser.add_argument("--skip-existing", action="store_true")
     parser.add_argument("--cache", help="reuse segmentation + structuring results kept in "
@@ -269,7 +283,9 @@ def main() -> int:
                 "step_seconds": args.step_seconds, "exec_timeout": args.exec_timeout,
                 "stop_after": args.stop_after, "debug": args.debug or bool(args.episode),
                 "sim": args.sim, "shtd": args.shtd, "skip_existing": args.skip_existing,
-                "cache": args.cache}
+                "cache": args.cache, "execution": args.execution,
+                "dry_step_seconds": args.dry_step_seconds,
+                "real_read_seconds": args.real_read_seconds}
 
     from .models import load_variant
     variant = load_variant(args.variant)
@@ -280,7 +296,8 @@ def main() -> int:
         "variant": variant.as_dict(), "episodes": names, "settings": settings,
         "workers": workers, "commit": _git_commit(),
         "started": time.strftime("%Y-%m-%d %H:%M:%S")}, indent=1), encoding="utf-8")
-    print(f"{len(names)} episode(s), variant {variant.name!r}, {workers} worker(s) -> {out}")
+    print(f"{len(names)} episode(s), variant {variant.name!r}, {workers} worker(s), "
+          f"execution {args.execution} -> {out}")
 
     started = time.perf_counter()
     if workers == 1:

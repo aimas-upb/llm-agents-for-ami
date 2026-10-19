@@ -22,6 +22,7 @@ from rdflib import Graph
 
 from ami_agents.agents.interaction_solver.utils.dependency_compiler import (
     CompileError,
+    VagueTime,
     compile_dependency,
 )
 from ami_agents.agents.interaction_solver.utils.dependency_context import resolve_predicate
@@ -327,7 +328,7 @@ class TestPlacement:
         duration = {"ref": {"artifact_name": "washer_1", "property_name": "countdownTime"},
                     "reads_as": "duration"}
         compiled = _plan(graph, {"G1": _goal(timing={"starts": "now"}),
-                                 "G2": _goal(timing={"starts": "completes_with", "ref": "G1"})},
+                                 "G2": _goal(timing={"completes_with": "G1"})},
                          profile=_answer("completion_timing", "G2",
                                          {"ref_remaining": remaining, "target_duration": duration}))
         _, timed = compiled.tree["children"]
@@ -339,7 +340,7 @@ class TestPlacement:
         duration = {"ref": {"artifact_name": "washer_1", "property_name": "countdownTime"},
                     "reads_as": "duration"}
         compiled = _plan(graph, {"G1": _goal(timing={"starts": "now"}),
-                                 "G2": _goal(timing={"starts": "completes_with", "ref": "G1"})},
+                                 "G2": _goal(timing={"completes_with": "G1"})},
                          profile=_answer("completion_timing", "G2",
                                          {"ref_remaining": None, "ref_duration": duration,
                                           "target_duration": duration}))
@@ -352,7 +353,7 @@ class TestPlacement:
     def test_completes_with_an_event_waits_until_its_remaining_time_fits(self, graph):
         remaining = {"ref": {"artifact_name": "washer_1", "property_name": "countdownTime"},
                      "reads_as": "duration"}
-        compiled = _plan(graph, {"G1": _goal(timing={"starts": "completes_with", "ref": "P1"}),
+        compiled = _plan(graph, {"G1": _goal(timing={"completes_with": "P1"}),
                                  "G2": _goal(timing={"starts": "after_goal", "ref_goal": "G1"})},
                          {"P1": {**WASHER_DONE, "role": "trigger", "applies_to": ["G1"]}},
                          profile=_answer("completion_timing", "G1",
@@ -364,16 +365,37 @@ class TestPlacement:
         assert compiled.notes == []
 
     def test_completes_with_an_event_with_no_timing_starts_now(self, graph):
-        compiled = _plan(graph, {"G1": _goal(timing={"starts": "completes_with", "ref": "P1"})},
+        """Reached only without the planner's check, which asks the user
+        first (time_consistency.check_completion): noted, never silent."""
+        compiled = _plan(graph, {"G1": _goal(timing={"completes_with": "P1"})},
                          {"P1": {**WASHER_DONE, "role": "trigger", "applies_to": ["G1"]}})
         assert compiled.tree["type"] == "action"
         assert compiled.notes == ["G1: no timing to finish with P1 -> starts now"]
 
+    def test_completes_with_and_a_start_the_user_gave_adds_nothing(self, graph):
+        """"Start it now so both finish together": checked before planning,
+        placed by its own start -- the same tree as without completes_with."""
+        pred = {"P1": {**WASHER_DONE, "role": "trigger", "applies_to": ["G1"]}}
+        checked = _plan(graph, {"G1": _goal(timing={"starts": "now", "completes_with": "P1"})},
+                        pred)
+        plain = _plan(graph, {"G1": _goal(timing={"starts": "now"})})
+        assert checked.tree == plain.tree and checked.notes == []
+
 
 class TestErrors:
     def test_unreadable_time_words(self, graph):
-        with pytest.raises(CompileError, match="no span of time"):
+        """"Soon" has no time in it: VagueTime, which the planner turns into a
+        question for the user."""
+        with pytest.raises(VagueTime, match="no span of time") as raised:
             _plan(graph, {"G1": _goal(timing={"starts": "after_delay", "offset_text": "soon"})})
+        assert (raised.value.gid, raised.value.text) == ("G1", "soon")
+
+    def test_a_trigger_no_goal_waits_for(self, graph):
+        """Seed 46's lost link: P1 conditions G1, but G1 starts now and does not
+        complete with it."""
+        with pytest.raises(CompileError, match="P1 is a trigger of G1, but none of them waits"):
+            _plan(graph, {"G1": _goal(timing={"starts": "now"})},
+                  {"P1": {**WASHER_DONE, "role": "trigger", "applies_to": ["G1"]}})
 
     def test_a_goal_waiting_for_a_goal_not_in_the_request(self, graph):
         with pytest.raises(CompileError, match="not in the request"):

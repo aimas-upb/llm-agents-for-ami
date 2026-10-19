@@ -18,10 +18,14 @@ accepts. Fetches the TD graph once, then per structure:
                            and each id's devices; answers resolved, unanswered
                            ones on their fallbacks. An inconsistent structure ->
                            an impossible entry.
-    3b. stated times       a goal whose start / end the user also stated as a
-                           clock time: the two must name the same moment
-                           (`utils/time_consistency.py`, the clock and each
-                           anchor's remaining time read once); a disagreement
+    3b. times              a goal whose start / end the user also stated as a
+                           clock time: the two must name the same moment; a
+                           goal that completes with a goal or event ("so both
+                           finish together"): its run must fit, and its run
+                           length and the event's time left must be known
+                           (`utils/time_consistency.py`; the clock, each
+                           anchor's time left and each run length read once).
+                           A disagreement, or anything that cannot be known
                            -> a clarification entry, no plan.
     3c. condition guards   each goal's steps on devices with a condition
                            (`config/planning_guidelines.yaml`): memory, then
@@ -29,11 +33,15 @@ accepts. Fetches the TD graph once, then per structure:
                            guarded step wrapped in its subtree
                            (`utils/condition_check.py`, `condition_guard.py`).
     4. compile             the templates (`utils/dependency_compiler.py`) -> one
-                           tree plus the runtime that keeps its keys current.
+                           tree plus the runtime that keeps its keys current. A
+                           time with no time in it ("soon") -> a clarification
+                           entry.
     4b. guards in order    the compiled tree walked in execution order, where
                            "before" is real across goals: first the condition
                            guards the plan already satisfies are removed
-                           (`condition_guard.drop_satisfied`); then a mode,
+                           (`condition_guard.drop_satisfied`); every start /
+                           pause / resume / stop gets its cycle check
+                           (`utils/cycle_guard.py`); then a mode,
                            level or operational-state command on a device the
                            `power_on_first` condition lists gets the power-on
                            guard, unless the plan switched that device on
@@ -73,6 +81,7 @@ from ..utils.dependency_compiler import (
     DEFAULT_POLL_SECONDS,
     DEFAULT_TOLERANCE,
     CompileError,
+    VagueTime,
     compile_dependency,
 )
 from ..utils.dependency_context import (
@@ -88,12 +97,14 @@ from ..utils.explicit_goal_plan import deterministic_goal
 from ..utils.goal_profile import InconsistentStructure, build_checklist
 from ..utils.condition_check import guard_trees
 from ..utils.condition_guard import drop_satisfied, guards_wire
+from ..utils.cycle_guard import guard_cycles
 from ..utils.planning_conditions import load_conditions
 from ..utils.power_on_guard import guard_tree, guidelines_path, load_applies_to
 from ..utils.profiling import ask_profile
 from ..utils.incomplete_goal_plan import as_explicit, candidates, incomplete_goal
 from ..utils.time_consistency import DEFAULT_TOLERANCE_SECONDS as DEFAULT_STATED_TIME_TOLERANCE
 from ..utils.time_consistency import check as check_times
+from ..utils.time_consistency import check_completion
 from .ambiguous_goal_planning import AmbiguousGoalPlanningBehaviour
 from .explicit_goal_planning import ExplicitGoalPlanningBehaviour
 from .incomplete_goal_planning import IncompleteGoalPlanningBehaviour
@@ -199,10 +210,11 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
         llm = llm or asked
         started = self._timed("profiling", started)
 
-        # 3b. Stated clock times against their relative timing: a disagreement
-        # is a question for the user, not a plan.
+        # 3b. Stated clock times against their relative timing, and "finish
+        # together" goals against their run lengths: a disagreement, or what
+        # cannot be known, is a question for the user, not a plan.
         planning = (self.agent.config.get("planning", {}) or {}).get("dependency", {}) or {}
-        checked = await self._check_stated_times(graph, structure, profile, planning)
+        checked = await self._check_times(graph, structure, profile, planning)
 
         # 3c. The condition guards of each goal's steps, decided for the
         #     whole structure at once and wrapped in the goals' subtrees.
@@ -218,6 +230,14 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
                 graph, structure, subtrees, targets, profile, per_device=per_device,
                 poll_seconds=float(planning.get("poll_seconds", DEFAULT_POLL_SECONDS)),
                 tolerance=float(planning.get("default_tolerance", DEFAULT_TOLERANCE)))
+        except VagueTime as exc:
+            # Words with no time in them ("soon"): only the user can say.
+            goal = structure.goals.get(exc.gid)
+            what = (goal.intent_text if goal else None) or exc.gid
+            raise _Stop({"tree": None, "requires_clarification": True, "error": "vague_time",
+                         "explanation": f"When should \"{what}\" happen? \"{exc.text}\" is "
+                                        f"not a time I can schedule; please give a time or a "
+                                        f"delay."})
         except CompileError as exc:
             raise _Stop({"tree": None, "error": "dependency_compile_failed",
                          "explanation": str(exc)})
@@ -227,10 +247,11 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
         #     devices on before setting them, where the conditions say so.
         compiled.tree, dropped = drop_satisfied(graph, compiled.tree) if decisions \
             else (compiled.tree, [])
-        guard_notes: List[str] = []
+        compiled.tree, guard_notes = guard_cycles(graph, compiled.tree)
         applies_to = load_applies_to(guidelines_path(self.agent.config))
         if applies_to is not None:
-            compiled.tree, guard_notes = guard_tree(graph, compiled.tree, applies_to, goal=None)
+            compiled.tree, power_notes = guard_tree(graph, compiled.tree, applies_to, goal=None)
+            guard_notes += power_notes
         # The two guard steps are timed apart from the compile they surround.
         self.timings[-1]["guarding"] = guarding + (time.perf_counter() - compiled_at)
         self.timings[-1]["compile"] = compiled_at - started - guarding
@@ -285,44 +306,85 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
             per_device[gid] = [(title, next(out)) for title, _ in pairs]
         return decisions, notes
 
-    async def _check_stated_times(self, graph: Graph, structure: GoalStructure,
-                                  profile: Dict[str, Any], planning: Dict[str, Any]) -> List[str]:
+    async def _check_times(self, graph: Graph, structure: GoalStructure,
+                           profile: Dict[str, Any], planning: Dict[str, Any]) -> List[str]:
         """Check each stated start / end clock time against the goal's relative
-        timing (`utils/time_consistency.py`). Raises _Stop with a clarification
-        on a disagreement; returns the notes otherwise. Reads the clock, and
-        each anchor's remaining time, once -- only for structures that state a
-        clock time beside a relative one."""
-        if not any(g.timing and (g.timing.stated_start_time_text or g.timing.stated_end_time_text)
-                   for g in structure.goals.values()):
+        timing, and each goal that completes with a goal or event against its
+        run length (`utils/time_consistency.py`). Raises _Stop with a
+        clarification on the first question; returns the notes otherwise.
+        Reads the clock, each anchor's time left and each run length once --
+        only for structures that have something to check."""
+        stated = any(g.timing and (g.timing.stated_start_time_text or g.timing.stated_end_time_text)
+                     for g in structure.goals.values())
+        completing = [gid for gid, g in structure.goals.items()
+                      if g.timing and g.timing.completes_with]
+        if not stated and not completing:
             return []
         # 1. The current time, from the configured clock (the simulator's in
-        #    SimuHome). Without one the times are not checked, only noted.
+        #    SimuHome). Without one, stated times are only noted; a "finish
+        #    together" goal cannot be timed at all, so it is asked about.
         try:
             now = make_clock((self.agent.config or {}).get("environment") or {}).now()
         except Exception as exc:  # noqa: BLE001 - unverifiable, not wrong
+            if completing:
+                raise _Stop({"tree": None, "requires_clarification": True,
+                             "error": "completion_unverifiable",
+                             "explanation": "I can't tell the time here, so I can't time "
+                                            "things to finish together. Should I start "
+                                            "them now?"})
             return [f"could not verify the stated times: no clock ({exc})"]
-        # 2. How far away each predicate's event is, where a property tells.
+        # 2. How far away each predicate's event is, and how long each
+        #    completing goal runs, where a property tells.
         remaining = {pid: await self._remaining(graph, profile, pid, now)
                      for pid in structure.predicates}
-        # 3. Compare; any disagreement stops the plan with a question.
-        result = check_times(structure, now, remaining, float(planning.get(
-            "stated_time_tolerance_seconds", DEFAULT_STATED_TIME_TOLERANCE)))
+        durations = {gid: await self._duration(graph, profile, gid, now) for gid in completing}
+        tolerance = float(planning.get("stated_time_tolerance_seconds",
+                                       DEFAULT_STATED_TIME_TOLERANCE))
+        # 3. The stated times first: a request whose own times disagree is
+        #    asked about as such.
+        result = check_times(structure, now, remaining, tolerance, durations)
         if result.conflicts:
             raise _Stop({"tree": None, "requires_clarification": True,
                          "error": "stated_time_conflict",
                          "explanation": " ".join(result.conflicts)})
-        return result.notes
+        # 4. Then whether each "finish together" goal can, and can be timed.
+        completion = check_completion(structure, now, remaining, durations, tolerance)
+        if completion.conflicts:
+            raise _Stop({"tree": None, "requires_clarification": True,
+                         "error": "completion_unverifiable",
+                         "explanation": " ".join(completion.conflicts)})
+        return result.notes + completion.notes
 
     async def _remaining(self, graph: Graph, profile: Dict[str, Any], pid: str,
                          now) -> Optional[float]:
         """Seconds until predicate ``pid``'s event, read now from the property
-        the profile names for it (`time_to_event`); None when nothing does,
-        or when the read fails -- the time is then unverifiable, not wrong."""
-        # 1. The property the profiling model named for this predicate.
-        answer = next((item["answer"] for item in profile.values()
-                       if item.get("question") == "time_to_event" and item.get("target") == pid),
+        the profile names for it: its `time_to_event`, else the `ref_remaining`
+        of a goal completing with it. None when nothing does, or the read has
+        no value -- the time is then unknown, not wrong."""
+        source = None
+        for item in profile.values():
+            answer = item.get("answer") if isinstance(item.get("answer"), dict) else {}
+            if item.get("question") == "time_to_event" and item.get("target") == pid:
+                source = answer.get("time_to_event") or source
+            elif item.get("question") == "completion_timing" and item.get("ref") == pid:
+                source = source or answer.get("ref_remaining")
+        return await self._read_seconds(graph, source, now)
+
+    async def _duration(self, graph: Graph, profile: Dict[str, Any], gid: str,
+                        now) -> Optional[float]:
+        """Seconds goal ``gid``'s run takes, read now from the property its
+        `completion_timing` answer names (`target_duration`); None when none
+        does, or it has no value (a cycle's countdown while it is stopped)."""
+        source = next((item["answer"].get("target_duration") for item in profile.values()
+                       if item.get("question") == "completion_timing"
+                       and item.get("target") == gid and isinstance(item.get("answer"), dict)),
                       None)
-        source = (answer or {}).get("time_to_event") if isinstance(answer, dict) else None
+        return await self._read_seconds(graph, source, now)
+
+    async def _read_seconds(self, graph: Graph, source: Any, now) -> Optional[float]:
+        """A TimeSource ({ref, reads_as}) read once, as seconds from now; None
+        when it names no known property, the read fails or has no value."""
+        # 1. The property it names.
         if not isinstance(source, dict) or not isinstance(source.get("ref"), dict):
             return None
         ref = source["ref"]
@@ -333,13 +395,13 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
         try:
             response = await asyncio.get_running_loop().run_in_executor(
                 None, HTTPClient(config=HTTPClientConfig()).get, info.url)
-        except Exception:  # noqa: BLE001 - unverifiable, not wrong
+        except Exception:  # noqa: BLE001 - unknown, not wrong
             return None
         value = response.body if getattr(response, "is_success", False) else None
         field_name = ref.get("property_field")
         if isinstance(value, dict) and field_name and field_name != "NA":
             value = value.get(field_name)
-        # 3. To seconds from now: an end time minus now, or a countdown in the
+        # 3. To seconds from now: an end time minus now, or a span in the
         #    property's own unit.
         if source.get("reads_as") == "timestamp":
             moment = parse_moment(value)
