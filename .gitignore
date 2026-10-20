@@ -264,3 +264,4 @@ agent_logs/
 **/HomeAssistant/scenes.yaml
 **/HomeAssistant/scripts.yaml
 **/HomeAssistant/secrets.yaml
+**/HomeAssistant/prepare-adapter-env.sh
