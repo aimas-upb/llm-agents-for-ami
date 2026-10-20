@@ -4,6 +4,8 @@ Runs SimuHome episodes through the steps the agents run (segmentation, structuri
 planning, execution, response) in one process, without SPADE. Each step is timed and its
 LLM calls are counted, and every episode is scored. Design:
 [docs/plans/simuhome_reasoning_harness.md](../../../docs/plans/simuhome_reasoning_harness.md).
+Full guide (setup, scoring, config formats, outputs, adding a benchmark):
+[docs/evaluation-simuhome.md](../../../docs/evaluation-simuhome.md).
 
 | Command | What it does | Cost |
 |---|---|---|

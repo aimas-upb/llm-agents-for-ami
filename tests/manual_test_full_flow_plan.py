@@ -115,6 +115,7 @@ if env_path.exists():
 
 from ami_agents.shared.utils import spade_compat  # noqa: F401
 from ami_agents.shared.utils.config_loader import ConfigLoader
+from ami_agents.shared.utils.config_resolver import resolve_yggdrasil_url
 from ami_agents.agents.env_explorer.env_explorer_agent import EnvExplorerAgent
 from ami_agents.agents.interaction_solver.interaction_solver_agent import InteractionSolverAgent
 from ami_agents.agents.user_assistant.user_assistant_agent import UserAssistantAgent
@@ -1171,16 +1172,16 @@ async def main():
     # Require LLM API key (both UA and solver will call it).
     _require_env("OPENAI_API_KEY")
 
-    yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8080/").strip()
-
     # Load configuration from files using ConfigLoader
     try:
         config = ConfigLoader.merge_configs(
             ConfigLoader.load_with_env_vars("ami_agents/config/agents.yaml"),
-            ConfigLoader.load_with_env_vars("ami_agents/config/environment.yaml")
+            ConfigLoader.load_environment_config("ami_agents/config/environment.yaml")
         )
     except Exception as e:
         raise RuntimeError(f"Failed to load agent configuration: {e}")
+    # Yggdrasil URL of the default environment (YGGDRASIL_URL overrides it in the yaml).
+    yggdrasil_url = resolve_yggdrasil_url(config)
 
     # Configure logging using the loaded configuration
     _configure_console_logging(config.get("logging", {}))

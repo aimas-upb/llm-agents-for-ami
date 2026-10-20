@@ -42,6 +42,7 @@ if env_path.exists():
 
 from ami_agents.shared.utils import spade_compat  # noqa: F401
 from ami_agents.shared.utils.config_loader import ConfigLoader
+from ami_agents.shared.utils.config_resolver import resolve_yggdrasil_url
 from ami_agents.agents.env_explorer.env_explorer_agent import EnvExplorerAgent
 from ami_agents.agents.interaction_solver.interaction_solver_agent import InteractionSolverAgent
 from ami_agents.agents.user_assistant.user_assistant_agent import UserAssistantAgent
@@ -342,7 +343,6 @@ async def main():
 
     xmpp_server = os.getenv("SPADE_SERVER", "localhost")
     password = os.getenv("SPADE_PASSWORD", "password")
-    yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8080/").strip()
 
     _require_env("OPENAI_API_KEY")
 
@@ -371,10 +371,12 @@ async def main():
     try:
         config = ConfigLoader.merge_configs(
             ConfigLoader.load_with_env_vars(str(PROJECT_ROOT / "ami_agents" / "config" / "agents.yaml")),
-            ConfigLoader.load_with_env_vars(str(PROJECT_ROOT / "ami_agents" / "config" / "environment.yaml"))
+            ConfigLoader.load_environment_config(str(PROJECT_ROOT / "ami_agents" / "config" / "environment.yaml"))
         )
     except Exception as e:
         raise RuntimeError(f"Failed to load agent configuration: {e}")
+    # Yggdrasil URL of the default environment (YGGDRASIL_URL overrides it in the yaml).
+    yggdrasil_url = resolve_yggdrasil_url(config)
 
     # Configure logging using the loaded configuration
     _configure_logging(config.get("logging", {}), demo_only=args.demo, no_logs=args.no_logs)

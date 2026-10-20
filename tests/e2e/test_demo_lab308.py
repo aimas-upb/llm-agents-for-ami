@@ -102,7 +102,7 @@ def test_model():
         # Load configuration
         config = ConfigLoader.merge_configs(
             ConfigLoader.load_with_env_vars("ami_agents/config/agents.yaml"),
-            ConfigLoader.load_with_env_vars("ami_agents/config/environment.yaml")
+            ConfigLoader.load_environment_config("ami_agents/config/environment.yaml")
         )
 
         llm_config = config.get("default_llm", {})

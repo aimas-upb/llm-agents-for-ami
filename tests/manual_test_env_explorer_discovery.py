@@ -71,7 +71,7 @@ async def main():
     # Load configuration
     config_dir = Path(__file__).resolve().parents[1] / "ami_agents" / "config"
     agents_config = ConfigLoader.load_with_env_vars(str(config_dir / "agents.yaml"))
-    env_config = ConfigLoader.load_with_env_vars(str(config_dir / "environment.yaml"))
+    env_config = ConfigLoader.load_environment_config(str(config_dir / "environment.yaml"))
 
     # Get EnvExplorer JID from config
     env_explorer_config = agents_config.get("env_explorer", {})

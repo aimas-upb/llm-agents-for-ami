@@ -130,6 +130,7 @@ from ami_agents.shared.models.messages import MessageType
 from ami_agents.shared.utils.demo_log import demo
 from ami_agents.shared.utils.spade_rpc import RpcTimeoutError, rpc_call
 from ami_agents.shared.utils.config_loader import ConfigLoader
+from ami_agents.shared.utils.config_resolver import resolve_yggdrasil_url
 
 
 class _DropHighFrequencyStateUpdateSpamFilter(logging.Filter):
@@ -1517,7 +1518,7 @@ async def main():
     # Load configuration EARLY to configure logging before first use
     env_config = ConfigLoader.merge_configs(
         ConfigLoader.load_with_env_vars("ami_agents/config/agents.yaml"),
-        ConfigLoader.load_with_env_vars("ami_agents/config/environment.yaml")
+        ConfigLoader.load_environment_config("ami_agents/config/environment.yaml")
     )
 
     # Configure logging using the loaded configuration
@@ -1535,7 +1536,8 @@ async def main():
     # Require LLM API key (both UA and solver will call it).
     _require_env("OPENAI_API_KEY")
 
-    yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8080/").strip()
+    # Yggdrasil URL of the default environment (YGGDRASIL_URL overrides it in the yaml).
+    yggdrasil_url = resolve_yggdrasil_url(env_config)
 
     orchestrator_jid = f"orchestrator@{xmpp_server}"
 

@@ -1,170 +1,95 @@
-# AMI Agents - Project Structure
+# Project Structure
 
-This document describes the folder structure and organization of the AMI Agents project.
+How the repository is laid out, and where to extend it. For how a request moves through these
+pieces, see [workflow.md](workflow.md).
 
-## Directory Structure
+## Directory layout
 
 ```
 ami_agents/
-├── config/                          # Configuration files
-│   ├── environment.yaml             # Environment discovery and connection config
-│   ├── agents.yaml                  # Agent-specific configurations
-│   └── services.yaml                # External services configuration
-│
-├── agents/                          # Agent implementations
-│   ├── user_assistant/              # UserAssistant agent
-│   │   ├── __init__.py
-│   │   └── user_assistant_agent.py  # Main agent + ChatAgent + PlanManager
-│   │
-│   ├── env_explorer/                # EnvExplorer agent
-│   │   ├── __init__.py
-│   │   └── env_explorer_agent.py    # Environment discovery and monitoring
-│   │
-│   └── interaction_solver/          # InteractionSolver agent
-│       ├── __init__.py
-│       └── interaction_solver_agent.py  # Planning and goal resolution
-│
-├── environment/                     # Environment connection layer
-│   ├── discovery/                   # Environment discovery implementations
-│   │   ├── __init__.py
-│   │   └── discovery_service.py     # Direct, Well-Known, mDNS discovery
-│   │
-│   ├── connection/                  # HMAS client
-│   │   ├── __init__.py
-│   │   └── hmas_client.py          # Client for interacting with HMAS
-│   │
-│   └── integration/                 # Integration engines
-│       ├── __init__.py
-│       └── integration_engine.py    # HomeAssistant and Yggdrasil integration
-│
-├── shared/                          # Shared components
-│   ├── models/                      # Data models
-│   │   ├── __init__.py
-│   │   ├── messages.py              # Message types for inter-agent communication
-│   │   ├── plan.py                  # Plan and BehaviorTree models
-│   │   └── environment.py           # Environment models (Workspace, Artifact, etc.)
-│   │
-│   ├── protocols/                   # Protocol interfaces
-│   │   ├── __init__.py
-│   │   ├── agent_protocol.py        # Base agent and routing interfaces
-│   │   └── llm_protocol.py          # LLM integration interfaces
-│   │
-│   ├── memory/                      # Memory management
-│   │   └── __init__.py
-│   │
-│   └── utils/                       # Utility functions
-│       ├── __init__.py
-│       ├── config_loader.py         # Configuration loading utilities
-│       └── logger.py                # Logging utilities
-│
-└── main.py                          # Main entry point and orchestrator
+├── main.py                          # Orchestrator: boots the three agents
+├── config/
+│   ├── agents.yaml                  # Agents, LLM per step, timeouts, BT execution (env-var substituted)
+│   ├── environment.yaml             # Discovery, clock, integration engine, demo environments, community API
+│   ├── planning_guidelines.yaml     # Device conditions per class / manufacturer (Matter-sourced)
+│   └── services.yaml                # External services as virtual Things (examples, disabled)
+├── agents/
+│   ├── user_assistant/
+│   │   ├── user_assistant_agent.py  # State holder + behaviour registration
+│   │   ├── behaviours/              # user_message, user_request (FSM), *_structuring,
+│   │   │                            # *_answer, plan_management, plan_execution
+│   │   ├── prompts/                 # segmentation, parsing, goal structuring, responses
+│   │   ├── utils/                   # goal_routing, goal_resolution, state/capability answers, llm_client
+│   │   ├── pipeline.py              # Segmentation and plan-summary calls
+│   │   ├── queries.py               # ENV_STATE / ENV_CAPABILITIES round trips
+│   │   ├── registry.py              # Open requests, one per utterance
+│   │   ├── signifiers.py, guards.py # Recording successful plans and guard decisions
+│   │   └── models.py
+│   ├── interaction_solver/
+│   │   ├── interaction_solver_agent.py
+│   │   ├── behaviours/              # goal_request (routing), explicit/incomplete/ambiguous/dependency
+│   │   │                            # planning, condition_guard, power_on_guard, planning_workflow
+│   │   ├── prompts.py               # MODIFY_RECIPE, GOAL_PROFILE, CONDITION_GUARD
+│   │   └── utils/                   # per-path planners, dependency_compiler, guards, profiling,
+│   │                                # time_consistency, signifier_memory, llm_client
+│   └── env_explorer/
+│       ├── env_explorer_agent.py
+│       ├── behaviors/               # one behaviour per request type (capabilities, state, resolve,
+│       │                            # snapshot, signifier and guard match / record)
+│       ├── experience/              # Memory-engine bootstrap
+│       └── utils/                   # state_resolution, capability_resolution, actuation_context
+├── bt_planning/
+│   ├── planning/                    # AsyncBTPlanner, BT JSON IR schema, planner prompt
+│   ├── execution/ir_executor.py     # Compiles the IR to py_trees and ticks it
+│   └── nodes/                       # Affordance, compute and dependency nodes; registry.py
+├── environment/
+│   ├── connection/hmas_client.py
+│   ├── discovery/                   # direct / well-known / mDNS discovery
+│   └── integration/
+│       ├── integration_engine.py    # YggdrasilIntegration: crawls an HMAS platform
+│       ├── HomeAssistant/           # HASP: Home Assistant → HMAS (+ semantic_mappings.yaml, home configs)
+│       └── SimuHome/                # SHTD: SimuHome → TDs; worker, inspector, notifications
+│           └── matter_model/        # Vendored CSA Matter data model (spec 1.5.1)
+└── shared/
+    ├── models/                      # messages (MessageType), goal_structure, intents, plan, environment
+    ├── protocols/                   # IAgent, ILLMProvider and other interfaces
+    ├── memory/src/                  # models/signifier, storage/{memory_store,guard_store},
+    │                                # validation (SHACL), api (FastAPI community store)
+    ├── community/community_client.py
+    ├── ontologies/                  # homeont.ttl, saref.rdf, hmas, td, hctl, http
+    └── utils/                       # goal_signifiers, clock, spade_rpc, config_loader, logger, demo_log
 
-# Project root files
-├── requirements.txt                 # Python dependencies
-├── .env.example                     # Example environment variables
-├── .gitignore                       # Git ignore patterns
-└── README.md                        # Project overview (existing)
+tests/
+├── unit/                            # No services needed (`pytest tests/unit`)
+├── integration/                     # Live LLM (needs OPENAI_API_KEY)
+├── simuhome/
+│   ├── bench/                       # The evaluation suite (see evaluation-simuhome.md)
+│   ├── td/                          # Matter → SAREF / SOSA / TD-SOSA mapping tables for SHTD
+│   └── *.py                         # Component evaluations (segmentation, structuring, dependency plans)
+├── e2e-lab308e/                     # JSON-driven end-to-end cases against HASP (lab308e)
+└── manual_interactive_cli.py        # Console chat with the three agents
 ```
 
-## Component Responsibilities
+## Layers
 
-### Configuration Layer (`config/`)
-- **environment.yaml**: Environment discovery settings, integration engine config, external services
-- **agents.yaml**: SPADE settings, agent-specific configurations, LLM settings, memory settings
-- **services.yaml**: External service definitions with Thing Description mappings
+- **Agents.** Each agent class only holds state and registers behaviours. Every task is a
+  behaviour: one `CyclicBehaviour` per inbound message type, and `OneShotBehaviour`s for discrete
+  sub-tasks. Pure helpers live in `utils/` and do not import SPADE.
+- **Planning and execution.** Plans are Behavior Trees in a JSON IR, which keeps them
+  serialisable between agents. The executor compiles them to `py_trees` and ticks them.
+  Leaves invoke TD affordances over HTTP.
+- **Environment.** The agents see only an HMAS platform of TDs. HASP and SHTD produce one from
+  Home Assistant and from SimuHome. Both type devices with HomeOnt / SAREF and annotate
+  effects with TD-SOSA, so the agents resolve "what can make this room brighter" semantically.
+- **Shared.** Message types, the goal structure, the experience memory, ontologies and utilities.
 
-### Agent Layer (`agents/`)
+## Extension points
 
-#### UserAssistant
-- **ChatAgent**: User-facing conversation management, message classification, intent extraction
-- **PlanManager**: System-facing plan management, execution monitoring, preference storage
-
-#### EnvExplorer
-- Environment discovery and crawling
-- Change detection and monitoring
-- Signifier storage and retrieval
-- Affordance matching (hybrid reasoning)
-
-#### InteractionSolver
-- Goal request handling
-- Planning context gathering
-- Behavior tree plan generation
-- Plan execution monitoring
-
-### Environment Layer (`environment/`)
-
-#### Discovery
-- Direct discovery (configured endpoint)
-- Well-known URI discovery
-- mDNS discovery on local network
-
-#### Connection
-- HMAS client for interacting with Thing Descriptions
-- Workspace and artifact operations
-- Property read/write, action invocation
-- Event subscriptions
-
-#### Integration
-- HomeAssistant integration (converts to HMAS)
-- Yggdrasil integration (already HMAS)
-- TD Directory functionality
-
-### Shared Layer (`shared/`)
-
-#### Models
-- Message types and structures
-- Plan representations (BehaviorTree, NodeTemplate)
-- Environment models (Workspace, Artifact, ThingDescription, Signifier)
-
-#### Protocols
-- Agent interfaces (IAgent, IMessageRouter, IMemoryManager)
-- LLM interfaces (ILLMProvider, IIntentExtractor, IPlanGenerator)
-
-#### Utilities
-- Configuration loading with environment variable substitution
-- Logging setup and management
-
-## Data Flow
-
-1. **Startup**:
-   - `main.py` orchestrates system initialization
-   - Environment discovery → Integration engine → HMAS creation
-   - Agents start in order: EnvExplorer → InteractionSolver → UserAssistant
-
-2. **Environment Discovery**:
-   - EnvExplorer crawls HMAS environment
-   - Builds internal map of workspaces and artifacts
-   - Subscribes to change notifications
-   - Notifies other agents when complete
-
-3. **Goal Request Flow**:
-   - User message → UserAssistant (ChatAgent)
-   - Message classification → Route to handler
-   - If GOAL_REQUEST:
-     - Extract intent
-     - Check running/previous goals
-     - Send to InteractionSolver
-   - InteractionSolver gathers context from EnvExplorer
-   - Generates BehaviorTree plan using LLM
-   - Returns plan to UserAssistant
-   - UserAssistant executes or schedules plan
-
-4. **Plan Execution**:
-   - PlanManager monitors execution
-   - Invokes affordances via HMAS client
-   - Updates node statuses
-   - Stores signifiers for successful actions
-
-5. **Change Detection**:
-   - EnvExplorer receives change events
-   - Analyzes impact on maintenance plans
-   - Notifies UserAssistant if plans affected
-   - UserAssistant triggers plans if conditions met
-
-## Extension Points
-
-- **New LLM Providers**: Implement `ILLMProvider` interface
-- **New Discovery Methods**: Implement `IDiscoveryService` interface
-- **New Integration Sources**: Implement `IIntegrationEngine` interface
-- **Custom Behaviors**: Add SPADE behaviors to agents
-- **External Services**: Add definitions to `services.yaml`
+| To add… | Do this |
+|---|---|
+| a BT node type | Define the `py_trees` node in `bt_planning/nodes/`, then `register_node_type(...)` in `nodes/registry.py`. Custom computation goes through a named op in `compute_node.py`, never code in the IR. |
+| an inter-agent message | Add it to `MessageType` in `shared/models/messages.py`, plus a behaviour on the receiving agent. |
+| an LLM step in an agent | Copy the `BTPlanGenerationBehaviour` pattern. Build the client with the agent's `utils/llm_client.py:build_llm_client`. Put the model under that agent's `llm:` / `planning:` section in `agents.yaml`. |
+| a device condition | Add an entry under `conditions:` in `config/planning_guidelines.yaml`, sourced from the Matter (or Home Assistant) specification. |
+| an environment | Serve it as an HMAS platform of TDs (HASP and SHTD are the two examples) and point `YGGDRASIL_URL` at it. |
+| a benchmark | See [evaluation-simuhome.md § Adding another benchmark](evaluation-simuhome.md#adding-another-benchmark). |

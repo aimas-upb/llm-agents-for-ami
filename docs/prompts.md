@@ -1,163 +1,125 @@
 # LLM Prompt Reference
 
-This document provides the complete reference for all LLM prompts used in AmI HMAS.
-The paper states (Section 3.3, footnote): *"Full system prompts are available in the source code repository."*
+AmI HMAS calls an LLM only at fixed points inside deterministic behaviours. Everything an LLM
+does not need to decide is decided in code: routing, explicit `set` / `modify` plans, dependency
+templates, power-on and cycle guards, and most state and capability answers. This page lists every
+prompt, when it is called, what it returns, and which config key picks its model. The config keys
+are explained in [configuration.md](configuration.md#llm-configuration-agentsyaml).
 
-AmI HMAS follows a **controlled injection point** principle: LLM calls occur only at explicitly designed
-locations, never inside the deterministic agent control flows. The three agents have the following LLM usage:
-
-| Agent | LLM calls | Prompt file |
-|---|---|---|
-| **UserAssistant** | NLU (intent extraction), NLG (plan summary), NLG (query response) | [`ami_agents/agents/user_assistant/prompts.py`](../ami_agents/agents/user_assistant/prompts.py) |
-| **InteractionSolver / BT Planner** | BT generation (structured JSON IR) | [`ami_agents/bt_planning/planning/prompts.py`](../ami_agents/bt_planning/planning/prompts.py) |
-| **EnvExplorer** | None — classical SPADE agent | — |
-
----
-
-## UserAssistant Prompts
-
-File: [`ami_agents/agents/user_assistant/prompts.py`](../ami_agents/agents/user_assistant/prompts.py)
-Called from: [`ami_agents/agents/user_assistant/behaviours.py`](../ami_agents/agents/user_assistant/behaviours.py)
-
-### 1. `INTENT_EXTRACTION_SYSTEM_PROMPT` — NLU
-
-**When called:** Every time the user sends a message. The UserAssistant enters the `EXTRACTING_INTENTS`
-state of its lifecycle state machine (Figure 1 in paper, Section 3.2).
-
-**What it does:** Classifies the user message into one of five categories and, for `goal` messages,
-extracts one or more **structured intents** (the core NLU step described in Section 3.2):
-- `action`: one of `check`, `set`, `modify`
-- `artifact`: exact device ID or generic type (determines `explicit` vs. `implicit` intent type)
-- `parameter`, `value`, `intent_text`
-- `intent_type`: `explicit` (user names a specific artifact) or `implicit` (vague reference)
-
-**Message categories:**
-| Category | Meaning |
+| Agent | Prompt files |
 |---|---|
-| `goal` | User wants to change something → structured intents extracted |
-| `query_capabilities` | User asks about available devices/actions |
-| `query_state` | User asks about current device state |
-| `confirmation` | User confirms or rejects a proposed plan |
-| `unclear` | Ambiguous message → agent asks one clarifying question |
-
-**Output:** JSON only — no markdown fences. See the prompt for full output schema with examples.
-
-**Paper connection:** The explicit/implicit classification drives Algorithm 1 (dual-path planning) —
-explicit `set` intents can hit the fast path; implicit intents always go through LLM planning.
+| UserAssistant | [`agents/user_assistant/prompts/`](../ami_agents/agents/user_assistant/prompts/): `intent_segmentation_prompts.py`, `intent_parsing_prompts.py`, `goal_structuring_prompts.py`, `intent_response_prompts.py` |
+| InteractionSolver | [`agents/interaction_solver/prompts.py`](../ami_agents/agents/interaction_solver/prompts.py) and [`bt_planning/planning/prompts.py`](../ami_agents/bt_planning/planning/prompts.py) |
+| EnvExplorer | none: discovery, semantic resolution (SPARQL) and memory lookup are deterministic |
 
 ---
 
-### 2. `PLAN_SUMMARY_SYSTEM_PROMPT` — NLG (plan presentation)
+## UserAssistant
 
-**When called:** After the InteractionSolver returns a BT JSON IR plan. The UserAssistant enters the
-`SUMMARIZING_PLAN` state (Figure 1 in paper), calls this prompt, and presents the result to the user
-for confirmation before execution.
+### 1. `ATOMIC_SEGMENTATION_SYSTEM_PROMPT`: segmentation
 
-**What it does:** Converts a BT JSON IR (machine-readable) into a concise 2–4 sentence human-readable
-description, ending with "Does this plan look good to you?". No raw URIs, no JSON, no technical jargon.
+- **When.** Once per utterance, in the `SEGMENTING` state (`pipeline.py`).
+- **Does.** Splits the utterance into atomic intents and types each one `GOAL_REQUEST`,
+  `ENV_STATE_REQUEST` or `ENV_CAPABILITIES_REQUEST`. Each goal gets qualifiers: one specificity
+  (`explicit` / `incomplete` / `ambiguous`), one kind (`achievement` / `maintenance`), and any
+  structure labels (`logical_dependency`, `temporal_dependency`, `sequential_dependency`).
+- **Environment.** It sees none; the split is purely linguistic. Its main rule: a split must not
+  create a fragment that is incomplete only because it was cut away.
+- **Model.** `user_assistant.llm.atomic_segmentation`.
 
-**Paper connection:** Section 3.3 — "the UserAssistant uses [the JSON IR] as input to an LLM call
-for human-readable plan summarization to be delivered for confirmation to the user."
+### 2. `ENV_STATE_REQUEST_PARSER_PROMPT` and `ENV_CAPABILITIES_REQUEST_PARSER_PROMPT`: query structuring
 
----
+- **When.** In `EXTRACTING`, once per state or capability intent
+  (`behaviours/env_state_structuring.py`, `behaviours/env_capability_structuring.py`).
+- **Does.** Extracts the ontology *classes* the question is about: location class, device class,
+  device property or environment variable. A capability question also gets a command class and
+  its performative (`query` or `query_if`). The prompts never name individual devices;
+  EnvExplorer resolves the classes over the TD graph.
+- **Model.** `user_assistant.llm.intent_parsing`.
 
-### 3. `QUERY_RESPONSE_SYSTEM_PROMPT` — NLG (state and capability responses)
+### 3. `GOAL_STRUCTURING_SIMPLE_PROMPT` and `GOAL_STRUCTURING_DEPENDENCY_PROMPT`: goal structuring
 
-**When called:** When the user's message is classified as `query_capabilities` or `query_state`.
-The UserAssistant fetches the raw data from EnvExplorer and passes it to this prompt.
+- **When.** In `EXTRACTING`, once per goal (`behaviours/goal_structuring.py`).
+  `utils/goal_routing.py` picks the prompt from the segmenter's qualifiers: *simple* for an
+  achievement with no dependency label, *dependency* otherwise.
+- **Does.** Turns the goal into a `GoalStructure` (`shared/models/goal_structure.py`):
+  - the simple prompt gives one goal;
+  - the dependency prompt gives goals plus the predicates that condition them, each with its
+    role, the goals it applies to, and its timing.
+- **Shared fragments.** Both prompts are built from the same fragments (`GOAL_SPEC_RULES`,
+  `PREDICATE_SPEC_RULES`, `BINDING_RULES`, …), so goal fields cannot drift between them.
+- **Context.** The home goes in through `render_goal_prompt` (`{goal_context}`): the actions,
+  and where needed device properties and environment variables, fetched from EnvExplorer.
+- **Plans.** Neither prompt composes a plan.
+- **Model.** `user_assistant.llm.intent_parsing`.
 
-**What it does:** Formats raw JSON environment state or capability data into a concise,
-user-friendly natural language response. No raw URIs or JSON dumps.
+### 4. `STATE_ANSWER_PROMPT`: state answers
 
----
+- **When.** Only when the answer cannot be built in code (`utils/state_answers.py`). Examples:
+  choosing one field out of a structured reading, or telling a collective question from a
+  single-device one (`behaviours/state_answer.py`).
+- **Model.** `user_assistant.llm.state_answer`.
 
-## InteractionSolver / BT Planner Prompts
+### 5. `CAPABILITY_ANSWER_PROMPT`: capability answers
 
-File: [`ami_agents/bt_planning/planning/prompts.py`](../ami_agents/bt_planning/planning/prompts.py)
-Called from: [`ami_agents/agents/interaction_solver/interaction_solver_agent.py`](../ami_agents/agents/interaction_solver/interaction_solver_agent.py)
-via [`ami_agents/bt_planning/planning/bt_planner.py`](../ami_agents/bt_planning/planning/bt_planner.py)
+- **When.** Phrases a capability answer that `utils/capability_answers.py` cannot build directly
+  (`behaviours/capability_answer.py`).
+- **Model.** `user_assistant.llm.capabilities_analysis`.
 
-### 4. `BT_PLANNING_SYSTEM_PROMPT` — BT generation
+### 6. `PLAN_SUMMARY_SYSTEM_PROMPT`: plan summary
 
-**When called:** LLM planning path of Algorithm 1 (lines 16–17). Called by `AsyncBTPlanner.generate_bt()`
-for any `implicit` intent or any `modify` action. Not called for `explicit set` intents (fast path).
-
-**What it does:** Instructs the LLM to produce a **BT JSON IR** (intermediate representation) using
-OpenAI function calling / tool use. The LLM must use only the node types from Table 1 of the paper
-(`sequence`, `selector`, `parallel`, `action`, `condition`) and only the affordance URLs provided
-in the dynamic context.
-
-**Template variables (injected at call time):**
-- `{signifier_hints}` — formatted signifier matches from EnvExplorer or community (see below)
-- `{capability_context}` — available affordances + current environment state
-
-**BT node types instructed** (matches Table 1 of paper):
-| Type | Behavior |
-|---|---|
-| `sequence` | Left-to-right; fail on first failure |
-| `selector` | Left-to-right; succeed on first success (used for idempotent patterns) |
-| `parallel` | All children concurrently; `success_on_all` or `success_on_one` |
-| `action` | HTTP POST to `action_url` |
-| `condition` | HTTP GET `property_url`; compare to `expected_value` |
-
-**Common patterns instructed:**
-- Idempotent action: `selector → [condition(check state), action(set state)]`
-- Sequential commands: `sequence → [action1, action2, ...]`
-- Independent commands: `parallel(success_on_all) → [action1, action2, ...]`
-
-**Retry logic:** Up to `max_attempts` (default 3) retries with validation feedback if the generated
-JSON fails schema validation. Implemented in `AsyncBTPlanner` (`bt_planner.py`).
-
----
-
-### 5. `format_signifier_hints()` — dynamic signifier context formatter
-
-**Type:** Helper function (not a standalone prompt), but generates the `{signifier_hints}` section
-injected into `BT_PLANNING_SYSTEM_PROMPT`.
-
-**What it does:** Formats the signifier matches returned by EnvExplorer (or community) into a
-structured hints section. Matches above `EXPLICIT_SIMILARITY_THRESHOLD = 0.95` are labelled
-**"exact — reuse as-is"**; lower-similarity matches are labelled **"suggested — adjust to context"**.
-
-**Paper connection:** Section 4.2 — "signifier matches are injected as hints into the LLM planning
-context." This function implements that injection.
+- **When.** In `SUMMARIZING`, for a plan with action nodes (`pipeline.summarize_plan`).
+- **Does.** A 2–4 sentence plain-language summary ending with a confirmation question. Read-only
+  plans are not summarised.
+- **Model.** The UA's default client, which is `atomic_segmentation`. The
+  `user_assistant.llm.plan_summarization` key exists in `agents.yaml`, but the summary does not
+  read it today.
 
 ---
 
-### 6. `format_capability_context()` — dynamic affordance + state formatter
+## InteractionSolver
 
-**Type:** Helper function, generates the `{capability_context}` section of `BT_PLANNING_SYSTEM_PROMPT`.
+### 7. `MODIFY_RECIPE_PROMPT`: explicit goals the TDs cannot settle
 
-**What it does:** Formats the list of available `ActionAffordance` and `PropertyAffordance` objects
-(URLs, methods, input schemas) plus the current environment state snapshot into a structured
-markdown section for the LLM context window.
+- **When.** An explicit goal could not be planned deterministically
+  (`behaviours/explicit_goal_llm_planning.py`):
+  - a `modify` whose read → compute → set recipe cannot be read off the TDs, or
+  - a `set` whose value is not determined.
+- **Does.** Names the pieces: the property to read, the computation, and the action to set.
+  The ISA checks them against the device's TD and builds the tree itself.
+- **Model.** `interaction_solver.planning.explicit_planning` (the small model).
 
-**Paper connection:** Section 3.4 — "the gathered context and the structured intent information
-constitute the input for LLM-based reasoning to generate the BT plan."
+### 8. `GOAL_PROFILE_PROMPT`: dependency profiling
 
----
+- **When.** In dependency planning, when the deterministic checklist (`utils/goal_profile.py`)
+  has open questions (`behaviours/dependency_goal_planning.py`, `utils/profiling.py`).
+- **Does.** Answers only the checklist questions: which event a dependency refers to, and which
+  properties the plan must read to know when it happens. It never chooses commands.
+  Unanswered questions take documented fallbacks.
+- **Model.** `interaction_solver.planning.explicit_planning`.
 
-## EnvExplorer — No LLM Prompts
+### 9. `CONDITION_GUARD_PROMPT`: condition guards
 
-The **EnvExplorer** is a **classical SPADE agent** (no LLM calls). Its responsibilities are:
-- W3C WoT discovery via RDF/HTTP crawling of the HMAS platform
-- Maintaining an up-to-date artifact state map via WebSub push events
-- Managing the Signifier Memory Engine (store, retrieve, match)
+- **When.** A planned step targets a device that has a condition in
+  `config/planning_guidelines.yaml` and the guard memory has no decision for it
+  (`utils/condition_check.py`, called from `behaviours/condition_guard.py` and from dependency
+  planning).
+- **Does.** For each such step, gives either a check (property, `==` / `!=`, value) and the action
+  that establishes it, or "no guard". Decisions are remembered after a successful run.
+- **Model.** `interaction_solver.planning.explicit_planning`.
 
-Signifier matching uses sentence embeddings (cosine similarity) and SHACL validation — no LLM.
-See [`ami_agents/shared/memory/src/matching/`](../ami_agents/shared/memory/src/matching/) for
-the matching implementations and [`ami_agents/shared/memory/src/validation/`](../ami_agents/shared/memory/src/validation/)
-for SHACL context validation.
+### 10. `BT_PLANNING_SYSTEM_PROMPT`: the general BT planner
 
----
-
-## Summary — Call Sites
-
-| Prompt / Function | Call site | State machine phase |
-|---|---|---|
-| `INTENT_EXTRACTION_SYSTEM_PROMPT` | `behaviours.py:116` | `EXTRACTING_INTENTS` |
-| `PLAN_SUMMARY_SYSTEM_PROMPT` | `behaviours.py:142` | `SUMMARIZING_PLAN` |
-| `QUERY_RESPONSE_SYSTEM_PROMPT` | `behaviours.py:165` | `IDLE` (query response) |
-| `BT_PLANNING_SYSTEM_PROMPT` | `interaction_solver_agent.py:372` via `bt_planner.py` | LLM planning path |
-| `format_signifier_hints()` | `prompts.py` (called by `bt_planner.py`) | Context assembly |
-| `format_capability_context()` | `prompts.py` (called by `bt_planner.py`) | Context assembly |
+- **When.** In `AsyncBTPlanner.generate_bt` (`bt_planning/planning/bt_planner.py`), called for:
+  - ambiguous goals (`behaviours/ambiguous_goal_planning.py`);
+  - the plain-text fallback workflow (`behaviours/bt_plan_generation.py`).
+- **Does.** Produces a BT JSON IR through the `generate_behavior_tree` tool. Node types are
+  `sequence`, `selector`, `parallel`, `action`, `condition`, `wait_condition` and
+  `ignore_failure`, and affordances are named by artifact, name and class. Invalid output is
+  retried with validation feedback, up to `max_planning_attempts`.
+- **Context formatters** (same module):
+  - `format_capability_context()` adds the affordances and current state;
+  - `format_observable_property_hints()` adds readings of the variables involved;
+  - `format_signifier_hints()` adds what a remembered plan used. Hints take precedence over the
+    context, but the LLM still plans.
+- **Model.** `interaction_solver.planning.llm_planning`.

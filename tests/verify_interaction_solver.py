@@ -37,9 +37,13 @@ from ami_agents.agents.interaction_solver.interaction_solver_agent import Intera
 from ami_agents.agents.env_explorer.env_explorer_agent import EnvExplorerAgent
 from ami_agents.shared.models.messages import MessageType
 from ami_agents.environment.connection.hmas_client import IHMASClient
+from ami_agents.shared.utils.config_loader import ConfigLoader
+from ami_agents.shared.utils.config_resolver import resolve_yggdrasil_url
 
 # --- Configuration ---
-YGGDRASIL_URL = os.getenv("YGGDRASIL_URL", "http://localhost:8080/")
+# Yggdrasil URL of the default environment (YGGDRASIL_URL overrides it in the yaml).
+YGGDRASIL_URL = resolve_yggdrasil_url(ConfigLoader.load_environment_config(
+    str(Path(__file__).resolve().parents[1] / "ami_agents" / "config" / "environment.yaml")))
 XMPP_SERVER = os.getenv("SPADE_SERVER", "localhost")
 XMPP_PASSWORD = os.getenv("SPADE_PASSWORD", "password")
 XMPP_PORT = int(os.getenv("SPADE_PORT", "5222"))

@@ -646,6 +646,7 @@ async def manual_start():
         from ami_agents.agents.interaction_solver.interaction_solver_agent import InteractionSolverAgent
         from ami_agents.agents.user_assistant.user_assistant_agent import UserAssistantAgent
         from ami_agents.shared.utils.config_loader import ConfigLoader
+        from ami_agents.shared.utils.config_resolver import resolve_yggdrasil_url
         from ami_agents.environment.connection.hmas_client import IHMASClient
 
         # Force reload .env file before config loading (ensure env vars are available)
@@ -662,13 +663,14 @@ async def manual_start():
         # Load configuration
         config = ConfigLoader.merge_configs(
             ConfigLoader.load_with_env_vars(str(PROJECT_ROOT / "ami_agents" / "config" / "agents.yaml")),
-            ConfigLoader.load_with_env_vars(str(PROJECT_ROOT / "ami_agents" / "config" / "environment.yaml"))
+            ConfigLoader.load_environment_config(str(PROJECT_ROOT / "ami_agents" / "config" / "environment.yaml"))
         )
 
         # Get environment variables (like in manual_interactive_cli.py)
         xmpp_server = os.getenv("SPADE_SERVER", "localhost")
         password = os.getenv("SPADE_PASSWORD", "password")
-        yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8080/").strip()
+        # Yggdrasil URL of the default environment (YGGDRASIL_URL overrides it in the yaml).
+        yggdrasil_url = resolve_yggdrasil_url(config)
 
         # Note: OPENAI_API_KEY verification removed - ConfigLoader will handle it properly
         # The issue was that env vars are checked too early, but config loading works correctly

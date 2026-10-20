@@ -138,6 +138,7 @@ from ami_agents.agents.user_assistant.user_assistant_agent import UserAssistantA
 from ami_agents.environment.connection.hmas_client import IHMASClient
 from ami_agents.shared.utils import spade_compat  # noqa: F401
 from ami_agents.shared.utils.config_loader import ConfigLoader
+from ami_agents.shared.utils.config_resolver import resolve_yggdrasil_url
 from ami_agents.shared.utils.demo_log import demo
 
 
@@ -768,7 +769,9 @@ class Lab308eHarness:
         self.logger = logger
         self.xmpp_server = os.getenv("SPADE_SERVER", "localhost")
         self.password = os.getenv("SPADE_PASSWORD", "password")
-        self.yggdrasil_url = os.getenv("YGGDRASIL_URL", "http://localhost:8080/").strip().rstrip("/")
+        # Yggdrasil URL of the default environment (YGGDRASIL_URL overrides it in the yaml).
+        self.yggdrasil_url = resolve_yggdrasil_url(ConfigLoader.load_environment_config(
+            str(PROJECT_ROOT / "ami_agents" / "config" / "environment.yaml"))).rstrip("/")
         self.ha_base_url = (
             os.getenv("HA_BASE_URL")
             or os.getenv("HA_URL", "ws://localhost:8123/api/websocket")
@@ -1228,7 +1231,7 @@ class Lab308eHarness:
     def _load_config(self) -> Dict[str, Any]:
         config = ConfigLoader.merge_configs(
             ConfigLoader.load_with_env_vars(str(PROJECT_ROOT / "ami_agents" / "config" / "agents.yaml")),
-            ConfigLoader.load_with_env_vars(str(PROJECT_ROOT / "ami_agents" / "config" / "environment.yaml")),
+            ConfigLoader.load_environment_config(str(PROJECT_ROOT / "ami_agents" / "config" / "environment.yaml")),
         )
 
         model = self.model_name

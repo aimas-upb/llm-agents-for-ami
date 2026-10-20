@@ -18,6 +18,11 @@ from ami_agents.agents.interaction_solver.interaction_solver_agent import Intera
 from ami_agents.environment.discovery.discovery_service import DiscoveryFactory
 from ami_agents.environment.integration.integration_engine import IntegrationEngineFactory
 from ami_agents.shared.utils.logger import LoggerFactory
+from ami_agents.shared.utils.config_resolver import resolve_yggdrasil_url
+
+
+# Agent sections of agents.yaml; each one holds that agent's XMPP jid/password.
+AGENT_SECTIONS = ("user_assistant", "env_explorer", "interaction_solver")
 
 
 def load_environment():
@@ -105,7 +110,7 @@ class AMIAgentsOrchestrator:
 
         # Load all config files
         agents_config = ConfigLoader.load_with_env_vars(os.path.join(config_dir, "agents.yaml"))
-        env_config = ConfigLoader.load_with_env_vars(os.path.join(config_dir, "environment.yaml"))
+        env_config = ConfigLoader.load_environment_config(os.path.join(config_dir, "environment.yaml"))
 
         # Check if services.yaml exists (optional)
         services_path = os.path.join(config_dir, "services.yaml")
@@ -116,40 +121,58 @@ class AMIAgentsOrchestrator:
         # Merge configs
         self.config = ConfigLoader.merge_configs(agents_config, env_config, services_config)
 
-        # Validate required fields
-        required_sections = ["spade", "user_assistant", "env_explorer", "interaction_solver"]
-        for section in required_sections:
-            if section not in self.config:
-                raise ValueError(f"Missing required configuration section: {section}")
+        # Validate the XMPP spec of each agent. There is no global `spade:`
+        # section: each agent's own section carries its jid and password,
+        # and SPADE takes host/port from the JID.
+        self.validate_agent_specs()
 
         if self.logger:
             self.logger.info("Configuration loaded successfully from %s", config_dir)
 
+    def validate_agent_specs(self) -> None:
+        """
+        Check that every agent section carries a usable XMPP jid and password.
+
+        Returns None when all three agents can log in to XMPP; raises
+        ValueError naming the first missing section or field otherwise. It
+        exists so a broken config fails here with a clear message, rather
+        than as an XMPP auth error after the first agents have started.
+        """
+        for section in AGENT_SECTIONS:
+            # 1. The agent section itself must be present.
+            spec = self.config.get(section)
+            if not isinstance(spec, dict):
+                raise ValueError(f"Missing required configuration section: {section}")
+
+            # 2. jid and password must be set. ConfigLoader leaves an unset
+            #    `${VAR}` (no default) as the literal placeholder, so treat
+            #    that as missing and name the env var to export.
+            for field in ("jid", "password"):
+                value = spec.get(field)
+                if not value:
+                    raise ValueError(f"Missing '{field}' in configuration section: {section}")
+                if isinstance(value, str) and value.startswith("${"):
+                    raise ValueError(
+                        f"'{section}.{field}' is unresolved ({value}); "
+                        f"set the environment variable it references"
+                    )
+
 
     async def initialize_environment(self) -> str:
         """
-        Initialize environment discovery and connection.
+        Resolve the HMAS endpoint of the environment the agents start in.
 
-        Returns:
-            The HMAS environment endpoint URL.
+        Returns the Yggdrasil URL of `environments.default`, whose definition
+        ConfigLoader.load_environment_config() loaded as the `environment`
+        section; YGGDRASIL_URL overrides it. Raises ValueError when no URL
+        is configured.
         """
-        # Get environment configuration
-        env_config = self.config.get("environment", {})
-        discovery_method = env_config.get("discovery_method", "mdns")
-
-        # For now, use a simple approach - get URL from environments config
-        environments = self.config.get("environments", {})
-        if environments:
-            # Use the first available environment
-            first_env = list(environments.values())[0]
-            yggdrasil_url = first_env.get("yggdrasil_url", os.getenv("BASE_WS_URI", "http://localhost:8080"))
-            self.logger.info("Using Yggdrasil environment: %s", yggdrasil_url)
-            return yggdrasil_url
-
-        # Fallback to default
-        default_url = os.getenv("BASE_WS_URI", "http://localhost:8080")
-        self.logger.warning("No environment configuration found, using default: %s", default_url)
-        return default_url
+        environment_id = (self.config.get("environments") or {}).get("default")
+        environment = self.config.get("environment") or {}
+        yggdrasil_url = resolve_yggdrasil_url(self.config)
+        self.logger.info("Using environment %s (%s): %s",
+                         environment_id, environment.get("name"), yggdrasil_url)
+        return yggdrasil_url
 
     async def initialize_agents(self, hmas_url: str) -> None:
         """
@@ -180,12 +203,19 @@ class AMIAgentsOrchestrator:
         for agent_config in [ua_config, ee_config, is_config]:
             agent_config.update(shared_configs)
 
-        # Setup target JIDs for inter-agent communication
+        # Setup target JIDs for inter-agent communication. "user" is the
+        # client the UA sends end-of-plan notices to; without it they are
+        # dropped, so warn when it is not set.
         target_jids = {
             "user_assistant": ua_config["jid"],
             "explorer": ee_config["jid"],
             "solver": is_config["jid"]
         }
+        user_jid = ua_config.get("user_jid")
+        if user_jid:
+            target_jids["user"] = user_jid
+        else:
+            self.logger.warning("AMI_USER_JID is not set; end-of-plan notices will be dropped")
 
         # Merge global logging config with agent-specific overrides
         ua_logging_config = LoggerFactory.merge_configs(self.logging_config, ua_config.get("logging"))

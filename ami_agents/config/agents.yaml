@@ -11,6 +11,9 @@
 user_assistant:
   jid: "user_assistant@localhost"
   password: "${SPADE_USER_ASSISTANT_PASSWORD}"
+  # XMPP address of the user's client; end-of-plan notices go there.
+  # Read by main.py; unset means the notices are dropped.
+  user_jid: "${AMI_USER_JID:-}"
 
   llm:
     # LLM for atomic intent splitting and per-span intent parsing

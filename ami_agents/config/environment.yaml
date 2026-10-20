@@ -1,64 +1,21 @@
 # Environment Configuration
-# Defines the smart environment connection and discovery settings
+# Lists the smart environments the agents can run in, and the settings they
+# share. Each environment has its own definition file (discovery, clock,
+# integration engine) under environments/.
+#
+# ConfigLoader.load_environment_config() loads this file and then loads the
+# default entry's definition as the `environment` section. For example, with
+# CURRENT_ENVIRONMENT=homebench, `environment` is environments/homebench.yaml.
 
-environment:
-  # Discovery method: 'direct', 'well_known', 'mdns'
-  discovery_method: "${ENV_DISCOVERY_METHOD:-mdns}"
+environments:
+  # Entry the agents start in; must be a key of `entries`.
+  default: "${CURRENT_ENVIRONMENT:-lab308}"
 
-  # Where plans read the time from (shared/utils/clock.py): the system clock, or
-  # a clock read over HTTP -- e.g. SimuHome's virtual time through SHTD:
-  #   CLOCK_SOURCE=http CLOCK_URL=http://localhost:8097/_shtd/time
-  clock:
-    source: "${CLOCK_SOURCE:-system}"
-    http:
-      url: "${CLOCK_URL:-}"
-      field: "now"
-      format: "%Y-%m-%d %H:%M:%S"
-
-  # Current environment to use (from environments section below)
-  current_environment: "${CURRENT_ENVIRONMENT:-lab308}"
-
-  # Direct discovery configuration (when discovery_method is 'direct')
-  direct:
-    td_directory_url: null  # e.g., "http://192.168.1.100:8080/td-directory"
-
-  # Well-known URI discovery configuration
-  well_known:
-    base_structure: null  # e.g., "house/{building}/{room}"
-    query_service_uri: null  # e.g., "https://discovery.example.com/query"
-
-  # mDNS discovery configuration
-  mdns:
-    service_type: "_ami-hmas._tcp.local"
-    timeout: 5  # seconds
-
-  # Integration Engine settings
-  integration_engine:
-    # Type of environment: 'yggdrasil' or 'homeassistant'
-    environment_type: 'homeassistant'
-
-    # HomeAssistant specific configuration
-    homeassistant:
-      url: null  # e.g., "http://homeassistant.local:8123"
-      access_token: null  # Long-lived access token
-
-      # Mapping configuration
-      mapping:
-        create_floor_workspaces: true
-        create_area_workspaces: true
-        create_logical_area_workspaces: true  # Based on device labels
-        logical_area_labels:
-          - "kids corner"
-          - "my desk"
-          - "study area"
-
-        # Requires user acknowledgment before finalizing
-        require_user_acknowledgment: true
-
-    # Yggdrasil specific configuration
-    yggdrasil:
-      url: null  # e.g., "http://localhost:8080"
-      workspace_root: "/"
+  # Entry id -> definition file, relative to this file. Several homes can
+  # share signifiers through one community store (see `community` below).
+  entries:
+    lab308: "environments/lab308.yaml"
+    homebench: "environments/homebench.yaml"
 
 # External Services Configuration
 external_services:
@@ -122,18 +79,6 @@ notifications:
     - artifact_removed
     - capability_changed
     - state_changed
-
-# Demo/Development Environments (moved from agents.yaml)
-environments:
-  lab308:
-    name: "Lab 308"
-    yggdrasil_url: "${LAB308_YGGDRASIL_URL:-http://localhost:8080}"
-    homeassistant_url: "${LAB308_HA_URL:-http://localhost:8123}"
-
-  homebench:
-    name: "Home Bench"
-    yggdrasil_url: "${HOMEBENCH_YGGDRASIL_URL:-http://localhost:8090}"
-    homeassistant_url: "${HOMEBENCH_HA_URL:-http://localhost:8124}"
 
 # Community Signifier API (shared service)
 community:

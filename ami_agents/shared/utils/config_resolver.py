@@ -38,33 +38,41 @@ def resolve_yggdrasil_url(
     config: Optional[Mapping[str, Any]] = None,
     *,
     env: Optional[Mapping[str, str]] = None,
-    default: str = None,
 ) -> str:
     """
-    Resolve the Yggdrasil HMAS endpoint URL from config/env.
+    Resolve the Yggdrasil HMAS endpoint URL the agents connect to.
 
-    Supports (in priority order):
+    Returns the first non-empty URL among (in priority order):
     - config["yggdrasil_url"]
     - config["yggdrasil"]["url"]
     - config["environment"]["yggdrasil"]["url"] (legacy)
     - config["environment"]["integration_engine"]["yggdrasil"]["url"] (environment.yaml)
     - config["integration_engine"]["yggdrasil"]["url"] (if integration_engine passed directly)
     - env["YGGDRASIL_URL"]
-    - default
+
+    Raises ValueError when none is set: a missing URL is a configuration
+    error, not something to guess. There is deliberately no fallback to
+    BASE_WS_URI, which is the HASP server's own setting, not the agents'.
     """
     cfg: Mapping[str, Any] = config or {}
-    env_map: Mapping[str, str] = env or os.environ
+    env_map: Mapping[str, str] = env if env is not None else os.environ
 
-    if default is None:
-        default = env_map.get("BASE_WS_URI", "http://localhost:8080/")
-
-    return _first_non_empty_str(
+    # 1. Take the first URL any supported config shape (or the agents' own
+    #    env var) provides.
+    url = _first_non_empty_str(
         _get(cfg, "yggdrasil_url"),
         _get(cfg, "yggdrasil", "url"),
         _get(cfg, "environment", "yggdrasil", "url"),
         _get(cfg, "environment", "integration_engine", "yggdrasil", "url"),
         _get(cfg, "integration_engine", "yggdrasil", "url"),
         env_map.get("YGGDRASIL_URL"),
-        default,
-    ) or default
+    )
 
+    # 2. Nothing set anywhere: fail at startup, naming where the URL belongs.
+    if url is None:
+        raise ValueError(
+            "No Yggdrasil URL configured: set integration_engine.yggdrasil.url "
+            "in the environment's definition file (ami_agents/config/environments/<id>.yaml) "
+            "or the YGGDRASIL_URL environment variable"
+        )
+    return url

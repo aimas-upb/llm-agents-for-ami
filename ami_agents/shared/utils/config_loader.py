@@ -70,6 +70,42 @@ class ConfigLoader:
         return substitute_vars(config)
 
     @staticmethod
+    def load_environment_config(file_path: str) -> Dict[str, Any]:
+        """
+        Load environment.yaml and resolve its default environment.
+
+        Returns the file's config (env vars substituted) with the definition
+        file of `environments.default` loaded as the `environment` section,
+        which is where the clock and the Yggdrasil URL are read from. It
+        exists so every entry point picks the environment the same way.
+        Raises ValueError when the default is not one of `environments.entries`.
+
+        Args:
+            file_path: Path to environment.yaml.
+        """
+        # 1. Load the listing file; without entries there is nothing to resolve.
+        config = ConfigLoader.load_with_env_vars(file_path)
+        environments = config.get("environments") or {}
+        entries = environments.get("entries") or {}
+        if not entries:
+            return config
+
+        # 2. The default must name one of the listed entries.
+        default = environments.get("default")
+        if default not in entries:
+            raise ValueError(
+                f"environments.default '{default}' is not one of environments.entries: "
+                f"{sorted(entries)}"
+            )
+
+        # 3. Load the default's definition; its path is relative to file_path.
+        definition_path = entries[default]
+        if not os.path.isabs(definition_path):
+            definition_path = os.path.join(os.path.dirname(file_path), definition_path)
+        config["environment"] = ConfigLoader.load_with_env_vars(definition_path)
+        return config
+
+    @staticmethod
     def validate_config(config: Dict[str, Any], schema: Dict[str, Any]) -> bool:
         """
         Validate configuration against a schema.
