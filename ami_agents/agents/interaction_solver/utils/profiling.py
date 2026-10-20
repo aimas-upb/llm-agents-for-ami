@@ -81,6 +81,9 @@ async def ask_profile(agent, logger, structure: GoalStructure,
                       ) -> Tuple[Dict[str, Dict[str, Any]], List[str]]:
     """Ask the profiling model ``checklist``; returns (resolved profile, log).
 
+    The profiling model is ``agent.profiling_llm`` when the agent has one, else
+    its small model ``agent.explicit_llm``.
+
     The profile maps each checklist id to its item plus the answer used and its
     source ("model", or "fallback" with a reason); the log lists the fallbacks
     applied, for the plan's notes. A failed call or unreadable reply puts every
@@ -94,8 +97,11 @@ async def ask_profile(agent, logger, structure: GoalStructure,
         json.dumps(structure.to_wire_dict(), indent=1),
         json.dumps(context, indent=1), json.dumps(checklist, indent=1))
     # 2. The trace starts with what is asked; "answer" stays None if the call
-    #    itself fails, so a failed call is told apart from an empty reply.
-    cfg = agent.explicit_llm
+    #    itself fails, so a failed call is told apart from an empty reply. The
+    #    model is the agent's small one (`explicit_llm`) unless it carries a
+    #    profiling model of its own (`profiling_llm`, set by the bench to
+    #    measure profiling on another model).
+    cfg = getattr(agent, "profiling_llm", None) or agent.explicit_llm
     trace.update({"model": cfg.model, "questions": checklist, "answer": None})
 
     # 3. Model parameters: reasoning models take effort and a completion

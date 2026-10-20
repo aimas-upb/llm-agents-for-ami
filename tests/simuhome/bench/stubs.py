@@ -288,10 +288,17 @@ def response_agent(config: Dict[str, Any], variant: Variant, logger) -> SimpleNa
 
 def isa_agent(config: Dict[str, Any], variant: Variant, explorer: Explorer,
               logger) -> SimpleNamespace:
-    """What the planning behaviours read from the ISA."""
+    """What the planning behaviours read from the ISA: its config, the general
+    and explicit planners with the variant's models, and the profiling and
+    guard models (`profiling_llm`, `guard_llm`) that profiling and the
+    condition check take over the small model when present."""
+    # 1. The ISA's section of agents.yaml and the general planner's client.
     isa = section(config, "interaction_solver")
     planning = isa.get("planning", {}) or {}
     general: ISAClientConfig = variant["planning.general"].isa_config()
+
+    # 2. The agent the behaviours read: one client per variant step, and the
+    #    EnvExplorer answered in-process.
     agent = SimpleNamespace(
         config=isa, logger=logger,
         llm_client=general.client, model=general.model, base_url=general.base_url,
@@ -300,10 +307,14 @@ def isa_agent(config: Dict[str, Any], variant: Variant, explorer: Explorer,
         bt_planner=AsyncBTPlanner(max_attempts=int(
             (planning.get("llm_planning", {}) or {}).get("max_planning_attempts", 2))),
         explicit_llm=variant["planning.explicit"].isa_config(),
+        profiling_llm=variant["profiling"].isa_config(),
+        guard_llm=variant["guarding"].isa_config(),
         explicit_bt_planner=AsyncBTPlanner(max_attempts=int(
             (planning.get("explicit_planning", {}) or {}).get("max_planning_attempts", 2))),
         community_client=None,
         _query_env_explorer=explorer.query)
+
+    # 3. Sub-behaviours spawned by a planning behaviour run in-process (the shim).
     agent.add_behaviour = lambda behaviour: add_behaviour(agent, behaviour)
     return agent
 

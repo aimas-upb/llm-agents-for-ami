@@ -51,9 +51,9 @@ class _FakePlanner:
         return None
 
 
-def _agent(model_answer=None, error=None):
-    seen = {}
-
+def _model(seen, model_answer=None, error=None, model="gpt-5-nano"):
+    """A small-model config whose calls are recorded in ``seen`` and answer
+    ``model_answer`` (or raise ``error``)."""
     async def create(**kwargs):
         seen.update(kwargs)
         if error:
@@ -61,11 +61,20 @@ def _agent(model_answer=None, error=None):
         return SimpleNamespace(choices=[SimpleNamespace(
             message=SimpleNamespace(content=json.dumps(model_answer)))])
 
+    return SimpleNamespace(
+        client=SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create))),
+        model=model, temperature=0.0, reasoning_effort="low", max_completion_tokens=None)
+
+
+def _agent(model_answer=None, error=None):
+    """An ISA whose small model is the fake above. Its profiling and guard
+    overrides are declared absent: a MagicMock would otherwise invent them,
+    and profiling would call the invented one."""
+    seen = {}
     agent = MagicMock()
     agent.config = {"planning": {"dependency": {"poll_seconds": "10"}}}
-    agent.explicit_llm = SimpleNamespace(
-        client=SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create))),
-        model="gpt-5-nano", temperature=0.0, reasoning_effort="low", max_completion_tokens=None)
+    agent.explicit_llm = _model(seen, model_answer, error)
+    agent.profiling_llm = agent.guard_llm = None
     return agent, seen
 
 
@@ -132,6 +141,21 @@ class TestBehaviour:
         call = entry["profile_call"]
         assert [q["id"] for q in call["questions"]] == ["Q1"]
         assert '"anchor": "condition"' in call["answer"]
+
+    @pytest.mark.asyncio
+    async def test_a_profiling_model_of_its_own_takes_the_call(self, graph):
+        """With `profiling_llm` set (the bench's per-phase models), profiling
+        asks it, not the small model."""
+        # 1. The small model would fail; the profiling model answers.
+        agent, small = _agent(error=RuntimeError("the small model was called"))
+        profiled = {}
+        agent.profiling_llm = _model(profiled, {"answers": [], "unresolved": []},
+                                     model="qwen3:8b")
+        entry = await _plan(graph, _structure(
+            {"G1": _goal(goal_kind="maintenance", timing={"starts": "now"}, **NAMED)}), agent)
+        # 2. Only the profiling model was asked, and the entry names it.
+        assert profiled["model"] == "qwen3:8b" and small == {}
+        assert entry["profile_call"]["model"] == "qwen3:8b"
 
     @pytest.mark.asyncio
     async def test_a_failed_profiling_call_falls_back(self, graph):

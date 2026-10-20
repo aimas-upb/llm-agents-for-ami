@@ -306,6 +306,20 @@ class TestDecide:
         assert trace["answer"] and trace["model"] == "gpt-4o-mini" and notes == []
 
     @pytest.mark.asyncio
+    async def test_a_guard_model_of_its_own_takes_the_call(self, graph, conditions):
+        """With `guard_llm` set (the bench's per-phase models), the check asks
+        it, not the small model."""
+        steps = conditioned_steps(graph, act("washer_1", "spinSpeedCurrent", 1200), conditions)
+        agent = _agent()
+        agent.guard_llm = _model({"answers": []})
+        agent.guard_llm.model = "qwen3:8b"
+        trace = {}
+        await decide(agent, LOG, graph, steps, {}, [], trace)
+        agent.guard_llm.client.chat.completions.create.assert_awaited_once()
+        agent.explicit_llm.client.chat.completions.create.assert_not_called()
+        assert trace["model"] == "qwen3:8b"
+
+    @pytest.mark.asyncio
     async def test_an_unusable_reply_leaves_every_step_unguarded(self, graph, conditions):
         """A reply with no JSON (a refusal, a truncated one): no guard, and the
         note says the check failed and why -- not that nothing came back."""

@@ -126,8 +126,6 @@ class MessageType(Enum):
     # resolved from the TD graph without reading any device.
     ENV_CAPABILITY_QUERY_REQUEST = "env_capability_query_request"
     ENV_CAPABILITY_QUERY_RESPONSE = "env_capability_query_response"
-    ENV_SEMANTIC_QUERY_REQUEST = "env_semantic_query_request"
-    ENV_SEMANTIC_QUERY_RESPONSE = "env_semantic_query_response"
 
     # Goal and planning messages
     GOAL_REQUEST = "goal_request"

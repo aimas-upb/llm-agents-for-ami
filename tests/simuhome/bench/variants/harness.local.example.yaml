@@ -1,0 +1,29 @@
+# Harness config: every reasoning phase on a local OpenAI-compatible server
+# (Ollama by default); the judge stays on OpenAI so scores compare across runs.
+#   conda run -n ami-agents python -m tests.simuhome.bench.harness \
+#       --config tests/simuhome/bench/variants/harness.local.example.yaml --dry-run
+name: harness-local-qwen3
+
+providers:
+  local: {base_url: "http://localhost:11434/v1"}     # e.g. a vLLM box: http://gpu:8000/v1
+
+models:
+  segmentation:  {provider: local, model: "qwen3:8b", temperature: 0}
+  structuring:   {provider: local, model: "qwen3:8b", temperature: 0}
+  planning:
+    explicit:    {provider: local, model: "qwen3:8b", temperature: 0}
+    general:     {provider: local, model: "qwen3:8b", temperature: 0}
+  profiling:     {provider: local, model: "qwen3:8b", temperature: 0}
+  guarding:      {provider: local, model: "qwen3:8b", temperature: 0}
+  response:      {provider: local, model: "qwen3:8b", temperature: 0}
+  judge:         {provider: openai, model: gpt-4o-mini, temperature: 0.5}
+
+run:
+  episodes: "qt*"
+  limit: null
+  workers: 1               # one local model: parallel workers only queue on it
+  context: none
+  memory: "off"
+
+evaluate:
+  judge: true

@@ -170,6 +170,43 @@ class TestVariants:
             if "sweep" not in path.name:
                 assert load_variant(str(path)).name
 
+    def test_profiling_and_guarding_follow_planning_explicit_unless_named(self):
+        """As the agents do: both run on the small model (`explicit_llm`)."""
+        small = {"model": "qwen3:8b", "base_url": "http://localhost:11434/v1"}
+        variant = variant_from_dict({"planning": {"explicit": small}})
+        assert variant["profiling"] == variant["guarding"] == variant["planning.explicit"]
+        named = variant_from_dict({"planning": {"explicit": small},
+                                   "guarding": {"model": "gpt-4o-mini"}})
+        assert named["guarding"].model == "gpt-4o-mini"
+        assert named["profiling"] == named["planning.explicit"]
+
+    def test_a_provider_names_the_endpoint(self):
+        """`provider:` fills base_url / api_key_env; the step's own fields win;
+        the built-in "openai" is the client's default (no base_url)."""
+        # 1. Built-in and configured providers, and the steps under `models:`.
+        variant = variant_from_dict({
+            "providers": {"gpu": {"base_url": "http://gpu:8000/v1", "api_key_env": "GPU_KEY"}},
+            "models": {"segmentation": {"provider": "local", "model": "qwen3:8b"},
+                       "structuring": {"provider": "gpu", "model": "llama"},
+                       "response": {"provider": "gpu", "model": "llama",
+                                    "base_url": "http://other:9000/v1"},
+                       "judge": {"provider": "openai", "model": "gpt-4o-mini"}},
+            "run": {"workers": 4}})
+        assert variant["segmentation"].base_url == "http://localhost:11434/v1"
+        assert variant["segmentation"].local
+        assert (variant["structuring"].base_url, variant["structuring"].api_key_env) == \
+            ("http://gpu:8000/v1", "GPU_KEY")
+        assert variant["response"].base_url == "http://other:9000/v1"
+        assert variant["judge"].base_url is None and not variant["judge"].local
+        # 2. Naming OpenAI hashes as naming nothing (step caches stay valid).
+        assert variant_from_dict({"segmentation": {"provider": "openai", "model": "m"}}).key(
+            "segmentation") == variant_from_dict({"segmentation": {"model": "m"}}).key(
+            "segmentation")
+
+    def test_an_unknown_provider_is_an_error(self):
+        with pytest.raises(ValueError, match="unknown provider 'olama'"):
+            variant_from_dict({"segmentation": {"provider": "olama", "model": "m"}})
+
 
 class FakeSim:
     """A simulator whose clock moves only when told to."""

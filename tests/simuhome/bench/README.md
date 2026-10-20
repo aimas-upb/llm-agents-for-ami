@@ -12,12 +12,15 @@ LLM calls are counted, and every episode is scored. Design:
 | `python -m tests.simuhome.bench.run_scheduled --episode qt4-3_feasible_seed_45` | the same, with execution as SimuHome scheduled workflows from a dry run of the trees (`scheduling.py`) instead of lockstep ticks; records → `results/bench_scheduled/` | as `run` |
 | `python -m tests.simuhome.bench.evaluate --records <out>/<variant> [--no-judge]` | scores → `<episode>.eval.json` | 3 judge calls per infeasible episode |
 | `python -m tests.simuhome.bench.report --root <out>` | `rates.csv`, `steps.csv`, `outcomes.csv`, `report.md` | none |
+| `python -m tests.simuhome.bench.harness --config variants/harness.example.yaml [--dry-run \| --stats-only]` | the evaluation harness: `run_scheduled` + `evaluate` + statistics from one config (a model per phase, OpenAI or `provider: local`); averages per type × feasible/infeasible, per type, per case and overall → `<out>/<name>/stats/summary.md` | as `run_scheduled` + `evaluate`; `--stats-only` none |
+| `python -m tests.simuhome.bench.stats --records <out>/<name>` | the harness statistics alone: cost per phase, goals verified / executed, SimuHome score | none |
 | `python -m tests.simuhome.bench.sweep --grid variants/sweep.example.yaml [--dry-run]` | run + evaluate + report per variant | per variant as above |
 
 Prefix each command with `conda run -n ami-agents`.
 
 - **Variants** (`variants/*.yaml`) set one model per step, including local Ollama models
-  via `base_url`. A step a variant doesn't name uses the agents' default.
+  via `base_url` or `provider: local`. A step a variant doesn't name uses the agents'
+  default; profiling and guarding, unnamed, use the variant's `planning.explicit` model.
 - **Servers.** Each worker starts its own simulator and SHTD and stops them at the end. Use
   `--sim/--shtd` to run against servers you already have.
 - **Timed episodes (qt4)** run in lockstep: the bench advances the simulator clock in

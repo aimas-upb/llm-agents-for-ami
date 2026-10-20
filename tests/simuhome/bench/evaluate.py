@@ -615,7 +615,15 @@ def _readable(value: Any) -> Any:
     return value
 
 
+def _scored_since(path: Path) -> bool:
+    """True when ``path`` has an .eval.json written after it: its score is
+    current, so `--skip-scored` leaves it (a re-run record is scored again)."""
+    scored = path.with_name(path.stem + ".eval.json")
+    return scored.exists() and scored.stat().st_mtime >= path.stat().st_mtime
+
+
 def main() -> int:
+    """The CLI: score each record, write its .eval.json, print the rates."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--records", required=True,
                         help="a variant's record directory, or one record file")
@@ -624,22 +632,36 @@ def main() -> int:
                         help="infeasible: the execution check only (no LLM calls)")
     parser.add_argument("--judge-model", help="override the variant's judge model")
     parser.add_argument("--explain", action="store_true", help="print each verdict in full")
+    parser.add_argument("--skip-scored", action="store_true",
+                        help="leave records whose .eval.json is newer than the record "
+                             "(a resumed run: no judge calls paid twice)")
     args = parser.parse_args()
 
+    # 1. The records to score: one file, or a variant's directory -- without
+    #    those already scored since they were written, when asked.
     target = Path(args.records)
     files = [target] if target.is_file() else sorted(
         p for p in target.glob("*.json") if not p.name.endswith(".eval.json")
         and p.name not in ("run.json", "summary.json"))
+    if args.skip_scored:
+        files = [p for p in files if not _scored_since(p)]
+        if not files:
+            print("Every record is scored already.")
+            return 0
     if not files:
         print("No records.")
         return 1
+
+    # 2. Shared across records: SimuHome's evaluators, a simulator started
+    #    only if a qt2 feasible record needs one, one judge panel per model.
     evaluators = simuhome_evaluators()
     benchmark = Path(args.benchmark)
-
     worker = None
     judges_by_spec: Dict[str, List[Judge]] = {}
     totals: Dict[Tuple[str, str], List[int]] = {}
     try:
+        # 3. Each record: its episode, the tools it needs, the verdict, written
+        #    next to it and printed in one line.
         for path in files:
             record = json.loads(path.read_text(encoding="utf-8"))
             episode = json.loads((benchmark / f"{record['episode']}.json")
@@ -687,6 +709,7 @@ def main() -> int:
         if worker is not None:
             worker.stop()
 
+    # 4. The rates per (type, case); infrastructure failures left out.
     print()
     for (qt, case), scores in sorted(totals.items()):
         counted = [s for s in scores if s >= 0]

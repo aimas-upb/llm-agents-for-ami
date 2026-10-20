@@ -10,8 +10,27 @@ endpoint works: no `base_url` means OpenAI; Ollama serves the same API at
     planning:
       explicit:    {model: gpt-5-nano, reasoning_effort: low}
       general:     {model: gpt-5-mini, reasoning_effort: medium}
+    profiling:     {model: gpt-5-nano, reasoning_effort: low}
+    guarding:      {model: gpt-5-nano, reasoning_effort: low}
     response:      {model: gpt-5-mini, reasoning_effort: low}
     judge:         {model: gpt-4o-mini, temperature: 0.5}
+
+Profiling (a dependency plan's checklist call) and guarding (the condition-guard
+call) use the agents' small model, `planning.explicit`, unless named: a variant
+written before they had their own entries runs as it did.
+
+Endpoints can be named once, under `providers`, and a step points at one with
+`provider:`; "openai" and "local" (Ollama on its default port) are built in. The
+steps may sit under a `models:` key, so a harness config (`harness.py`) with its
+`run:` and `evaluate:` sections is itself a variant file:
+
+    providers:
+      local: {base_url: http://gpu-box:8000/v1}       # overrides the built-in one
+    models:
+      segmentation: {provider: local, model: "qwen3:8b", temperature: 0}
+      structuring:  {provider: openai, model: gpt-5-mini, reasoning_effort: low}
+
+A step's own `base_url` / `api_key_env` win over its provider's.
 
 Flow:
     load_variant(path)       YAML -> Variant (every step filled, defaults below)
@@ -51,7 +70,17 @@ OPENAI_URL = "https://api.openai.com/v1"
 REQUEST_TIMEOUT = 180.0
 
 STEPS = ("segmentation", "structuring", "planning.explicit", "planning.general",
-         "response", "judge")
+         "profiling", "guarding", "response", "judge")
+
+# The endpoints a step can name with `provider:`. OpenAI is the client's own
+# default (no base_url), so a spec naming it hashes as one that names nothing.
+PROVIDERS: Dict[str, Dict[str, Any]] = {
+    "openai": {},
+    "local": {"base_url": "http://localhost:11434/v1"},
+}
+# The steps that, unnamed, run on the variant's planning.explicit model -- as
+# the agents do (`agent.explicit_llm`).
+INHERIT_EXPLICIT = ("profiling", "guarding")
 
 
 @dataclass(frozen=True)
@@ -122,6 +151,8 @@ DEFAULTS: Dict[str, ModelSpec] = {
     "structuring": ModelSpec("gpt-5-mini", reasoning_effort="medium"),
     "planning.explicit": ModelSpec("gpt-5-nano", reasoning_effort="low"),
     "planning.general": ModelSpec("gpt-5-mini", reasoning_effort="medium"),
+    "profiling": ModelSpec("gpt-5-nano", reasoning_effort="low"),
+    "guarding": ModelSpec("gpt-5-nano", reasoning_effort="low"),
     "response": ModelSpec("gpt-5-mini", reasoning_effort="low"),
     "judge": ModelSpec("gpt-4o-mini", temperature=0.5),
 }
@@ -149,27 +180,64 @@ class Variant:
         return hashlib.sha1(blob.encode()).hexdigest()[:12]
 
 
-def _spec(raw: Any, default: ModelSpec) -> ModelSpec:
+# --------------------------------------------------------------------------
+# Reading a variant
+# --------------------------------------------------------------------------
+
+def _spec(raw: Any, default: ModelSpec,
+          providers: Optional[Dict[str, Dict[str, Any]]] = None) -> ModelSpec:
+    """One step's spec from its YAML entry: ``default`` when the step is not
+    named, a bare model name, or a mapping. A mapping's `provider` fills in
+    `base_url` / `api_key_env` the entry does not give itself; an unknown
+    provider is an error, so a typo never silently runs on OpenAI."""
+    # 1. Unnamed, or just a model name.
     if raw is None:
         return default
     if isinstance(raw, str):
         return ModelSpec(raw)
-    known = {k: raw[k] for k in ModelSpec.__dataclass_fields__ if k in raw}
+
+    # 2. The provider's endpoint under the entry's own fields.
+    fields = dict(raw)
+    provider = fields.pop("provider", None)
+    if provider is not None:
+        known_providers = {**PROVIDERS, **(providers or {})}
+        if provider not in known_providers:
+            raise ValueError(f"unknown provider {provider!r}; known: "
+                             f"{', '.join(sorted(known_providers))}")
+        fields = {**(known_providers[provider] or {}), **fields}
+
+    # 3. Only ModelSpec's own fields; anything else in the entry is ignored.
+    known = {k: fields[k] for k in ModelSpec.__dataclass_fields__ if k in fields}
     return ModelSpec(**known)
 
 
 def variant_from_dict(raw: Dict[str, Any], name: Optional[str] = None) -> Variant:
-    """A variant from its YAML mapping; unnamed steps take the defaults."""
-    planning = raw.get("planning") or {}
+    """A variant from its YAML mapping; unnamed steps take the defaults, and
+    unnamed profiling / guarding the variant's planning.explicit spec. The
+    steps are read from `models:` when the mapping has one (a harness config),
+    else from the top level; `providers:` names the endpoints they may use."""
+    # 1. Where the steps are, and the endpoints they may name.
+    steps = raw.get("models") if isinstance(raw.get("models"), dict) else raw
+    providers = raw.get("providers") or {}
+    planning = steps.get("planning") or {}
+    planning = planning if isinstance(planning, dict) else {}
     given = {
-        "segmentation": raw.get("segmentation"),
-        "structuring": raw.get("structuring"),
-        "planning.explicit": planning.get("explicit") if isinstance(planning, dict) else None,
-        "planning.general": planning.get("general") if isinstance(planning, dict) else None,
-        "response": raw.get("response"),
-        "judge": raw.get("judge"),
+        "segmentation": steps.get("segmentation"),
+        "structuring": steps.get("structuring"),
+        "planning.explicit": planning.get("explicit"),
+        "planning.general": planning.get("general"),
+        "profiling": steps.get("profiling"),
+        "guarding": steps.get("guarding"),
+        "response": steps.get("response"),
+        "judge": steps.get("judge"),
     }
-    specs = {step: _spec(given[step], DEFAULTS[step]) for step in STEPS}
+
+    # 2. Each step's spec; profiling and guarding default to planning.explicit
+    #    as resolved here, not to its global default.
+    specs: Dict[str, ModelSpec] = {}
+    for step in STEPS:
+        default = specs["planning.explicit"] if step in INHERIT_EXPLICIT else DEFAULTS[step]
+        specs[step] = _spec(given[step], default, providers)
     return Variant(name=str(name or raw.get("name") or "default"), specs=specs)
 
 

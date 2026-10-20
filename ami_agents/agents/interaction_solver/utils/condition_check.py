@@ -9,8 +9,10 @@ The steps are the plan's actions on devices with a condition
                   exact key. A hit is resolved again on today's TD graph
                   (`condition_guard.apply_remembered`); one that no longer
                   resolves counts as a miss.
-    2. the model  every miss in one call to the small model (the profiling
-                  model, `agent.explicit_llm`) with CONDITION_GUARD_PROMPT: the
+    2. the model  every miss in one call to the small model (the guard model,
+                  `agent.guard_llm`, when the agent has one -- the bench sets it
+                  -- else the profiling model, `agent.explicit_llm`) with
+                  CONDITION_GUARD_PROMPT: the
                   request, the plan's actions in order, the steps with their
                   conditions, and the TDs of their devices. Each answer is
                   resolved against the step's own device
@@ -205,9 +207,10 @@ def render_condition_guard_prompt(request: str, actions: str, steps: str, device
 
 async def _ask(agent, logger, graph: Graph, steps: List[Step], request: Any,
                actions: List[Dict[str, Any]], trace: Dict[str, Any]) -> Dict[str, Any]:
-    """The model's answers, by step id. The reply's shape is enforced by the
-    API (RESPONSE_FORMAT), so it always parses; raises on a failed call (or a
-    refusal), and the caller falls back."""
+    """The model's answers, by step id. The model is ``agent.guard_llm`` when
+    the agent has one, else ``agent.explicit_llm``. The reply's shape is
+    enforced by the API (RESPONSE_FORMAT), so it always parses; raises on a
+    failed call (or a refusal), and the caller falls back."""
     # 1. The prompt: the request, the plan's actions, the steps, their devices.
     devices = device_context(graph, steps)
     prompt = render_condition_guard_prompt(
@@ -215,8 +218,9 @@ async def _ask(agent, logger, graph: Graph, steps: List[Step], request: Any,
         json.dumps([_step_brief(graph, s) for s in steps], indent=1, default=str),
         json.dumps(devices, indent=1, default=str))
 
-    # 2. The call, with the profiling model's parameters (as `profiling.ask_profile`).
-    cfg = agent.explicit_llm
+    # 2. The call, with the guard model's parameters (as `profiling.ask_profile`):
+    #    `guard_llm` when the agent has one, else its small model.
+    cfg = getattr(agent, "guard_llm", None) or agent.explicit_llm
     trace.update({"model": cfg.model, "steps": [s.id for s in steps], "answer": None})
     kwargs: Dict[str, Any] = {}
     if _is_reasoning(cfg.model):
