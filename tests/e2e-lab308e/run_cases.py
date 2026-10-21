@@ -139,6 +139,7 @@ from ami_agents.environment.connection.hmas_client import IHMASClient
 from ami_agents.shared.utils import spade_compat  # noqa: F401
 from ami_agents.shared.utils.config_loader import ConfigLoader
 from ami_agents.shared.utils.config_resolver import resolve_yggdrasil_url
+from ami_agents.shared.utils.llm_models import is_reasoning_model
 from ami_agents.shared.utils.demo_log import demo
 
 
@@ -1226,7 +1227,7 @@ class Lab308eHarness:
     def _requires_default_temperature(model: str, base_url: str) -> bool:
         model_name = (model or "").strip().lower()
         base = (base_url or "").strip().lower()
-        return model_name.startswith("gpt-5") and "api.openai.com" in base
+        return is_reasoning_model(model_name) and "api.openai.com" in base
 
     def _load_config(self) -> Dict[str, Any]:
         config = ConfigLoader.merge_configs(
@@ -1239,7 +1240,7 @@ class Lab308eHarness:
         if not base_url:
             base_url = "https://openrouter.ai/api/v1" if ":" in model or "/" in model else "https://api.openai.com/v1"
         reasoning_effort = os.getenv("OPENAI_REASONING_EFFORT", "").strip() or (
-            "high" if model.startswith("o") and "openai.com" in base_url else ""
+            "high" if is_reasoning_model(model) and "openai.com" in base_url else ""
         )
 
         config["yggdrasil_url"] = self.yggdrasil_url

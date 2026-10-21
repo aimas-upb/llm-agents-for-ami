@@ -39,6 +39,7 @@ from ami_agents.shared.models.messages import MessageType
 from ami_agents.environment.connection.hmas_client import IHMASClient
 from ami_agents.shared.utils.config_loader import ConfigLoader
 from ami_agents.shared.utils.config_resolver import resolve_yggdrasil_url
+from ami_agents.shared.utils.llm_models import is_reasoning_model
 
 # --- Configuration ---
 # Yggdrasil URL of the default environment (YGGDRASIL_URL overrides it in the yaml).
@@ -52,13 +53,13 @@ XMPP_PORT = int(os.getenv("SPADE_PORT", "5222"))
 LLM_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 LLM_MODEL = os.getenv("OPENAI_MODEL", "o3")
 LLM_REASONING_EFFORT = os.getenv("OPENAI_REASONING_EFFORT", "").strip() or (
-    "high" if LLM_MODEL.startswith("o") and "openai.com" in LLM_BASE_URL else ""
+    "high" if is_reasoning_model(LLM_MODEL) and "openai.com" in LLM_BASE_URL else ""
 )
 LLM_TIMEOUT = os.getenv("OPENAI_TIMEOUT", "").strip() or os.getenv("OPENAI_HTTP_TIMEOUT", "").strip()
 try:
-    LLM_TIMEOUT_S = float(LLM_TIMEOUT) if LLM_TIMEOUT else (120.0 if LLM_MODEL.startswith("o") and "openai.com" in LLM_BASE_URL else 30.0)
+    LLM_TIMEOUT_S = float(LLM_TIMEOUT) if LLM_TIMEOUT else (120.0 if is_reasoning_model(LLM_MODEL) and "openai.com" in LLM_BASE_URL else 30.0)
 except Exception:
-    LLM_TIMEOUT_S = 120.0 if LLM_MODEL.startswith("o") and "openai.com" in LLM_BASE_URL else 30.0
+    LLM_TIMEOUT_S = 120.0 if is_reasoning_model(LLM_MODEL) and "openai.com" in LLM_BASE_URL else 30.0
 LLM_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 EXPLORER_JID = f"env_explorer@{XMPP_SERVER}"
@@ -117,8 +118,8 @@ def _default_config():
                     "api_key": LLM_API_KEY,
                     "base_url": LLM_BASE_URL,
                     "model": LLM_MODEL,
-                    **({} if LLM_MODEL.startswith("o") else {"temperature": 0.5}),  # more deterministic JSON
-                    **({} if LLM_MODEL.startswith("o") else {"max_tokens": 1500}),
+                    **({} if is_reasoning_model(LLM_MODEL) else {"temperature": 0.5}),  # more deterministic JSON
+                    **({} if is_reasoning_model(LLM_MODEL) else {"max_tokens": 1500}),
                     **({"reasoning_effort": LLM_REASONING_EFFORT} if LLM_REASONING_EFFORT else {}),
                 }
             },
@@ -127,8 +128,8 @@ def _default_config():
         "planning": {
             "llm_planning": {
                 "model": LLM_MODEL,
-                **({} if LLM_MODEL.startswith("o") else {"temperature": 0.5}),
-                **({} if LLM_MODEL.startswith("o") else {"max_tokens": 1500}),
+                **({} if is_reasoning_model(LLM_MODEL) else {"temperature": 0.5}),
+                **({} if is_reasoning_model(LLM_MODEL) else {"max_tokens": 1500}),
                 **({"reasoning_effort": LLM_REASONING_EFFORT} if LLM_REASONING_EFFORT else {}),
             },
             "context_gathering": {"timeout": 10},

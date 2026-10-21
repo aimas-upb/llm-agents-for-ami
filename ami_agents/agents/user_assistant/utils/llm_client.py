@@ -1,8 +1,10 @@
 """AsyncOpenAI client construction for the UserAssistant agent.
 
-Encapsulates all the reasoning-model (o-series) special-casing: temperature
-pinned to 1.0, reasoning_effort default of ``high``, and a bumped timeout
-pulled from ``timeouts.llm.reasoning`` when the default would be too short.
+Encapsulates all the reasoning-model special-casing (o-series, gpt-5 and
+later; see ``shared/utils/llm_models.py``): temperature pinned to 1.0,
+reasoning_effort default of ``high``, and a bumped timeout pulled from
+``timeouts.llm.reasoning`` when the default would be too short. Non-reasoning
+models get ``temperature`` and ``max_tokens`` on every call instead.
 """
 
 import os
@@ -11,15 +13,9 @@ from typing import Any, Dict, Optional
 
 from openai import AsyncOpenAI
 
-
-def is_reasoning_model(model: str) -> bool:
-    """True for models that take ``reasoning_effort`` instead of ``temperature``.
-
-    Covers the o-series and the gpt-5 family. Both client builders and
-    ``build_llm_call_kwargs`` must agree on this, or a model gets configured as
-    a reasoning model but called as a normal one (dropping reasoning_effort).
-    """
-    return model.startswith("o") or model.startswith("gpt-5")
+# Re-exported: both client builders and ``build_llm_call_kwargs`` must agree on
+# it, or a model is configured as a reasoning model but called as a normal one.
+from ami_agents.shared.utils.llm_models import is_reasoning_model
 
 
 @dataclass
@@ -31,6 +27,8 @@ class LLMClientConfig:
     temperature: float
     reasoning_effort: Optional[str]
     max_completion_tokens: Optional[int]
+    # Output cap for non-reasoning models; None leaves the API default.
+    max_tokens: Optional[int] = None
 
 
 def build_llm_client(config: Dict[str, Any]) -> LLMClientConfig:
@@ -86,12 +84,20 @@ def build_llm_client(config: Dict[str, Any]) -> LLMClientConfig:
     if reasoning_effort is None and is_reasoning and "openai.com" in base_url:
         reasoning_effort = "high"
 
+    # Output cap: reasoning models take max_completion_tokens, the others
+    # max_tokens (each rejects the other's key).
     max_completion_tokens: Optional[int] = None
+    max_tokens: Optional[int] = None
     if is_reasoning and max_completion_tokens_cfg is not None:
         try:
             max_completion_tokens = int(max_completion_tokens_cfg)
         except Exception:
             max_completion_tokens = None
+    elif not is_reasoning and provider_cfg.get("max_tokens") is not None:
+        try:
+            max_tokens = int(provider_cfg["max_tokens"])
+        except Exception:
+            max_tokens = None
 
     client_kwargs: Dict[str, Any] = {"api_key": str(api_key), "base_url": base_url}
     if timeout is not None:
@@ -105,18 +111,22 @@ def build_llm_client(config: Dict[str, Any]) -> LLMClientConfig:
         temperature=temperature,
         reasoning_effort=str(reasoning_effort) if reasoning_effort else None,
         max_completion_tokens=max_completion_tokens,
+        max_tokens=max_tokens,
     )
 
 
 def build_llm_call_kwargs(cfg: LLMClientConfig) -> Dict[str, Any]:
     """Build extra kwargs for ``client.chat.completions.create``.
 
-    Reasoning models reject ``temperature``; pass ``reasoning_effort`` and
-    ``max_completion_tokens`` instead.
+    Returns ``temperature`` and ``max_tokens`` for a non-reasoning model, and
+    ``reasoning_effort`` and ``max_completion_tokens`` for a reasoning model,
+    which rejects the first two. Keys whose value is unset are left out.
     """
     kwargs: Dict[str, Any] = {}
     if not is_reasoning_model(cfg.model):
         kwargs["temperature"] = cfg.temperature
+        if cfg.max_tokens is not None:
+            kwargs["max_tokens"] = cfg.max_tokens
     else:
         if cfg.reasoning_effort:
             kwargs["reasoning_effort"] = cfg.reasoning_effort
@@ -194,4 +204,5 @@ def build_behaviour_llm_client(
         temperature=temperature,
         reasoning_effort=str(reasoning_effort) if reasoning_effort else None,
         max_completion_tokens=max_completion_tokens,
+        max_tokens=max_tokens,
     )

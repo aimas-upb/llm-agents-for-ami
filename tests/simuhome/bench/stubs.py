@@ -276,12 +276,21 @@ def ua_agent(config: Dict[str, Any], variant: Variant, logger) -> SimpleNamespac
 
 
 def response_agent(config: Dict[str, Any], variant: Variant, logger) -> SimpleNamespace:
-    """The UA as it phrases its reply: the plan summary's client is the
-    variant's response model (the agent uses its segmentation client)."""
+    """The UA as it phrases its reply: the variant's response model answers
+    every step, the plan summary included (the agent's per-step lookup,
+    `get_llm_client_for_behaviour`, returns it whatever the step)."""
+    # 1. One client for the variant's response model.
     spec = variant["response"]
+    client = spec.client()
+
+    # 2. The agent: the default-client fields, plus the per-step lookups
+    #    `summarize_plan` reads, both answered by the same model.
     agent = SimpleNamespace(config=section(config, "user_assistant"), logger=logger,
-                            llm_client=spec.client(), llm_model=spec.model,
+                            llm_client=client, llm_model=spec.model,
                             build_llm_kwargs=spec.call_kwargs)
+    agent.get_llm_client_for_behaviour = lambda key: SimpleNamespace(client=client,
+                                                                     model=spec.model)
+    agent.build_llm_kwargs_for_behaviour = lambda key: spec.call_kwargs()
     agent.add_behaviour = lambda behaviour: add_behaviour(agent, behaviour)
     return agent
 

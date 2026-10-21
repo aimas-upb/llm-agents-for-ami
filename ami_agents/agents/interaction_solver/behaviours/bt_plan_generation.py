@@ -13,6 +13,7 @@ from spade.behaviour import OneShotBehaviour
 
 from ....shared.utils.logger import LoggerFactory
 from ....shared.utils.demo_log import demo
+from ....shared.utils.llm_models import is_reasoning_model
 
 
 class BTPlanGenerationBehaviour(OneShotBehaviour):
@@ -49,7 +50,7 @@ class BTPlanGenerationBehaviour(OneShotBehaviour):
                 affected_env_vars=self.affected_env_vars,
                 client=agent.llm_client,
                 model=agent.model,
-                temperature=agent.temperature if not (agent.model.startswith("o") or agent.model.startswith("gpt-5")) else None,
+                temperature=agent.temperature if not is_reasoning_model(agent.model) else None,
                 reasoning_effort=agent.reasoning_effort,
                 max_completion_tokens=agent.max_completion_tokens,
             )

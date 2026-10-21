@@ -28,6 +28,7 @@ from ...shared.models.messages import (
 from ...shared.utils.spade_rpc import send_via_router
 from ...shared.utils.config_resolver import resolve_yggdrasil_url
 from ...shared.utils.demo_log import demo
+from ...shared.utils.llm_models import is_reasoning_model
 from ...shared.utils.logger import LoggerFactory
 from ...shared.state_memory import StateMemoryCache
 from ...shared.community.community_client import CommunitySignifierClient
@@ -262,7 +263,7 @@ class UserAssistantAgent(Agent, IAgent):
         # per process, and the goal parser sees classes through its actuation
         # context.
 
-        temp_display = "default" if self.llm_model.startswith("o") else self.llm_temperature
+        temp_display = "default" if is_reasoning_model(self.llm_model) else self.llm_temperature
         self.logger.info(
             demo(
                 f"UserAssistant booting (model={self.llm_model}, base_url={self.llm_base_url}, "

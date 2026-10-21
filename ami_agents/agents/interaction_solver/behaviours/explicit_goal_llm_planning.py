@@ -34,6 +34,7 @@ from spade.behaviour import OneShotBehaviour
 
 from ....shared.models.goal_structure import GoalSpec
 from ....shared.utils.demo_log import demo
+from ....shared.utils.llm_models import is_reasoning_model
 from ....shared.utils.logger import LoggerFactory
 from ..prompts import MODIFY_RECIPE_PROMPT
 from ..utils.modify_goal_plan import describe, modify_tree, recipe_from_answer
@@ -165,8 +166,8 @@ class ExplicitGoalLLMPlanningBehaviour(OneShotBehaviour):
 
 
 def _is_reasoning(model: str) -> bool:
-    """Reasoning models (o-series, gpt-5) take no temperature."""
-    return model.startswith("o") or model.startswith("gpt-5")
+    """Reasoning models (o-series, gpt-5 and later) take no temperature."""
+    return is_reasoning_model(model)
 
 
 def _json_object(text: str) -> Dict[str, Any]:

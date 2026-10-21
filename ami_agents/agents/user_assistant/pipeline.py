@@ -87,17 +87,27 @@ async def segment_into_atomic_intents(agent, logger, user_text: str) -> list[Ato
 
 
 async def summarize_plan(agent, logger, plan_json: str) -> str:
-    """Call LLM to produce a user-friendly plan summary."""
+    """Call LLM to produce a user-friendly plan summary.
+
+    Returns the summary text, or a generic "plan ready" line when the LLM
+    returns nothing or fails, so confirmation can still go ahead. It uses
+    its own `user_assistant.llm.plan_summarization` config (model,
+    temperature, tokens), not the segmentation step's default client:
+    phrasing a summary for the user is a different job from segmenting.
+    """
     messages = [
         {"role": "system", "content": PLAN_SUMMARY_SYSTEM_PROMPT},
         {"role": "user", "content": plan_json},
     ]
     try:
-        response = await agent.llm_client.chat.completions.create(
-            model=agent.llm_model,
+        # 1. Call the LLM with the summarisation step's own client and kwargs.
+        llm_cfg = agent.get_llm_client_for_behaviour("plan_summarization")
+        response = await llm_cfg.client.chat.completions.create(
+            model=llm_cfg.model,
             messages=messages,
-            **agent.build_llm_kwargs(),
+            **agent.build_llm_kwargs_for_behaviour("plan_summarization"),
         )
+        # 2. An empty answer still gets a line the user can confirm against.
         return (response.choices[0].message.content or "").strip() or (
             "Plan ready. Does this plan look good to you?"
         )

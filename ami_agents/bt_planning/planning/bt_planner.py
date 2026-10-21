@@ -12,6 +12,8 @@ from typing import Any, Optional
 
 from openai import AsyncOpenAI
 
+from ami_agents.shared.utils.llm_models import is_reasoning_model
+
 from .affordance_refs import CLASS_FIELD, DEVICE_FIELD, READING_NODES, TITLE_FIELD, AffordanceCatalog
 from .schema import GENERATE_BT_TOOL
 from .prompts import (
@@ -351,8 +353,8 @@ class AsyncBTPlanner:
             },
         }
 
-        # Reasoning models (o-series and gpt-5) don't support temperature
-        is_reasoning = model.startswith("o") or model.startswith("gpt-5")
+        # Reasoning models (o-series, gpt-5 and later) don't support temperature
+        is_reasoning = is_reasoning_model(model)
         if not is_reasoning and temperature is not None:
             kwargs["temperature"] = temperature
 

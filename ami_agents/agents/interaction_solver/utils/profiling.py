@@ -38,6 +38,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from ....shared.models.goal_structure import GoalStructure
 from ....shared.utils.demo_log import demo
+from ....shared.utils.llm_models import is_reasoning_model
 from .dependency_context import known_properties
 from .goal_profile import (
     InconsistentStructure,
@@ -50,9 +51,9 @@ from .goal_profile import (
 # -- call helpers ------------------------------------------------------------
 
 def _is_reasoning(model: str) -> bool:
-    """True for reasoning models (o-series, gpt-5): they reject `temperature`
-    and take `reasoning_effort` / `max_completion_tokens` instead."""
-    return model.startswith("o") or model.startswith("gpt-5")
+    """True for reasoning models (o-series, gpt-5 and later): they reject
+    `temperature` and take `reasoning_effort` / `max_completion_tokens` instead."""
+    return is_reasoning_model(model)
 
 
 def _json_object(text: str) -> Dict[str, Any]:

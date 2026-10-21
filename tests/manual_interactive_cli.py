@@ -43,6 +43,7 @@ if env_path.exists():
 from ami_agents.shared.utils import spade_compat  # noqa: F401
 from ami_agents.shared.utils.config_loader import ConfigLoader
 from ami_agents.shared.utils.config_resolver import resolve_yggdrasil_url
+from ami_agents.shared.utils.llm_models import is_reasoning_model
 from ami_agents.agents.env_explorer.env_explorer_agent import EnvExplorerAgent
 from ami_agents.agents.interaction_solver.interaction_solver_agent import InteractionSolverAgent
 from ami_agents.agents.user_assistant.user_assistant_agent import UserAssistantAgent
@@ -357,15 +358,15 @@ async def main():
         base_url = "https://openrouter.ai/api/v1" if ":" in model or "/" in model else "https://api.openai.com/v1"
 
     reasoning_effort = os.getenv("OPENAI_REASONING_EFFORT", "").strip() or (
-        "high" if model.startswith("o") and "openai.com" in base_url else ""
+        "high" if is_reasoning_model(model) and "openai.com" in base_url else ""
     )
     api_timeout = os.getenv("OPENAI_TIMEOUT", "").strip() or os.getenv("OPENAI_HTTP_TIMEOUT", "").strip()
     try:
         api_timeout_s = float(api_timeout) if api_timeout else (
-            120.0 if model.startswith("o") and "openai.com" in base_url else 30.0
+            120.0 if is_reasoning_model(model) and "openai.com" in base_url else 30.0
         )
     except Exception:
-        api_timeout_s = 120.0 if model.startswith("o") and "openai.com" in base_url else 30.0
+        api_timeout_s = 120.0 if is_reasoning_model(model) and "openai.com" in base_url else 30.0
 
     # Load complete configuration from agents.yaml and environment.yaml
     try:
@@ -414,7 +415,7 @@ async def main():
         "base_url": base_url,
         "model": model,
     })
-    if not model.startswith("o"):
+    if not is_reasoning_model(model):
         config["default_llm"]["providers"]["openai"].update({
             "temperature": float(os.getenv("OPENAI_TEMPERATURE") or
                                str(config["default_llm"]["providers"]["openai"].get("temperature", 0.7))),
@@ -432,7 +433,7 @@ async def main():
     if "planning" not in config:
         config["planning"] = {}
     config["planning"]["timeout"] = float(os.getenv("AMI_PLANNING_TIMEOUT",
-                                                   "180" if model.startswith("o") else "90"))
+                                                   "180" if is_reasoning_model(model) else "90"))
 
     explorer = EnvExplorerAgent(explorer_jid, password, config, hmas_client=DummyHMASClient())
     assistant = UserAssistantAgent(

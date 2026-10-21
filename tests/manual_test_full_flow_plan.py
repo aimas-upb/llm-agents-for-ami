@@ -116,6 +116,7 @@ if env_path.exists():
 from ami_agents.shared.utils import spade_compat  # noqa: F401
 from ami_agents.shared.utils.config_loader import ConfigLoader
 from ami_agents.shared.utils.config_resolver import resolve_yggdrasil_url
+from ami_agents.shared.utils.llm_models import is_reasoning_model
 from ami_agents.agents.env_explorer.env_explorer_agent import EnvExplorerAgent
 from ami_agents.agents.interaction_solver.interaction_solver_agent import InteractionSolverAgent
 from ami_agents.agents.user_assistant.user_assistant_agent import UserAssistantAgent
@@ -1249,18 +1250,18 @@ async def main():
         base_url = "https://openrouter.ai/api/v1" if ":" in model or "/" in model else "https://api.openai.com/v1"
 
     reasoning_effort = os.getenv("OPENAI_REASONING_EFFORT", "").strip() or (
-        "high" if model.startswith("o") and "openai.com" in base_url else ""
+        "high" if is_reasoning_model(model) and "openai.com" in base_url else ""
     )
     api_timeout = os.getenv("OPENAI_TIMEOUT", "").strip() or os.getenv("OPENAI_HTTP_TIMEOUT", "").strip()
     try:
-        api_timeout_s = float(api_timeout) if api_timeout else (120.0 if model.startswith("o") and "openai.com" in base_url else 30.0)
+        api_timeout_s = float(api_timeout) if api_timeout else (120.0 if is_reasoning_model(model) and "openai.com" in base_url else 30.0)
     except Exception:
-        api_timeout_s = 120.0 if model.startswith("o") and "openai.com" in base_url else 30.0
+        api_timeout_s = 120.0 if is_reasoning_model(model) and "openai.com" in base_url else 30.0
 
     try:
-        planning_timeout_s = float(os.getenv("AMI_PLANNING_TIMEOUT", "").strip() or ("180" if model.startswith("o") else "90"))
+        planning_timeout_s = float(os.getenv("AMI_PLANNING_TIMEOUT", "").strip() or ("180" if is_reasoning_model(model) else "90"))
     except Exception:
-        planning_timeout_s = 180.0 if model.startswith("o") else 90.0
+        planning_timeout_s = 180.0 if is_reasoning_model(model) else 90.0
 
     # Keep orchestrator wait times aligned with planning timeout unless explicitly overridden.
     os.environ.setdefault("AMI_PLAN_TIMEOUT_S", str(planning_timeout_s))
@@ -1283,8 +1284,8 @@ async def main():
                     "api_key": os.getenv("OPENAI_API_KEY"),
                     "base_url": base_url,
                     "model": model,
-                    **({} if model.startswith("o") else {"temperature": float(os.getenv("OPENAI_TEMPERATURE") or str(provider_cfg.get("temperature", 0.7)))}),
-                    **({} if model.startswith("o") else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS") or str(provider_cfg.get("max_tokens", 1500)))}),
+                    **({} if is_reasoning_model(model) else {"temperature": float(os.getenv("OPENAI_TEMPERATURE") or str(provider_cfg.get("temperature", 0.7)))}),
+                    **({} if is_reasoning_model(model) else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS") or str(provider_cfg.get("max_tokens", 1500)))}),
                     **({"reasoning_effort": reasoning_effort} if reasoning_effort else {}),
                 }
             },
@@ -1294,8 +1295,8 @@ async def main():
             "timeout": planning_timeout_s,
             "llm_planning": {
                 "model": model,
-                **({} if model.startswith("o") else {"temperature": float(os.getenv("OPENAI_TEMPERATURE") or str(provider_cfg.get("temperature", 0.7)))}),
-                **({} if model.startswith("o") else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS") or str(provider_cfg.get("max_tokens", 1500)))}),
+                **({} if is_reasoning_model(model) else {"temperature": float(os.getenv("OPENAI_TEMPERATURE") or str(provider_cfg.get("temperature", 0.7)))}),
+                **({} if is_reasoning_model(model) else {"max_tokens": int(os.getenv("OPENAI_MAX_TOKENS") or str(provider_cfg.get("max_tokens", 1500)))}),
                 **({"reasoning_effort": reasoning_effort} if reasoning_effort else {}),
             },
             "context_gathering": {"timeout": 60},

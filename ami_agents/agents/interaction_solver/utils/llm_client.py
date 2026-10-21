@@ -5,7 +5,7 @@ Differs from the UserAssistant's equivalent in two ways:
 1. A ``planning.llm_planning`` yaml section can override the shared
    ``default_llm.providers.openai`` settings (planning-specific model/temperature).
 2. ``max_tokens`` is supported for non-reasoning models, since BT-JSON
-   plans can be long. Reasoning models (o-series) still only use
+   plans can be long. Reasoning models (o-series, gpt-5 and later) still only use
    ``max_completion_tokens``.
 """
 
@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from openai import AsyncOpenAI
+
+from ami_agents.shared.utils.llm_models import is_reasoning_model
 
 
 @dataclass
@@ -59,7 +61,7 @@ def build_llm_client(config: Dict[str, Any],
         "max_completion_tokens", provider_cfg.get("max_completion_tokens")
     )
 
-    is_reasoning = model.startswith("o") or model.startswith("gpt-5")
+    is_reasoning = is_reasoning_model(model)
     max_tokens: Optional[int] = None
     max_completion_tokens: Optional[int] = None
     if is_reasoning:

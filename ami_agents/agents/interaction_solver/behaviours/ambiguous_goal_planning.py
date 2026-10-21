@@ -35,6 +35,7 @@ from spade.behaviour import OneShotBehaviour
 
 from ....shared.models.goal_structure import GoalSpec
 from ....shared.utils.demo_log import demo
+from ....shared.utils.llm_models import is_reasoning_model
 from ....shared.utils.logger import LoggerFactory
 from ..utils.ambiguous_goal_plan import SOURCE
 from ..utils.environment_graph import fetch_environment_graph
@@ -79,7 +80,7 @@ class AmbiguousGoalPlanningBehaviour(OneShotBehaviour):
                  if remembered and remembered.get("used") else None)
 
         # 3. The general planner model, with only that context.
-        reasoning = agent.model.startswith("o") or agent.model.startswith("gpt-5")
+        reasoning = is_reasoning_model(agent.model)
         self.logger.info(demo(
             f"Ambiguous goal {goal.intent_text!r} ({variables}): planning with "
             f"{agent.model} against {len(context.affordances)} affordances of "

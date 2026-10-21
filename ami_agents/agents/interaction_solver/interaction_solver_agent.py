@@ -28,6 +28,7 @@ from ...shared.models.messages import (
 )
 from ...shared.protocols.agent_protocol import IAgent
 from ...shared.utils.demo_log import demo
+from ...shared.utils.llm_models import is_reasoning_model
 from ...shared.utils.logger import LoggerFactory
 from ...shared.utils.spade_rpc import RpcTimeoutError, rpc_call, send_via_router
 from .behaviours import EnvironmentReadyBehaviour, GoalRequestBehaviour
@@ -213,7 +214,7 @@ class InteractionSolverAgent(Agent, IAgent):
         goal_template.set_metadata("type", MessageType.GOAL_REQUEST.value)
         self.add_behaviour(GoalRequestBehaviour(self.logger), template=goal_template)
 
-        temp_display = "default" if self.model.startswith("o") else self.temperature
+        temp_display = "default" if is_reasoning_model(self.model) else self.temperature
         self.logger.info(
             demo(
                 "InteractionSolver booting (model=%s, base_url=%s, temperature=%s, "
