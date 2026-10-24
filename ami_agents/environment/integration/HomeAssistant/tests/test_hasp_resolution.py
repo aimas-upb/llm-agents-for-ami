@@ -32,6 +32,11 @@ from ami_agents.agents.env_explorer.utils.state_resolution import (  # noqa: E40
     load_vocabulary,
     resolve_state_request,
 )
+from ami_agents.agents.interaction_solver.utils.specific_capability_context import (
+    build_specific_context,
+)
+from ami_agents.shared.models.goal_structure import GoalSpec
+from ami_agents.shared.utils.vocabulary import close_types
 
 FIXTURE = Path(__file__).parent / "fixtures" / "lab308e_ha.json"
 HOME_CONFIG = Path(__file__).resolve().parents[1] / "lab308e.yaml"
@@ -163,6 +168,32 @@ class TestState:
 
 
 class TestCapabilities:
+    @pytest.mark.parametrize("variable, direction, actuator, sensor", [
+        ("Illuminance", "increase", "ambient_lights_308e", "internal_light_sensing_308e"),
+        ("Illuminance", "decrease", "blackout_blinds_308e", "internal_light_sensing_308e"),
+        ("AirTemperature", "decrease", "air_conditioner_308e", "temperature_sensing_308e"),
+    ])
+    def test_ambiguous_goal_finds_room_actuators(self, graph, variable, direction, actuator, sensor):
+        """Exercise the planner's room-variable join, not just device discovery."""
+        closed = Graph()
+        closed += graph
+        close_types(closed)
+        goal = GoalSpec.from_dict({
+            "goal_kind": "achievement", "goal_specificity": "ambiguous",
+            "implied_environment_vars": [{
+                "property_name": variable,
+                "property_class": f"homeont:{variable}",
+                "property_sensed_space": {"space_class": ROOM, "space_name": AREA},
+                "property_change_direction": direction,
+            }],
+        })
+        context = build_specific_context(closed, goal)
+        assert context is not None
+        assert any(a["artifact_name"] == actuator and a["type"] == "action_affordance"
+                   for a in context.affordances)
+        assert any(a["artifact_name"] == sensor and a["type"] == "property_affordance"
+                   for a in context.affordances)
+
     def test_lights_can_be_dimmed_even_when_off(self, graph):
         """An off light reports no brightness attribute in HA, but it can
         still be dimmed: the capability comes from its supported modes."""

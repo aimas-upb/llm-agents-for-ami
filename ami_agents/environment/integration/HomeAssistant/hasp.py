@@ -675,6 +675,9 @@ def _add_environment_variable_semantics(
     hasp_semantics.add_type(rdf.g, env_var_uri, env_class)
     if room_environment is not None:
         rdf.g.add((env_var_uri, SSN.isPropertyOf, room_environment))
+        # The planner traverses environment -> variable; its type closure
+        # does not infer inverse properties, so publish both directions.
+        rdf.g.add((room_environment, SSN.hasProperty, env_var_uri))
 
 
 def _add_tdsosa_property_links(
