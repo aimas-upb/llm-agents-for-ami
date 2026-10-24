@@ -12,10 +12,11 @@ import json
 import sys
 from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
-from rdflib import Graph
+from rdflib import Graph, Literal, Namespace, URIRef
 
 import hasp as appmod
 
@@ -37,6 +38,10 @@ from ami_agents.agents.interaction_solver.utils.specific_capability_context impo
 )
 from ami_agents.shared.models.goal_structure import GoalSpec
 from ami_agents.shared.utils.vocabulary import close_types
+from ami_agents.agents.env_explorer.utils.actuation_context import build_actuation_context
+from ami_agents.agents.interaction_solver.utils.specific_capability_context import artifact_affordances
+from ami_agents.bt_planning.planning.affordance_refs import AffordanceCatalog
+from ami_agents.bt_planning.planning.bt_planner import AsyncBTPlanner
 
 FIXTURE = Path(__file__).parent / "fixtures" / "lab308e_ha.json"
 HOME_CONFIG = Path(__file__).resolve().parents[1] / "lab308e.yaml"
@@ -73,16 +78,17 @@ class FixtureHAREST:
 
 
 @contextmanager
-def _hasp_on_fixture():
+def _hasp_on_fixture(env_overrides=None):
     """HASP's app, talking to the recorded snapshot instead of Home Assistant."""
     patch = pytest.MonkeyPatch()
     patch.setattr(appmod, "AREAS", set())
     patch.setattr(appmod, "BASE_WS_URI", "http://localhost:8080")
-    patch.setattr(appmod, "TD_SOSA_ENV_VAR_OVERRIDES", {})
+    patch.setattr(appmod, "TD_SOSA_ENV_VAR_OVERRIDES", env_overrides or {})
     patch.setattr(appmod, "TD_SOSA_PROPERTY_RANGES", {})
     patch.setattr(appmod, "TD_SOSA_SETTLING_TIMES", {})
     patch.setattr(appmod, "ha_client", FixtureHAWS())
     patch.setattr(appmod, "ha_rest", FixtureHAREST())
+    patch.setattr(appmod.app.state, "graph_cache", None, raising=False)
     patch.setenv("SEMANTIC_CONFIG", str(HOME_CONFIG))
     appmod.reload_semantics()
     try:
@@ -101,6 +107,10 @@ def client():
 @pytest.fixture(scope="module")
 def graph(client):
     """Every TD HASP serves for lab308e, plus the vocabulary."""
+    return _fixture_graph(client)
+
+
+def _fixture_graph(client):
     g = Graph()
     response = client.get(f"/workspaces/{AREA}")
     assert response.status_code == 200, response.text
@@ -117,6 +127,45 @@ def _names(result):
     if entries is None:
         entries = result.affordances
     return sorted({e.artifact_name for e in entries})
+
+
+def test_entity_only_covers_publish_canonical_names_for_the_unmodified_planner(monkeypatch):
+    """HA can report several entity-only covers all named 'Cover'."""
+    names = ["blinds_308e_cover", "blackout_blinds_308e_cover", "window_308e_cover"]
+    entities = [{"entity_id": f"cover.{name}", "device_id": None, "area_id": AREA,
+                 "name": None, "original_name": "Cover"} for name in names]
+    states = [{"entity_id": ent["entity_id"], "state": "open",
+               "attributes": {"current_position": 100, "supported_features": 15}}
+              for ent in entities]
+    monkeypatch.setattr(FixtureHAWS, "get_devices", AsyncMock(return_value=[]))
+    monkeypatch.setattr(FixtureHAWS, "get_entities", AsyncMock(return_value=entities))
+    monkeypatch.setattr(FixtureHAREST, "get_states", AsyncMock(return_value=states))
+    td = Namespace("https://www.w3.org/2019/wot/td#")
+    schema = Namespace("https://schema.org/")
+    graph = Graph()
+    with _hasp_on_fixture() as client:
+        responses = [client.get(f"/workspaces/{AREA}"), client.get(f"/workspaces/{AREA}/artifacts")]
+        responses += [client.get(f"/workspaces/{AREA}/artifacts/{name}") for name in names]
+        for response in responses:
+            assert response.status_code == 200
+            document = Graph().parse(data=response.text, format="turtle")
+            for name in names:
+                artifact = URIRef(f"http://testserver/workspaces/{AREA}/artifacts/{name}#artifact")
+                if (artifact, None, None) in document:
+                    assert set(document.objects(artifact, td.title)) == {Literal(name)}
+                    assert document.value(artifact, schema.name) == Literal(f"Cover ({name})")
+            graph += document
+        # HA display-name lookup still reaches the same canonical TD.
+        named = client.get(f"/workspaces/{AREA}/artifacts/Cover ({names[0]})")
+        assert named.status_code == 200
+        assert (URIRef(f"http://testserver/workspaces/{AREA}/artifacts/{names[0]}#artifact"),
+                td.title, Literal(names[0])) in Graph().parse(data=named.text, format="turtle")
+    affordances = artifact_affordances(graph, URIRef(
+        f"http://testserver/workspaces/{AREA}/artifacts/{names[0]}#artifact"))
+    tree = {"type": "action", "artifact": names[0], "affordance": "CoverOpenCover",
+            "affordance_class": "saref:OpenCommand"}
+    assert AsyncBTPlanner()._resolve_affordance_refs(tree, AffordanceCatalog(affordances)) == []
+    assert tree["action_url"].endswith(f"/{names[0]}/ha/cover/open_cover")
 
 
 class TestState:
@@ -168,6 +217,40 @@ class TestState:
 
 
 class TestCapabilities:
+    def test_lab308e_air_quality_connects_window_to_co2(self):
+        overrides = json.loads((HOME_CONFIG.parent / "tdsosa-env-overrides.lab308e.json").read_text())
+        # The recorded snapshot predates Virtual Components' _cover suffix.
+        overrides = {key.replace("window_308e_cover", "window_308e"): value
+                     for key, value in overrides.items()}
+        with _hasp_on_fixture(overrides) as client:
+            graph = _fixture_graph(client)
+        close_types(graph)
+        # The structurer must see a concrete, measurable class for stuffy air.
+        view = build_actuation_context(graph, with_environment=True)
+        variables = [var for ws in view["workspaces"]
+                     for var in (ws.get("environment") or {}).get("variables", [])]
+        assert any(var["class"] == "homeont:CarbonDioxideConcentration" for var in variables)
+        goal = GoalSpec.from_dict({
+            "goal_kind": "achievement", "goal_specificity": "ambiguous",
+            "implied_environment_vars": [{
+                "property_name": "air_quality",
+                "property_class": "homeont:CarbonDioxideConcentration",
+                "property_sensed_space": {"space_class": ROOM, "space_name": AREA},
+                "property_change_direction": "decrease",
+            }],
+        })
+        context = build_specific_context(graph, goal)
+        assert context is not None
+        assert any(a["artifact_name"] == "window_308e" and a["name"] == "CoverOpenCover"
+                   and a["type"] == "action_affordance" for a in context.affordances)
+        assert any(a["artifact_name"] == "co2_sensing_308e" and a["type"] == "property_affordance"
+                   for a in context.affordances)
+        effects = [action for result in context.observable_property_hints["results"]
+                   for action in result["actions"]]
+        assert any(action["artifact_title"] == "window_308e"
+                   and action["action_name"] == "CoverOpenCover"
+                   and action["direction"] == "decrease" for action in effects)
+
     @pytest.mark.parametrize("variable, direction, actuator, sensor", [
         ("Illuminance", "increase", "ambient_lights_308e", "internal_light_sensing_308e"),
         ("Illuminance", "decrease", "blackout_blinds_308e", "internal_light_sensing_308e"),

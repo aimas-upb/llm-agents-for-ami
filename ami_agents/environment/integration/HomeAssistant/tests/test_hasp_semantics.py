@@ -114,6 +114,7 @@ class TestRooms:
 
 def test_environment_keys(defaults):
     assert defaults.environment_class("thermal_comfort") == "homeont:AirTemperature"
+    assert defaults.environment_class("air_quality") == "homeont:CarbonDioxideConcentration"
     assert defaults.environment_class("security_state") is None
 
 

@@ -114,6 +114,8 @@ environment_variables:
   luminosity: "homeont:Illuminance"
   humidity: "homeont:RelativeHumidity"
   occupancy_presence: "homeont:Occupancy"
+  # Legacy lab308e key: its air-quality proxy is measured CO2 in ppm.
+  air_quality: "homeont:CarbonDioxideConcentration"
 
 # -- What an action changes (saref:actsUpon) -----------------------------------
 # HASP links each action to the property affordances it changes, so a resolver
