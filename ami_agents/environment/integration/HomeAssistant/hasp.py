@@ -16,7 +16,6 @@ from fastapi.responses import Response, JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
-from rdflib.namespace import XSD
 
 from http import HTTPStatus
 from hasp_utils import (HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST,
@@ -35,7 +34,6 @@ WEBSUB = Namespace("https://purl.org/hmas/websub/")
 HCTL   = Namespace("https://www.w3.org/2019/wot/hypermedia#")
 JS     = Namespace("https://www.w3.org/2019/wot/json-schema#")
 HMAS   = Namespace("https://purl.org/hmas/")
-EX     = Namespace("http://example.org/")
 WOTSEC = Namespace("https://www.w3.org/2019/wot/security#")
 HTV    = Namespace("http://www.w3.org/2011/http#")
 JACAMO = Namespace("https://purl.org/hmas/jacamo/")
@@ -45,7 +43,6 @@ SSN    = Namespace("http://www.w3.org/ns/ssn/")
 QUDT   = Namespace("http://qudt.org/schema/qudt/")
 UNIT   = Namespace("http://qudt.org/vocab/unit/")
 TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
-TIME   = Namespace("http://www.w3.org/2006/time#")
 # Thing-level device metadata (manufacturer, product name). The TD spec mints no
 # vendor vocabulary of its own and points at schema.org for it.
 SCHEMA = Namespace("https://schema.org/")
@@ -71,106 +68,6 @@ AREAS = {a.strip() for a in os.getenv("AREAS", "").split(",") if a.strip()}  # a
 BASE_WS_URI = os.getenv("BASE_WS_URI", BASE_FALLBACK)  # e.g., https://example.org/ws/lab
 GRAPH_SNAPSHOT_DIR = os.path.join(os.path.dirname(__file__), "graph_snapshots")
 subscriptions: Dict[str, Dict[str, Any]] = {}
-
-
-def _load_tdsosa_overrides() -> Dict[str, str]:
-    raw = os.getenv("TD_SOSA_ENV_VAR_OVERRIDES", "").strip()
-    if not raw:
-        return {}
-    try:
-        data = json.loads(raw)
-    except Exception as exc:
-        print("Invalid TD_SOSA_ENV_VAR_OVERRIDES JSON:", exc)
-        return {}
-    if not isinstance(data, dict):
-        print("TD_SOSA_ENV_VAR_OVERRIDES must be a JSON object")
-        return {}
-    out: Dict[str, str] = {}
-    for k, v in data.items():
-        if not isinstance(k, str) or not isinstance(v, str):
-            continue
-        key = " ".join(k.strip().lower().split())
-        val = v.strip()
-        if key and val:
-            out[key] = val
-    return out
-
-
-TD_SOSA_ENV_VAR_OVERRIDES = _load_tdsosa_overrides()
-
-
-def _load_tdsosa_property_ranges() -> Dict[str, Dict[str, Any]]:
-    raw = os.getenv("TD_SOSA_PROPERTY_RANGES", "").strip()
-    if not raw:
-        return {}
-    try:
-        data = json.loads(raw)
-    except Exception as exc:
-        print("Invalid TD_SOSA_PROPERTY_RANGES JSON:", exc)
-        return {}
-    if not isinstance(data, dict):
-        print("TD_SOSA_PROPERTY_RANGES must be a JSON object")
-        return {}
-
-    out: Dict[str, Dict[str, Any]] = {}
-    for k, v in data.items():
-        if not isinstance(k, str) or not isinstance(v, dict):
-            continue
-        normalized_key = " ".join(k.strip().lower().split())
-        if not normalized_key:
-            continue
-        target_min = v.get("min")
-        target_max = v.get("max")
-        unit = v.get("unit")
-
-        entry: Dict[str, Any] = {}
-        if isinstance(target_min, (int, float)) and not isinstance(target_min, bool):
-            entry["min"] = target_min
-        if isinstance(target_max, (int, float)) and not isinstance(target_max, bool):
-            entry["max"] = target_max
-        if isinstance(unit, str) and unit.strip():
-            entry["unit"] = unit.strip()
-        if entry:
-            out[normalized_key] = entry
-    return out
-
-
-TD_SOSA_PROPERTY_RANGES = _load_tdsosa_property_ranges()
-
-
-def _load_tdsosa_settling_times() -> Dict[str, float]:
-    raw = os.getenv("TD_SOSA_SETTLING_TIMES", "").strip()
-    if not raw:
-        return {}
-    try:
-        data = json.loads(raw)
-    except Exception as exc:
-        print("Invalid TD_SOSA_SETTLING_TIMES JSON:", exc)
-        return {}
-    if not isinstance(data, dict):
-        print("TD_SOSA_SETTLING_TIMES must be a JSON object")
-        return {}
-
-    out: Dict[str, float] = {}
-    for k, v in data.items():
-        if not isinstance(k, str):
-            continue
-        seconds: Optional[float] = None
-        if isinstance(v, (int, float)) and not isinstance(v, bool):
-            seconds = float(v)
-        elif isinstance(v, dict):
-            raw_seconds = v.get("seconds", v.get("value"))
-            if isinstance(raw_seconds, (int, float)) and not isinstance(raw_seconds, bool):
-                seconds = float(raw_seconds)
-        if seconds is None or seconds < 0:
-            continue
-        key = " ".join(k.strip().lower().split())
-        if key:
-            out[key] = seconds
-    return out
-
-
-TD_SOSA_SETTLING_TIMES = _load_tdsosa_settling_times()
 
 app = FastAPI(title="HASP")
 app.add_middleware(
@@ -421,336 +318,107 @@ def _format_climate_state(state: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _normalize_override_key(key: str) -> str:
-    return " ".join(key.strip().lower().split())
+# -- the room's environment in an artifact's TD -------------------------------
+#
+# Which variable a property observes or an action moves is decided by
+# hasp_semantics (homeont's environment classes + the home's overrides); these
+# emit it the way SimuHome's td_builder does, so the agents' queries -- `?place
+# homeont:hasEnvironment ?env . ?env ssn:hasProperty ?var`, `?actuation
+# sosa:actsOnProperty ?var` -- find the same shapes on both.
 
-
-def _to_override_token(value: Optional[str]) -> str:
-    return _normalize_override_key((value or "").replace(" ", "_"))
-
-
-def _resolve_env_var_override(
-    *,
-    entity: Optional[Dict[str, Any]] = None,
-    device: Optional[Dict[str, Any]] = None,
-    artifact_label: Optional[str] = None,
-    domain: Optional[str] = None,
-    signal_name: Optional[str] = None,
-    service_name: Optional[str] = None,
-) -> Optional[str]:
-    if not TD_SOSA_ENV_VAR_OVERRIDES:
-        return None
-    ent_id = _to_override_token((entity or {}).get("entity_id"))
-    dev_id = _to_override_token((device or {}).get("id"))
-    dev_name = _to_override_token((device or {}).get("name"))
-    art = _to_override_token(artifact_label)
-    dom = _to_override_token(domain)
-    sig = _to_override_token(signal_name)
-    svc = _to_override_token(service_name)
-    keys: List[str] = []
-    if svc and dom:
-        dsvc = f"{dom}.{svc}"
-        if ent_id:
-            keys.append(f"entity:{ent_id}:action:{dsvc}")
-        if dev_id:
-            keys.append(f"device_id:{dev_id}:action:{dsvc}")
-        if dev_name:
-            keys.append(f"device:{dev_name}:action:{dsvc}")
-        if art:
-            keys.append(f"artifact:{art}:action:{dsvc}")
-        keys.append(f"action:{dsvc}")
-    if sig:
-        if ent_id:
-            keys.append(f"entity:{ent_id}:{sig}")
-        if dev_id:
-            keys.append(f"device_id:{dev_id}:{sig}")
-        if dev_name:
-            keys.append(f"device:{dev_name}:{sig}")
-        if art:
-            keys.append(f"artifact:{art}:{sig}")
-        if dom:
-            keys.append(f"domain:{dom}:{sig}")
-    if ent_id:
-        keys.append(f"entity:{ent_id}")
-    if dev_id:
-        keys.append(f"device_id:{dev_id}")
-    if dev_name:
-        keys.append(f"device:{dev_name}")
-    if art:
-        keys.append(f"artifact:{art}")
-    if dom:
-        keys.append(f"domain:{dom}")
-    for key in keys:
-        match = TD_SOSA_ENV_VAR_OVERRIDES.get(_normalize_override_key(key))
-        if match:
-            return match
-    return None
-
-
-_OVERRIDE_DIRECTIONS = {"increase", "decrease", "affects"}
-
-
-def _split_override_direction(value: Optional[str]) -> tuple[Optional[str], Optional[str]]:
-    """Split an override value like "air_quality:decrease" into (key, direction).
-
-    Service-name heuristics cannot know device semantics (turning an air
-    purifier ON decreases pm10), so override values may carry an explicit
-    actuation direction suffix.
-    """
-    if not value or ":" not in value:
-        return value, None
-    head, _, tail = value.rpartition(":")
-    tail_norm = tail.strip().lower()
-    if tail_norm in _OVERRIDE_DIRECTIONS and head:
-        return head, tail_norm
-    return value, None
-
-
-def _env_var_uri(base: str, workspace_id: str, env_var: str) -> URIRef:
-    if env_var.startswith("http://") or env_var.startswith("https://"):
-        return URIRef(env_var)
-    return URIRef(f"{base}workspaces/{workspace_id}/environment/{urllib.parse.quote(env_var, safe='')}")
-
-
-def _resolve_property_range(
-    env_var_key: Optional[str],
-    env_var_uri: Optional[URIRef] = None,
-) -> Optional[Dict[str, Any]]:
-    if not TD_SOSA_PROPERTY_RANGES:
-        return None
-
-    candidates: List[str] = []
-    if env_var_key:
-        candidates.append(_normalize_override_key(env_var_key))
-    if env_var_uri is not None:
-        uri_str = str(env_var_uri).strip()
-        if uri_str:
-            candidates.append(uri_str)
-            last_token = uri_str.rstrip("/").rsplit("/", 1)[-1]
-            if last_token:
-                candidates.append(_normalize_override_key(urllib.parse.unquote(last_token)))
-
-    for candidate in candidates:
-        match = TD_SOSA_PROPERTY_RANGES.get(candidate)
-        if match:
-            return dict(match)
-    return None
-
-
-def _resolve_settling_time(
-    *,
-    entity: Optional[Dict[str, Any]] = None,
-    device: Optional[Dict[str, Any]] = None,
-    artifact_label: Optional[str] = None,
-    domain: Optional[str] = None,
-    service_name: Optional[str] = None,
-    env_var_key: Optional[str] = None,
-) -> Optional[float]:
-    if not TD_SOSA_SETTLING_TIMES:
-        return None
-    ent_id = _to_override_token((entity or {}).get("entity_id"))
-    dev_id = _to_override_token((device or {}).get("id"))
-    dev_name = _to_override_token((device or {}).get("name"))
-    art = _to_override_token(artifact_label)
-    dom = _to_override_token(domain)
-    svc = _to_override_token(service_name)
-    env_key = _to_override_token(env_var_key)
-    keys: List[str] = []
-    if svc and dom:
-        dsvc = f"{dom}.{svc}"
-        if ent_id:
-            keys.append(f"entity:{ent_id}:action:{dsvc}")
-        if dev_id:
-            keys.append(f"device_id:{dev_id}:action:{dsvc}")
-        if dev_name:
-            keys.append(f"device:{dev_name}:action:{dsvc}")
-        if art:
-            keys.append(f"artifact:{art}:action:{dsvc}")
-        keys.append(f"action:{dsvc}")
-    if env_key:
-        keys.append(f"environment:{env_key}")
-    if ent_id:
-        keys.append(f"entity:{ent_id}")
-    if dev_id:
-        keys.append(f"device_id:{dev_id}")
-    if dev_name:
-        keys.append(f"device:{dev_name}")
-    if art:
-        keys.append(f"artifact:{art}")
-    if dom:
-        keys.append(f"domain:{dom}")
-    for key in keys:
-        match = TD_SOSA_SETTLING_TIMES.get(_normalize_override_key(key))
-        if match is not None:
-            return float(match)
-    return None
-
-
-def _ambient_var_from_signals(domain: str, device_class: Optional[str], signal_name: Optional[str]) -> Optional[str]:
-    text = f"{domain} {(device_class or '')} {(signal_name or '')}".lower()
-    if any(tok in text for tok in ("illumin", "lumin", "bright", "light")):
-        return "luminosity"
-    if any(tok in text for tok in ("temp", "thermal", "heat", "cool")):
-        return "thermal_comfort"
-    if "humid" in text:
-        return "humidity"
-    if "press" in text:
-        return "pressure"
-    if any(tok in text for tok in ("motion", "occup", "presence", "person")):
-        return "occupancy_presence"
-    if any(tok in text for tok in ("lock", "security", "alarm", "camera")):
-        return "security_state"
-    if any(tok in text for tok in ("media", "speaker", "vacuum", "coffee", "appliance")):
-        return "activity_state"
-    return None
-
-
-def _ambient_var_for_action(domain: str, service_name: str) -> Optional[str]:
-    token = f"{domain}.{service_name}".lower()
-    if domain == "climate":
-        return "thermal_comfort"
-    if domain in {"light", "cover"}:
-        return "luminosity"
-    if domain == "humidifier":
-        return "humidity"
-    if domain in {"lock", "alarm_control_panel", "camera"}:
-        return "security_state"
-    if domain in {"media_player", "vacuum"}:
-        return "activity_state"
-    return _ambient_var_from_signals(domain, None, token)
-
-
-def _effect_direction(service_name: str) -> Optional[str]:
-    s = service_name.lower()
-    inc_markers = ("turn_on", "open", "raise", "increase", "up", "unlock", "start")
-    dec_markers = ("turn_off", "close", "lower", "decrease", "down", "lock", "stop")
-    if any(marker in s for marker in inc_markers):
-        return "increase"
-    if any(marker in s for marker in dec_markers):
-        return "decrease"
-    return None
-
-
-# Setpoint-style services can move their observable property in either
-# direction, so they get a direction-neutral actuation instead of none.
-_SETPOINT_SERVICES = {
-    "set_temperature",
-    "set_hvac_mode",
-    "set_percentage",
-    "set_speed",
-    "set_humidity",
-    "set_cover_position",
-    "set_position",
-    "set_value",
-}
-
-
-def _is_setpoint_service(service_name: str) -> bool:
-    return service_name.lower() in _SETPOINT_SERVICES
-
-
-def _domain_is_observer(domain: str) -> bool:
-    return domain in {"sensor", "binary_sensor", "weather", "person", "device_tracker"}
+# HA domains whose entities change something: an artifact with one is a
+# saref:Actuator, as SimuHome types its controllable devices.
+_ACTUATOR_DOMAINS = {"light", "cover", "climate", "humidifier", "fan", "switch",
+                     "media_player", "vacuum", "lock", "alarm_control_panel", "valve"}
+# HA domains whose entities are measuring instruments: an artifact with one that
+# observes a room variable is also a saref:Sensor (a thermostat observing the
+# air is a sosa:Sensor only, as SimuHome's air conditioner is).
+_SENSOR_DOMAINS = {"sensor", "binary_sensor"}
 
 
 def _domain_is_actuator(domain: str) -> bool:
-    return domain in {"light", "cover", "climate", "humidifier", "fan", "switch", "media_player", "vacuum", "lock", "alarm_control_panel"}
+    """True for the HA domains whose entities can be commanded."""
+    return domain in _ACTUATOR_DOMAINS
 
 
-def _add_environment_variable_semantics(
-    rdf: HomeAssistantRDF,
-    env_var_uri: URIRef,
-    env_var_key: Optional[str],
-    room_environment: Optional[URIRef],
-) -> None:
-    """Type a TD-SOSA effect key's URI with the homeont room variable it is.
+def _area_for(workspace_id: str) -> Dict[str, Any]:
+    """The HA area a workspace is, from the graph cache; a bare stand-in
+    (its id as its name) before the cache has loaded."""
+    cache = getattr(app.state, "graph_cache", None)
+    area = (getattr(cache, "areas_by_id", {}) or {}).get(workspace_id) if cache else None
+    return area or {"area_id": workspace_id, "name": workspace_id}
 
-    The key-based URI (…/environment/thermal_comfort) stays, so plans and
-    signifiers that name it are unaffected; the class beside it is what the
-    capability resolver matches an effect by.
+
+def _variable_node(rdf: HomeAssistantRDF, workspace_id: str,
+                   variable: hasp_semantics.Variable) -> URIRef:
+    """The variable's IRI in this document, with its class and environment;
+    an environment other than the room's is described here too, since no
+    place in the document leads to it."""
+    if variable.environment != hasp_semantics.ROOM_ENVIRONMENT:
+        declared = hasp_semantics.current().environments().get(variable.environment) or {}
+        hasp_semantics.add_environment(rdf.g, rdf.base, workspace_id,
+                                       variable.environment, declared.get("label"))
+    return hasp_semantics.link_variable(rdf.g, rdf.base, workspace_id, variable)
+
+
+def _add_observation(rdf: HomeAssistantRDF, art: URIRef, prop: BNode, workspace_id: str,
+                     variable: hasp_semantics.Variable, domain: str) -> None:
+    """A property that reads a room variable: the device observes it.
+
+    As SimuHome's ambient sensor: the artifact `sosa:observes` the variable
+    (and the variable `sosa:isObservedBy` it); the property affordance is the
+    device's own reading of it -- an observable property of the variable's
+    environment, with the variable's quantity kind and unit.
     """
-    env_class = hasp_semantics.current().environment_class(env_var_key)
-    if env_class is None:
-        return
-    hasp_semantics.add_type(rdf.g, env_var_uri, env_class)
-    if room_environment is not None:
-        rdf.g.add((env_var_uri, SSN.isPropertyOf, room_environment))
+    # 1. The device observes the environment's variable.
+    node = _variable_node(rdf, workspace_id, variable)
+    environment = hasp_semantics.environment_uri(rdf.base, workspace_id, variable.environment)
+    rdf.g.add((art, SOSA.observes, node))
+    rdf.g.add((node, SOSA.isObservedBy, art))
+    rdf.g.add((art, RDF.type, SOSA.Sensor))
+    if domain in _SENSOR_DOMAINS:
+        rdf.g.add((art, RDF.type, hasp_semantics.SAREF.Sensor))
+
+    # 2. Its reading is an observation affordance of that environment.
+    rdf.g.add((prop, RDF.type, TDSOSA.ObservablePropertyAffordance))
+    rdf.g.add((prop, RDF.type, SOSA.ObservableProperty))
+    rdf.g.add((prop, SOSA.isObservedBy, art))
+    rdf.g.add((prop, SSN.isPropertyOf, environment))
+    if variable.cls.quantity_kind is not None:
+        rdf.g.add((prop, QUDT.hasQuantityKind, variable.cls.quantity_kind))
+    if variable.cls.unit is not None:
+        rdf.g.add((prop, QUDT.unit, variable.cls.unit))
 
 
-def _add_tdsosa_property_links(
-    rdf: HomeAssistantRDF,
-    property_affordance: BNode,
-    feature_of_interest: URIRef,
-    env_var_uri: URIRef,
-    env_var_key: Optional[str],
-    observable: bool,
-    actuatable: bool,
-    room_environment: Optional[URIRef] = None,
-) -> None:
-    _add_environment_variable_semantics(rdf, env_var_uri, env_var_key, room_environment)
-    if observable:
-        rdf.g.add((property_affordance, RDF.type, TDSOSA.ObservablePropertyAffordance))
-        rdf.g.add((env_var_uri, RDF.type, SOSA.ObservableProperty))
-    if actuatable:
-        rdf.g.add((property_affordance, RDF.type, TDSOSA.ActuatablePropertyAffordance))
-        rdf.g.add((env_var_uri, RDF.type, SOSA.ActuatableProperty))
-    rdf.g.add((property_affordance, TDSOSA.affordsProperty, env_var_uri))
-    rdf.g.add((feature_of_interest, SSN.hasProperty, env_var_uri))
-    rdf.g.add((env_var_uri, SSN.isPropertyOf, feature_of_interest))
-    range_hint = _resolve_property_range(env_var_key, env_var_uri)
-    if range_hint:
-        if "min" in range_hint:
-            rdf.g.add((env_var_uri, TDSOSA.targetMinValue, Literal(range_hint["min"])))
-        if "max" in range_hint:
-            rdf.g.add((env_var_uri, TDSOSA.targetMaxValue, Literal(range_hint["max"])))
-        if "unit" in range_hint:
-            rdf.g.add((env_var_uri, TDSOSA.targetUnit, Literal(str(range_hint["unit"]))))
+def _add_effect(rdf: HomeAssistantRDF, art: URIRef, action: BNode, workspace_id: str,
+                actuation: URIRef, variable: hasp_semantics.Variable,
+                direction: Optional[str]) -> None:
+    """An action that moves a room variable, as SimuHome's `_action_effects`.
 
+    The actuation `sosa:actsOnProperty` the variable, and says which way when
+    the direction is known (`tdsosa:increases/decreasesObservableProperty`),
+    otherwise only that it affects it; the artifact's feature of interest is
+    the variable's environment.
+    """
+    # 1. The actuation and the variable it acts on.
+    node = _variable_node(rdf, workspace_id, variable)
+    rdf.g.add((action, TDSOSA.hasEffectActuation, actuation))
+    rdf.g.add((actuation, RDF.type, SOSA.Actuation))
+    rdf.g.add((actuation, SOSA.actsOnProperty, node))
 
-def _add_tdsosa_action_effect(
-    rdf: HomeAssistantRDF,
-    action_affordance: BNode,
-    feature_of_interest: URIRef,
-    env_var_uri: URIRef,
-    env_var_key: Optional[str],
-    actuation_uri: URIRef,
-    direction: Optional[str],
-    settling_time_seconds: Optional[float] = None,
-    room_environment: Optional[URIRef] = None,
-) -> None:
-    _add_environment_variable_semantics(rdf, env_var_uri, env_var_key, room_environment)
-    rdf.g.add((action_affordance, TDSOSA.hasEffectActuation, actuation_uri))
-    rdf.g.add((actuation_uri, RDF.type, SOSA.Actuation))
+    # 2. Which way it moves it, when that is known.
     if direction == "increase":
-        rdf.g.add((actuation_uri, RDF.type, TDSOSA.IncreasingActuation))
-        rdf.g.add((actuation_uri, TDSOSA.increasesObservableProperty, env_var_uri))
+        rdf.g.add((actuation, RDF.type, TDSOSA.IncreasingActuation))
+        rdf.g.add((actuation, TDSOSA.increasesObservableProperty, node))
     elif direction == "decrease":
-        rdf.g.add((actuation_uri, RDF.type, TDSOSA.DecreasingActuation))
-        rdf.g.add((actuation_uri, TDSOSA.decreasesObservableProperty, env_var_uri))
-    rdf.g.add((actuation_uri, SOSA.actsOnProperty, env_var_uri))
-    amount = BNode()
-    rdf.g.add((actuation_uri, TDSOSA.amount, amount))
-    rdf.g.add((amount, RDF.type, QUDT.QuantityValue))
-    rdf.g.add((amount, QUDT.numericValue, Literal(1)))
-    rdf.g.add((amount, QUDT.unit, UNIT.UNITLESS))
-    if settling_time_seconds is not None:
-        duration = BNode()
-        rdf.g.add((actuation_uri, TDSOSA.settlingTime, duration))
-        rdf.g.add((duration, RDF.type, TIME.Duration))
-        rdf.g.add((duration, TIME.numericDuration, Literal(float(settling_time_seconds), datatype=XSD.decimal)))
-        rdf.g.add((duration, TIME.unitType, TIME.unitSecond))
-    rdf.g.add((feature_of_interest, SSN.hasProperty, env_var_uri))
-    rdf.g.add((env_var_uri, SSN.isPropertyOf, feature_of_interest))
-    rdf.g.add((env_var_uri, RDF.type, SOSA.ObservableProperty))
-    rdf.g.add((env_var_uri, RDF.type, SOSA.ActuatableProperty))
-    range_hint = _resolve_property_range(env_var_key, env_var_uri)
-    if range_hint:
-        if "min" in range_hint:
-            rdf.g.add((env_var_uri, TDSOSA.targetMinValue, Literal(range_hint["min"])))
-        if "max" in range_hint:
-            rdf.g.add((env_var_uri, TDSOSA.targetMaxValue, Literal(range_hint["max"])))
-        if "unit" in range_hint:
-            rdf.g.add((env_var_uri, TDSOSA.targetUnit, Literal(str(range_hint["unit"]))))
+        rdf.g.add((actuation, RDF.type, TDSOSA.DecreasingActuation))
+        rdf.g.add((actuation, TDSOSA.decreasesObservableProperty, node))
+    else:
+        rdf.g.add((actuation, TDSOSA.affectsObservableProperty, node))
+
+    # 3. What the device acts on: that environment.
+    rdf.g.add((art, SOSA.hasFeatureOfInterest,
+               hasp_semantics.environment_uri(rdf.base, workspace_id, variable.environment)))
 
 
 async def _resolve_device_and_entities(workspace_id: str, artifact_name: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]], Optional[Dict[str, Any]], str]:
@@ -1131,12 +799,29 @@ def _build_cached_artifact_ttl(
     state_map: Dict[str, Dict[str, Any]],
     device: Dict[str, Any],
 ) -> str:
+    """The Thing Description of one artifact (one HA entity), as Turtle.
+
+    What it carries, in order: the Thing and its registry metadata; what the
+    device is (its homeont class and label) and where it is (`isLocatedIn` the
+    room's place, which has the room's environment); one action per HA
+    service the entity supports, typed with its command class, and -- when
+    the service moves a room variable -- its effect actuation; one property
+    per state / attribute, typed with its property class, and -- when that
+    class is an environment variable -- the device's observation of it; the
+    `saref:actsUpon` links from actions to the properties they change; the
+    JaCaMo and WebSub actions every artifact has.
+
+    Example, the lab308e desk lamp: `homeont:DimmableLight`, `saref:Actuator`,
+    `isLocatedIn` the study room; `LightTurnOn` increases `desk_illuminance`
+    (the home gives the lamp `zone: desk`); `lightState` is its
+    `homeont:DimmableLightOnOff`.
+    """
+    # 1. The Thing, its IRIs, and the prefixes its document uses.
     rdf = HomeAssistantRDF(BASE_WS_URI)
     aid = workspace_id
     ws = URIRef(f"{rdf.base}workspaces/{aid}#workspace")
     art_dir = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/")
     art = URIRef(f"{art_dir}{safe_name}#artifact")
-    artifact_foi = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/environment#foi")
 
     for prefix, ns in {
         "sosa": SOSA,
@@ -1144,6 +829,7 @@ def _build_cached_artifact_ttl(
         "qudt": QUDT,
         "unit": UNIT,
         "tdsosa": TDSOSA,
+        "saref": hasp_semantics.SAREF,
     }.items():
         rdf.g.bind(prefix, ns)
 
@@ -1151,7 +837,7 @@ def _build_cached_artifact_ttl(
     rdf.g.add((art, RDF.type, HMAS.Artifact))
     rdf.g.add((art, TD.title, Literal(artifact_label)))
 
-    # Thing-level device metadata, straight from the Home Assistant device
+    # 2. Thing-level device metadata, straight from the Home Assistant device
     # registry (`config/device_registry/list`). A fact about the device, not an
     # interaction with it, so it annotates the Thing rather than joining its
     # affordance set. A field the registry leaves unset stays absent from the
@@ -1165,17 +851,12 @@ def _build_cached_artifact_ttl(
         text = str(value).strip()
         if text:
             rdf.g.add((art, predicate, Literal(text)))
-    rdf.g.add((artifact_foi, RDF.type, SOSA.FeatureOfInterest))
-    rdf.g.add((artifact_foi, TD.title, Literal(f"{artifact_label} environment")))
     domains = {e["entity_id"].split(".")[0] for e in device_entities if e.get("entity_id")}
-    if "light" in domains:
-        rdf.g.add((art, RDF.type, EX.HueLamp))
 
-    # The homeont semantic layer (semantic_mappings.yaml + SEMANTIC_CONFIG):
-    # what the device is, and below what each of its affordances is.
+    # 3. The homeont semantic layer (semantic_mappings.yaml + SEMANTIC_CONFIG):
+    #    what the device is and where it is; below, what each affordance is.
     semantics = hasp_semantics.current()
     device_name = (device or {}).get("name") or artifact_label
-    room_environment = hasp_semantics.room_environment_uri(rdf.base, aid)
     semantic_entities = {
         e["entity_id"]: hasp_semantics.Entity(
             e["entity_id"].split(".")[0],
@@ -1185,6 +866,9 @@ def _build_cached_artifact_ttl(
     device_class = semantics.device_class(device_name, semantic_entities.values())
     hasp_semantics.add_type(rdf.g, art, device_class)
     hasp_semantics.add_label(rdf.g, art, device_class)
+    hasp_semantics.add_place_context(rdf.g, rdf.base, _area_for(aid), art)
+    if any(_domain_is_actuator(domain) for domain in domains):
+        rdf.g.add((art, RDF.type, hasp_semantics.SAREF.Actuator))
     state_names = state_property_names(list(semantic_entities))
     # Actions are built before the properties they change; `saref:actsUpon`
     # is linked once both exist.
@@ -1194,6 +878,8 @@ def _build_cached_artifact_ttl(
     rdf.g.add((art, TD.hasSecurityConfiguration, sec))
     rdf.g.add((sec, RDF.type, WOTSEC.NoSecurityScheme))
 
+    # 4. The actions: one per HA service the entity supports, with the room
+    #    variables it moves (`semantics.effects`).
     svc_by_domain: Dict[str, Dict[str, Dict[str, Any]]] = {}
     graph_cache = getattr(app.state, "graph_cache", None)
     if graph_cache is not None:
@@ -1205,7 +891,6 @@ def _build_cached_artifact_ttl(
     for domain in sorted(domains):
         domain_svcs = svc_by_domain.get(domain, {})
         domain_entity = _pick_entity(device_entities, domain)
-        domain_entity_meta = next((e for e in device_entities if e.get("entity_id") == domain_entity), None)
         domain_entity_state = state_map.get(domain_entity, {}) if domain_entity else {}
         domain_entity_attrs = domain_entity_state.get("attributes", {}) if isinstance(domain_entity_state, dict) else {}
 
@@ -1257,46 +942,16 @@ def _build_cached_artifact_ttl(
             if action_affordance is not None and domain_entity:
                 pending_acts_upon.append((action_affordance, domain_entity, domain,
                                           svc_name, list(supported_fields)))
-            env_var_key = _resolve_env_var_override(
-                entity=domain_entity_meta,
-                device=device,
-                artifact_label=artifact_label,
-                domain=domain,
-                service_name=svc_name,
-            ) or _ambient_var_for_action(domain, svc_name)
-            env_var_key, override_direction = _split_override_direction(env_var_key)
-            if override_direction in {"increase", "decrease"}:
-                direction = override_direction
-            elif override_direction == "affects":
-                direction = None
-            else:
-                direction = _effect_direction(svc_name)
-            if action_affordance and env_var_key and (direction or override_direction or _is_setpoint_service(svc_name)):
-                env_var_uri = _env_var_uri(rdf.base, aid, env_var_key)
+            if action_affordance is None:
+                continue
+            for variable, direction in semantics.effects(device_name, domain, svc_name):
                 actuation_uri = URIRef(
                     f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/actuations/"
-                    f"{urllib.parse.quote(domain, safe='')}_{urllib.parse.quote(svc_name, safe='')}_{direction or 'affects'}"
-                )
-                settling_time_seconds = _resolve_settling_time(
-                    entity=domain_entity_meta,
-                    device=device,
-                    artifact_label=artifact_label,
-                    domain=domain,
-                    service_name=svc_name,
-                    env_var_key=env_var_key,
-                )
-                _add_tdsosa_action_effect(
-                    rdf=rdf,
-                    action_affordance=action_affordance,
-                    feature_of_interest=artifact_foi,
-                    env_var_uri=env_var_uri,
-                    env_var_key=env_var_key,
-                    actuation_uri=actuation_uri,
-                    direction=direction,
-                    settling_time_seconds=settling_time_seconds,
-                    room_environment=room_environment,
-                )
+                    f"{urllib.parse.quote(domain, safe='')}_{urllib.parse.quote(svc_name, safe='')}"
+                    f"_{variable.name}")
+                _add_effect(rdf, art, action_affordance, aid, actuation_uri, variable, direction)
 
+    # 5. A climate entity's whole state, readable in one call.
     if "climate" in domains:
         climate_ent = _pick_entity(device_entities, "climate")
         if climate_ent and climate_ent in state_map:
@@ -1310,6 +965,13 @@ def _build_cached_artifact_ttl(
                 "application/json",
                 output_schema=rdf._build_climate_output_schema(),
             )
+
+    # 6. The properties: each entity's state and attributes, typed, and --
+    #    where the type is a room variable -- observed (`_add_observation`).
+    def observe(prop: Optional[BNode], prop_class: Optional[str], domain: str) -> None:
+        variable = semantics.variable(device_name, prop_class)
+        if prop is not None and variable is not None:
+            _add_observation(rdf, art, prop, aid, variable, domain)
 
     for entity in device_entities:
         entity_id = entity.get("entity_id")
@@ -1336,24 +998,12 @@ def _build_cached_artifact_ttl(
                 art, state_name, property_uri, output_schema=schema,
                 description=f"Current state of {entity_id}", observable=True
             )
-            hasp_semantics.add_type(rdf.g, state_prop, semantics.property_class(
+            state_class = semantics.property_class(
                 device_name, device_class,
-                hasp_semantics.Entity(entity_domain, entity_attrs), "state"))
+                hasp_semantics.Entity(entity_domain, entity_attrs), "state")
+            hasp_semantics.add_type(rdf.g, state_prop, state_class)
             property_nodes[(entity_id, "state")] = state_prop
-            state_env_key = _resolve_env_var_override(
-                entity=entity, device=device, artifact_label=artifact_label,
-                domain=entity_domain, signal_name="state",
-            ) or _ambient_var_from_signals(entity_domain, entity_attrs.get("device_class"), "state")
-            state_env_key, _ = _split_override_direction(state_env_key)
-            if state_prop and state_env_key:
-                env_var_uri = _env_var_uri(rdf.base, aid, state_env_key)
-                _add_tdsosa_property_links(
-                    rdf=rdf, property_affordance=state_prop, feature_of_interest=artifact_foi,
-                    env_var_uri=env_var_uri, env_var_key=state_env_key,
-                    observable=_domain_is_observer(entity_domain),
-                    actuatable=_domain_is_actuator(entity_domain),
-                    room_environment=room_environment,
-                )
+            observe(state_prop, state_class, entity_domain)
 
         if entity_attrs:
             from hasp_utils import get_operational_attributes, get_metadata_attributes
@@ -1371,23 +1021,11 @@ def _build_cached_artifact_ttl(
                     art, attr_name, property_uri, output_schema=schema,
                     description=f"{attr_name} of {entity_id}", observable=True
                 )
-                hasp_semantics.add_type(rdf.g, op_prop, semantics.property_class(
-                    device_name, device_class, semantic_entity, attr_name))
+                op_class = semantics.property_class(
+                    device_name, device_class, semantic_entity, attr_name)
+                hasp_semantics.add_type(rdf.g, op_prop, op_class)
                 property_nodes[(entity_id, attr_name)] = op_prop
-                env_var_key = _resolve_env_var_override(
-                    entity=entity, device=device, artifact_label=artifact_label,
-                    domain=domain, signal_name=attr_name,
-                ) or _ambient_var_from_signals(domain, entity_attrs.get("device_class"), attr_name)
-                env_var_key, _ = _split_override_direction(env_var_key)
-                if op_prop and env_var_key:
-                    env_var_uri = _env_var_uri(rdf.base, aid, env_var_key)
-                    _add_tdsosa_property_links(
-                        rdf=rdf, property_affordance=op_prop, feature_of_interest=artifact_foi,
-                        env_var_uri=env_var_uri, env_var_key=env_var_key,
-                        observable=_domain_is_observer(domain),
-                        actuatable=_domain_is_actuator(domain),
-                        room_environment=room_environment,
-                    )
+                observe(op_prop, op_class, domain)
 
             # Properties the device has by what it supports, whatever HA
             # reports right now: an off light has no `brightness` attribute,
@@ -1407,6 +1045,7 @@ def _build_cached_artifact_ttl(
                 )
                 hasp_semantics.add_type(rdf.g, declared_prop, str(rule["class"]))
                 property_nodes[(entity_id, attr_name)] = declared_prop
+                observe(declared_prop, str(rule["class"]), domain)
 
             metadata_attrs = get_metadata_attributes(entity_attrs)
             for ts_field in ("last_changed", "last_reported", "last_updated"):
@@ -1420,7 +1059,7 @@ def _build_cached_artifact_ttl(
                     description=f"Metadata attributes of {entity_id}", observable=False
                 )
 
-    # What each action changes: the property affordances of its entity named
+    # 7. What each action changes: the property affordances of its entity named
     # by its fields or by the `acts_upon` rules in semantic_mappings.yaml.
     for action_affordance, entity_id, domain, svc_name, fields in pending_acts_upon:
         for signal in sorted(semantics.acts_upon(domain, svc_name, fields)):
@@ -1428,6 +1067,7 @@ def _build_cached_artifact_ttl(
             if target is not None:
                 rdf.g.add((action_affordance, hasp_semantics.SAREF.actsUpon, target))
 
+    # 8. The actions every artifact has, its container, and its profile.
     rdf._add_action(art, "getArtifactRepresentation", JACAMO.PerceiveArtifact, "GET",
                     URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}"), "application/json")
     rdf._add_action(art, "updateArtifactRepresentation", JACAMO.UpdateArtifact, "PUT",
@@ -1451,9 +1091,7 @@ def _build_cached_artifact_ttl(
 async def _startup_cache():
     print(
         f"AREAS={sorted(AREAS) if AREAS else 'ALL'}, BASE_WS_URI={BASE_WS_URI}, "
-        f"TD_SOSA_ENV_VAR_OVERRIDES={len(TD_SOSA_ENV_VAR_OVERRIDES)}, "
-        f"TD_SOSA_PROPERTY_RANGES={len(TD_SOSA_PROPERTY_RANGES)}, "
-        f"TD_SOSA_SETTLING_TIMES={len(TD_SOSA_SETTLING_TIMES)}"
+        f"SEMANTIC_CONFIG={os.getenv('SEMANTIC_CONFIG') or '(none: defaults only)'}"
     )
     app.state.graph_cache = HASPGraphCache(
         ws_client=ha_client,
@@ -1532,14 +1170,9 @@ async def query_actions_affecting_observable_property(request: Request):
     if not await cache.has_workspace(workspace_id):
         raise HTTPException(status_code=404, detail="Workspace not found")
     matches = await cache.query_actions_affecting_observable_property(workspace_id, observable_property)
-    resolved_property_uri = (
-        observable_property
-        if observable_property.startswith(("http://", "https://"))
-        else f"{cache.base_uri}workspaces/{workspace_id}/environment/{urllib.parse.quote(observable_property, safe='')}"
-    )
     return {
         "workspace_id": workspace_id,
-        "property_uri": resolved_property_uri,
+        "property_uri": matches.get("property_uri"),
         "target_min": matches.get("target_min"),
         "target_max": matches.get("target_max"),
         "target_unit": matches.get("target_unit", ""),
@@ -1629,6 +1262,29 @@ async def read_property(workspace_id: str, artifact_name: str, property_name: st
         return JSONResponse(await cache.read_property(workspace_id, artifact_name, property_name))
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Property '{urllib.parse.unquote(property_name)}' not found on artifact")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+# Room variable endpoint - read an environment variable of a workspace
+@app.get("/workspaces/{workspace_id}/properties/{variable_name}")
+async def read_room_property(workspace_id: str, variable_name: str):
+    """Read a room variable (`illuminance`, `air_temperature`) of a workspace.
+
+    The form every variable the workspace TD lists as observable points at:
+    the value is the current reading of a device that observes it (a sensor
+    first). A variable no device observes has no form and gets a 404 here.
+    """
+    try:
+        cache = await _ensure_graph_cache()
+        if not await cache.has_workspace(workspace_id):
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        return JSONResponse(await cache.read_room_property(workspace_id, variable_name))
+    except KeyError:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No device observes '{urllib.parse.unquote(variable_name)}' in {workspace_id}")
     except HTTPException:
         raise
     except Exception as exc:

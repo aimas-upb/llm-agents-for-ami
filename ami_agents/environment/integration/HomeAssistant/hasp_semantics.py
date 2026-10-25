@@ -1,14 +1,35 @@
-"""Home Assistant -> home ontology: which homeont / SAREF class a thing is.
+"""Home Assistant -> home ontology: which homeont / SAREF class a thing is,
+and which room variable it observes or changes.
 
 HASP's TDs carry the same semantic layer SimuHome's do -- a device class on the
 Thing, a property class on each property affordance, a command class on each
-action, a room class on the workspace's space -- so the agents' class-based
-resolvers work on a Home Assistant home unchanged.
+action, a room class on the workspace's place, and the room's environment with
+its variables -- so the agents' class-based resolvers work on a Home Assistant
+home unchanged.
 
 The classes come from `semantic_mappings.yaml` (defaults, by HA domain /
-service / attribute / device_class), overridden per device by the `semantic:`
-block of the home's own config (the file `SEMANTIC_CONFIG` points at). Pure
-functions and data: no HA connection, no FastAPI, testable on their own.
+service / attribute / device_class / unit), overridden per device by the
+`semantic:` block of the home's own config (the file `SEMANTIC_CONFIG` points
+at). Pure functions and data: no HA connection, no FastAPI, testable on their
+own.
+
+Environment variables are not listed anywhere: homeont says which of its
+classes are a property of a space's environment (`ssn:isPropertyOf
+homeont:Environment`), and a device property typed with one of them is an
+observation of that variable. Its name is the class's, in snake_case, as
+SimuHome names its room variables. Example, the lab308e temperature sensor:
+
+    HA entity     sensor.temperature_sensing_308e, device_class temperature
+    property      state -> homeont:AirTemperature      (`properties` rules)
+    variable      homeont:AirTemperature is an environment class -> name
+                  `air_temperature`, IRI <base>workspaces/lab308e#air_temperature,
+                  qudt quantity kind and unit from homeont
+    emitted       the sensor `sosa:observes` it; the room environment
+                  `ssn:hasProperty` it (`add_variable`, workspace document)
+
+A home's `semantic:` block adds only what HA cannot know: a `zone` (a second
+variable of the same class, `desk_illuminance`), another `environment` (the
+outdoor light), an action's `effects`, and comfort `ranges`.
 """
 
 from __future__ import annotations
@@ -18,10 +39,10 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import yaml
-from rdflib import Graph, Literal, Namespace, URIRef
+from rdflib import BNode, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, RDFS
 
 logger = logging.getLogger("hasp.semantics")
@@ -35,12 +56,36 @@ HOMEONT_PATH = Path(os.getenv(
 HOMEONT = Namespace("http://example.org/homeont/")
 SAREF = Namespace("https://saref.etsi.org/core/")
 SOSA = Namespace("http://www.w3.org/ns/sosa/")
+SSN = Namespace("http://www.w3.org/ns/ssn/")
+QUDT = Namespace("http://qudt.org/schema/qudt/")
+UNIT = Namespace("http://qudt.org/vocab/unit/")
+QUANTITYKIND = Namespace("http://qudt.org/vocab/quantitykind/")
+TD = Namespace("https://www.w3.org/2019/wot/td#")
+HCTL = Namespace("https://www.w3.org/2019/wot/hypermedia#")
+HTV = Namespace("http://www.w3.org/2011/http#")
+JS = Namespace("https://www.w3.org/2019/wot/json-schema#")
+TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
 
 _PREFIXES = {
     "homeont": str(HOMEONT),
     "saref": str(SAREF),
     "sosa": str(SOSA),
+    "unit": str(UNIT),
+    "quantitykind": str(QUANTITYKIND),
 }
+
+# The environment of the room a workspace is; any other environment a home
+# declares (`semantic: environments:`) is named by its own key.
+ROOM_ENVIRONMENT = "room"
+
+# How an action's service name says which way it moves a variable, when no
+# rule states it. Setters move it either way -- the value decides -- so they
+# get an effect without a direction.
+_INCREASE_MARKERS = ("turn_on", "open", "raise", "increase", "up", "unlock", "start")
+_DECREASE_MARKERS = ("turn_off", "close", "lower", "decrease", "down", "lock", "stop")
+SETPOINT_SERVICES = {"set_temperature", "set_hvac_mode", "set_percentage", "set_speed",
+                     "set_humidity", "set_cover_position", "set_position", "set_value"}
+DIRECTIONS = ("increase", "decrease")
 
 # Colour modes that mean a light can be dimmed / can change colour.
 _DIM_MODES = {"brightness", "color_temp", "hs", "xy", "rgb", "rgbw", "rgbww", "white"}
@@ -66,6 +111,46 @@ def _as_set(value: Any) -> Set[str]:
 
 def _normalise(text: str) -> str:
     return re.sub(r"[^a-z0-9]", "", str(text or "").lower())
+
+
+def snake_case(local_name: str) -> str:
+    """`AirTemperature` -> `air_temperature`, `Pm10MassConcentration` ->
+    `pm10_mass_concentration`: SimuHome's room-variable names, which are its
+    homeont classes' local names in snake_case."""
+    return re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", local_name).lower()
+
+
+def service_direction(service: str) -> Optional[str]:
+    """`increase` / `decrease` from a service's name (`turn_on`,
+    `close_cover`), or None when the name says neither (setters, toggles)."""
+    name = service.lower()
+    if any(marker in name for marker in _INCREASE_MARKERS):
+        return "increase"
+    if any(marker in name for marker in _DECREASE_MARKERS):
+        return "decrease"
+    return None
+
+
+@dataclass(frozen=True)
+class EnvironmentClass:
+    """A homeont class that is a property of a space's environment, with
+    what homeont states about it."""
+
+    curie: str                               # homeont:AirTemperature
+    name: str                                # air_temperature
+    label: Optional[str] = None
+    quantity_kind: Optional[URIRef] = None   # quantitykind:ThermodynamicTemperature
+    unit: Optional[URIRef] = None            # unit:DEG_C
+
+
+@dataclass(frozen=True)
+class Variable:
+    """One environment variable of one workspace: its class, its name there
+    (`desk_illuminance` for a zone), and the environment it belongs to."""
+
+    cls: EnvironmentClass
+    name: str
+    environment: str = ROOM_ENVIRONMENT
 
 
 def light_supports(attributes: Dict[str, Any]) -> Set[str]:
@@ -130,11 +215,14 @@ class Semantics:
     def __init__(self, mappings: Dict[str, Any],
                  home: Optional[Dict[str, Any]] = None,
                  room_labels: Optional[Dict[str, str]] = None,
-                 class_labels: Optional[Dict[str, str]] = None) -> None:
+                 class_labels: Optional[Dict[str, str]] = None,
+                 environment_classes: Optional[Dict[str, EnvironmentClass]] = None) -> None:
         self.mappings = mappings or {}
         self.home = home or {}
         self.room_labels = room_labels or {}
         self.class_labels = class_labels or {}
+        # homeont's environment classes, by CURIE (`_environment_classes`).
+        self.environment_classes = environment_classes or {}
         self._reported: Set[str] = set()
 
     def label(self, curie: Optional[str]) -> Optional[str]:
@@ -190,13 +278,26 @@ class Semantics:
 
     def property_rule(self, device_name: Optional[str], device_class: Optional[str],
                       entity: Entity, signal: str) -> Optional[Dict[str, Any]]:
-        """The rule typing one property, or None. An override is a bare class."""
+        """The rule typing one property, or None. An override is a bare class.
+
+        Order: the home's override, then the first matching `properties` rule,
+        then -- for a sensor's own reading only -- its unit
+        (`environment_class_for_unit`), so a sensor HA gives no device_class
+        is still typed when its unit names one environment variable.
+        """
+        # 1. The home says what this property is.
         override = (self._device_override(device_name).get("properties") or {}).get(signal)
         if override:
             return {"class": str(override)}
+        # 2. The defaults, first match wins.
         for rule in self.mappings.get("properties") or []:
             if _matches(rule, entity, device=device_class, signal=signal):
                 return rule
+        # 3. A sensor's reading, typed by its unit alone.
+        if entity.domain == "sensor" and signal == "state":
+            by_unit = self.environment_class_for_unit(entity.unit)
+            if by_unit is not None:
+                return {"class": by_unit.curie}
         return None
 
     def property_class(self, device_name: Optional[str], device_class: Optional[str],
@@ -244,34 +345,150 @@ class Semantics:
             signals |= _as_set(rule.get("signals"))
         return signals
 
-    def environment_class(self, env_key: Optional[str]) -> Optional[str]:
-        """The homeont room variable a TD-SOSA effect key stands for."""
-        if not env_key:
+    # -- environment variables --------------------------------------------
+
+    def environment_class(self, curie: Optional[str]) -> Optional[EnvironmentClass]:
+        """The environment class a property class is, or None when homeont
+        does not make it a property of a space's environment."""
+        return self.environment_classes.get(curie or "")
+
+    def environment_class_for_unit(self, unit: Optional[str]) -> Optional[EnvironmentClass]:
+        """The one environment class whose homeont unit is this HA unit
+        (`lx` -> `unit:LUX` -> homeont:Illuminance), via the `units` table.
+
+        None when the unit is unknown or ambiguous: `%` is both relative
+        humidity and glare, and guessing between them would be worse than
+        leaving the reading untyped.
+        """
+        qudt_unit = expand((self.mappings.get("units") or {}).get(unit or ""))
+        if qudt_unit is None:
             return None
-        return (self.mappings.get("environment_variables") or {}).get(env_key)
+        matches = [c for c in self.environment_classes.values() if c.unit == qudt_unit]
+        return matches[0] if len(matches) == 1 else None
+
+    def variable(self, device_name: Optional[str],
+                 curie: Optional[str]) -> Optional[Variable]:
+        """The variable a device's property of class `curie` observes (or its
+        action moves), or None when `curie` is no environment class.
+
+        The device's `zone` makes it a second variable of the same class in
+        the same environment (`desk` -> `desk_illuminance`); its `environment`
+        moves it to another environment the home declares (`outdoor` ->
+        `outdoor_illuminance`, of the outdoor environment).
+        """
+        # 1. Only homeont's environment classes are variables.
+        cls = self.environment_class(curie)
+        if cls is None:
+            return None
+        # 2. Which environment, and which name in it: the class's, or zoned.
+        override = self._device_override(device_name)
+        environment = str(override.get("environment") or ROOM_ENVIRONMENT)
+        prefix = override.get("zone") or (
+            environment if environment != ROOM_ENVIRONMENT else None)
+        name = f"{prefix}_{cls.name}" if prefix else cls.name
+        return Variable(cls=cls, name=name, environment=environment)
+
+    def effects(self, device_name: Optional[str], domain: str,
+                service: str) -> List[Tuple[Variable, Optional[str]]]:
+        """The variables a service of a device moves, each with its direction
+        (`increase` / `decrease`, or None when the value decides).
+
+        The device's own `effects` replace the defaults (`effects` rules in
+        semantic_mappings.yaml). In a rule, `services` restricts which
+        services it covers, `<service>: increase|decrease` states a direction,
+        and `direction: none` makes every covered service directionless.
+        Otherwise the direction is read from the service name; a service with
+        none and no setter (a toggle, a stop) has no stated effect.
+        """
+        # 1. The rules that apply: the device's own, else the defaults for its domain.
+        override = self._device_override(device_name)
+        if "effects" in override:
+            rules = list(override.get("effects") or [])
+        else:
+            rules = [r for r in self.mappings.get("effects") or []
+                     if domain in _as_set(r.get("domain"))]
+
+        # 2. Each rule covering this service, with its direction.
+        out: List[Tuple[Variable, Optional[str]]] = []
+        for rule in rules:
+            if "services" in rule and service not in _as_set(rule["services"]):
+                continue
+            variable = self.variable(device_name, rule.get("class"))
+            if variable is None:
+                self._unmapped(f"effect class {rule.get('class')!r}")
+                continue
+            stated = rule.get(service)
+            if stated in DIRECTIONS:
+                out.append((variable, stated))
+            elif str(rule.get("direction")) == "none" or service in SETPOINT_SERVICES:
+                out.append((variable, None))
+            elif service_direction(service):
+                out.append((variable, service_direction(service)))
+        return out
+
+    def target_range(self, variable_name: str) -> Dict[str, Any]:
+        """The home's comfort range for a variable (`min`, `max`, `unit`), or {}."""
+        return dict((self.home.get("ranges") or {}).get(variable_name) or {})
+
+    def environments(self) -> Dict[str, Dict[str, Any]]:
+        """The environments the home declares beside the room's own, by key."""
+        return {str(k): dict(v or {}) for k, v in (self.home.get("environments") or {}).items()}
+
+    def variable_name(self, text: str) -> str:
+        """A variable's name from a name or an older key (`luminosity` ->
+        `illuminance`), via the `variable_aliases` table."""
+        return str((self.mappings.get("variable_aliases") or {}).get(text, text))
 
 
-def _homeont_labels(path: Path):
-    """From homeont: (room label lookup, class label table).
+def _homeont_tables(path: Path):
+    """From homeont: (room label lookup, class label table, environment classes).
 
     The first maps a normalised label / local name to a room class CURIE, for
     matching HA area names; the second maps every homeont class CURIE to its
-    `rdfs:label`, for naming what a device is.
+    `rdfs:label`, for naming what a device is; the third is every class
+    homeont makes a property of a space's environment (`_environment_classes`).
     """
+    # 1. The ontology; without it, every table is empty and nothing is typed.
     if not path.is_file():
-        return {}, {}
+        return {}, {}, {}
     graph = Graph()
     try:
         graph.parse(str(path), format="turtle")
     except Exception as exc:
         logger.warning("Could not read %s: %s", path, exc)
-        return {}, {}
+        return {}, {}, {}
+
+    # 2. Every class's English label.
     class_labels: Dict[str, str] = {}
     for subject, label in graph.subject_objects(RDFS.label):
         text = str(subject)
         if text.startswith(str(HOMEONT)) and getattr(label, "language", None) in (None, "en"):
             class_labels.setdefault("homeont:" + text[len(str(HOMEONT)):], str(label))
-    return _room_table(graph), class_labels
+    return _room_table(graph), class_labels, _environment_classes(graph, class_labels)
+
+
+def _environment_classes(graph: Graph,
+                         class_labels: Dict[str, str]) -> Dict[str, EnvironmentClass]:
+    """CURIE -> EnvironmentClass for every homeont class stated to be a
+    property of `homeont:Environment`, with its quantity kind and unit.
+
+    Read from the ontology, not listed here, so adding a variable to homeont
+    is enough for HASP to emit it.
+    """
+    out: Dict[str, EnvironmentClass] = {}
+    # Each homeont class with `ssn:isPropertyOf homeont:Environment`, with the
+    # name SimuHome would give it and what QUDT says it measures.
+    for cls in graph.subjects(SSN.isPropertyOf, HOMEONT.Environment):
+        text = str(cls)
+        if not text.startswith(str(HOMEONT)):
+            continue
+        local = text[len(str(HOMEONT)):]
+        curie = f"homeont:{local}"
+        out[curie] = EnvironmentClass(
+            curie=curie, name=snake_case(local), label=class_labels.get(curie),
+            quantity_kind=graph.value(cls, QUDT.hasQuantityKind),
+            unit=graph.value(cls, QUDT.unit))
+    return out
 
 
 def _room_table(graph: Graph) -> Dict[str, str]:
@@ -288,7 +505,8 @@ def _room_table(graph: Graph) -> Dict[str, str]:
 
 
 def _home_config(path: Optional[str]) -> Dict[str, Any]:
-    """The `semantic:` block of a home config, resolved like ygg_ha_adapter."""
+    """The `semantic:` block of a home config. A relative path that does not
+    exist is looked up beside this module, where the home configs live."""
     if not path:
         return {}
     candidate = Path(path)
@@ -306,8 +524,8 @@ def load_semantics(home_config: Optional[str] = None) -> Semantics:
     mappings = yaml.safe_load(MAPPINGS_PATH.read_text()) or {}
     home = _home_config(home_config if home_config is not None
                         else os.getenv("SEMANTIC_CONFIG"))
-    room_labels, class_labels = _homeont_labels(HOMEONT_PATH)
-    return Semantics(mappings, home, room_labels, class_labels)
+    room_labels, class_labels, environment_classes = _homeont_tables(HOMEONT_PATH)
+    return Semantics(mappings, home, room_labels, class_labels, environment_classes)
 
 
 # -- the semantics in use --------------------------------------------------
@@ -330,42 +548,160 @@ def reload(home_config: Optional[str] = None) -> Semantics:
     return _current
 
 
-# -- emitting it ----------------------------------------------------------
+# -- IRIs -----------------------------------------------------------------
+#
+# SimuHome's shapes: <room>#place, <room>#environment, <room>#<variable>. Every
+# document names these nodes by the same IRIs, so the workspace document and
+# each artifact's describe one graph.
 
-def room_place_uri(base: str, workspace_id: str) -> URIRef:
+def place_uri(base: str, workspace_id: str) -> URIRef:
     """The physical room an HA area is, distinct from its workspace."""
-    return URIRef(f"{base}workspaces/{workspace_id}#space")
+    return URIRef(f"{base}workspaces/{workspace_id}#place")
 
 
-def room_environment_uri(base: str, workspace_id: str) -> URIRef:
-    """The room's environment: what its sensors observe and actuators change."""
-    return URIRef(f"{base}workspaces/{workspace_id}#environment")
+def environment_uri(base: str, workspace_id: str,
+                    environment: str = ROOM_ENVIRONMENT) -> URIRef:
+    """An environment of a workspace: the room's own (`#environment`), or
+    one the home declares (`outdoor` -> `#outdoor_environment`)."""
+    suffix = "environment" if environment == ROOM_ENVIRONMENT else f"{environment}_environment"
+    return URIRef(f"{base}workspaces/{workspace_id}#{suffix}")
 
+
+def variable_uri(base: str, workspace_id: str, name: str) -> URIRef:
+    """An environment variable of a workspace (`#illuminance`)."""
+    return URIRef(f"{base}workspaces/{workspace_id}#{name}")
+
+
+def variable_target(base: str, workspace_id: str, name: str) -> URIRef:
+    """Where a variable's current value is read (HASP's room-property route)."""
+    return URIRef(f"{base}workspaces/{workspace_id}/properties/{name}")
+
+
+# -- emitting it ----------------------------------------------------------
 
 def add_room(graph: Graph, base: str, area: Dict[str, Any], workspace: URIRef) -> None:
     """The place and environment of one area, as SimuHome's room_workspace has them.
 
-    The resolvers scope by `?space a <room> ; homeont:isSpaceOfWorkspace ?ws`
-    and name the room by the space's `rdfs:label`.
+    The resolvers scope by `?place a <room> ; homeont:isSpaceOfWorkspace ?ws`
+    and name the room by the place's `rdfs:label`; they reach the room's
+    variables by `?place homeont:hasEnvironment ?env . ?env ssn:hasProperty ?var`.
     """
+    # 1. The place and its workspace.
     workspace_id = area["area_id"]
     title = area.get("name") or workspace_id
-    place = room_place_uri(base, workspace_id)
-    room_class = expand(current().location_class(area))
-    if room_class is not None:
-        graph.add((place, RDF.type, room_class))
-    graph.add((place, RDF.type, HOMEONT.BuildingSpace))
+    place = _add_place(graph, base, area)
     graph.add((place, RDFS.label, Literal(title)))
     graph.add((place, HOMEONT.isSpaceOfWorkspace, workspace))
     graph.add((workspace, HOMEONT.hasSpace, place))
 
-    environment = room_environment_uri(base, workspace_id)
+    # 2. Its environment, labelled, and offered on the workspace as SimuHome does.
+    environment = environment_uri(base, workspace_id)
+    graph.add((environment, RDFS.label, Literal(f"{title} environment")))
+    graph.add((workspace, TD.hasPropertyAffordance, environment))
+    graph.bind("homeont", HOMEONT)
+
+
+def _add_place(graph: Graph, base: str, area: Dict[str, Any]) -> URIRef:
+    """The place of an area typed with its room class, and its environment
+    linked both ways; the place IRI."""
+    workspace_id = area["area_id"]
+    place = place_uri(base, workspace_id)
+    room_class = expand(current().location_class(area))
+    if room_class is not None:
+        graph.add((place, RDF.type, room_class))
+    graph.add((place, RDF.type, HOMEONT.BuildingSpace))
+    environment = environment_uri(base, workspace_id)
     graph.add((environment, RDF.type, HOMEONT.Environment))
     graph.add((environment, RDF.type, SOSA.FeatureOfInterest))
-    graph.add((environment, RDFS.label, Literal(f"{title} environment")))
     graph.add((environment, HOMEONT.isEnvironmentOf, place))
     graph.add((place, HOMEONT.hasEnvironment, environment))
+    return place
+
+
+def add_place_context(graph: Graph, base: str, area: Dict[str, Any], artifact: URIRef) -> None:
+    """Where an artifact is, in its own document: located in the room's
+    place, which has the room's environment -- so an agent holding only this
+    TD can walk from the device to the room and its variables."""
+    place = _add_place(graph, base, area)
+    graph.add((artifact, HOMEONT.isLocatedIn, place))
+    graph.add((place, HOMEONT.containsArtifact, artifact))
     graph.bind("homeont", HOMEONT)
+
+
+def add_environment(graph: Graph, base: str, workspace_id: str, key: str,
+                    label: Optional[str] = None) -> URIRef:
+    """An environment the home declares beside the room's (`outdoor`): a
+    feature of interest of its own, which no place `hasEnvironment` -- the
+    room's queries must not take the outdoor light for the room's."""
+    environment = environment_uri(base, workspace_id, key)
+    graph.add((environment, RDF.type, HOMEONT.Environment))
+    graph.add((environment, RDF.type, SOSA.FeatureOfInterest))
+    graph.add((environment, RDFS.label, Literal(label or f"{key.capitalize()} environment")))
+    return environment
+
+
+def link_variable(graph: Graph, base: str, workspace_id: str, variable: Variable) -> URIRef:
+    """The variable as an artifact's document mentions it: its class and the
+    environment it belongs to. Its full description is the workspace's
+    (`add_variable`); the IRI is the same in both."""
+    node = variable_uri(base, workspace_id, variable.name)
+    add_type(graph, node, variable.cls.curie)
+    graph.add((node, SSN.isPropertyOf, environment_uri(base, workspace_id, variable.environment)))
+    return node
+
+
+def add_variable(graph: Graph, base: str, workspace_id: str, variable: Variable,
+                 readable: bool, target: Optional[Dict[str, Any]] = None) -> URIRef:
+    """A room variable in full, as SimuHome's room_workspace describes it.
+
+    Typed with its homeont class and as a TD property affordance of the
+    environment; named; with its quantity kind and unit; readable through
+    HASP's room-property route when some device observes it (`readable`),
+    otherwise marked not observable and given no form; with the home's
+    comfort range (`target`: min / max / unit) when it states one.
+    """
+    # 1. What it is, and whose property.
+    node = link_variable(graph, base, workspace_id, variable)
+    environment = environment_uri(base, workspace_id, variable.environment)
+    graph.add((environment, SSN.hasProperty, node))
+    for cls in (TD.PropertyAffordance, TDSOSA.ObservablePropertyAffordance,
+                SOSA.ObservableProperty):
+        graph.add((node, RDF.type, cls))
+    graph.add((node, TD.name, Literal(variable.name)))
+    graph.add((node, TD.title, Literal(variable.name)))
+    graph.add((node, TD.isObservable, Literal(readable)))
+
+    # 2. What it measures, and the shape of its value.
+    if variable.cls.quantity_kind is not None:
+        graph.add((node, QUDT.hasQuantityKind, variable.cls.quantity_kind))
+    if variable.cls.unit is not None:
+        graph.add((node, QUDT.unit, variable.cls.unit))
+        schema = BNode()
+        graph.add((schema, RDF.type, JS.NumberSchema))
+        graph.add((schema, QUDT.unit, variable.cls.unit))
+        graph.add((node, TD.hasOutputSchema, schema))
+
+    # 3. How to read it -- only when a device observes it.
+    if readable:
+        form = BNode()
+        graph.add((node, TD.hasForm, form))
+        graph.add((form, HTV.methodName, Literal("GET")))
+        graph.add((form, HCTL.hasTarget, variable_target(base, workspace_id, variable.name)))
+        graph.add((form, HCTL.forContentType, Literal("application/json")))
+        graph.add((form, HCTL.hasOperationType, TD.readProperty))
+
+    # 4. The comfort range the home wants it kept in.
+    target = target or {}
+    if "min" in target:
+        graph.add((node, TDSOSA.targetMinValue, Literal(target["min"])))
+    if "max" in target:
+        graph.add((node, TDSOSA.targetMaxValue, Literal(target["max"])))
+    if "unit" in target:
+        graph.add((node, TDSOSA.targetUnit, Literal(str(target["unit"]))))
+    for prefix, namespace in (("ssn", SSN), ("qudt", QUDT), ("unit", UNIT),
+                              ("quantitykind", QUANTITYKIND), ("tdsosa", TDSOSA)):
+        graph.bind(prefix, namespace)
+    return node
 
 
 def add_label(graph: Graph, artifact: Any, device_class: Optional[str]) -> None:

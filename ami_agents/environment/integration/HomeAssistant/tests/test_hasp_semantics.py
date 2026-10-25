@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from hasp_semantics import Entity, light_supports, load_semantics
+from hasp_semantics import Entity, light_supports, load_semantics, snake_case
 
 LAB308E = Path(__file__).resolve().parents[1] / "lab308e.yaml"
 
@@ -112,9 +112,79 @@ class TestRooms:
         assert lab308e.location_class({"area_id": "lab308e"}) == "homeont:StudyRoom"
 
 
-def test_environment_keys(defaults):
-    assert defaults.environment_class("thermal_comfort") == "homeont:AirTemperature"
-    assert defaults.environment_class("security_state") is None
+# -- environment variables ------------------------------------------------------
+
+class TestEnvironmentVariables:
+    """Which variables exist, what they are called, which devices observe and
+    move them -- derived from homeont and HA's vocabulary, not listed."""
+
+    def test_the_variables_are_homeonts_environment_classes(self, defaults):
+        names = {c.name for c in defaults.environment_classes.values()}
+        assert {"air_temperature", "relative_humidity", "illuminance",
+                "pm10_mass_concentration", "carbon_dioxide_concentration",
+                "occupancy", "occupant_count", "glare"} <= names
+        assert defaults.environment_class("homeont:DimmableLightOnOff") is None
+
+    def test_quantity_kinds_and_units_come_from_homeont(self, defaults):
+        co2 = defaults.environment_class("homeont:CarbonDioxideConcentration")
+        assert str(co2.quantity_kind).endswith("quantitykind/MoleFraction")
+        assert str(co2.unit).endswith("unit/PPM")
+        assert str(defaults.environment_class("homeont:Glare").quantity_kind).endswith(
+            "quantitykind/DimensionlessRatio")
+        assert str(defaults.environment_class("homeont:OccupantCount").quantity_kind).endswith(
+            "quantitykind/Count")
+
+    @pytest.mark.parametrize("local, name", [
+        ("AirTemperature", "air_temperature"),
+        ("Pm10MassConcentration", "pm10_mass_concentration"),
+        ("Illuminance", "illuminance"),
+    ])
+    def test_names_are_simuhomes(self, local, name):
+        assert snake_case(local) == name
+
+    def test_a_sensor_without_device_class_is_typed_by_its_unit(self, defaults):
+        lux = Entity("sensor", {"unit_of_measurement": "lx"})
+        assert defaults.property_class("x", None, lux, "state") == "homeont:Illuminance"
+        # "%" is humidity and glare alike: no guess.
+        percent = Entity("sensor", {"unit_of_measurement": "%"})
+        assert defaults.property_class("x", None, percent, "state") is None
+
+    def test_zone_and_environment_name_the_variable(self, lab308e):
+        assert lab308e.variable("internal_light_sensing_308e",
+                                "homeont:Illuminance").name == "illuminance"
+        assert lab308e.variable("desk_light_sensing_308e",
+                                "homeont:Illuminance").name == "desk_illuminance"
+        outdoor = lab308e.variable("external_light_sensing_308e", "homeont:Illuminance")
+        assert (outdoor.name, outdoor.environment) == ("outdoor_illuminance", "outdoor")
+
+    @pytest.mark.parametrize("device, domain, service, expected", [
+        ("lamp", "light", "turn_on", [("illuminance", "increase")]),
+        ("blinds", "cover", "close_cover", [("illuminance", "decrease")]),
+        ("blinds", "cover", "set_cover_position", [("illuminance", None)]),
+        ("blinds", "cover", "stop_cover", []),
+        ("ac", "climate", "turn_on", [("air_temperature", None)]),
+        ("projector", "media_player", "turn_on", []),
+    ])
+    def test_default_effects(self, defaults, device, domain, service, expected):
+        got = defaults.effects(device, domain, service)
+        assert [(v.name, d) for v, d in got] == expected
+
+    @pytest.mark.parametrize("device, domain, service, expected", [
+        ("desk_lamp_308e", "light", "turn_on", [("desk_illuminance", "increase")]),
+        ("window_308e", "cover", "open_cover", [("carbon_dioxide_concentration", "decrease")]),
+        ("blackout_blinds_308e", "cover", "close_cover", [("glare", "decrease")]),
+        ("ceiling_fan_308e", "switch", "turn_on", [("air_temperature", "decrease")]),
+    ])
+    def test_a_homes_effects_replace_the_defaults(self, lab308e, device, domain,
+                                                  service, expected):
+        got = lab308e.effects(device, domain, service)
+        assert [(v.name, d) for v, d in got] == expected
+
+    def test_ranges_and_older_names(self, lab308e):
+        assert lab308e.target_range("desk_illuminance") == {"min": 300, "unit": "lx"}
+        assert lab308e.variable_name("luminosity") == "illuminance"
+        assert lab308e.variable_name("thermal_comfort") == "air_temperature"
+        assert lab308e.variable_name("illuminance") == "illuminance"
 
 
 def test_light_supports():

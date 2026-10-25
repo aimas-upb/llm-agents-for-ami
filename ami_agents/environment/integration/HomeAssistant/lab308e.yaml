@@ -1,19 +1,53 @@
 version: 1
 
 semantic:
-  # Read by HASP (via SEMANTIC_CONFIG): `location_class`, and per device
-  # `device_class`, `properties` and `commands`, overriding
-  # semantic_mappings.yaml. Only what the defaults cannot infer is here.
+  # Read by HASP (via SEMANTIC_CONFIG), overriding semantic_mappings.yaml. Only
+  # what Home Assistant cannot tell is here; every room variable, its sensors
+  # and the lights' and climate's effects are derived from the deployment.
+  #   location_class   the room the area is
+  #   environments     environments beside the room's own (no place has them)
+  #   devices          per device: device_class, properties, commands,
+  #                    zone (a second variable of the same class in the room),
+  #                    environment (observes / acts on another environment),
+  #                    effects (replace the defaults; see semantic_mappings.yaml)
+  #   ranges           comfort targets, by variable name
   location_class: "homeont:StudyRoom"
+  environments:
+    outdoor: {label: "Outdoor environment"}
   devices:
     ceiling_fan_308e:
-      # A fan wired as an HA switch: HA cannot tell it is a fan.
+      # A fan wired as an HA switch: HA cannot tell it is a fan, nor that the
+      # lab's model has it cool the room.
       device_class: "homeont:Fan"
+      effects:
+        - {class: "homeont:AirTemperature", services: [turn_on, turn_off], turn_on: decrease, turn_off: increase}
     glare_sensing_308e:
       # A bare "%" sensor: the unit alone does not say what it measures.
       device_class: "homeont:GlareSensor"
       properties:
         state: "homeont:Glare"
+    desk_light_sensing_308e:
+      zone: desk                  # observes desk_illuminance, not the room's
+    desk_lamp_308e:
+      zone: desk                  # its light moves desk_illuminance
+    external_light_sensing_308e:
+      environment: outdoor        # observes outdoor_illuminance
+    blackout_blinds_308e:
+      # Blocks direct sunlight: moves glare rather than the room's light level.
+      effects:
+        - {class: "homeont:Glare", services: [open_cover, close_cover, set_cover_position]}
+    window_308e:
+      # Opening it ventilates: CO2 falls.
+      effects:
+        - {class: "homeont:CarbonDioxideConcentration", services: [open_cover, close_cover],
+           open_cover: decrease, close_cover: increase}
+  ranges:
+    illuminance: {min: 200, unit: lx}
+    desk_illuminance: {min: 300, unit: lx}
+    glare: {max: 50, unit: percent}
+    carbon_dioxide_concentration: {max: 2100, unit: ppm}
+    air_temperature: {max: 24, unit: degC}
+    relative_humidity: {min: 30, max: 60, unit: percent}
 
 devices:
   ambient_lights_308e:
