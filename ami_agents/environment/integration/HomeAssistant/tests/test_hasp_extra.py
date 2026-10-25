@@ -270,7 +270,8 @@ def test_artifact_slug_prefers_entity_object_id(monkeypatch):
 
     artifact = client.get("/workspaces/lab/artifacts/blinds_308")
     assert artifact.status_code == 200
-    assert 'td:title "blinds_308 cover"' in artifact.text
+    assert 'td:title "blinds_308"' in artifact.text
+    assert 'schema:name "blinds_308 cover"' in artifact.text
 
     workspace = client.get("/workspaces/lab")
     assert workspace.status_code == 200
