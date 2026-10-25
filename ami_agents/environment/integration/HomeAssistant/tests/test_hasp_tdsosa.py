@@ -121,12 +121,13 @@ def test_tdsosa_observable_property_links_added_for_sensor_state():
     g = _ttl_graph(r.text)
 
     env_uri = URIRef("http://testserver/workspaces/lab308/environment/thermal_comfort")
-    foi_uri = URIRef(f"http://testserver/workspaces/lab308/artifacts/{artifact}/environment#foi")
+    foi_uri = URIRef("http://testserver/workspaces/lab308#environment")
 
     assert (None, TDSOSA.affordsProperty, env_uri) in g
     assert (None, RDF.type, TDSOSA.ObservablePropertyAffordance) in g
     assert (env_uri, RDF.type, SOSA.ObservableProperty) in g
     assert (foi_uri, SSN.hasProperty, env_uri) in g
+    assert set(g.objects(env_uri, SSN.isPropertyOf)) == {foi_uri}
 
 
 def test_tdsosa_override_resolution_prefers_specific_key(monkeypatch):

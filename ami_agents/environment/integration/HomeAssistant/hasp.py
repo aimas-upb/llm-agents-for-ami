@@ -661,34 +661,31 @@ def _add_environment_variable_semantics(
     rdf: HomeAssistantRDF,
     env_var_uri: URIRef,
     env_var_key: Optional[str],
-    room_environment: Optional[URIRef],
+    room_environment: URIRef,
 ) -> None:
-    """Type a TD-SOSA effect key's URI with the homeont room variable it is.
+    """Attach a shared variable to its room environment, and type it if mapped.
 
     The key-based URI (…/environment/thermal_comfort) stays, so plans and
     signifiers that name it are unaffected; the class beside it is what the
     capability resolver matches an effect by.
     """
     env_class = hasp_semantics.current().environment_class(env_var_key)
-    if env_class is None:
-        return
-    hasp_semantics.add_type(rdf.g, env_var_uri, env_class)
-    if room_environment is not None:
-        rdf.g.add((env_var_uri, SSN.isPropertyOf, room_environment))
-        # The planner traverses environment -> variable; its type closure
-        # does not infer inverse properties, so publish both directions.
-        rdf.g.add((room_environment, SSN.hasProperty, env_var_uri))
+    if env_class is not None:
+        hasp_semantics.add_type(rdf.g, env_var_uri, env_class)
+    # Ownership does not depend on whether the variable has a class mapping.
+    # The planner's type closure does not infer inverse properties.
+    rdf.g.add((env_var_uri, SSN.isPropertyOf, room_environment))
+    rdf.g.add((room_environment, SSN.hasProperty, env_var_uri))
 
 
 def _add_tdsosa_property_links(
     rdf: HomeAssistantRDF,
     property_affordance: BNode,
-    feature_of_interest: URIRef,
+    room_environment: URIRef,
     env_var_uri: URIRef,
     env_var_key: Optional[str],
     observable: bool,
     actuatable: bool,
-    room_environment: Optional[URIRef] = None,
 ) -> None:
     _add_environment_variable_semantics(rdf, env_var_uri, env_var_key, room_environment)
     if observable:
@@ -698,8 +695,6 @@ def _add_tdsosa_property_links(
         rdf.g.add((property_affordance, RDF.type, TDSOSA.ActuatablePropertyAffordance))
         rdf.g.add((env_var_uri, RDF.type, SOSA.ActuatableProperty))
     rdf.g.add((property_affordance, TDSOSA.affordsProperty, env_var_uri))
-    rdf.g.add((feature_of_interest, SSN.hasProperty, env_var_uri))
-    rdf.g.add((env_var_uri, SSN.isPropertyOf, feature_of_interest))
     range_hint = _resolve_property_range(env_var_key, env_var_uri)
     if range_hint:
         if "min" in range_hint:
@@ -713,13 +708,12 @@ def _add_tdsosa_property_links(
 def _add_tdsosa_action_effect(
     rdf: HomeAssistantRDF,
     action_affordance: BNode,
-    feature_of_interest: URIRef,
+    room_environment: URIRef,
     env_var_uri: URIRef,
     env_var_key: Optional[str],
     actuation_uri: URIRef,
     direction: Optional[str],
     settling_time_seconds: Optional[float] = None,
-    room_environment: Optional[URIRef] = None,
 ) -> None:
     _add_environment_variable_semantics(rdf, env_var_uri, env_var_key, room_environment)
     rdf.g.add((action_affordance, TDSOSA.hasEffectActuation, actuation_uri))
@@ -742,8 +736,6 @@ def _add_tdsosa_action_effect(
         rdf.g.add((duration, RDF.type, TIME.Duration))
         rdf.g.add((duration, TIME.numericDuration, Literal(float(settling_time_seconds), datatype=XSD.decimal)))
         rdf.g.add((duration, TIME.unitType, TIME.unitSecond))
-    rdf.g.add((feature_of_interest, SSN.hasProperty, env_var_uri))
-    rdf.g.add((env_var_uri, SSN.isPropertyOf, feature_of_interest))
     rdf.g.add((env_var_uri, RDF.type, SOSA.ObservableProperty))
     rdf.g.add((env_var_uri, RDF.type, SOSA.ActuatableProperty))
     range_hint = _resolve_property_range(env_var_key, env_var_uri)
@@ -1139,7 +1131,6 @@ def _build_cached_artifact_ttl(
     ws = URIRef(f"{rdf.base}workspaces/{aid}#workspace")
     art_dir = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/")
     art = URIRef(f"{art_dir}{safe_name}#artifact")
-    artifact_foi = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/environment#foi")
 
     for prefix, ns in {
         "sosa": SOSA,
@@ -1171,8 +1162,6 @@ def _build_cached_artifact_ttl(
         text = str(value).strip()
         if text:
             rdf.g.add((art, predicate, Literal(text)))
-    rdf.g.add((artifact_foi, RDF.type, SOSA.FeatureOfInterest))
-    rdf.g.add((artifact_foi, TD.title, Literal(f"{artifact_label} environment")))
     domains = {e["entity_id"].split(".")[0] for e in device_entities if e.get("entity_id")}
     if "light" in domains:
         rdf.g.add((art, RDF.type, EX.HueLamp))
@@ -1294,7 +1283,6 @@ def _build_cached_artifact_ttl(
                 _add_tdsosa_action_effect(
                     rdf=rdf,
                     action_affordance=action_affordance,
-                    feature_of_interest=artifact_foi,
                     env_var_uri=env_var_uri,
                     env_var_key=env_var_key,
                     actuation_uri=actuation_uri,
@@ -1354,7 +1342,7 @@ def _build_cached_artifact_ttl(
             if state_prop and state_env_key:
                 env_var_uri = _env_var_uri(rdf.base, aid, state_env_key)
                 _add_tdsosa_property_links(
-                    rdf=rdf, property_affordance=state_prop, feature_of_interest=artifact_foi,
+                    rdf=rdf, property_affordance=state_prop,
                     env_var_uri=env_var_uri, env_var_key=state_env_key,
                     observable=_domain_is_observer(entity_domain),
                     actuatable=_domain_is_actuator(entity_domain),
@@ -1388,7 +1376,7 @@ def _build_cached_artifact_ttl(
                 if op_prop and env_var_key:
                     env_var_uri = _env_var_uri(rdf.base, aid, env_var_key)
                     _add_tdsosa_property_links(
-                        rdf=rdf, property_affordance=op_prop, feature_of_interest=artifact_foi,
+                        rdf=rdf, property_affordance=op_prop,
                         env_var_uri=env_var_uri, env_var_key=env_var_key,
                         observable=_domain_is_observer(domain),
                         actuatable=_domain_is_actuator(domain),

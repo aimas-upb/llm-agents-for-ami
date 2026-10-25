@@ -129,6 +129,36 @@ def _names(result):
     return sorted({e.artifact_name for e in entries})
 
 
+def test_room_exclusively_owns_the_shared_environment_properties(graph):
+    home = Namespace("http://example.org/homeont/")
+    ssn = Namespace("http://www.w3.org/ns/ssn/")
+    sosa = Namespace("http://www.w3.org/ns/sosa/")
+    tdsosa = Namespace("https://example.org/hmas/td-sosa-ext#")
+    td = Namespace("https://www.w3.org/2019/wot/td#")
+    base = "http://testserver/workspaces/lab308e"
+    room = URIRef(base + "#space")
+    environment = URIRef(base + "#environment")
+    assert (URIRef(base + "#workspace"), home.hasSpace, room) in graph
+    assert (room, home.hasEnvironment, environment) in graph
+    variables = set(graph.objects(None, sosa.actsOnProperty)) | set(graph.objects(None, tdsosa.affordsProperty))
+    assert variables
+    for variable in variables:
+        assert set(graph.objects(variable, ssn.isPropertyOf)) == {environment}
+        assert set(graph.subjects(ssn.hasProperty, variable)) == {environment}
+    assert not any("/artifacts/" in str(node) and str(node).endswith("/environment#foi")
+                   for node in graph.all_nodes())
+
+    # Lights and the sensor must still point to the very same room variable.
+    luminosity = URIRef(base + "/environment/luminosity")
+    for name in ("ambient_lights_308e", "task_lights_308e"):
+        actions = graph.objects(URIRef(base + f"/artifacts/{name}#artifact"), td.hasActionAffordance)
+        assert any((actuation, sosa.actsOnProperty, luminosity) in graph
+                   for action in actions for actuation in graph.objects(action, tdsosa.hasEffectActuation))
+    sensor = URIRef(base + "/artifacts/internal_light_sensing_308e#artifact")
+    assert any((prop, tdsosa.affordsProperty, luminosity) in graph
+               for prop in graph.objects(sensor, td.hasPropertyAffordance))
+
+
 def test_entity_only_covers_publish_canonical_names_for_the_unmodified_planner(monkeypatch):
     """HA can report several entity-only covers all named 'Cover'."""
     names = ["blinds_308e_cover", "blackout_blinds_308e_cover", "window_308e_cover"]
