@@ -12,10 +12,11 @@ import json
 import sys
 from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
-from rdflib import Graph
+from rdflib import Graph, Literal, Namespace, URIRef
 
 import hasp as appmod
 
@@ -27,6 +28,11 @@ from ami_agents.agents.env_explorer.utils.capability_resolution import (  # noqa
     CapabilityOutcome,
     resolve_capability_request,
 )
+from ami_agents.agents.interaction_solver.utils.specific_capability_context import (  # noqa: E402
+    artifact_affordances,
+)
+from ami_agents.bt_planning.planning.affordance_refs import AffordanceCatalog  # noqa: E402
+from ami_agents.bt_planning.planning.bt_planner import AsyncBTPlanner  # noqa: E402
 from ami_agents.agents.env_explorer.utils.state_resolution import (  # noqa: E402
     StateOutcome,
     load_vocabulary,
@@ -73,6 +79,8 @@ def _hasp_on_fixture():
     patch = pytest.MonkeyPatch()
     patch.setattr(appmod, "AREAS", set())
     patch.setattr(appmod, "BASE_WS_URI", "http://localhost:8080")
+    # A cache left by another test would serve that test's home.
+    patch.setattr(appmod.app.state, "graph_cache", None, raising=False)
     patch.setattr(appmod, "ha_client", FixtureHAWS())
     patch.setattr(appmod, "ha_rest", FixtureHAREST())
     patch.setenv("SEMANTIC_CONFIG", str(HOME_CONFIG))
@@ -319,3 +327,51 @@ class TestActsUpon:
             device_property={"class": "homeont:MediaPlaybackState"},
             command={"class": "saref:SetAbsoluteLevelCommand"})
         assert result.outcome is CapabilityOutcome.DEVICE_LACKS
+
+
+# -- artifact names (icordos, 3813728) ------------------------------------------------
+
+def test_entity_only_covers_publish_canonical_names_for_the_unmodified_planner(monkeypatch):
+    """HA can report several entity-only covers all named 'Cover': each TD's
+    `td:title` is its stable slug, HA's display name its `schema:name`, and
+    the planner resolves an action by the slug."""
+    # 1. Three device-less covers HA names alike.
+    names = ["blinds_308e_cover", "blackout_blinds_308e_cover", "window_308e_cover"]
+    entities = [{"entity_id": f"cover.{name}", "device_id": None, "area_id": AREA,
+                 "name": None, "original_name": "Cover"} for name in names]
+    states = [{"entity_id": ent["entity_id"], "state": "open",
+               "attributes": {"current_position": 100, "supported_features": 15}}
+              for ent in entities]
+    monkeypatch.setattr(FixtureHAWS, "get_devices", AsyncMock(return_value=[]))
+    monkeypatch.setattr(FixtureHAWS, "get_entities", AsyncMock(return_value=entities))
+    monkeypatch.setattr(FixtureHAREST, "get_states", AsyncMock(return_value=states))
+    td = Namespace("https://www.w3.org/2019/wot/td#")
+    schema = Namespace("https://schema.org/")
+
+    # 2. Every document names each cover the same way.
+    graph = Graph()
+    with _hasp_on_fixture() as client:
+        responses = [client.get(f"/workspaces/{AREA}"), client.get(f"/workspaces/{AREA}/artifacts")]
+        responses += [client.get(f"/workspaces/{AREA}/artifacts/{name}") for name in names]
+        for response in responses:
+            assert response.status_code == 200
+            document = Graph().parse(data=response.text, format="turtle")
+            for name in names:
+                artifact = URIRef(f"http://testserver/workspaces/{AREA}/artifacts/{name}#artifact")
+                if (artifact, None, None) in document:
+                    assert set(document.objects(artifact, td.title)) == {Literal(name)}
+                    assert document.value(artifact, schema.name) == Literal(f"Cover ({name})")
+            graph += document
+        # HA display-name lookup still reaches the same canonical TD.
+        named = client.get(f"/workspaces/{AREA}/artifacts/Cover ({names[0]})")
+        assert named.status_code == 200
+        assert (URIRef(f"http://testserver/workspaces/{AREA}/artifacts/{names[0]}#artifact"),
+                td.title, Literal(names[0])) in Graph().parse(data=named.text, format="turtle")
+
+    # 3. The planner resolves an action by the slug.
+    affordances = artifact_affordances(graph, URIRef(
+        f"http://testserver/workspaces/{AREA}/artifacts/{names[0]}#artifact"))
+    tree = {"type": "action", "artifact": names[0], "affordance": "CoverOpenCover",
+            "affordance_class": "saref:OpenCommand"}
+    assert AsyncBTPlanner()._resolve_affordance_refs(tree, AffordanceCatalog(affordances)) == []
+    assert tree["action_url"].endswith(f"/{names[0]}/ha/cover/open_cover")

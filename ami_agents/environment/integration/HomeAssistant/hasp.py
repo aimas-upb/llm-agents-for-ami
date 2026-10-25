@@ -836,6 +836,11 @@ def _build_cached_artifact_ttl(
     rdf.g.add((art, RDF.type, TD.Thing))
     rdf.g.add((art, RDF.type, HMAS.Artifact))
     rdf.g.add((art, TD.title, Literal(artifact_label)))
+    # `td:title` is the stable instance name (the slug); HA's display name,
+    # which a user may change, is `schema:name`.
+    display_label = next((e.get("_artifact_display_label") for e in device_entities
+                          if e.get("_artifact_display_label")), artifact_label)
+    rdf.g.add((art, SCHEMA.name, Literal(display_label)))
 
     # 2. Thing-level device metadata, straight from the Home Assistant device
     # registry (`config/device_registry/list`). A fact about the device, not an

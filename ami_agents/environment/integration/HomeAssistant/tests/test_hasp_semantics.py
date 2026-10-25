@@ -172,7 +172,8 @@ class TestEnvironmentVariables:
     @pytest.mark.parametrize("device, domain, service, expected", [
         ("desk_lamp_308e", "light", "turn_on", [("desk_illuminance", "increase")]),
         ("window_308e", "cover", "open_cover", [("carbon_dioxide_concentration", "decrease")]),
-        ("blackout_blinds_308e", "cover", "close_cover", [("glare", "decrease")]),
+        ("blackout_blinds_308e", "cover", "close_cover",
+         [("illuminance", "decrease"), ("glare", "decrease")]),
         ("ceiling_fan_308e", "switch", "turn_on", [("air_temperature", "decrease")]),
     ])
     def test_a_homes_effects_replace_the_defaults(self, lab308e, device, domain,

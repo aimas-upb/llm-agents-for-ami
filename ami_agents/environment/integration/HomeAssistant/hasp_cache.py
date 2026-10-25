@@ -17,6 +17,7 @@ except ImportError:  # pragma: no cover
 
 HMAS = Namespace("https://purl.org/hmas/")
 TD = Namespace("https://www.w3.org/2019/wot/td#")
+SCHEMA = Namespace("https://schema.org/")
 HCTL = Namespace("https://www.w3.org/2019/wot/hypermedia#")
 SOSA = Namespace("http://www.w3.org/ns/sosa/")
 SSN = Namespace("http://www.w3.org/ns/ssn/")
@@ -638,7 +639,7 @@ class HASPGraphCache:
                     suffix = ent.get("entity_id", "")
                     object_id = suffix.split(".", 1)[1] if isinstance(suffix, str) and "." in suffix else suffix
                     label = f"{base_label} ({object_id})"
-                ent["_artifact_label"] = label
+                ent["_artifact_display_label"] = label
                 base_slug = _artifact_slug_from_entity(ent, label)
                 slug_counts[base_slug] = slug_counts.get(base_slug, 0) + 1
                 if slug_counts[base_slug] > 1:
@@ -648,6 +649,9 @@ class HASPGraphCache:
                     else:
                         base_slug = label
                 ent["_artifact_slug"] = urllib.parse.quote(base_slug, safe="")
+                # One instance name across listings, TDs, and focus contexts.
+                # Keep HA's mutable display name as separate metadata.
+                ent["_artifact_label"] = base_slug
             self.workspace_devices[workspace_id] = filtered_devices
             self.workspace_entities[workspace_id] = workspace_entities
 
@@ -662,6 +666,7 @@ class HASPGraphCache:
             object_id = ent.get("entity_id", "").split(".", 1)[-1]
             candidates = {
                 label, ent.get("_artifact_base_label", ""), ent.get("_artifact_slug", ""),
+                ent.get("_artifact_display_label", ""),
                 _entity_display_name(ent, dev_by_id), ent.get("entity_id", ""), object_id,
             }
             matched = decoded_name in {c for c in candidates if c} or any(_canonical_label(c) == decoded_canon for c in candidates if c)
@@ -814,6 +819,7 @@ class HASPGraphCache:
             rdf.g.add((art, RDF.type, HMAS.Artifact))
             rdf.g.add((ws, HMAS.contains, art))
             rdf.g.add((art, TD.title, Literal(label)))
+            rdf.g.add((art, SCHEMA.name, Literal(ent.get("_artifact_display_label") or label)))
             for cls in (artifacts_graph.objects(art, RDF.type) if artifacts_graph is not None else []):
                 if str(cls).startswith(str(hasp_semantics.HOMEONT)):
                     rdf.g.add((art, RDF.type, cls))
@@ -832,4 +838,5 @@ class HASPGraphCache:
             rdf.g.add((art, RDF.type, HMAS.Artifact))
             rdf.g.add((ws, HMAS.contains, art))
             rdf.g.add((art, TD.title, Literal(label)))
+            rdf.g.add((art, SCHEMA.name, Literal(ent.get("_artifact_display_label") or label)))
         return rdf.serialize()

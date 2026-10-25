@@ -28,6 +28,9 @@ REPO = Path(__file__).resolve().parents[5]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
+from ami_agents.agents.env_explorer.utils.actuation_context import (  # noqa: E402
+    build_actuation_context,
+)
 from ami_agents.agents.interaction_solver.utils.specific_capability_context import (  # noqa: E402
     build_specific_context,
 )
@@ -188,3 +191,89 @@ def test_an_ambiguous_goal_finds_what_lights_the_room(graph):
     assert "desk_lamp_308e" in context.artifacts
     # The window moves CO2, not light.
     assert "window_308e" not in context.artifacts
+
+
+# -- regressions (icordos, 3a964c9 / 3813728, ported to the room-variable IRIs) ---------
+
+def _closed(graph: Graph) -> Graph:
+    """The served graph closed under the ontology, as the agents query it."""
+    closed = Graph()
+    closed += graph
+    close_types(closed)
+    return closed
+
+
+def _ambiguous(variable_class: str, direction: str) -> GoalSpec:
+    """An ambiguous goal on one lab308e room variable."""
+    return GoalSpec.from_dict({
+        "goal_kind": "achievement", "goal_specificity": "ambiguous",
+        "implied_environment_vars": [{
+            "property_name": variable_class.split(":")[1],
+            "property_class": variable_class,
+            "property_sensed_space": {"space_class": "homeont:StudyRoom", "space_name": AREA},
+            "property_change_direction": direction}]})
+
+
+def test_each_variable_has_exactly_one_environment(graph):
+    """Every variable an action moves or a device observes belongs to one
+    environment, which alone has it; no per-artifact environment remains; the
+    lights and the light sensor name the very same room variable."""
+    # 1. One owner, both directions.
+    variables = (set(graph.objects(None, SOSA.actsOnProperty))
+                 | set(graph.objects(None, SOSA.observes)))
+    assert variables
+    for variable in variables:
+        owners = set(graph.objects(variable, SSN.isPropertyOf))
+        assert len(owners) == 1, variable
+        assert set(graph.subjects(SSN.hasProperty, variable)) == owners, variable
+    assert not any("/artifacts/" in str(node) and str(node).endswith("#foi")
+                   for node in graph.all_nodes())
+
+    # 2. Shared references to the room's illuminance.
+    illuminance = _var("illuminance")
+    for name in ("ambient_lights_308e", "task_lights_308e"):
+        actions = graph.objects(_artifact(name), TD.hasActionAffordance)
+        assert any((actuation, SOSA.actsOnProperty, illuminance) in graph
+                   for action in actions
+                   for actuation in graph.objects(action, TDSOSA.hasEffectActuation))
+    assert (_artifact("internal_light_sensing_308e"), SOSA.observes, illuminance) in graph
+
+
+def test_the_window_lowers_co2(graph):
+    """"The air is stuffy": the structurer sees a measurable CO2 variable, and
+    the ISA's context finds the window lowering it and the CO2 sensor."""
+    # 1. What the UA's structurer is shown of the room.
+    closed = _closed(graph)
+    view = build_actuation_context(closed, with_environment=True)
+    variables = [var for ws in view["workspaces"]
+                 for var in (ws.get("environment") or {}).get("variables", [])]
+    assert any(var["class"] == "homeont:CarbonDioxideConcentration" for var in variables)
+
+    # 2. The ISA's context for lowering it.
+    context = build_specific_context(closed, _ambiguous(
+        "homeont:CarbonDioxideConcentration", "decrease"))
+    assert context is not None
+    assert any(a["artifact_name"] == "window_308e" and a["name"] == "CoverOpenCover"
+               and a["type"] == "action_affordance" for a in context.affordances)
+    assert any(a["artifact_name"] == "co2_sensing_308e" and a["type"] == "property_affordance"
+               for a in context.affordances)
+    effects = [action for result in context.observable_property_hints["results"]
+               for action in result["actions"]]
+    assert any(action["artifact_title"] == "window_308e"
+               and action["action_name"] == "CoverOpenCover"
+               and action["direction"] == "decrease" for action in effects)
+
+
+@pytest.mark.parametrize("variable, direction, actuator, sensor", [
+    ("homeont:Illuminance", "increase", "ambient_lights_308e", "internal_light_sensing_308e"),
+    ("homeont:Illuminance", "decrease", "blackout_blinds_308e", "internal_light_sensing_308e"),
+    ("homeont:AirTemperature", "decrease", "air_conditioner_308e", "temperature_sensing_308e"),
+])
+def test_ambiguous_goals_find_room_actuators(graph, variable, direction, actuator, sensor):
+    """The planner's room-variable join, not just device discovery."""
+    context = build_specific_context(_closed(graph), _ambiguous(variable, direction))
+    assert context is not None
+    assert any(a["artifact_name"] == actuator and a["type"] == "action_affordance"
+               for a in context.affordances)
+    assert any(a["artifact_name"] == sensor and a["type"] == "property_affordance"
+               for a in context.affordances)

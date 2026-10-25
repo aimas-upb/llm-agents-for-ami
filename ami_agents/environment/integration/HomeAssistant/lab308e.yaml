@@ -33,8 +33,9 @@ semantic:
     external_light_sensing_308e:
       environment: outdoor        # observes outdoor_illuminance
     blackout_blinds_308e:
-      # Blocks direct sunlight: moves glare rather than the room's light level.
+      # Blocks direct sunlight: moves the glare, and the room's light with it.
       effects:
+        - {class: "homeont:Illuminance", services: [open_cover, close_cover, set_cover_position]}
         - {class: "homeont:Glare", services: [open_cover, close_cover, set_cover_position]}
     window_308e:
       # Opening it ventilates: CO2 falls.
