@@ -4,9 +4,10 @@ Nothing here reasons: every decision is made by the code the agents run. The
 stand-ins only carry what that code reads from its agent, and answer in-process
 what would otherwise be a message to another agent.
 
-    Home                 the discovered home: TDs and workspaces built by SHTD's
-                         TD builder from the simulator's state, with SHTD's URLs
-                         (discovery -- offline in a deployment, never timed)
+    Home                 the discovered home: TDs and workspaces built by the suite's
+                         TD builder (SHTD's, or HomeBench's) from the simulator's
+                         state, with its server's URLs (discovery -- offline in a
+                         deployment, never timed)
     Explorer             the EnvExplorer's per-request answers: goal context,
                          candidate lookup, state queries, the capability graph,
                          memory matches -- each one logged as the SimuHome tool
@@ -104,16 +105,22 @@ class Home:
     discovery, with SHTD's URLs so plans act through SHTD."""
 
     def __init__(self, shtd_base: str, home_id: str, state: Dict[str, Any],
-                 config: Dict[str, Any], logger) -> None:
+                 config: Dict[str, Any], logger,
+                 builder_cls: Any = SimuHomeTD) -> None:
+        """``builder_cls`` is the suite's TD builder (`SimuHomeTD`, or HomeBench's
+        `HomeBenchTD`), called as ``builder_cls(base, home_id, state)``."""
         self.shtd_base = shtd_base.rstrip("/")
         self.home_id = home_id
-        self.builder = SimuHomeTD(self.shtd_base, home_id, state)
+        self.builder = builder_cls(self.shtd_base, home_id, state)
         # What each room workspace lists, as the EnvExplorer's crawl finds it:
         # the simulator's devices and SHTD's virtual ambient sensors (one per
-        # room variable -- what a room-state question is answered from).
+        # room variable -- what a room-state question is answered from). A
+        # builder without ambient sensors (a benchmark with no room physics)
+        # has none to list.
+        ambient = getattr(self.builder, "ambient_sensors", None)
         self.sensors: Dict[str, str] = {
-            sensor: room for room in state["rooms"]
-            for _token, sensor, _row in self.builder.ambient_sensors(room)}
+            sensor: room for room in state["rooms"] if ambient is not None
+            for _token, sensor, _row in ambient(room)}
         self.rooms: Dict[str, List[str]] = {
             room: [d["device_id"] for d in data.get("devices", [])]
             + [s for s, r in self.sensors.items() if r == room]

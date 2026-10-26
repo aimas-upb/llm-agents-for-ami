@@ -14,7 +14,10 @@ Reads every <root>/<variant>/<episode>.json with its .eval.json and writes, in
     steps.csv     variant, type, step: n, mean / median / p95 / max seconds,
                   LLM calls, LLM seconds, tokens in / out (per episode)
     outcomes.csv  variant, type, case, outcome: count
-    report.md     the same, as tables
+    official.csv  HomeBench only: variant, bucket: n, EM, precision, recall, F1 -- the
+                  official metrics (`homebench_metrics`) per bucket, with the rate under
+                  the benchmark's reading and with its extra reading next to them
+    report.md     the same, as tables (HomeBench: the official table with its caveats)
 
 Steps: segmentation, structuring, state_read, planning (with
 planning.achievement and planning.dependency for dependency structures),
@@ -33,13 +36,22 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import statistics
 import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
+from . import homebench_metrics as hbm
+
 STEPS = ("segmentation", "structuring", "state_read", "planning", "planning.achievement",
          "planning.dependency", "profiling", "guarding", "execution", "response")
+
+
+def type_key(query_type: str) -> list:
+    """A sort key that puts request types in natural order: qt1 .. qt4-3 as before,
+    and HomeBench's hb1, hb2, ... hb10 (a plain string sort would put hb10 before hb2)."""
+    return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", query_type)]
 
 
 def _p95(values: List[float]) -> float:
@@ -89,13 +101,17 @@ def _step_values(record: Dict[str, Any], step: str) -> Optional[Dict[str, float]
 
 
 def rates(data) -> List[Dict[str, Any]]:
+    """One row per (variant, type, case): the rates of `rates.csv`, types in natural
+    order (hb2 before hb10); infeasible and mixed groups add the execution-check and
+    judge rates."""
     rows = []
     for variant, items in data.items():
         groups: Dict[tuple, List[Dict[str, Any]]] = {}
         for item in items:
             record = item["record"]
             groups.setdefault((record["query_type"], record["case"]), []).append(item)
-        for (qt, case), group in sorted(groups.items()):
+        for (qt, case), group in sorted(groups.items(),
+                                        key=lambda kv: (type_key(kv[0][0]), kv[0][1])):
             scores = [(i["evaluation"] or {}).get("score") for i in group]
             evaluated = [s for s in scores if s is not None and s >= 0]
             row = {"variant": variant, "type": qt, "case": case, "n": len(group),
@@ -103,6 +119,12 @@ def rates(data) -> List[Dict[str, Any]]:
                    "infra": sum(1 for s in scores if s == -1),
                    "unscored": sum(1 for s in scores if s is None),
                    "rate": round(sum(evaluated) / len(evaluated), 3) if evaluated else None}
+            # HomeBench: the rate with the one extra reading of a label (`rate` is the
+            # benchmark's own reading), over the same evaluated episodes.
+            if any("score_extra" in (i["evaluation"] or {}) for i in group):
+                extra = [(i["evaluation"] or {}).get("score_extra", (i["evaluation"] or {}).get("score"))
+                         for i in group if (i["evaluation"] or {}).get("score", -1) >= 0]
+                row["rate_extra"] = round(sum(extra) / len(extra), 3) if extra else None
             # Partial success (feasible): every expected value, classified.
             parts = [(i["evaluation"] or {}).get("breakdown") for i in group]
             parts = [p for p in parts if p and p.get("total")]
@@ -116,7 +138,7 @@ def rates(data) -> List[Dict[str, Any]]:
                     "missing": sum(p["missing"] for p in parts),
                     "wrong_value": sum(p["wrong_value"] for p in parts),
                     "wrong_timing": sum(p["wrong_timing"] for p in parts)})
-            if case == "infeasible":
+            if case in ("infeasible", "mixed"):
                 checks = [((i["evaluation"] or {}).get("execution_check") or {}).get("score")
                           for i in group if (i["evaluation"] or {}).get("score", -1) >= 0]
                 judged = [((i["evaluation"] or {}).get("judge") or {}).get("score")
@@ -130,14 +152,50 @@ def rates(data) -> List[Dict[str, Any]]:
     return rows
 
 
+def official(data) -> List[Dict[str, Any]]:
+    """One row per (variant, bucket) of `official.csv`: HomeBench's official EM / Precision /
+    Recall / F1 (`homebench_metrics.by_bucket`: `all`, then the five buckets; an empty
+    bucket is None) from the `homebench` blocks of the evaluations, and over the same
+    episodes the rate under the benchmark's reading and with the extra reading. Variants
+    with no HomeBench evaluation have no rows."""
+    rows = []
+    for variant, items in data.items():
+        # 1. The evaluations that carry a block (HomeBench's, not infrastructure failures).
+        blocks = [(i["evaluation"] or {}) for i in items if (i["evaluation"] or {}).get("homebench")]
+        if not blocks:
+            continue
+        # 2. The official numbers per bucket, from the stored token counts.
+        scores = hbm.by_bucket({**e["homebench"]} for e in blocks)
+        for bucket, result in scores.items():
+            # 3. The rates of the same episodes under the two readings of a label.
+            members = [e for e in blocks if bucket in (hbm.ALL, e["homebench"]["bucket"])]
+            scored = [e for e in members if e.get("score") in (0, 1)]
+            extra = [e.get("score_extra", e["score"]) for e in scored]
+            rows.append({"variant": variant, "bucket": bucket, "n": result["n"],
+                         "em": _round(result["em"]), "precision": _round(result["precision"]),
+                         "recall": _round(result["recall"]), "f1": _round(result["f1"]),
+                         "scored": len(scored),
+                         "rate": round(sum(e["score"] for e in scored) / len(scored), 3)
+                         if scored else None,
+                         "rate_extra": round(sum(extra) / len(extra), 3) if extra else None})
+    return rows
+
+
+def _round(value: Optional[float]) -> Optional[float]:
+    """A metric to three digits, None kept (an empty bucket)."""
+    return None if value is None else round(value, 3)
+
+
 def step_stats(data) -> List[Dict[str, Any]]:
+    """One row per (variant, type, step) of `steps.csv`: seconds and LLM cost per
+    episode, types in natural order, with an "all" row per variant."""
     rows = []
     for variant, items in data.items():
         by_type: Dict[str, List[Dict[str, Any]]] = {}
         for item in items:
             by_type.setdefault(item["record"]["query_type"], []).append(item["record"])
             by_type.setdefault("all", []).append(item["record"])
-        for qt, records in sorted(by_type.items()):
+        for qt, records in sorted(by_type.items(), key=lambda kv: type_key(kv[0])):
             for step in STEPS + ("discovery",):
                 if step == "discovery":
                     values = [{"seconds": r["discovery_seconds"], "calls": 0,
@@ -166,6 +224,8 @@ def step_stats(data) -> List[Dict[str, Any]]:
 
 
 def outcomes(data) -> List[Dict[str, Any]]:
+    """One row per (variant, type, case, outcome) of `outcomes.csv`: how many episodes
+    ended each way, types in natural order."""
     counts: Dict[tuple, int] = {}
     for variant, items in data.items():
         for item in items:
@@ -176,7 +236,8 @@ def outcomes(data) -> List[Dict[str, Any]]:
             key = (variant, record["query_type"], record["case"], outcome)
             counts[key] = counts.get(key, 0) + 1
     return [{"variant": v, "type": t, "case": c, "outcome": o, "count": n}
-            for (v, t, c, o), n in sorted(counts.items())]
+            for (v, t, c, o), n in sorted(
+                counts.items(), key=lambda kv: (kv[0][0], type_key(kv[0][1]), *kv[0][2:]))]
 
 
 def _csv(path: Path, rows: List[Dict[str, Any]]) -> None:
@@ -211,10 +272,19 @@ def main() -> int:
         print("No records.")
         return 1
     rate_rows, step_rows, outcome_rows = rates(data), step_stats(data), outcomes(data)
+    official_rows = official(data)
     _csv(root / "rates.csv", rate_rows)
     _csv(root / "steps.csv", step_rows)
     _csv(root / "outcomes.csv", outcome_rows)
-    report = ("# Bench report\n\n## Success rates\n\n" + _table(rate_rows)
+    _csv(root / "official.csv", official_rows)
+    # HomeBench: the official table and its caveats follow the success rates.
+    hb_section = ("\n## Official HomeBench metrics (per bucket)\n\n" + _table(official_rows)
+                  + f"\n{hbm.CAVEAT_OFFICIAL}\n\n`rate` is the benchmark's own reading of each "
+                  "label, `rate_extra` adds the one extra reading of plan 3.7 (a zero level the "
+                  "request asked to turn off, met by the device being off): our criterion, not "
+                  "HomeBench's. Episodes scored with --no-judge have the execution check alone "
+                  "for their infeasible parts, which is weaker.\n" if official_rows else "")
+    report = ("# Bench report\n\n## Success rates\n\n" + _table(rate_rows) + hb_section
               + "\n## Time per step (seconds per episode)\n\n" + _table(step_rows)
               + "\n## Outcomes\n\n" + _table(outcome_rows))
     (root / "report.md").write_text(report, encoding="utf-8")

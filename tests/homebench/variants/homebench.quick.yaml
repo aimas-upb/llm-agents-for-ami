@@ -1,0 +1,44 @@
+# HomeBench harness config, QUICK: a stratified subset sized for a local run of about
+# 30 minutes (plan section 5). Comparing configurations and catching regressions.
+#
+#   hb1..hb4 x (feasible, infeasible, mixed) = 11 groups, the first 4 episodes of
+#   each (`seed_1..4`, a fixed random sample over the 100 homes) = at most 44
+#   episodes, about 160 LLM calls (1 segmentation + 1 structuring per part), about
+#   100 judge calls on the OpenAI judge. Nothing is run by --dry-run:
+#
+#   conda run -n ami-agents python -m tests.simuhome.bench.harness \
+#       --config tests/homebench/variants/homebench.quick.yaml --dry-run
+#
+# homebench.spread.yaml and homebench.full.yaml differ from this file ONLY in `run:`.
+# The records directory is named after the file (no `name:` key), so the three never
+# share records: <out>/homebench.quick/, ...
+#
+# 44 episodes cannot resolve a 5-point difference between models, and `limit` is per
+# group, so a subset over-represents the rare groups (plan 5.1).
+
+suite: homebench
+
+providers:
+  local: {base_url: "http://localhost:11434/v1"}     # Ollama; the planner needs tool calling
+
+models:
+  segmentation:  {provider: local, model: "ministral-3:8b", temperature: 0}
+  structuring:   {provider: local, model: "ministral-3:8b", temperature: 0}
+  planning:
+    explicit:    {provider: local, model: "ministral-3:8b", temperature: 0}
+    general:     {provider: local, model: "ministral-3:8b", temperature: 0}
+  profiling:     {provider: local, model: "ministral-3:8b", temperature: 0}
+  guarding:      {provider: local, model: "ministral-3:8b", temperature: 0}
+  response:      {provider: local, model: "ministral-3:8b", temperature: 0}
+  judge:         {provider: openai, model: gpt-4o-mini, temperature: 0.5}
+
+run:
+  episodes: "hb1_*,hb2_*,hb3_*,hb4_*"
+  limit: 4                 # per (type, case)
+  workers: 1               # one local model: parallel workers only queue on it
+  context: none
+  memory: "off"
+  guidelines: homebench    # homebench: no device conditions | default: as deployed
+
+evaluate:
+  judge: true

@@ -1,0 +1,27 @@
+# Planning conditions for the HomeBench bench: none.
+#
+# The ISA reads device conditions from a guidelines file (`planning.guidelines.path`
+# in agents.yaml, `PLANNING_GUIDELINES_PATH`); the repo's own file,
+# `ami_agents/config/planning_guidelines.yaml`, holds Matter's rules:
+#
+#   power_on_first          switch a device on before a level / mode command
+#   thermostat / window covering / robot vacuum / laundry ...   a state to reach first
+#
+# HomeBench defines no such precondition. Its gold sets an attribute on a device
+# that is off in 6,472 calls, with no `turn_on` (plan 2.2, point 1), and its engine
+# accepts those commands (plan 3.5). With the Matter file the agents would add a
+# `turn_on` before `set_brightness(20)`: the final state would still match, but the
+# action log would gain a call the gold does not have, and the condition-guard model
+# would be asked about conditions HomeBench never states.
+#
+# So the HomeBench suite points the ISA here by default (`run.guidelines: homebench`).
+# The list is empty, which turns the power-on guard and the condition-guard check off:
+# the `guarding` phase is not exercised on HomeBench in this setting. To run the same
+# episodes "as deployed", set `run.guidelines: default` (or `--guidelines default`);
+# the secondary metrics then carry the extra-`turn_on` caveat (plan 3.10).
+#
+# Read by `interaction_solver/utils/power_on_guard.py` (`load_applies_to`: no
+# `power_on_first` entry -> no guard) and `utils/planning_conditions.py`
+# (`load_conditions`: no entry -> nothing to check).
+
+conditions: []

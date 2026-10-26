@@ -1,5 +1,5 @@
-"""The evaluation harness: run SimuHome episodes with scheduled execution, score
-them, and compute the statistics -- from one config file.
+"""The evaluation harness: run SimuHome or HomeBench episodes, score them, and
+compute the statistics -- from one config file.
 
     conda run -n ami-agents python -m tests.simuhome.bench.harness \\
         --config tests/simuhome/bench/variants/harness.example.yaml \\
@@ -9,6 +9,7 @@ them, and compute the statistics -- from one config file.
 The config is a variant file (`models.py`: one model per phase, each on OpenAI
 or a local OpenAI-compatible server through `provider:`), plus how to run it:
 
+    suite: simuhome                    # simuhome (default) | homebench
     name: nano-openai                  # records under <out>/<name>/
     providers: {local: {base_url: http://localhost:11434/v1}}
     models:
@@ -18,12 +19,15 @@ or a local OpenAI-compatible server through `provider:`), plus how to run it:
     run:                               # run_scheduled.py options
       episodes: "qt*"                  # patterns: qt3_feasible, qt4-2_*, full names
       limit: null                      # at most N episodes per (type, case)
+      guidelines: homebench            # homebench only: homebench | default (below)
       workers: 4
     evaluate: {judge: true}            # false: infeasible scored without the LLM judge
 
 Flow, each step its own process (as `sweep.py` runs them):
 
-    1. run         run_scheduled.py --variant <config> --skip-existing
+    1. run         run_scheduled.py (SimuHome) / run.py --suite homebench (HomeBench:
+                   no timed episodes, so the trees are ticked, never scheduled)
+                   --variant <config> --skip-existing
                    -> <out>/<name>/<episode>.json  (an interrupted run resumes)
     2. evaluate    evaluate.py --skip-scored  -> <episode>.eval.json
     3. statistics  stats.py, in-process       -> <out>/<name>/stats/
@@ -31,8 +35,17 @@ Flow, each step its own process (as `sweep.py` runs them):
 Records are reused by name: give a changed config a new `name`, or its old
 records are kept as they are.
 
-`--dry-run` prints the commands and what they would cost; `--stats-only`
-recomputes the statistics from the records already on disk (no LLM calls).
+`--dry-run` prints the commands and what they would cost (the episodes
+selected, the LLM calls and the judge calls); `--stats-only` recomputes the
+statistics from the records already on disk (no LLM calls).
+
+HomeBench (`suite: homebench`, configs in `tests/homebench/variants/`; the data from
+`tests/homebench/convert.py`): `run.guidelines` picks the ISA's planning conditions,
+`homebench` (none: the Matter rules do not apply to HomeBench) or `default` (as
+deployed). Example, nothing run:
+
+    conda run -n ami-agents python -m tests.simuhome.bench.harness \\
+        --config tests/homebench/variants/homebench.quick.yaml --dry-run
 """
 
 from __future__ import annotations
@@ -41,43 +54,48 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import yaml
 
-from .run import DEFAULT_BENCHMARK, PROJECT_ROOT, select_episodes
+from .run import PROJECT_ROOT, select_episodes
+from .suites import DEFAULT_SUITE, SUITE_NAMES, Suite, get_suite
 
-DEFAULT_OUT = PROJECT_ROOT / "tests" / "simuhome" / "results" / "harness"
-# The run_scheduled.py options a config's `run:` section may set.
+# The run.py options a config's `run:` section may set.
 RUN_OPTIONS = ("episodes", "seeds", "limit", "workers", "context", "memory", "step_seconds",
-               "dry_step_seconds", "real_read_seconds", "exec_timeout")
-# Rough LLM calls per episode for the agents' steps, and per judged episode.
-CALLS_PER_EPISODE = (3, 6)
-JUDGE_CALLS = 3
+               "dry_step_seconds", "real_read_seconds", "exec_timeout", "guidelines")
 
 
 # --------------------------------------------------------------------------
 # The plan of a harness run
 # --------------------------------------------------------------------------
 
-def run_options(config: Dict[str, Any], args: argparse.Namespace) -> Dict[str, Any]:
+def run_options(config: Dict[str, Any], args: argparse.Namespace,
+                suite: Optional[Suite] = None) -> Dict[str, Any]:
     """The run options: the config's `run:` section, under the command line's
-    own flags (a flag given wins)."""
+    own flags (a flag given wins); every episode of the suite when none is named."""
     options = dict(config.get("run") or {})
     for key in ("episodes", "seeds", "limit", "workers"):
         if getattr(args, key) is not None:
             options[key] = getattr(args, key)
-    options.setdefault("episodes", "qt*")
+    options.setdefault("episodes", (suite or get_suite(DEFAULT_SUITE)).default_episodes)
     return options
 
 
 def commands(config_path: Path, records: Path, out: Path, options: Dict[str, Any],
-             judge: bool, benchmark: Path) -> List[List[str]]:
+             judge: bool, benchmark: Path,
+             suite: Optional[Suite] = None) -> List[List[str]]:
     """The run and evaluate command lines, in order."""
-    # 1. The run, resuming: episodes already recorded are skipped.
-    run = [sys.executable, "-m", "tests.simuhome.bench.run_scheduled",
+    suite = suite or get_suite(DEFAULT_SUITE)
+    # 1. The run, resuming: episodes already recorded are skipped. SimuHome's is
+    #    the scheduled runner; a suite without scheduled execution (HomeBench)
+    #    runs the tick-based one, with its suite named.
+    module = "run_scheduled" if suite.scheduled else "run"
+    run = [sys.executable, "-m", f"tests.simuhome.bench.{module}",
            "--variant", str(config_path), "--out", str(out), "--benchmark", str(benchmark),
            "--skip-existing"]
+    if suite.name != DEFAULT_SUITE:
+        run += ["--suite", suite.name]
     for key in RUN_OPTIONS:
         if options.get(key) is not None:
             run += [f"--{key.replace('_', '-')}", str(options[key])]
@@ -85,21 +103,32 @@ def commands(config_path: Path, records: Path, out: Path, options: Dict[str, Any
     # 2. The scoring, of the records not scored since they were written.
     evaluate = [sys.executable, "-m", "tests.simuhome.bench.evaluate",
                 "--records", str(records), "--benchmark", str(benchmark), "--skip-scored"]
+    if suite.name != DEFAULT_SUITE:
+        evaluate += ["--suite", suite.name]
     if not judge:
         evaluate.append("--no-judge")
     return [run, evaluate]
 
 
-def estimate(names: List[str], records: Path, judge: bool) -> str:
-    """What the run would cost: the episodes still to run, and a rough count of
-    LLM calls (the steps' and the judge's)."""
+def estimate(names: List[str], records: Path, judge: bool,
+             suite: Optional[Suite] = None) -> str:
+    """What the run would cost: the episodes still to run, and a count of LLM
+    calls (the steps' and the judge's), from the suite's per-episode estimate:
+    a range for SimuHome, exact for HomeBench (one segmentation call and one
+    structuring call per part)."""
+    suite = suite or get_suite(DEFAULT_SUITE)
+    # 1. What is still to run, and its calls by the suite's estimate.
     todo = [n for n in names if not (records / f"{n}.json").exists()]
-    infeasible = sum(1 for n in todo if "_infeasible_" in n)
-    low, high = (len(todo) * c for c in CALLS_PER_EPISODE)
-    judged = infeasible * JUDGE_CALLS if judge else 0
+    estimates = [suite.estimate(n) for n in todo]
+    low, high = sum(e[0] for e in estimates), sum(e[1] for e in estimates)
+    judged_episodes = sum(1 for e in estimates if e[2])
+    judged = sum(e[2] for e in estimates) if judge else 0
+    calls = f"{low}-{high}" if low != high or not todo else f"{low}"
+    # 2. The line.
     return (f"{len(names)} episode(s) selected, {len(names) - len(todo)} already recorded, "
-            f"{len(todo)} to run: ~{low}-{high} LLM calls for the steps"
-            + (f" + ~{judged} judge calls ({infeasible} infeasible)" if judge else "")
+            f"{len(todo)} to run: ~{calls} LLM calls for the steps"
+            + (f" + ~{judged} judge calls ({judged_episodes} {suite.judged_label})"
+               if judge else "")
             + " (none for steps on a local model)")
 
 
@@ -111,8 +140,10 @@ def main() -> int:
     """Run, score and summarise one config's episodes (module docstring)."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--config", required=True, help="harness config (a variant file)")
-    parser.add_argument("--out", default=str(DEFAULT_OUT))
-    parser.add_argument("--benchmark", default=str(DEFAULT_BENCHMARK))
+    parser.add_argument("--suite", choices=SUITE_NAMES,
+                        help="the benchmark (default: the config's `suite:`, else simuhome)")
+    parser.add_argument("--out", help="results root (default: <suite results>/harness)")
+    parser.add_argument("--benchmark", help="the benchmark directory (default: the suite's)")
     parser.add_argument("--episodes", help="override run.episodes, e.g. qt3_*,qt4-1_*")
     parser.add_argument("--seeds", help="override run.seeds, e.g. 1-10,15")
     parser.add_argument("--limit", type=int, help="override run.limit (per type and case)")
@@ -134,11 +165,18 @@ def main() -> int:
     config_path = Path(args.config).resolve()
     config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
     variant = load_variant(str(config_path))
-    out, benchmark = Path(args.out).resolve(), Path(args.benchmark)
+    try:
+        suite = get_suite(args.suite or config.get("suite"))
+        options = run_options(config, args, suite)
+        suite.guidelines_path(options.get("guidelines"))
+    except ValueError as exc:
+        print(f"config {config_path.name}: {exc}")
+        return 2
+    out = Path(args.out).resolve() if args.out else suite.results_root / "harness"
+    benchmark = Path(args.benchmark) if args.benchmark else suite.default_benchmark
     records = out / variant.name
-    options = run_options(config, args)
     judge = bool((config.get("evaluate") or {}).get("judge", True)) and not args.no_judge
-    title = f"SimuHome harness: {variant.name}"
+    title = f"{suite.title} harness: {variant.name}"
 
     # 2. Statistics only: nothing to run.
     if args.stats_only:
@@ -147,17 +185,20 @@ def main() -> int:
     # 3. What would run: the models per phase, the commands, the estimate.
     seeds = options.get("seeds")
     names = select_episodes(benchmark, str(options["episodes"]),
-                            None if seeds is None else str(seeds), options.get("limit"))
+                            None if seeds is None else str(seeds), options.get("limit"), suite)
     if not names:
-        print("No episodes match.")
+        print("No episodes match." + ("" if suite.names(benchmark) else
+              f" {suite.title} has no episodes under {benchmark}: for HomeBench, convert "
+              "the dataset first (tests/homebench/convert.py)."))
         return 1
-    print(f"config {config_path.name} -> {records}")
+    print(f"config {config_path.name}"
+          + (f" ({suite.title})" if suite.name != DEFAULT_SUITE else "") + f" -> {records}")
     for step, spec in variant.specs.items():
         print(f"  {step:<18} {spec.label():<28} {'local ' + spec.base_url if spec.local else 'OpenAI'}")
-    steps = commands(config_path, records, out, options, judge, benchmark)
+    steps = commands(config_path, records, out, options, judge, benchmark, suite)
     for command in steps:
         print("  $ " + " ".join(command[1:]))
-    print(estimate(names, records, judge))
+    print(estimate(names, records, judge, suite))
     if args.dry_run:
         return 0
 

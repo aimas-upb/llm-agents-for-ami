@@ -1,0 +1,40 @@
+# HomeBench harness config, SPREAD: one episode per (type, case), all types. Checks that
+# nothing breaks at large N (up to ten parts per request); the same run as the quick
+# config otherwise (plan section 5).
+#
+#   27 groups (hb1 2, hb2..hb8 3 each, hb9 2, hb10 2) x 1 = 27 episodes, about 172
+#   LLM calls (the sum of 1 + N per group), about 23 minutes at 8 s per call on a
+#   local 8B model, about 50 judge calls. Nothing is run by --dry-run:
+#
+#   conda run -n ami-agents python -m tests.simuhome.bench.harness \
+#       --config tests/homebench/variants/homebench.spread.yaml --dry-run
+#
+# Differs from homebench.quick.yaml and homebench.full.yaml ONLY in `run:`. The records
+# directory is named after the file (no `name:` key): <out>/homebench.spread/.
+
+suite: homebench
+
+providers:
+  local: {base_url: "http://localhost:11434/v1"}     # Ollama; the planner needs tool calling
+
+models:
+  segmentation:  {provider: local, model: "ministral-3:8b", temperature: 0}
+  structuring:   {provider: local, model: "ministral-3:8b", temperature: 0}
+  planning:
+    explicit:    {provider: local, model: "ministral-3:8b", temperature: 0}
+    general:     {provider: local, model: "ministral-3:8b", temperature: 0}
+  profiling:     {provider: local, model: "ministral-3:8b", temperature: 0}
+  guarding:      {provider: local, model: "ministral-3:8b", temperature: 0}
+  response:      {provider: local, model: "ministral-3:8b", temperature: 0}
+  judge:         {provider: openai, model: gpt-4o-mini, temperature: 0.5}
+
+run:
+  episodes: "hb*"
+  limit: 1                 # per (type, case)
+  workers: 1               # one local model: parallel workers only queue on it
+  context: none
+  memory: "off"
+  guidelines: homebench    # homebench: no device conditions | default: as deployed
+
+evaluate:
+  judge: true

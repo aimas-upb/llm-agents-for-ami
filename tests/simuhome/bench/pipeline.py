@@ -1,4 +1,4 @@
-"""One SimuHome episode through our agents' reasoning steps, in-process.
+"""One episode (SimuHome's, or HomeBench's) through our agents' reasoning steps, in-process.
 
     0. load        reset the simulator to the episode's home; discovery builds the
                    TDs (offline in a deployment: logged, never in the statistics)
@@ -22,6 +22,11 @@
                        / capability answers, the plan summary
     6. snapshot        the final home state, 0.5 s after execution (as SimuHome's
                        runner)
+
+The suite (`suites/`) decides what differs: the TD builder discovery uses, and
+whether an episode is timed (SimuHome's qt4; none of HomeBench's, whose plans are
+ticked or run immediately). The record names it (`record["suite"]`) so scoring
+reads the episode the same way.
 
 Each step is timed and its LLM calls booked to it (`meter.py`). The record holds
 what every step produced, what the EnvExplorer was asked (as SimuHome tool
@@ -75,7 +80,6 @@ from ami_agents.agents.user_assistant.utils.plan import (
 )
 
 from . import execution as bench_execution
-from . import scheduling as bench_scheduling
 from .meter import Meter
 from .models import Variant
 from .stubs import (
@@ -87,6 +91,7 @@ from .stubs import (
     response_agent,
     ua_agent,
 )
+from .suites import DEFAULT_SUITE, Suite, get_suite
 from .toollog import ToolLog, parse_url
 
 STOP_AFTER = ("segmentation", "structuring", "planning")
@@ -171,9 +176,12 @@ def _entry_outcome(entry: Dict[str, Any]) -> str:
 
 async def run_episode(name: str, episode: Dict[str, Any], variant: Variant,
                       config: Dict[str, Any], target: Target, options: Options,
-                      logger) -> Dict[str, Any]:
-    """Run one episode; the record of everything it did."""
+                      logger, suite: Optional[Suite] = None) -> Dict[str, Any]:
+    """Run one episode of ``suite`` (SimuHome when None), already loaded by the
+    suite's `load_episode`; the record of everything it did."""
+    suite = suite or get_suite(DEFAULT_SUITE)
     record: Dict[str, Any] = {
+        "suite": suite.name,
         "episode": name, "query_type": episode["meta"]["query_type"],
         "case": episode["meta"]["case"], "meta": episode["meta"],
         "query": episode["query"], "variant": variant.as_dict(),
@@ -188,7 +196,7 @@ async def run_episode(name: str, episode: Dict[str, Any], variant: Variant,
     try:
         with meter.installed():
             await _run(name, episode, variant, config, target, options, logger,
-                       record, meter, tools, current)
+                       record, meter, tools, current, suite)
     except Exception as exc:  # noqa: BLE001 - recorded, scored as an error
         record["error"] = f"{type(exc).__name__}: {exc}"
         record["error_step"] = current["step"]
@@ -202,7 +210,12 @@ async def run_episode(name: str, episode: Dict[str, Any], variant: Variant,
 
 
 async def _run(name, episode, variant, config, target, options, logger, record, meter,
-               tools, current) -> None:
+               tools, current, suite) -> None:
+    """The steps of one episode (module docstring), filling ``record`` as it goes.
+
+    ``suite`` supplies the TD builder discovery uses and whether the episode is timed;
+    ``current`` names the step running, so `run_episode` can say where an error was.
+    """
     sim = target.sim
     home_config = episode["initial_home_config"]
 
@@ -210,7 +223,8 @@ async def _run(name, episode, variant, config, target, options, logger, record, 
     current["step"] = "load"
     started = time.perf_counter()
     sim.reset(home_config)
-    home = Home(target.shtd_base, target.home_id, sim.home_state(), config, logger)
+    home = Home(target.shtd_base, target.home_id, sim.home_state(), config, logger,
+                builder_cls=suite.td_cls)
     record["discovery_seconds"] = time.perf_counter() - started
     record["ambient_sensors"] = home.sensors
     tools.sensors = home.sensors
@@ -341,7 +355,7 @@ async def _run(name, episode, variant, config, target, options, logger, record, 
         runnable = [e for e in ordered if isinstance(e.get("tree"), dict) and e["tree"]]
         # Timed episodes are always run in lockstep, plans or not: their goals
         # are checked at set times, so the home is followed through them.
-        timed = record["query_type"].startswith("qt4")
+        timed = suite.timed(record["query_type"])
         contexts = []
         if runnable or timed:
             sim.reset(home_config)
@@ -532,8 +546,10 @@ def _execute(runnable, tools, sim, config, options, home_config, episode, timed,
     """Execution in a thread (it blocks): scheduled workflows from a dry run
     (`--execution scheduled`), else lockstep or the UA's loop."""
     bt = config.get("bt_execution", {}) or {}
-    # 1. Scheduled: every episode, timed or not, through the dry run.
+    # 1. Scheduled: every episode, timed or not, through the dry run. Imported
+    #    here: only SimuHome's scheduled runs use it.
     if options.execution == "scheduled":
+        from . import scheduling as bench_scheduling
         return bench_scheduling.run_scheduled(
             runnable, tools, sim, turtle=turtle,
             tick_interval=float(home_config.get("tick_interval", 0.1)),
