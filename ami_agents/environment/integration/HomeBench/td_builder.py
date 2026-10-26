@@ -20,15 +20,26 @@ The state of a device is one affordance of its kind: ``onOff`` (a boolean, shown
 one ``onOff`` action stands for ``turn_on`` and ``turn_off``; the gold call is a pure
 function of ``(device, action, value)`` through the ``command_map`` table.
 
-There is no physics: no environment resource and no room variables are served, no
-ambient sensor exists, and no action carries a TD-SOSA effect (``tdsosa:`` actuation
-nodes would claim a causal model HomeBench does not have). See ``README.md``.
+The environment model is SimuHome's and HASP's, declared and not simulated. With
+``environment=True`` (the default) a room whose devices can affect an ambient variable
+(``EFFECT_FAMILIES``: an air conditioner, a light, ...) serves one ``#environment``
+owned by the room's place (``homeont:hasEnvironment``) carrying those variables
+(``ssn:hasProperty``); every action of such a device carries a directionless TD-SOSA
+effect on its room's variable, and the device is a ``saref:Actuator`` with the
+environment as its ``sosa:hasFeatureOfInterest``. HomeBench has no room values and no
+physics, so each variable is ``td:isObservable false`` with no read form, no ambient
+sensor exists, and the engine never simulates an effect. ``environment=False`` serves
+the flat graph (no environment, no effects, no ``saref:Actuator``) that matches the
+ECAI evaluation. See ``README.md``.
 
 Worked example. Home ``home75`` has ``bathroom_light`` (``state: on``, ``brightness:
 40``): ``artifact("bathroom", "bathroom_light")`` is a ``homeont:DimmableLight`` with
 properties ``onOff`` (reads ``true``) and ``brightness`` (reads ``40``, schema integer
 0-100) and actions ``onOff`` (boolean, ``homeont:SetOnOffCommand``) and ``brightness``
-(integer, ``saref:SetAbsoluteLevelCommand``).
+(integer, ``saref:SetAbsoluteLevelCommand``). With the environment on, ``bathroom``
+also has an environment with ``illuminance`` (not observable), the light is a
+``saref:Actuator`` and both of its actions have a ``tdsosa:hasEffectActuation`` that
+``sosa:actsOnProperty`` ``bathroom#illuminance``.
 """
 
 from __future__ import annotations
@@ -43,8 +54,8 @@ from ami_agents.environment.integration.HomeBench.mappings import (
     Mappings, load_mappings,
 )
 from ami_agents.environment.integration.SimuHome.td_builder import (
-    HCTL, HMAS, HOME, HTV, JS, SAREF, TD, TDSOSA, SimuHomeTD, _add_unit, _literal,
-    _new_graph, _no_security, curie_to_uri,
+    HCTL, HMAS, HOME, HTV, JS, SAREF, SOSA, TD, TDSOSA, SimuHomeTD, _add_unit,
+    _literal, _new_graph, _no_security, curie_to_uri,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -52,6 +63,11 @@ LOGGER = logging.getLogger(__name__)
 # -- constants ------------------------------------------------------------------------
 
 PLATFORM_TITLE = "HomeBench Platform"
+
+#: The values of the ``--environment`` switch of HBTD, the worker and the bench, and the
+#: default: ``on`` serves the environment model, ``off`` the flat graph.
+ENVIRONMENT_MODES = ("on", "off")
+DEFAULT_ENVIRONMENT = "on"
 
 
 class HomeBenchTD(SimuHomeTD):
@@ -61,8 +77,12 @@ class HomeBenchTD(SimuHomeTD):
     home id used in every URL (``home<id>``). Built per request, like ``SimuHomeTD``.
     """
 
-    def __init__(self, base: str, home: str, state: Dict[str, Any]):
+    def __init__(self, base: str, home: str, state: Dict[str, Any],
+                 environment: bool = True):
         """Set the fields the inherited builders read; ``self.m`` is the HomeBench tables.
+
+        ``environment`` switches the environment model on (the default) or serves the
+        flat graph: no environment resource, no effects, no ``saref:Actuator``.
 
         ``SimuHomeTD.__init__`` is not called: all it does is store these four fields
         and load SimuHome's Matter tables (13k lines of YAML), which a HomeBench
@@ -70,6 +90,7 @@ class HomeBenchTD(SimuHomeTD):
         """
         self.base = base.rstrip("/") + "/"
         self.home = home
+        self.environment = environment
         self.state = state or {}
         self.rooms: Dict[str, Any] = self.state.get("rooms") or {}
         self.m: Mappings = load_mappings()  # type: ignore[assignment]
@@ -95,17 +116,33 @@ class HomeBenchTD(SimuHomeTD):
         return g
 
     def room_workspace(self, room_id: str) -> Graph:
-        """The room workspace without its environment resource.
+        """The room workspace with the variables its devices can affect, or without
+        any environment resource.
 
-        The inherited document mints a ``homeont:Environment`` (a feature of
-        interest for room variables) for every room. HomeBench has no room variables,
-        so the resource would be an empty promise; it is removed together with every
-        triple that points at it.
+        The inherited document mints a ``homeont:Environment`` for every room but fills
+        it from the room's ``state`` (empty in HomeBench). With the environment on:
+
+        * a room with at least one variable keeps its environment, and the variables
+          are added declared-only (``readable=False``: not observable, no form);
+        * a room with none (its devices affect nothing, 56 of 1,256 rooms) would have
+          an empty promise, so the resource is removed with every triple pointing at it.
+
+        With the environment off the resource is removed from every room.
         """
         g = super().room_workspace(room_id)
         foi = self.foi_uri(room_id)
-        g.remove((foi, None, None))
-        g.remove((None, None, foi))
+        # 1. Which variables this room has (none with the environment off).
+        tokens = (self.m.room_variables(self.rooms.get(room_id) or {})
+                  if self.environment else [])
+        # 2. No variable: no environment resource at all.
+        if not tokens:
+            g.remove((foi, None, None))
+            g.remove((None, None, foi))
+            return g
+        # 3. Declare the variables: only the keys of ``state`` are read, so the values
+        #    are None (HomeBench has none).
+        self._room_state_properties(g, room_id, {t: None for t in tokens}, foi,
+                                    readable=False)
         return g
 
     # -- the device -------------------------------------------------------------------
@@ -132,6 +169,11 @@ class HomeBenchTD(SimuHomeTD):
             uri = curie_to_uri(curie)
             if uri is not None:
                 g.add((art, RDF.type, uri))
+        # A device that can affect a room variable is an actuator on that room's
+        # environment (an environment exists for every such room).
+        if self.environment and self.m.affects_environment(device_type):
+            g.add((art, RDF.type, SAREF.Actuator))
+            g.add((art, SOSA.hasFeatureOfInterest, self.foi_uri(room_id)))
         if family.get("title"):
             g.add((art, RDFS.label, Literal(family["title"])))
         place = self.place_uri(room_id)
@@ -145,7 +187,8 @@ class HomeBenchTD(SimuHomeTD):
         for row in self.m.affordances(device_type, attributes):
             prop = self._property(g, art, path, row, device)
             if row["actuatable"]:
-                self._action(g, art, path, row, device, acts_upon=prop)
+                self._action(g, art, path, row, device, acts_upon=prop,
+                             room_id=room_id)
         # 4. Subscription affordances and the resource profile.
         self._subscribe_actions(g, art, f"{path}#artifact", artifact=True)
         profile = URIRef(path)
@@ -197,9 +240,15 @@ class HomeBenchTD(SimuHomeTD):
         return prop
 
     def _action(self, g: Graph, art: URIRef, path: str, row: Dict[str, Any],
-                device: Dict[str, Any], acts_upon: BNode) -> None:
+                device: Dict[str, Any], acts_upon: BNode, room_id: str) -> None:
         """The action affordance of a settable attribute: command class, input schema
-        (none for ``pack``), POST form, ``saref:actsUpon`` its property. No effects."""
+        (none for ``pack``), POST form, ``saref:actsUpon`` its property.
+
+        With the environment on, also the TD-SOSA effect the ``actuation_effects``
+        table claims for this ``(device type, attribute)``: directionless, declared
+        domain semantics that the engine does not simulate. Nothing else is written
+        for an action with no row.
+        """
         name = str(row["affordance_name"])
         action = BNode()
         g.add((art, TD.hasActionAffordance, action))
@@ -222,6 +271,13 @@ class HomeBenchTD(SimuHomeTD):
         g.add((form, HCTL.hasTarget, URIRef(f"{path}/actions/{name}")))
         g.add((form, HCTL.forContentType, Literal("application/json")))
         g.add((form, HCTL.hasOperationType, TD.invokeAction))
+        # The effect on the room's variable, from the table (none when the flat graph
+        # is served or the attribute affects nothing).
+        if self.environment:
+            claims = self.m.effects(str(device.get("device_type") or ""),
+                                    str(row["attribute"]))
+            if claims:
+                self._write_effects(g, action, room_id, claims)
 
     # -- value schemas ------------------------------------------------------------------
 

@@ -42,6 +42,7 @@ one home. `python .../HomeBench/worker.py` loads two episodes in a row as a smok
 | `sim_client.py` | `HomeBenchClient(SimuHomeClient)`: same method names, HomeBench actuation calls |
 | `hbtd.py` | the TD server |
 | `verify_phase2.py` | the P2 gate |
+| `dump_graphs.py` | one `.ttl` per home and `--environment` mode (the full served graph), for browsing or review |
 
 ## What a device looks like
 

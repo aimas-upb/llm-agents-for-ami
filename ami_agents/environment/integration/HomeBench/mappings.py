@@ -9,8 +9,11 @@ them through this module and keep no table of their own.
 
 The class offers the lookups ``SimuHomeTD`` calls on its ``self.m`` (``room``,
 ``device_family``, ``senses``, ``room_state_property``, ``ambient_sensor``, ...), so
-the inherited document builders run unchanged; the observable, ambient and actuation
-tables are empty (HomeBench has no physics), and those lookups answer "nothing".
+the inherited document builders run unchanged. HomeBench has no physics, so the room
+variables are declared and not observable: ``observable_properties`` types the four
+variables, ``actuation_effects`` says which settable attributes can affect which one
+(``room_variables``, ``effects``, ``affects_environment``), and ``ambient_sensors`` is
+empty, so ``ambient_sensor`` and ``senses`` answer "nothing".
 
 A row is honoured only when ``status`` is ``approved`` or ``auto``; anything else is
 counted by ``unsettled()`` instead of being used.
@@ -26,6 +29,12 @@ either a call string (``pack()``), a template whose ``{value}`` is the action's 
     m.gold_string("bathroom_light", "light", "brightness", 20)
     # "bathroom.light.set_brightness(20)"
     m.action_for_command("light", "turn_off", None)   # ("onOff", False)
+
+The environment lookups, for a home whose bathroom has a light and an air conditioner:
+
+    m.room_variables(room)                    # ["illuminance", "temperature"]
+    m.effects("air_conditioner", "temperature")   # {"air_temperature": None}
+    m.affects_environment("curtain")          # False
 """
 
 from __future__ import annotations
@@ -52,7 +61,7 @@ TABLE_VERSION = 1
 #: Rows in these states are trusted. Anything else still needs a human.
 SETTLED = {"approved", "auto"}
 
-#: Every table this module reads (the last three are empty by design).
+#: Every table this module reads (``ambient_sensors`` is empty by design).
 TABLES = (
     "device_type_map", "room_map", "property_classes", "actuatable_properties",
     "command_map", "observable_properties", "ambient_sensors", "actuation_effects",
@@ -139,13 +148,37 @@ class Mappings:
         for row in _rows("command_map"):
             self._commands[(str(row["device_type"]), str(row["action"]))] = \
                 self._parse_command_row(row)
-        # 4. The tables HomeBench leaves empty: no physics, no ambient sensors.
+        # 4. The room variables: ``room_state.<token>`` rows, indexed by the token and
+        #    by the ``sosa_property`` a device's effect names.
         self.observable_properties: Dict[str, Dict[str, Any]] = {
             str(r["key"]): r for r in _rows("observable_properties")}
+        self.room_state_properties: Dict[str, Dict[str, Any]] = {}
+        self._token_of_property: Dict[str, str] = {}
+        for row in self.observable_properties.values():
+            key = str(row["key"])
+            if key.startswith("room_state."):
+                token = key.split(".", 1)[1]
+                self.room_state_properties[token] = row
+                self._token_of_property[str(row["sosa_property"])] = token
+        # 5. The effects: (device type, home attribute) -> {sosa_property: direction},
+        #    and the device types that affect a variable at all.
+        self.actuation_effects: List[Dict[str, Any]] = _rows("actuation_effects")
+        self._effects: Dict[Tuple[str, str], Dict[str, Optional[str]]] = {}
+        self.families_affecting_environment: Dict[str, set] = {}
+        for row in self.actuation_effects:
+            prop = row.get("affectsObservableProperty")
+            if not prop:
+                continue
+            if str(prop) not in self._token_of_property:
+                raise MappingTableError(
+                    f"{row['key']}: affects {prop!r}, which observable_properties lacks")
+            family = str(row["family"])
+            attribute = str((row.get("command") or {}).get("name"))
+            self._effects.setdefault((family, attribute), {})[str(prop)] =                 row.get("direction")
+            self.families_affecting_environment.setdefault(family, set()).add(str(prop))
+        # 6. The tables HomeBench leaves empty: no ambient instruments exist.
         self.ambient_sensors: Dict[str, Dict[str, Any]] = {
             str(r["key"]): r for r in _rows("ambient_sensors")}
-        self.actuation_effects: List[Dict[str, Any]] = _rows("actuation_effects")
-        self.families_affecting_environment: Dict[str, set] = {}
         self.sensing: Dict[str, Dict[str, Any]] = {}
 
     @staticmethod
@@ -181,12 +214,12 @@ class Mappings:
                         "title": variant["title"]}
         return row
 
-    def room_state_property(self, token: str) -> None:
-        """No room variables exist in HomeBench."""
-        return None
+    def room_state_property(self, token: str) -> Optional[Dict[str, Any]]:
+        """The ``observable_properties`` row of a room-variable token (``temperature``)."""
+        return self.room_state_properties.get(token)
 
     def ambient_sensor(self, token: str) -> None:
-        """No ambient sensors exist in HomeBench."""
+        """No ambient sensors exist in HomeBench (the table is empty by design)."""
         return None
 
     def senses(self, device_type: str) -> None:
@@ -194,8 +227,37 @@ class Mappings:
         return None
 
     def effects_for(self, device_type: str, cluster: str) -> List[Dict[str, Any]]:
-        """No actuation effects: HomeBench has no physics."""
+        """Always empty: SimuHome's lookup is keyed by Matter cluster, which HomeBench
+        lacks; its actions are looked up by home attribute through ``effects``."""
         return []
+
+    # -- the environment ------------------------------------------------------------
+
+    def affects_environment(self, device_type: str) -> bool:
+        """Whether devices of this type can affect a room variable at all."""
+        return device_type in self.families_affecting_environment
+
+    def effects(self, device_type: str, attribute: str) -> Dict[str, Optional[str]]:
+        """The claims of one action: ``{sosa_property: direction}`` it can move.
+
+        ``attribute`` is the home attribute the action writes (``state``,
+        ``temperature``). Empty for an action with no row. HomeBench rows carry no
+        direction (every action carries a value), so the direction is ``None``.
+        """
+        return dict(self._effects.get((device_type, attribute), {}))
+
+    def room_variables(self, room: Dict[str, Any]) -> List[str]:
+        """The sorted variable tokens a room has: those its devices can affect.
+
+        ``room`` is the home's room record (``{"devices": [...]}``). A room with no
+        device of an effect family has none, and then no environment is served for it.
+        """
+        found = set()
+        for device in room.get("devices") or []:
+            for prop in self.families_affecting_environment.get(
+                    str(device.get("device_type") or ""), ()):
+                found.add(self._token_of_property[prop])
+        return sorted(found)
 
     # -- affordances ----------------------------------------------------------------
 

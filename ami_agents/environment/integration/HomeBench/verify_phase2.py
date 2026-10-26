@@ -19,15 +19,21 @@ processes of a worker, loads one home, and checks the gate of the plan's section
    (SHTD would power the device off); a well-typed value the device refuses is 422.
 4. **WebSub.** Through ``subscribe_to_artifact`` and the notification listener, a
    change arrives with ``propertyUri`` (the property's form URL) and ``value``.
-5. **Shape.** Typed devices, no environment resource, no TD-SOSA effects, unique
-   ``td:name``, every ``homeont`` term emitted is defined in the ontology, curtains
-   and blinds are told apart, the vacuum sits in the ``household`` workspace,
-   ``/_shtd/time`` returns ``base_time``.
+5. **Shape.** Typed devices, unique ``td:name``, every ``homeont`` term emitted is
+   defined in the ontology, curtains and blinds are told apart, the vacuum sits in the
+   ``household`` workspace, ``/_shtd/time`` returns ``base_time``; and by mode
+   (``--environment``, which must be the mode HBTD was started with):
+   ``on``: every room with a variable has one environment owned by its place, carrying
+   exactly the variables its devices can affect, declared and not observable (no read
+   form); every action of an effect-family device has one directionless TD-SOSA effect,
+   no other action has any; ``saref:Actuator`` exactly on the effect families; no
+   sensor. ``off``: no environment resource and no TD-SOSA effect anywhere.
 
     python ami_agents/environment/integration/HomeBench/verify_phase2.py \\
         --data tests/homebench/data            # spawns engine + HBTD on free ports
     python .../verify_phase2.py --engine http://127.0.0.1:8099/api \\
         --hbtd http://127.0.0.1:8097 --home-id 75   # an already running pair
+    python .../verify_phase2.py --environment off    # the flat graph
 """
 
 from __future__ import annotations
@@ -58,6 +64,9 @@ from ami_agents.environment.integration.HomeBench.mappings import (
     MappingTableError, load_mappings,
 )
 from ami_agents.environment.integration.HomeBench.sim_client import HomeBenchClient
+from ami_agents.environment.integration.HomeBench.td_builder import (
+    DEFAULT_ENVIRONMENT, ENVIRONMENT_MODES,
+)
 
 LOGGER = logging.getLogger("verify_phase2")
 
@@ -73,6 +82,8 @@ TD = Namespace("https://www.w3.org/2019/wot/td#")
 HOME = Namespace("http://example.org/homeont/")
 TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
 SOSA = Namespace("http://www.w3.org/ns/sosa/")
+SSN = Namespace("http://www.w3.org/ns/ssn/")
+SAREF = Namespace("https://saref.etsi.org/core/")
 OWL = Namespace("http://www.w3.org/2002/07/owl#")
 JS = "https://www.w3.org/2019/wot/json-schema#"
 
@@ -120,10 +131,12 @@ def _http_ok(url: str) -> bool:
 
 
 @contextlib.contextmanager
-def spawn_pair(home_id: int, home_config: Dict[str, Any]) -> Iterator[Tuple[str, str]]:
+def spawn_pair(home_id: int, home_config: Dict[str, Any],
+               environment: str = DEFAULT_ENVIRONMENT) -> Iterator[Tuple[str, str]]:
     """Start an engine and an HBTD on free ports, load the home, yield their URLs.
 
-    The two processes are the ones a worker starts; both are reaped on exit.
+    The two processes are the ones a worker starts (HBTD with ``--environment
+    <environment>``); both are reaped on exit.
     """
     sim_port, hbtd_port = free_port(), free_port()
     sim_url = f"http://127.0.0.1:{sim_port}/api"
@@ -141,7 +154,7 @@ def spawn_pair(home_id: int, home_config: Dict[str, Any]) -> Iterator[Tuple[str,
         procs.append(subprocess.Popen(
             [sys.executable, str(HERE / "hbtd.py"), "--sim", sim_url,
              "--home", f"home{home_id}", "--port", str(hbtd_port),
-             "--poll-interval", str(POLL_INTERVAL)],
+             "--poll-interval", str(POLL_INTERVAL), "--environment", environment],
             stdout=logs[1], stderr=subprocess.STDOUT))
         _wait(lambda: _http_ok(f"http://127.0.0.1:{hbtd_port}/_shtd/status"), "HBTD")
         yield sim_url, f"http://127.0.0.1:{hbtd_port}"
@@ -535,16 +548,96 @@ async def check_websub(integration, base: str, client: HomeBenchClient) -> None:
 # -- 5. shape -------------------------------------------------------------------------------------------------
 
 
-def check_shape(integration, base: str, state: Dict[str, Any]) -> None:
-    """Check 5: typing, no environment, no effects, unique names, defined vocabulary."""
-    LOGGER.info("\n5. Shape")
+def parse_documents(integration) -> Tuple[Dict[str, Graph], Dict[str, Graph]]:
+    """``(artifact graphs, workspace graphs)`` of the crawl, keyed by IRI."""
+    artifacts: Dict[str, Graph] = {}
+    for iri, art in integration.artifact_map.items():
+        artifacts[iri] = Graph().parse(data=art.thing_description.rdf, format="turtle")
+    workspaces: Dict[str, Graph] = {}
+    for iri, ws in integration.workspace_map.items():
+        workspaces[iri] = Graph().parse(data=ws.rdf, format="turtle")
+    return artifacts, workspaces
+
+
+def check_flat_graph(artifacts: Dict[str, Graph], workspaces: Dict[str, Graph]) -> None:
+    """``--environment off``: no effect on any action and no environment resource."""
+    effects = sum(len(list(g.subject_objects(TDSOSA.hasEffectActuation)))
+                  for g in artifacts.values())
+    check("no TD-SOSA effect on any action", effects == 0, f"{effects} found")
+    env = sum(len(list(g.subjects(RDF.type, HOME.Environment)))
+              + len(list(g.subjects(RDF.type, SOSA.FeatureOfInterest)))
+              for g in workspaces.values())
+    check("no environment resource in any workspace", env == 0, f"{env} found")
+    actuators = sum(1 for g in artifacts.values()
+                    if list(g.subjects(RDF.type, SAREF.Actuator)))
+    check("no saref:Actuator from the effect table", actuators == 0, f"{actuators} found")
+
+
+def check_environment_graph(artifacts: Dict[str, Graph], workspaces: Dict[str, Graph],
+                            state: Dict[str, Any]) -> None:
+    """``--environment on``: the declared environment (module docstring, check 5)."""
     mappings = load_mappings()
     devices = device_map(state)
-    graphs: Dict[str, Graph] = {}
-    for iri, art in integration.artifact_map.items():
-        graph = Graph()
-        graph.parse(data=art.thing_description.rdf, format="turtle")
-        graphs[iri] = graph
+    # 1. The actions: every device action of an effect family has one directionless
+    #    effect, no other action has any; saref:Actuator and the foi on the same devices.
+    wrong_effects, wrong_actuator, directed = [], [], 0
+    for iri, graph in artifacts.items():
+        device = devices[device_id_of(iri)]
+        family = mappings.affects_environment(device["device_type"])
+        subject = URIRef(iri)
+        for action in graph.objects(subject, TD.hasActionAffordance):
+            if (action, SAREF.actsUpon, None) not in graph:
+                continue                       # the WebSub (un)subscribe actions
+            found = list(graph.objects(action, TDSOSA.hasEffectActuation))
+            if len(found) != (1 if family else 0):
+                wrong_effects.append(f"{device_id_of(iri)}: {len(found)} effects")
+            directed += sum(
+                1 for effect in found
+                if (effect, TDSOSA.affectsObservableProperty, None) not in graph)
+        has_actuator = (subject, RDF.type, SAREF.Actuator) in graph
+        has_foi = (subject, SOSA.hasFeatureOfInterest, None) in graph
+        if not (has_actuator == has_foi == family):
+            wrong_actuator.append(device_id_of(iri))
+    check("every action of an effect family has one effect, no other has any",
+          not wrong_effects, str(wrong_effects[:3]))
+    check("every effect is directionless", directed == 0, f"{directed} directed")
+    check("saref:Actuator and the environment as foi exactly on the effect families",
+          not wrong_actuator, str(wrong_actuator[:3]))
+    sensors = sum(len(list(g.subject_objects(SOSA.observes))) for g in artifacts.values())
+    check("no device observes a variable (no sensor exists)", sensors == 0,
+          f"{sensors} found")
+    # 2. The rooms: one environment with exactly the variables the devices can affect,
+    #    declared and not observable, with no read form.
+    rooms = state["rooms"]
+    bad_rooms, bad_variables, checked = [], [], 0
+    for iri, graph in workspaces.items():
+        room = iri.rstrip("/").rsplit("/", 1)[-1].split("#")[0]
+        if room not in rooms:
+            continue                           # the home workspace
+        expected = mappings.room_variables(rooms[room])
+        environments = list(graph.subjects(RDF.type, HOME.Environment))
+        variables = [v for env in environments for v in graph.objects(env, SSN.hasProperty)]
+        if len(environments) != (1 if expected else 0) or len(variables) != len(expected):
+            bad_rooms.append(f"{room}: {len(environments)} environments, "
+                             f"{len(variables)} variables, expected {expected}")
+        for variable in variables:
+            checked += 1
+            if (str(graph.value(variable, TD.isObservable)).lower() != "false"
+                    or graph.value(variable, TD.hasForm) is not None):
+                bad_variables.append(str(variable))
+    check("each room has one environment with exactly its devices' variables",
+          not bad_rooms, str(bad_rooms[:3]))
+    check("every variable is declared and not observable (no read form)",
+          not bad_variables and checked > 0, f"{checked} variables checked")
+
+
+def check_shape(integration, base: str, state: Dict[str, Any],
+                environment: str = DEFAULT_ENVIRONMENT) -> None:
+    """Check 5: typing, the environment (by mode), unique names, defined vocabulary."""
+    LOGGER.info("\n5. Shape (environment %s)", environment)
+    mappings = load_mappings()
+    devices = device_map(state)
+    graphs, workspaces = parse_documents(integration)
     # Typing: the class the table gives, a light by its attributes.
     untyped, dup_names = [], []
     for iri, graph in graphs.items():
@@ -561,17 +654,11 @@ def check_shape(integration, base: str, state: Dict[str, Any]) -> None:
             dup_names.append(device_id_of(iri))
     check("every device carries its table class", not untyped, f"{untyped[:3]}")
     check("td:name is unique among each Thing's properties", not dup_names, str(dup_names[:3]))
-    # No physics claimed.
-    effects = sum(len(list(g.subject_objects(TDSOSA.hasEffectActuation)))
-                  for g in graphs.values())
-    check("no TD-SOSA effect on any action", effects == 0, f"{effects} found")
-    env = 0
-    for ws_iri, ws in integration.workspace_map.items():
-        graph = Graph()
-        graph.parse(data=ws.rdf, format="turtle")
-        env += len(list(graph.subjects(RDF.type, HOME.Environment)))
-        env += len(list(graph.subjects(RDF.type, SOSA.FeatureOfInterest)))
-    check("no environment resource in any workspace", env == 0, f"{env} found")
+    # The environment, by mode.
+    if environment == "on":
+        check_environment_graph(graphs, workspaces, state)
+    else:
+        check_flat_graph(graphs, workspaces)
     # Every homeont term emitted is defined.
     onto = Graph()
     onto.parse(str(ONTOLOGY), format="turtle")
@@ -612,8 +699,8 @@ def check_shape(integration, base: str, state: Dict[str, Any]) -> None:
 
 
 async def run(base: str, sim_url: str, home_id: int, home_config: Dict[str, Any],
-              data: Optional[Path]) -> None:
-    """Run every check against a live pair."""
+              data: Optional[Path], environment: str = DEFAULT_ENVIRONMENT) -> None:
+    """Run every check against a live pair (``environment``: the mode HBTD serves)."""
     client = HomeBenchClient(sim_url)
     state = client.home_state()
     LOGGER.info("Crawling HBTD as the EnvExplorer would (home%d: %d rooms, %d devices)",
@@ -625,7 +712,7 @@ async def run(base: str, sim_url: str, home_id: int, home_config: Dict[str, Any]
         check_gold_dataset(data)
     check_strictness(base, home_id, client)
     await check_websub(integration, base, client)
-    check_shape(integration, base, client.home_state())
+    check_shape(integration, base, client.home_state(), environment)
 
 
 def main() -> int:
@@ -638,6 +725,10 @@ def main() -> int:
     parser.add_argument("--engine", default=None,
                         help="URL of a running engine API; with --hbtd, spawn nothing")
     parser.add_argument("--hbtd", default=None, help="URL of a running HBTD")
+    parser.add_argument("--environment", choices=ENVIRONMENT_MODES,
+                        default=DEFAULT_ENVIRONMENT,
+                        help="the mode HBTD serves (the one it is spawned with, or the "
+                             "one a running --hbtd was started with)")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
     logging.getLogger("ami_agents").setLevel(logging.WARNING)
@@ -646,10 +737,11 @@ def main() -> int:
     home_id = args.home_id if args.home_id is not None else pick_home(data)
     home_config = json.loads((data / "homes" / f"home{home_id}.json").read_text(encoding="utf-8"))
     if args.engine and args.hbtd:
-        asyncio.run(run(args.hbtd.rstrip("/"), args.engine, home_id, home_config, data))
+        asyncio.run(run(args.hbtd.rstrip("/"), args.engine, home_id, home_config, data,
+                        args.environment))
     else:
-        with spawn_pair(home_id, home_config) as (sim_url, base):
-            asyncio.run(run(base, sim_url, home_id, home_config, data))
+        with spawn_pair(home_id, home_config, args.environment) as (sim_url, base):
+            asyncio.run(run(base, sim_url, home_id, home_config, data, args.environment))
 
     failures = [r for r in _results if r[0] == FAIL]
     LOGGER.info("\n%s\n%d/%d checks passed", "=" * 60,

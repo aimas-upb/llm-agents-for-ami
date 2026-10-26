@@ -47,6 +47,9 @@ if __package__ in {None, ""}:  # allow `python .../HomeBench/worker.py`
 
 from ami_agents.environment.integration.HomeBench.engine import load_home_file
 from ami_agents.environment.integration.HomeBench.sim_client import HomeBenchClient
+from ami_agents.environment.integration.HomeBench.td_builder import (
+    DEFAULT_ENVIRONMENT, ENVIRONMENT_MODES,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -101,12 +104,19 @@ class HomeBenchWorker:
         poll_interval: float = 1.0,
         startup_timeout: float = 90.0,
         worker_id: int = 0,
+        environment: str = DEFAULT_ENVIRONMENT,
     ) -> None:
         """Pick the two ports; start nothing (``start`` does).
 
         ``benchmark`` is the converter's output directory (``homes/``, ``episodes/``).
+        ``environment`` (``on`` | ``off``) is passed to every HBTD this worker starts:
+        the environment model, or the flat graph.
         """
+        if environment not in ENVIRONMENT_MODES:
+            raise ValueError(
+                f"environment must be one of {ENVIRONMENT_MODES}, got {environment!r}")
         self.benchmark = Path(benchmark)
+        self.environment = environment
         self.poll_interval = poll_interval
         self.startup_timeout = startup_timeout
         self.worker_id = worker_id
@@ -152,7 +162,8 @@ class HomeBenchWorker:
             [sys.executable, str(HERE / "hbtd.py"),
              "--sim", self.sim_base, "--home", home,
              "--host", HOST, "--port", str(self.shtd_port),
-             "--poll-interval", str(self.poll_interval)],
+             "--poll-interval", str(self.poll_interval),
+             "--environment", self.environment],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         # 3. Ready when its status route answers.

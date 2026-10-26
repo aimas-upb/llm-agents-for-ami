@@ -5,13 +5,15 @@ FastAPI's ``TestClient`` (HBTD with a stub client wrapping an in-process engine)
 end-to-end gate (a real engine + HBTD pair crawled with ``YggdrasilIntegration``) is
 ``HomeBench/verify_phase2.py``; the tests here cover the same rules without processes:
 
-* mapping tables: settled, the physics tables empty, ``command_for`` and
-  ``action_for_command`` inverse, the gold string a function of
-  ``(device, action, value)``; the generator, with approved rows preserved;
+* mapping tables: settled, the room variables and the 21 effect rows declared, no
+  ambient sensor, ``command_for`` and ``action_for_command`` inverse, the gold string a
+  function of ``(device, action, value)``; the generator, with approved rows preserved;
 * ontology: the six new device classes and their commands and properties, curtains
   and blinds kept apart by the type closure;
-* the TD: one property per attribute, one action per settable attribute, the schemas,
-  no environment and no TD-SOSA effect;
+* the TD: one property per attribute, one action per settable attribute, the schemas;
+  with ``environment=True`` the room environments (declared, not observable), the
+  directionless action effects and ``saref:Actuator``; with ``environment=False`` the
+  flat graph, no environment and no TD-SOSA effect;
 * the engine app and ``HomeBenchClient``; HBTD: 400 for a missing or wrongly typed
   value, 422 for a refused one, the WebSub payload with ``propertyUri`` and ``value``;
 * the gold round trip over the real dataset (skipped when ``../HomeBench`` is absent).
@@ -26,6 +28,9 @@ import yaml
 from fastapi.testclient import TestClient
 from rdflib import Graph, Namespace, RDF, RDFS, URIRef
 
+from ami_agents.agents.interaction_solver.utils.specific_capability_context import (
+    build_specific_context,
+)
 from ami_agents.environment.integration.HomeBench import (
     engine, hbtd, simulator, verify_phase2,
 )
@@ -38,7 +43,10 @@ from ami_agents.environment.integration.HomeBench.mappings import (
 from ami_agents.environment.integration.HomeBench.sim_client import (
     HomeBenchClient, SimuHomeError,
 )
-from ami_agents.environment.integration.HomeBench.td_builder import HomeBenchTD
+from ami_agents.environment.integration.HomeBench.td_builder import (
+    DEFAULT_ENVIRONMENT, ENVIRONMENT_MODES, HomeBenchTD,
+)
+from ami_agents.shared.models.goal_structure import GoalSpec
 from ami_agents.shared.utils.vocabulary import close_types
 from tests.homebench import convert, mapping_tables
 
@@ -53,6 +61,8 @@ TD = Namespace("https://www.w3.org/2019/wot/td#")
 JS = Namespace("https://www.w3.org/2019/wot/json-schema#")
 TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
 SOSA = Namespace("http://www.w3.org/ns/sosa/")
+SSN = Namespace("http://www.w3.org/ns/ssn/")
+QUDT = Namespace("http://qudt.org/schema/qudt/")
 OWL = Namespace("http://www.w3.org/2002/07/owl#")
 ONTOLOGY = ROOT / "ami_agents" / "shared" / "ontologies" / "homeont.ttl"
 BASE = "http://hb.test"
@@ -145,6 +155,12 @@ def td(machine):
     return HomeBenchTD(BASE, HOME_ID, machine.home_state())
 
 
+@pytest.fixture()
+def flat_td(machine):
+    """The TD builder with the environment off: the flat graph."""
+    return HomeBenchTD(BASE, HOME_ID, machine.home_state(), environment=False)
+
+
 def graph_of(g):
     """Parse a built graph back from Turtle, as an agent receives it."""
     out = Graph()
@@ -169,11 +185,17 @@ def thing(td, room, device):
 
 
 class TestMappings:
-    def test_tables_are_settled_and_the_physics_tables_empty(self):
+    def test_tables_are_settled_the_environment_declared_and_no_sensor_exists(self):
+        """The four room variables and the 21 effect rows are declared; the ambient
+        sensor table stays empty (HomeBench has no instrument to read a variable)."""
         m = load_mappings()
         assert m.unsettled() == {}
-        assert (m.observable_properties, m.ambient_sensors, m.actuation_effects) == \
-            ({}, {}, [])
+        assert m.ambient_sensors == {}
+        assert set(m.room_state_properties) == {
+            "temperature", "humidity", "illuminance", "pm10"}
+        assert len(m.actuation_effects) == 21
+        assert m.families_affecting_environment == {
+            family: {prop} for family, prop in mapping_tables.EFFECT_FAMILIES.items()}
         assert set(m.device_types) == set(engine.DEVICE_STATE_COMMANDS)
         assert set(m.rooms) == set(engine.ROOMS) | {engine.HOUSEHOLD_ROOM}
 
@@ -289,8 +311,17 @@ class TestGenerator:
         tables = mapping_tables.generate_tables([home])
         assert set(tables) == {"device_type_map", "room_map", "property_classes",
                                "actuatable_properties", "command_map",
+                               "observable_properties", "actuation_effects",
                                *mapping_tables.EMPTY_TABLES}
+        assert mapping_tables.EMPTY_TABLES == ("ambient_sensors",)
         assert all(tables[name] == [] for name in mapping_tables.EMPTY_TABLES)
+        # The four variables, SimuHome's classes; the effects: the synthetic home has
+        # every effect family with all its settable attributes, so all 21 rows.
+        assert {r["key"] for r in tables["observable_properties"]} == {
+            f"room_state.{t}" for t in ("temperature", "humidity", "illuminance", "pm10")}
+        assert len(tables["actuation_effects"]) == 21
+        assert {r["family"] for r in tables["actuation_effects"]} == set(
+            mapping_tables.EFFECT_FAMILIES)
         assert {r["key"] for r in tables["room_map"]} == {
             "living_room", "kitchen", "bathroom", "household"}
         assert all(r["status"] == "auto" for rows in tables.values() for r in rows)
@@ -503,18 +534,23 @@ class TestTD:
         assert (colour, RDF.type, JS.ArraySchema) in g
         assert int(g.value(colour, JS.minItems)) == int(g.value(colour, JS.maxItems)) == 3
 
-    def test_no_physics_is_claimed(self, td):
-        """No environment resource, no room variables, no sensors, no effects."""
+    def test_no_physics_is_claimed_with_the_environment_off(self, flat_td):
+        """``environment=False``: no environment resource, no room variables, no
+        sensors, no effects, no ``saref:Actuator`` from the effect table (the flat
+        graph of the ECAI evaluation)."""
+        td = flat_td
         for room in td.room_ids():
             g = graph_of(td.room_workspace(room))
             assert not list(g.subjects(RDF.type, HOMEONT.Environment))
             assert not list(g.subjects(RDF.type, SOSA.FeatureOfInterest))
+            assert not list(g.subject_objects(SSN.hasProperty))
             assert td.ambient_sensors(room) == []
             for device in td.rooms[room]["devices"]:
                 dg = td.artifact(room, device["device_id"])
                 assert not list(dg.subject_objects(TDSOSA.hasEffectActuation))
                 assert not list(dg.subject_objects(SOSA.hasFeatureOfInterest))
                 assert not list(dg.subject_objects(SOSA.observes))
+                assert (None, RDF.type, SAREF.Actuator) not in dg
 
     def test_names_are_unique_and_every_homeont_term_is_defined(self, td, onto):
         defined = {str(s) for kind in (OWL.Class, OWL.DatatypeProperty, OWL.ObjectProperty)
@@ -547,6 +583,253 @@ class TestTD:
         assert td.artifact("kitchen", "kitchen_toaster") is None
         platform = graph_of(td.platform())
         assert "HomeBench" in str(platform.value(td.platform_uri(), TD.title))
+
+
+# -- the environment (declared, not simulated) ------------------------------------------------------------------
+
+#: The device types that affect a room variable, and the variable's token and name.
+EFFECT_DEVICES = {
+    "air_conditioner": "air_temperature", "heating": "air_temperature",
+    "humidifier": "relative_humidity", "dehumidifiers": "relative_humidity",
+    "air_purifiers": "pm10_mass_concentration", "light": "illuminance",
+}
+
+
+def room_graph(td, room):
+    """``(graph, room place, environment)`` of a room workspace, parsed back."""
+    return (graph_of(td.room_workspace(room)), td.place_uri(room), td.foi_uri(room))
+
+
+def variable_node(td, room, name):
+    """The room's variable named ``name`` (``air_temperature``)."""
+    return td.room_property_uri(room, name)
+
+
+def home_graph(td):
+    """The whole home as an agent would crawl it: every room and every device."""
+    g = Graph()
+    for room in td.room_ids():
+        g += td.room_workspace(room)
+        for device in td.rooms[room]["devices"]:
+            g += td.artifact(room, device["device_id"])
+    return graph_of(g)
+
+
+class TestEnvironment:
+    """``HomeBenchTD(environment=True)``: the same model as SHTD and HASP, with the
+    variables declared and not observable."""
+
+    def test_the_mode_constants_agree_with_the_bench(self):
+        from tests.simuhome.bench import suites
+        assert ENVIRONMENT_MODES == suites.ENVIRONMENT_MODES == ("on", "off")
+        assert DEFAULT_ENVIRONMENT == suites.DEFAULT_ENVIRONMENT == "on"
+
+    def test_the_default_is_the_environment_on(self, machine):
+        assert HomeBenchTD(BASE, HOME_ID, machine.home_state()).environment is True
+
+    def test_the_place_has_the_environment_which_has_its_variables(self, td):
+        """One ``#environment`` per room, owned by the room's place, carrying exactly
+        the variables the room's devices can affect (living room: all four)."""
+        g, place, env = room_graph(td, "living_room")
+        assert (place, HOMEONT.hasEnvironment, env) in g
+        assert (env, HOMEONT.isEnvironmentOf, place) in g
+        assert (env, RDF.type, HOMEONT.Environment) in g
+        assert (env, RDF.type, SOSA.FeatureOfInterest) in g
+        names = {str(g.value(v, TD.name)) for v in g.objects(env, SSN.hasProperty)}
+        assert names == {"air_temperature", "relative_humidity", "illuminance",
+                         "pm10_mass_concentration"}
+        # The kitchen has a light and a curtain: the light only, the curtain nothing.
+        g, _place, env = room_graph(td, "kitchen")
+        assert {str(g.value(v, TD.name)) for v in g.objects(env, SSN.hasProperty)} == {
+            "illuminance"}
+
+    @pytest.mark.parametrize("name, cls, kind, unit", [
+        ("air_temperature", "AirTemperature", "ThermodynamicTemperature", "DEG_C"),
+        ("relative_humidity", "RelativeHumidity", "RelativeHumidity", "PERCENT"),
+        ("illuminance", "Illuminance", "Illuminance", "LUX"),
+        ("pm10_mass_concentration", "Pm10MassConcentration", "MassConcentration",
+         "MicroGM-PER-M3"),
+    ])
+    def test_a_variable_is_declared_and_not_observable(self, td, name, cls, kind, unit):
+        """Typed (homeont class, QUDT quantity kind and unit), named, belonging to the
+        environment, ``td:isObservable false`` and with no read form."""
+        g, _place, env = room_graph(td, "living_room")
+        var = variable_node(td, "living_room", name)
+        assert (env, SSN.hasProperty, var) in g
+        assert (var, SSN.isPropertyOf, env) in g
+        for kind_type in (TD.PropertyAffordance, TDSOSA.ObservablePropertyAffordance,
+                          SOSA.ObservableProperty, HOMEONT[cls]):
+            assert (var, RDF.type, kind_type) in g
+        assert str(g.value(var, TD.title)) == name
+        assert (var, QUDT.hasQuantityKind,
+                URIRef(f"http://qudt.org/vocab/quantitykind/{kind}")) in g
+        assert (var, QUDT.unit, URIRef(f"http://qudt.org/vocab/unit/{unit}")) in g
+        assert g.value(var, TD.hasOutputSchema) is not None
+        assert str(g.value(var, TD.isObservable)).lower() == "false"
+        assert g.value(var, TD.hasForm) is None
+
+    def test_every_device_of_a_room_finds_the_same_variable(self, td):
+        """The AC and the heater name the very same room temperature node, and it is
+        the one the environment has; no per-artifact feature of interest exists."""
+        g = home_graph(td)
+        temperature = variable_node(td, "living_room", "air_temperature")
+        acting = set()
+        for device in ("living_room_air_conditioner", "living_room_heating"):
+            art = URIRef(f"{td.artifact_path('living_room', device)}#artifact")
+            for action in g.objects(art, TD.hasActionAffordance):
+                for effect in g.objects(action, TDSOSA.hasEffectActuation):
+                    acting.add((device, g.value(effect, SOSA.actsOnProperty)))
+        assert acting == {("living_room_air_conditioner", temperature),
+                          ("living_room_heating", temperature)}
+        assert (td.foi_uri("living_room"), SSN.hasProperty, temperature) in g
+        assert not any("/artifacts/" in str(n) and str(n).endswith("#foi")
+                       for n in g.all_nodes())
+
+    def test_effects_are_directionless_and_on_every_action_of_an_effect_family(self, td):
+        """Every action of an effect device (``onOff`` included) has one effect on its
+        family's variable and no direction; every other device has no effect."""
+        for room in td.room_ids():
+            for device in td.rooms[room]["devices"]:
+                device_id, dtype = device["device_id"], device["device_type"]
+                g, art = thing(td, room, device_id)
+                for action in g.objects(art, TD.hasActionAffordance):
+                    # The device's own actions act upon a property; the WebSub
+                    # (un)subscribe actions every Thing has do not.
+                    if g.value(action, SAREF.actsUpon) is None:
+                        continue
+                    effects = list(g.objects(action, TDSOSA.hasEffectActuation))
+                    if dtype not in EFFECT_DEVICES:
+                        assert effects == [], (device_id, g.value(action, TD.name))
+                        continue
+                    assert len(effects) == 1, (device_id, g.value(action, TD.name))
+                    effect = effects[0]
+                    target = td.room_property_uri(room, EFFECT_DEVICES[dtype])
+                    assert (effect, RDF.type, SOSA.Actuation) in g
+                    assert (effect, SOSA.actsOnProperty, target) in g
+                    assert (effect, TDSOSA.affectsObservableProperty, target) in g
+                    assert (effect, RDF.type, TDSOSA.IncreasingActuation) not in g
+                    assert (effect, RDF.type, TDSOSA.DecreasingActuation) not in g
+
+    def test_saref_actuator_is_exactly_on_the_effect_families(self, td):
+        """``saref:Actuator`` and the environment as ``sosa:hasFeatureOfInterest`` on the
+        devices that affect a variable (six types), on no other, curtains, blinds and the
+        garage door included (they lost the static parent)."""
+        seen = set()
+        for room in td.room_ids():
+            for device in td.rooms[room]["devices"]:
+                g, art = thing(td, room, device["device_id"])
+                effect_family = device["device_type"] in EFFECT_DEVICES
+                assert ((art, RDF.type, SAREF.Actuator) in g) is effect_family, device
+                foi = list(g.objects(art, SOSA.hasFeatureOfInterest))
+                assert foi == ([td.foi_uri(room)] if effect_family else [])
+                if effect_family:
+                    seen.add(device["device_type"])
+        assert seen == set(EFFECT_DEVICES)
+
+    def test_no_sensor_and_no_observation_exists(self, td):
+        """Declared, not simulated: no virtual sensor, nothing observes a variable."""
+        for room in td.room_ids():
+            assert td.ambient_sensors(room) == []
+            for device in td.rooms[room]["devices"]:
+                dg = td.artifact(room, device["device_id"])
+                assert not list(dg.subject_objects(SOSA.observes))
+
+    def test_a_room_without_a_variable_has_no_environment(self, machine):
+        """A room whose devices affect nothing (56 of the dataset's 1,256) gets no
+        environment resource at all, and its place has none."""
+        state = copy.deepcopy(machine.home_state())
+        state["rooms"]["kitchen"]["devices"] = [
+            d for d in state["rooms"]["kitchen"]["devices"]
+            if d["device_type"] != "light"]
+        td = HomeBenchTD(BASE, HOME_ID, state)
+        g, place, env = room_graph(td, "kitchen")
+        assert td.m.room_variables(state["rooms"]["kitchen"]) == []
+        assert not list(g.subjects(RDF.type, HOMEONT.Environment))
+        assert (place, HOMEONT.hasEnvironment, None) not in g
+        assert not list(g.subject_objects(SSN.hasProperty))
+        # The rest of the home is unchanged: the living room still has its environment.
+        assert list(room_graph(td, "living_room")[0].subjects(
+            RDF.type, HOMEONT.Environment))
+
+    def test_the_variable_set_follows_the_room_devices(self, td):
+        """``room_variables`` is the sorted tokens its devices can affect."""
+        m = td.m
+        assert m.room_variables(td.rooms["living_room"]) == [
+            "humidity", "illuminance", "pm10", "temperature"]
+        assert m.room_variables(td.rooms["kitchen"]) == ["illuminance"]
+        assert m.room_variables({"devices": []}) == []
+        assert m.effects("air_conditioner", "temperature") == {"air_temperature": None}
+        assert m.effects("fan", "speed") == {}
+        assert m.affects_environment("light") and not m.affects_environment("curtain")
+
+    def test_the_serialised_turtle_has_no_example_vocabulary(self, td):
+        """Nothing in the example namespace but homeont and the TD-SOSA extension
+        (SimuHome's own rule: no ``ex:`` types)."""
+        text = serialize_all(td)
+        assert "http://example.org/ex" not in text
+
+    def test_an_ambiguous_goal_finds_the_devices_through_the_room_environment(self, td):
+        """The agents' join: workspace -> space -> environment -> variable, and the
+        actions acting on it. "Cool the living room" finds the AC and the heater."""
+        closed = Graph()
+        closed += home_graph(td)
+        close_types(closed)
+
+        def goal(variable_class, direction):
+            return GoalSpec.from_dict({
+                "goal_kind": "achievement", "goal_specificity": "ambiguous",
+                "implied_environment_vars": [{
+                    "property_name": variable_class.split(":")[1],
+                    "property_class": variable_class,
+                    "property_sensed_space": {"space_class": "homeont:LivingRoom",
+                                              "space_name": "living_room"},
+                    "property_change_direction": direction}]})
+
+        context = build_specific_context(closed, goal("homeont:AirTemperature", "decrease"))
+        assert context is not None
+        found = {(a["artifact_name"], a["type"]) for a in context.affordances}
+        assert ("living_room_air_conditioner", "action_affordance") in found
+        assert ("living_room_heating", "action_affordance") in found
+        context = build_specific_context(closed, goal("homeont:Illuminance", "increase"))
+        assert ("living_room_light", "action_affordance") in {
+            (a["artifact_name"], a["type"]) for a in context.affordances}
+
+    def test_the_flat_graph_gives_the_agents_no_room_variable(self, flat_td):
+        """With the environment off the same ambiguous goal has nothing to join."""
+        closed = Graph()
+        closed += home_graph(flat_td)
+        close_types(closed)
+        goal = GoalSpec.from_dict({
+            "goal_kind": "achievement", "goal_specificity": "ambiguous",
+            "implied_environment_vars": [{
+                "property_name": "AirTemperature",
+                "property_class": "homeont:AirTemperature",
+                "property_sensed_space": {"space_class": "homeont:LivingRoom",
+                                         "space_name": "living_room"},
+                "property_change_direction": "decrease"}]})
+        context = build_specific_context(closed, goal)
+        assert context is None or not any(
+            a["type"] == "action_affordance" for a in context.affordances)
+
+    def test_the_variable_writer_keeps_simuhomes_default(self):
+        """SimuHome's ``_room_state_properties`` default stays readable (``readable=True``):
+        the switch exists only for HomeBench."""
+        import inspect
+        from ami_agents.environment.integration.SimuHome.td_builder import SimuHomeTD
+        parameter = inspect.signature(
+            SimuHomeTD._room_state_properties).parameters["readable"]
+        assert parameter.default is True
+
+
+def serialize_all(td):
+    """Every document of the home as one Turtle text."""
+    from ami_agents.environment.integration.SimuHome.td_builder import serialize
+    g = Graph()
+    for room in td.room_ids():
+        g += td.room_workspace(room)
+        for device in td.rooms[room]["devices"]:
+            g += td.artifact(room, device["device_id"])
+    return serialize(g)
 
 
 # -- the engine app and its client -----------------------------------------------------------------------------
@@ -704,6 +987,80 @@ def action(room, device, name):
 def prop(room, device, name):
     """The property URL of a device."""
     return f"/workspaces/{HOME_ID}/{room}/artifacts/{device}/properties/{name}"
+
+
+class TestEnvironmentSwitch:
+    """``--environment on|off``: HBTD, the worker and run_engine."""
+
+    def test_hbtd_serves_the_mode_it_was_started_with(self, server, monkeypatch):
+        """``on`` (the default): the kitchen has its environment; ``off``: the flat
+        graph, no environment in the room document."""
+        client, _stub = server
+        path = f"/workspaces/{HOME_ID}/kitchen"
+        monkeypatch.setattr(hbtd, "_environment", True)
+        on = Graph().parse(data=client.get(path).text, format="turtle")
+        assert list(on.subjects(RDF.type, HOMEONT.Environment))
+        monkeypatch.setattr(hbtd, "_environment", False)
+        flat = Graph().parse(data=client.get(path).text, format="turtle")
+        assert not list(flat.subjects(RDF.type, HOMEONT.Environment))
+
+    @pytest.mark.parametrize("argv, expected", [
+        ([], True), (["--environment", "on"], True), (["--environment", "off"], False)])
+    def test_hbtd_command_line(self, monkeypatch, argv, expected):
+        """The flag defaults to on; ``main`` stores it where ``build`` reads it."""
+        import sys
+        import uvicorn
+        for name in ("_client", "_home_id", "_base_url", "_poll_interval", "_environment"):
+            monkeypatch.setattr(hbtd, name, getattr(hbtd, name))
+        monkeypatch.setattr(uvicorn, "run", lambda *a, **k: None)
+        monkeypatch.setattr(sys, "argv", ["hbtd", "--sim", "http://x/api", "--home", "h",
+                                          *argv])
+        hbtd.main()
+        assert hbtd._environment is expected
+
+    def test_hbtd_refuses_another_mode(self, monkeypatch):
+        import sys
+        monkeypatch.setattr(sys, "argv", ["hbtd", "--environment", "maybe"])
+        with pytest.raises(SystemExit) as stop:
+            hbtd.main()
+        assert stop.value.code == 2
+
+    def test_the_worker_passes_its_mode_to_every_hbtd_it_starts(self, monkeypatch):
+        """``--environment <mode>`` is in the command line of the HBTD process."""
+        from ami_agents.environment.integration.HomeBench import worker as worker_module
+        started = []
+        monkeypatch.setattr(worker_module.subprocess, "Popen",
+                            lambda command, **kw: started.append(command))
+        for mode in ("on", "off"):
+            w = worker_module.HomeBenchWorker(environment=mode)
+            monkeypatch.setattr(w, "_wait_for", lambda *a, **k: True)
+            w._start_hbtd("home7")
+            assert started[-1][started[-1].index("--environment") + 1] == mode
+        assert worker_module.HomeBenchWorker().environment == "on"
+
+    def test_the_worker_refuses_another_mode(self):
+        from ami_agents.environment.integration.HomeBench.worker import HomeBenchWorker
+        with pytest.raises(ValueError, match="environment must be one of"):
+            HomeBenchWorker(environment="maybe")
+
+    def test_run_engine_passes_the_mode_to_hbtd(self, monkeypatch, tmp_path):
+        """``run`` starts the engine and HBTD; HBTD's command line has the mode."""
+        from ami_agents.environment.integration.HomeBench import run_engine
+        (tmp_path / "homes").mkdir()
+        (tmp_path / "homes" / "home3.json").write_text("{}", encoding="utf-8")
+        started = []
+
+        class Process:
+            def poll(self):
+                return 0                       # "died": ends the wait loop at once
+
+        monkeypatch.setattr(run_engine.subprocess, "Popen",
+                            lambda command, **kw: started.append(command) or Process())
+        monkeypatch.setattr(run_engine, "_wait", lambda *a, **k: None)
+        monkeypatch.setattr(run_engine, "_terminate", lambda p: None)
+        assert run_engine.run(3, tmp_path, 1, 2, "off") == 1
+        hbtd_command = next(c for c in started if str(c[1]).endswith("hbtd.py"))
+        assert hbtd_command[hbtd_command.index("--environment") + 1] == "off"
 
 
 class TestHBTD:

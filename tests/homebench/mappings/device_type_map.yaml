@@ -27,13 +27,11 @@ rows:
 - key: blinds
   td_types:
   - homeont:Blinds
-  - saref:Actuator
   title: Blinds
   status: auto
 - key: curtain
   td_types:
   - homeont:Curtain
-  - saref:Actuator
   title: Curtain
   status: auto
 - key: dehumidifiers
@@ -51,7 +49,6 @@ rows:
 - key: garage_door
   td_types:
   - homeont:GarageDoor
-  - saref:Actuator
   title: Garage Door
   status: auto
 - key: heating
@@ -69,19 +66,16 @@ rows:
 - key: light
   td_types:
   - homeont:OnOffLight
-  - saref:Actuator
   title: Light
   variants:
   - requires: color
     title: Color Light
     td_types:
     - homeont:ColorLight
-    - saref:Actuator
   - requires: brightness
     title: Dimmable Light
     td_types:
     - homeont:DimmableLight
-    - saref:Actuator
   status: auto
 - key: media_player
   td_types:

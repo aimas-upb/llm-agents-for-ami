@@ -64,7 +64,9 @@ from ami_agents.environment.integration.HomeBench.mappings import (
 from ami_agents.environment.integration.HomeBench.sim_client import (
     HomeBenchClient, SimuHomeError,
 )
-from ami_agents.environment.integration.HomeBench.td_builder import HomeBenchTD
+from ami_agents.environment.integration.HomeBench.td_builder import (
+    DEFAULT_ENVIRONMENT, ENVIRONMENT_MODES, HomeBenchTD,
+)
 from ami_agents.environment.integration.SimuHome import notifications as notify
 from ami_agents.environment.integration.SimuHome.td_builder import serialize
 
@@ -84,6 +86,7 @@ _client: Optional[HomeBenchClient] = None
 _home_id: str = os.getenv(HOME_ENV_VAR, "home")
 _base_url: str = os.getenv(BASE_ENV_VAR, f"http://{DEFAULT_HOST}:{DEFAULT_PORT}")
 _poll_interval: float = DEFAULT_POLL_INTERVAL
+_environment: bool = DEFAULT_ENVIRONMENT == "on"  # serve the environment model
 _watcher: Optional["notify.StateWatcher"] = None
 _stop = asyncio.Event()
 
@@ -106,7 +109,8 @@ def build(request: Request) -> HomeBenchTD:
         state = get_client().home_state()
     except SimuHomeError as exc:
         raise HTTPException(status_code=502, detail=f"engine unreachable: {exc}")
-    return HomeBenchTD(str(request.base_url).rstrip("/"), _home_id, state)
+    return HomeBenchTD(str(request.base_url).rstrip("/"), _home_id, state,
+                       environment=_environment)
 
 
 def ttl(graph) -> Response:
@@ -535,19 +539,24 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--poll-interval", type=float, default=DEFAULT_POLL_INTERVAL,
                         help="seconds between state polls")
+    parser.add_argument("--environment", choices=ENVIRONMENT_MODES,
+                        default=DEFAULT_ENVIRONMENT,
+                        help="on: serve the room environments and the action effects; "
+                             "off: the flat graph without them")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    global _client, _home_id, _base_url, _poll_interval
+    global _client, _home_id, _base_url, _poll_interval, _environment
     os.environ[SIM_ENV_VAR] = args.sim
     _client = HomeBenchClient(args.sim)
     _home_id = args.home
     _base_url = f"http://{args.host}:{args.port}"
     _poll_interval = args.poll_interval
+    _environment = args.environment == "on"
 
     import uvicorn
-    LOGGER.info("HBTD on http://%s:%d/  home=%s  engine=%s",
-                args.host, args.port, args.home, args.sim)
+    LOGGER.info("HBTD on http://%s:%d/  home=%s  engine=%s  environment=%s",
+                args.host, args.port, args.home, args.sim, args.environment)
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 
 

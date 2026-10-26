@@ -14,7 +14,9 @@ Worked example (home 42, the home of ``hb1_feasible_seed_1``)::
     # HBTD    http://127.0.0.1:8097/      (the crawler's root; the home workspace is home42)
     # then, for the console runner:  YGGDRASIL_URL=http://127.0.0.1:8097
 
-``--engine-only`` leaves HBTD out. Ctrl-C stops what was started.
+``--engine-only`` leaves HBTD out. ``--environment off`` serves the flat graph (no room
+environments, no action effects); the default ``on`` serves the environment model.
+Ctrl-C stops what was started.
 """
 
 from __future__ import annotations
@@ -34,6 +36,9 @@ from ami_agents.environment.integration.HomeBench.worker import (
     DEFAULT_BENCHMARK, HERE, HOST, _terminate,
 )
 from ami_agents.environment.integration.HomeBench.sim_client import HomeBenchClient
+from ami_agents.environment.integration.HomeBench.td_builder import (
+    DEFAULT_ENVIRONMENT, ENVIRONMENT_MODES,
+)
 
 LOGGER = logging.getLogger("run_engine")
 
@@ -55,9 +60,13 @@ def _wait(probe, what: str) -> None:
     raise TimeoutError(f"{what} did not come up within {STARTUP_SECONDS:.0f}s")
 
 
-def run(home: int, benchmark: Path, sim_port: int, hbtd_port: Optional[int]) -> int:
+def run(home: int, benchmark: Path, sim_port: int, hbtd_port: Optional[int],
+        environment: str = DEFAULT_ENVIRONMENT) -> int:
     """Start the engine on ``sim_port`` with home ``home`` loaded, and HBTD on
-    ``hbtd_port`` unless it is None; block until interrupted. Returns the exit code."""
+    ``hbtd_port`` unless it is None; block until interrupted. Returns the exit code.
+
+    ``environment`` (``on`` | ``off``) is HBTD's ``--environment``: the room
+    environments and action effects, or the flat graph."""
     home_file = benchmark / "homes" / f"home{home}.json"
     if not home_file.is_file():
         LOGGER.error("no such home file: %s (run tests/homebench/convert.py first)", home_file)
@@ -76,8 +85,10 @@ def run(home: int, benchmark: Path, sim_port: int, hbtd_port: Optional[int]) -> 
         if hbtd_port is not None:
             processes.append(subprocess.Popen(
                 [sys.executable, str(HERE / "hbtd.py"), "--sim", sim_base,
-                 "--home", f"home{home}", "--host", HOST, "--port", str(hbtd_port)]))
-            LOGGER.info("HBTD    http://%s:%d/  (home workspace home%d)", HOST, hbtd_port, home)
+                 "--home", f"home{home}", "--host", HOST, "--port", str(hbtd_port),
+                 "--environment", environment]))
+            LOGGER.info("HBTD    http://%s:%d/  (home workspace home%d, environment %s)",
+                        HOST, hbtd_port, home, environment)
 
         # 3. Until interrupted, or until one of them dies.
         while all(p.poll() is None for p in processes):
@@ -99,10 +110,13 @@ def main() -> int:
     parser.add_argument("--sim-port", type=int, default=DEFAULT_SIM_PORT)
     parser.add_argument("--hbtd-port", type=int, default=DEFAULT_HBTD_PORT)
     parser.add_argument("--engine-only", action="store_true", help="do not start HBTD")
+    parser.add_argument("--environment", choices=ENVIRONMENT_MODES,
+                        default=DEFAULT_ENVIRONMENT,
+                        help="on: room environments and action effects; off: flat graph")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     return run(args.home, args.benchmark, args.sim_port,
-               None if args.engine_only else args.hbtd_port)
+               None if args.engine_only else args.hbtd_port, args.environment)
 
 
 if __name__ == "__main__":

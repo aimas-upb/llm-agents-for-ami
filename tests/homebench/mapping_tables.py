@@ -47,11 +47,11 @@ MAPPINGS_DIR = Path(__file__).resolve().parent / "mappings"
 GENERATOR = "tests/homebench/convert.py --mappings"
 SETTLED = ("approved", "auto")
 
-#: Tables written empty on purpose: HomeBench has no clock, no room variables and no
-#: physics, so there are no observable room properties, no ambient sensors and no
-#: actuation effects. The tables exist so ``HomeBenchTD`` reads the same lookups as
-#: ``SimuHomeTD`` and an empty answer is a stated fact, not a missing file.
-EMPTY_TABLES = ("observable_properties", "ambient_sensors", "actuation_effects")
+#: Tables written empty on purpose: HomeBench has no ambient instruments, so no virtual
+#: sensor exists to read a room variable. The table exists so ``HomeBenchTD`` reads the
+#: same lookups as ``SimuHomeTD`` and an empty answer is a stated fact, not a missing
+#: file. (The room variables and the effects are declared, see ``EFFECT_FAMILIES``.)
+EMPTY_TABLES = ("ambient_sensors",)
 
 # -- the specification ----------------------------------------------------------------
 
@@ -73,9 +73,12 @@ ROOM_SPEC: Dict[str, Tuple[str, str]] = {
     engine.HOUSEHOLD_ROOM: ("homeont:BuildingSpace", "Household"),
 }
 
-#: device type -> (homeont class, SAREF parent, title).
-DEVICE_SPEC: Dict[str, Tuple[str, str, str]] = {
-    "light": ("homeont:OnOffLight", "saref:Actuator", "Light"),
+#: device type -> (homeont class, SAREF parent or ``None``, title). A device type with
+#: no static parent is typed ``saref:Actuator`` by ``HomeBenchTD`` only when it has an
+#: effect on a room variable (``EFFECT_FAMILIES``), so the type says what the device does
+#: in the model instead of being a blanket parent.
+DEVICE_SPEC: Dict[str, Tuple[str, Optional[str], str]] = {
+    "light": ("homeont:OnOffLight", None, "Light"),
     "air_conditioner": ("homeont:AirConditioner", "saref:HVAC", "Air Conditioner"),
     "heating": ("homeont:Heater", "saref:HVAC", "Heater"),
     "fan": ("homeont:Fan", "saref:Appliance", "Fan"),
@@ -84,9 +87,9 @@ DEVICE_SPEC: Dict[str, Tuple[str, str, str]] = {
     "dehumidifiers": ("homeont:Dehumidifier", "saref:Appliance", "Dehumidifier"),
     "aromatherapy": ("homeont:Aromatherapy", "saref:Appliance", "Aromatherapy"),
     "water_heater": ("homeont:WaterHeater", "saref:Appliance", "Water Heater"),
-    "curtain": ("homeont:Curtain", "saref:Actuator", "Curtain"),
-    "blinds": ("homeont:Blinds", "saref:Actuator", "Blinds"),
-    "garage_door": ("homeont:GarageDoor", "saref:Actuator", "Garage Door"),
+    "curtain": ("homeont:Curtain", None, "Curtain"),
+    "blinds": ("homeont:Blinds", None, "Blinds"),
+    "garage_door": ("homeont:GarageDoor", None, "Garage Door"),
     "media_player": ("homeont:MediaPlayer", "saref:Appliance", "Media Player"),
     "trash": ("homeont:Trash", "saref:Appliance", "Trash"),
     "vacuum_robot": ("homeont:Rvc", "saref:Appliance", "Vacuum Robot"),
@@ -204,6 +207,44 @@ READONLY_SPEC: Dict[str, Dict[str, Any]] = {
 OBSERVABLE_CLASSES = ("homeont:BatteryLevel", "homeont:WaterTankLevel",
                       "homeont:VacuumState")
 
+#: Which ambient variable the devices of a type can affect: device type -> the
+#: ``sosa_property`` of the variable. Exactly SimuHome's effect table, without the
+#: window coverings (curtain, blinds) and the garage door, which the project decided
+#: not to model as acting on ``illuminance`` (decision N1, 2026-10-26).
+EFFECT_FAMILIES: Dict[str, str] = {
+    "air_conditioner": "air_temperature",
+    "heating": "air_temperature",
+    "humidifier": "relative_humidity",
+    "dehumidifiers": "relative_humidity",
+    "air_purifiers": "pm10_mass_concentration",
+    "light": "illuminance",
+}
+
+#: The room variables, keyed by the room-state token the tables and ``HomeBenchTD``
+#: use (``room_state.<token>``); the values are SimuHome's approved rows (the same
+#: homeont class, QUDT quantity kind and unit), so one variable is the same node on
+#: every platform. ``unit`` is the symbol the TD builder resolves to a QUDT unit.
+OBSERVABLE_SPEC: Dict[str, Dict[str, str]] = {
+    "temperature": {
+        "room_state_token": "Temperature", "sosa_property": "air_temperature",
+        "homeont_class": "homeont:AirTemperature", "unit": "°C",
+        "quantityKind": "quantitykind:ThermodynamicTemperature",
+        "qudt_unit": "unit:DEG_C"},
+    "humidity": {
+        "room_state_token": "Humidity", "sosa_property": "relative_humidity",
+        "homeont_class": "homeont:RelativeHumidity", "unit": "%",
+        "quantityKind": "quantitykind:RelativeHumidity", "qudt_unit": "unit:PERCENT"},
+    "illuminance": {
+        "room_state_token": "Illuminance", "sosa_property": "illuminance",
+        "homeont_class": "homeont:Illuminance", "unit": "lx",
+        "quantityKind": "quantitykind:Illuminance", "qudt_unit": "unit:LUX"},
+    "pm10": {
+        "room_state_token": "Pm10", "sosa_property": "pm10_mass_concentration",
+        "homeont_class": "homeont:Pm10MassConcentration", "unit": "ug/m3",
+        "quantityKind": "quantitykind:MassConcentration",
+        "qudt_unit": "unit:MicroGM-PER-M3"},
+}
+
 
 class MappingError(ValueError):
     """The dataset holds something the specification does not cover."""
@@ -222,12 +263,15 @@ def device_type_rows(types: Iterable[str]) -> List[Dict[str, Any]]:
     rows = []
     for dtype in sorted(types):
         cls, parent, title = DEVICE_SPEC[dtype]
-        row: Dict[str, Any] = {"key": dtype, "td_types": [cls, parent],
+        # The SAREF parent is optional: a type without one gets ``saref:Actuator`` from
+        # the builder, and only when it has an effect.
+        parents = [parent] if parent else []
+        row: Dict[str, Any] = {"key": dtype, "td_types": [cls, *parents],
                                "title": title}
         # A light is typed by what it can do; variants are tried in order.
         if dtype == "light":
             row["variants"] = [
-                {"requires": attr, "title": vtitle, "td_types": [vcls, parent]}
+                {"requires": attr, "title": vtitle, "td_types": [vcls, *parents]}
                 for attr, vcls, vtitle in LIGHT_VARIANTS]
         row["status"] = "auto"
         rows.append(row)
@@ -330,6 +374,59 @@ def property_class_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return [{"key": cls, "kind": used[cls], "status": "auto"} for cls in sorted(used)]
 
 
+def observable_rows() -> List[Dict[str, Any]]:
+    """The ``observable_properties`` table: the four room variables.
+
+    One row per ``OBSERVABLE_SPEC`` entry, shaped like SimuHome's
+    ``room_state.<token>`` rows. The variables are declared, not observable (no
+    HomeBench device reads one and the home has no value for it); the row types them.
+    """
+    rows = []
+    # One row per variable; ``evidence`` says where the shape comes from and that no
+    # reader exists, so a reviewer sees why the property is declared but not served.
+    for token, spec in OBSERVABLE_SPEC.items():
+        rows.append({
+            "key": f"room_state.{token}", **spec,
+            "sosa_type": "sosa:ObservableProperty", "feature_of_interest": "room",
+            "evidence": {"named_after": f"the measured quantity ({spec['quantityKind']})",
+                         "mirrors": "tests/simuhome/td/mappings/observable_properties.yaml",
+                         "observable": False},
+            "status": "auto"})
+    return rows
+
+
+def effect_rows(affordances: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The ``actuation_effects`` table: one row per settable attribute of an effect family.
+
+    Every actuatable affordance of a device type in ``EFFECT_FAMILIES`` is claimed to
+    affect that family's variable, ``direction`` null: every HomeBench action carries a
+    value (``onOff`` included), so invoking it does not say which way the variable moves.
+    The rows are ``auto``: a human approves them, and an approved row survives
+    regeneration. They mean "this action can move that variable", declared domain
+    semantics; the engine does not simulate them.
+    """
+    rows = []
+    for row in affordances:
+        # 1. Only settable attributes of an effect family: read-only ones (``tank``)
+        #    have no action, so nothing to claim an effect for.
+        dtype = row["device_type"]
+        if not row["actuatable"] or dtype not in EFFECT_FAMILIES:
+            continue
+        # 2. One claim per (device type, attribute): the variable it can move.
+        attribute = row["attribute"]
+        rows.append({
+            "key": f"{dtype}:{attribute}", "family": dtype,
+            "command": {"mechanism": "attribute_write", "name": attribute},
+            "affectsObservableProperty": EFFECT_FAMILIES[dtype],
+            "actsOnProperty": None, "direction": None,
+            "evidence": {
+                "rationale": "value-carrying setter: no inherent direction",
+                "seeded_from": "SimuHome actuation_effects (same family, same variable)",
+                "simulated": False},
+            "status": "auto"})
+    return rows
+
+
 # -- the tables -------------------------------------------------------------------------
 
 
@@ -363,6 +460,8 @@ def generate_tables(homes: Iterable[Dict[str, Any]]) -> Dict[str, List[Dict[str,
         "property_classes": property_class_rows(affordances),
         "actuatable_properties": affordances,
         "command_map": command_rows(affordances),
+        "observable_properties": observable_rows(),
+        "actuation_effects": effect_rows(affordances),
     }
     for name in EMPTY_TABLES:
         tables[name] = []
