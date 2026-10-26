@@ -65,14 +65,15 @@ class TestSections:
         assert len(list(_descendants(context["locations"]["homeont:BuildingSpace"]))) == 16
         # 16 SimuHome device families + the 4 virtual ambient sensors SHTD
         # mints + 6 Home Assistant (lab308e) devices, under the five SAREF
-        # families.
+        # families, + 6 HomeBench devices (Curtain, Blinds, Aromatherapy,
+        # GarageDoor, WaterHeater, Trash).
         devices = context["device_types"]["saref:Device"]
         assert len(devices["subclasses"]) == 5
-        assert len(list(_descendants(devices))) == 5 + 20 + 6
+        assert len(list(_descendants(devices))) == 5 + 20 + 6 + 6
         assert len(list(_descendants(properties["homeont:DeviceCapabilityProperty"]))) == 19
-        assert len(list(_descendants(properties["homeont:DeviceStateProperty"]))) == 47 + 1
-        assert len(list(_descendants(properties["homeont:ActuatableDeviceProperty"]))) == 93 + 5 + 4   # + OperationalState and its 3 appliance leaves
-        assert len(list(_descendants(properties["sosa:ObservableProperty"]))) == 10
+        assert len(list(_descendants(properties["homeont:DeviceStateProperty"]))) == 47 + 1 + 1   # + HomeBench VacuumState
+        assert len(list(_descendants(properties["homeont:ActuatableDeviceProperty"]))) == 93 + 5 + 4 + 7   # + OperationalState and its 3 appliance leaves; + 7 HomeBench
+        assert len(list(_descendants(properties["sosa:ObservableProperty"]))) == 10 + 2  # + HomeBench battery, tank
         assert len(list(_descendants(
             context["environment_variables"]["sosa:ObservableProperty"]))) == 8
 

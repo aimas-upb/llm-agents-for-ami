@@ -1632,3 +1632,138 @@ lifecycle commands rather than falling back to a bare saref:Command."""@en ;
 	rdfs:subClassOf :TemperatureSetpoint ;
 	qudt:hasQuantityKind quantitykind:ThermodynamicTemperature ;
 	qudt:unit unit:DEG_C .
+
+################################################################################
+# 10. HomeBench deployments
+#
+# Classes a HomeBench home needs and neither the SimuHome corpus nor the Home
+# Assistant lab did: six device families, the commands and properties that go
+# with them. Additions only: nothing above is changed, and each class sits under
+# an existing root, so the parsers, the resolvers and every other TD are
+# unaffected. Curtain and Blinds are told apart on purpose: a request about
+# "the curtains" in a room that has only blinds must not resolve to the blinds.
+# They stay discoverable under the generic WindowCoveringController.
+################################################################################
+
+# -- Devices ---------------------------------------------------------------------
+
+:Curtain a owl:Class ;
+	rdfs:label "Curtain"@en ;
+	skos:altLabel "curtains"@en ;
+	skos:altLabel "drapes"@en ;
+	rdfs:comment "A window covering of fabric that is drawn open or closed, and in some homes to a degree."@en ;
+	rdfs:subClassOf :WindowCoveringController .
+
+:Blinds a owl:Class ;
+	rdfs:label "Blinds"@en ;
+	skos:altLabel "blind"@en ;
+	skos:altLabel "venetian blinds"@en ;
+	rdfs:comment "A window covering of slats that is opened or closed as a whole. Not a curtain."@en ;
+	rdfs:subClassOf :WindowCoveringController .
+
+:Aromatherapy a owl:Class ;
+	rdfs:label "Aromatherapy"@en ;
+	skos:altLabel "aroma diffuser"@en ;
+	skos:altLabel "essential oil diffuser"@en ;
+	skos:altLabel "diffuser"@en ;
+	rdfs:comment "A diffuser that releases scent into a space at a set intensity and interval."@en ;
+	rdfs:subClassOf saref:Appliance .
+
+:GarageDoor a owl:Class ;
+	rdfs:label "Garage Door"@en ;
+	skos:altLabel "garage door opener"@en ;
+	rdfs:comment "A motorised door of a garage that is opened or closed."@en ;
+	rdfs:subClassOf saref:Actuator .
+
+:WaterHeater a owl:Class ;
+	rdfs:label "Water Heater"@en ;
+	skos:altLabel "hot water heater"@en ;
+	skos:altLabel "boiler"@en ;
+	rdfs:comment "An appliance that heats water to a target temperature, in a heating or an eco mode."@en ;
+	rdfs:subClassOf saref:Appliance .
+
+:Trash a owl:Class ;
+	rdfs:label "Trash"@en ;
+	skos:altLabel "trash can"@en ;
+	skos:altLabel "trash bin"@en ;
+	skos:altLabel "garbage can"@en ;
+	skos:altLabel "waste bin"@en ;
+	rdfs:comment "A smart bin that reports how full it is and can pack (seal and empty) its bag."@en ;
+	rdfs:subClassOf saref:Appliance .
+
+# -- Commands ---------------------------------------------------------------------
+
+:SetOpenCloseCommand a owl:Class ;
+	rdfs:label "Set Open/Close Command"@en ;
+	rdfs:comment """Opens or closes a covering or a door, by the position it is to reach.
+
+Like SetOnOffCommand, one action stands for two SAREF commands, each of which
+fixes the position it writes: invoked with open it is an OpenCommand, with
+closed a CloseCommand."""@en ;
+	rdfs:subClassOf saref:OpenCommand, saref:CloseCommand .
+
+:PackCommand a owl:Class ;
+	rdfs:label "Pack Command"@en ;
+	rdfs:comment "Packs a trash can: seals its bag and leaves it empty. Takes no input."@en ;
+	rdfs:subClassOf saref:Command .
+
+:SetColorCommand a owl:Class ;
+	rdfs:label "Set Color Command"@en ;
+	rdfs:comment "Sets the colour of the light a lamp emits, to a red, green, blue triple."@en ;
+	rdfs:subClassOf saref:Command .
+
+# -- Actuatable properties --------------------------------------------------------
+
+:OpenCloseState a owl:Class ;
+	rdfs:label "Open/Close State"@en ;
+	rdfs:comment "Whether a covering or a door is open or closed."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty, saref:OpenCloseState .
+
+:TrashFillState a owl:Class ;
+	rdfs:label "Trash Fill State"@en ;
+	rdfs:comment "How full a trash can is: empty, not full or full. Packing it leaves it empty."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty .
+
+:DeviceMode a owl:Class ;
+	rdfs:label "Device Mode"@en ;
+	rdfs:comment "The operating mode of a device, chosen from the named modes it offers (for example auto or sleep on a purifier, eco on a water heater)."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty .
+
+:SwingMode a owl:Class ;
+	rdfs:label "Swing Mode"@en ;
+	rdfs:comment "Where a fan or an air conditioner directs its airflow: auto, up, middle or down."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty .
+
+:OutputIntensity a owl:Class ;
+	rdfs:label "Output Intensity"@en ;
+	rdfs:comment "How strongly a humidifier, dehumidifier or diffuser works, as a level from its minimum to its maximum."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty .
+
+:OperatingInterval a owl:Class ;
+	rdfs:label "Operating Interval"@en ;
+	rdfs:comment "The interval between two emissions of a diffuser."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty .
+
+:CleaningArea a owl:Class ;
+	rdfs:label "Cleaning Area"@en ;
+	rdfs:comment "The room a robot vacuum is told to clean, chosen from the rooms of the home."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty .
+
+# -- Readings of a device ------------------------------------------------------------
+
+:BatteryLevel a owl:Class ;
+	rdfs:label "Battery Level"@en ;
+	rdfs:comment "How much charge a battery-powered device has left, as a percentage."@en ;
+	qudt:unit unit:PERCENT ;
+	rdfs:subClassOf sosa:ObservableProperty .
+
+:WaterTankLevel a owl:Class ;
+	rdfs:label "Water Tank Level"@en ;
+	rdfs:comment "How full the water tank of a humidifier or dehumidifier is, as a percentage."@en ;
+	qudt:unit unit:PERCENT ;
+	rdfs:subClassOf sosa:ObservableProperty .
+
+:VacuumState a owl:Class ;
+	rdfs:label "Vacuum State"@en ;
+	rdfs:comment "The state a robot vacuum reports. Read only: it has no command to change it."@en ;
+	rdfs:subClassOf :DeviceStateProperty .

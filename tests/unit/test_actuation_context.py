@@ -239,7 +239,10 @@ class TestMatching:
 
     def test_alt_labels_and_plurals(self, small_home):
         labels = device_family_labels(small_home)
-        assert match_classes("close the blinds", labels) == ["homeont:WindowCoveringController"]
+        # "blinds" is an alt label of the generic controller and the label of the
+        # HomeBench Blinds subclass: one mention, two classes, as "lamps" is two.
+        assert set(match_classes("close the blinds", labels)) == {
+            "homeont:WindowCoveringController", "homeont:Blinds"}
         assert set(match_classes("turn off both lamps", labels)) == {
             "homeont:OnOffLight", "homeont:DimmableLight"}
         assert match_classes("run the washing machine", labels) == ["homeont:LaundryWasher"]
