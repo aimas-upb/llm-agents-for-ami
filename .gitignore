@@ -265,3 +265,7 @@ agent_logs/
 **/HomeAssistant/scripts.yaml
 **/HomeAssistant/secrets.yaml
 **/HomeAssistant/prepare-adapter-env.sh
+# HomeBench converter output (about 17k generated files; rebuild with tests/homebench/convert.py)
+tests/homebench/data/
+# HomeBench bench records and statistics (run.py / harness.py / sweep.py write here)
+tests/homebench/results/
