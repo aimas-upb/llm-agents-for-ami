@@ -100,7 +100,7 @@
   ],
   "query": "the air is so stuffy in here",
   "semantic_expectations": {
-    "target_properties": ["air_quality"],
+    "target_properties": ["carbon_dioxide_concentration"],
     "preferred_artifacts": ["window_308e_cover", "ceiling_fan_308e"],
     "acceptable_artifacts": ["window_308e_cover", "ceiling_fan_308e", "air_conditioner_308e"],
     "forbidden_artifacts": ["projector_308e", "display_wall_308e", "blackout_blinds_308e_cover"],

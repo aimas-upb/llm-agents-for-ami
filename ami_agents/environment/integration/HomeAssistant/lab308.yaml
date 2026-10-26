@@ -1,10 +1,14 @@
 version: 1
 
 semantic:
-  # Read by HASP (via SEMANTIC_CONFIG): `location_class`, and per device
-  # `device_class`, `properties` and `commands`, overriding
-  # semantic_mappings.yaml. Only what the defaults cannot infer is here.
+  # Read by HASP (via SEMANTIC_CONFIG), overriding semantic_mappings.yaml. Only
+  # what Home Assistant cannot tell is here; the keys are those of lab308e.yaml.
   location_class: "homeont:StudyRoom"
+  environments:
+    outdoor: {label: "Outdoor environment"}
+  devices:
+    external_light_sensing_308:
+      environment: outdoor        # observes outdoor_illuminance, not the room's
 
 devices:
   lights_308:

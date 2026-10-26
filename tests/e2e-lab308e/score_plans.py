@@ -80,20 +80,24 @@ def _looks_like_continuous_condition(node: Dict[str, Any]) -> bool:
 
 
 def _artifact_properties(artifact_name: str) -> set[str]:
+    """The lab308e room variables an artifact reads or moves, by HASP's names
+    (named after their homeont class: `illuminance`, `air_temperature`), for
+    matching a plan against a case's `target_properties`."""
     name = (artifact_name or "").lower()
     props: set[str] = set()
+    # One rule per variable, matched on the artifact's name.
     if any(tok in name for tok in ("glare_sensing", "glare")):
         props.add("glare")
     if any(tok in name for tok in ("co2_sensing", "co2")):
-        props.add("air_quality")
+        props.add("carbon_dioxide_concentration")
     if any(tok in name for tok in ("humidity_sensing", "humidity")):
-        props.add("humidity")
+        props.add("relative_humidity")
     if any(tok in name for tok in ("temperature_sensing", "temperature")):
-        props.add("thermal_comfort")
+        props.add("air_temperature")
     if any(tok in name for tok in ("internal_light_sensing", "external_light_sensing", "ambient_lights", "task_lights", "blinds", "window_308e_cover")):
-        props.add("luminosity")
+        props.add("illuminance")
     if "desk_light_sensing" in name or "desk_lamp" in name:
-        props.update({"luminosity", "desk_luminosity"})
+        props.update({"illuminance", "desk_illuminance"})
     return props
 
 

@@ -106,14 +106,48 @@ commands:
   - {service: [volume_down, decrease_speed], class: "saref:StepDownCommand"}
   - {service: [set_hvac_mode, set_fan_mode, set_preset_mode, set_swing_mode, set_swing_horizontal_mode, select_source, select_sound_mode, set_mode, set_direction], class: "homeont:SetModeCommand"}
 
-# -- Room variables HASP's TD-SOSA effect keys stand for -------------------------
-# The key-based URIs (…/environment/thermal_comfort) are kept; this adds the
-# homeont class beside them.
-environment_variables:
-  thermal_comfort: "homeont:AirTemperature"
-  luminosity: "homeont:Illuminance"
-  humidity: "homeont:RelativeHumidity"
-  occupancy_presence: "homeont:Occupancy"
+# -- Room variables ---------------------------------------------------------------
+# Which variables a home has is not listed here: homeont says which of its
+# classes are a property of a space's environment (`ssn:isPropertyOf
+# homeont:Environment`), and a device property typed with one of them observes
+# that variable -- named after the class (AirTemperature -> air_temperature),
+# as SimuHome names its room variables.
+
+# HA units -> QUDT units. A sensor HA gives no device_class is typed by its
+# unit when exactly one environment class in homeont has that QUDT unit
+# (lx -> unit:LUX -> homeont:Illuminance); "%" is relative humidity and glare
+# alike, so it types nothing on its own.
+units:
+  lx: "unit:LUX"
+  "°C": "unit:DEG_C"
+  "%": "unit:PERCENT"
+  ppm: "unit:PPM"
+  "µg/m³": "unit:MicroGM-PER-M3"
+  persons: "unit:NUM"
+
+# What an action moves in the room, by default. A device's own `effects` (in
+# the home config) replace these. In a rule: `services` limits it to those
+# services; `<service>: increase|decrease` states a direction; `direction:
+# none` leaves every covered service directionless (a thermostat warms or
+# cools depending on its mode and setpoint). Otherwise the direction comes from
+# the service name (turn_on / open_cover increase, turn_off / close_cover
+# decrease), and setters (set_cover_position) get an effect without one.
+effects:
+  - {domain: light, services: [turn_on, turn_off], class: "homeont:Illuminance"}
+  - {domain: cover, services: [open_cover, close_cover, set_cover_position], class: "homeont:Illuminance"}
+  - {domain: climate, services: [turn_on, turn_off, set_temperature, set_hvac_mode], class: "homeont:AirTemperature", direction: none}
+  - {domain: humidifier, services: [turn_on, turn_off, set_humidity], class: "homeont:RelativeHumidity"}
+
+# Names HASP used for its variables before they were named after their homeont
+# class. The graph-query endpoints still accept them.
+variable_aliases:
+  luminosity: illuminance
+  desk_luminosity: desk_illuminance
+  outdoor_luminosity: outdoor_illuminance
+  thermal_comfort: air_temperature
+  humidity: relative_humidity
+  air_quality: carbon_dioxide_concentration
+  occupancy_presence: occupancy
 
 # -- What an action changes (saref:actsUpon) -----------------------------------
 # HASP links each action to the property affordances it changes, so a resolver

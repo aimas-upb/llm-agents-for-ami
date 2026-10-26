@@ -120,6 +120,89 @@ executed, and the SimuHome score. They are averaged:
 - per case;
 - overall.
 
+### Metrics (`stats.py`)
+
+The statistics are computed once per episode (`episodes.csv`), then averaged over groups of
+episodes (`summary.*`). `summary.md` starts with a legend of its columns.
+
+**Terms**
+- **Eval goal**: one target that SimuHome's answer key checks, for example "washer 1 running in
+  Heavy mode at minute 40". A request usually has 1–3.
+- **Check**: one expected device value inside an eval goal. `evaluate.py` labels each one *ok*,
+  *missing* (never set), *wrong value* or *wrong timing*.
+- **Plan entry**: what the ISA returned for one structured goal: a plan, an "impossible" verdict,
+  or a question. A dependency plan (qt4-3) can cover several eval goals in one entry.
+- **Infrastructure failure**: score −1, meaning the API, the simulator or the judge failed rather
+  than the agents. These episodes are left out of every rate and every cost mean. An interrupted
+  run costs almost nothing, so keeping it would make the averages look cheaper.
+
+**Cost per phase.** The phases are segmentation, structuring, planning, profiling, guarding and
+execution. A seventh bucket, *other*, holds the state reads and the reply to the user.
+
+| Column (`episodes.csv`) | Meaning |
+|---|---|
+| `<phase>_s` | Wall seconds in the phase. Profiling and guarding run inside planning and are subtracted from it, so the phases add up to `total_s`. |
+| `<phase>_calls` | LLM calls the phase made. |
+| `<phase>_tok_in`, `<phase>_tok_out` | Prompt and completion tokens. Output includes a reasoning model's reasoning tokens. |
+| `total_s`, `total_calls`, `total_tok_in`, `total_tok_out` | Sums over the phases: the end-to-end cost of handling the request. |
+| `wall_s` | The episode's full wall time, including discovery and the simulator reset. |
+
+The cost is read from the record's `meter.stages`. Discovery is not counted, because a deployment
+does it offline. Steps replayed from a sweep's step cache are not counted either. A record written
+before the meter kept stages has no cost columns.
+
+**Goals achieved.** Two complementary views:
+
+| Column | Meaning | Applies to |
+|---|---|---|
+| `goals_total` | Eval goals in the request. | feasible |
+| `goals_verified` | Eval goals SimuHome confirms were fully reached (every check *ok*). This is the ground truth for how many of the things asked for actually happened. | feasible |
+| `goals_verified_frac` | `goals_verified / goals_total`. This is partial credit where SimuHome's score is all-or-nothing. | feasible |
+| `multi_goal` | The request has more than one eval goal. | feasible |
+| `goal_intents` | Goals the UA structured. | all |
+| `plan_entries` | Plan entries the ISA returned. | all |
+| `plans_run`, `plans_success` | Plans executed, and those that ended `SUCCESS` as our executor sees it. These measure whether execution worked, regardless of whether the result matched the answer key. | all |
+| `goals_refused` | Plan entries answered "impossible" or with a question, plus goals stopped for a clarification at structuring. On an infeasible request, refusing the impossible part is the correct behaviour. | all |
+
+The two views can disagree. For example, both plans can run to `SUCCESS` (`plans_success` 2) while
+one goal set a wrong value (`goals_verified` 1).
+
+**SimuHome result** (see [Scoring](#scoring-evaluatepy)):
+
+| Column | Meaning | Applies to |
+|---|---|---|
+| `score` | 1 pass, 0 fail, −1 infrastructure failure. A feasible request passes only if every check passes. An infeasible one passes only if both the execution check and the judge pass. | all |
+| `check_rate` | Share of the checks that passed. | feasible |
+| `execution_check` | 1 when nothing ran on the impossible part and that part was answered as impossible or with a question. | infeasible |
+| `judge` | The judge panel's verdict on the reply. The judge's own failures (−1) are left empty. | infeasible |
+| `outcome`, `error_step` | How the episode ended (`executed`, `answered`, `impossible`, `clarify`, `failed`, `error`), and for `error`, the step that raised. | all |
+
+**Groups and averages.** The rows of `summary.*`, in this order:
+1. type × case, for example `qt3 / feasible` (12 rows);
+2. type, both cases together, for example `qt3 / all`;
+3. case, all types together: `all / feasible`, `all / infeasible`;
+4. overall: `all / all`.
+
+| Column (`summary.csv`) | `summary.md` | Meaning |
+|---|---|---|
+| `n`, `n_scored`, `n_infra`, `n_error`, `n_unscored` | n, scored, infra, errors | Episodes in the group: all of them, scored 1 or 0, infrastructure failures, raised in our code, not scored yet. |
+| `success_rate` | success | Share of scored episodes that passed. |
+| `check_rate` | checks | Mean check pass rate. |
+| `goals_verified_rate` | goals ok | Pooled over the group: verified eval goals summed ÷ eval goals summed. |
+| `goals_verified_mean`, `goals_per_request` | ok/request, goals/request | Mean verified goals, and mean eval goals, per request. |
+| `multi_n`, `multi_goals_verified_rate`, `multi_goals_verified_mean` | multi n, multi goals ok, multi ok/request | The same, over the multi-goal requests only. |
+| `plans_success_rate`, `plans_success_mean` | plans ok | Plans that ended `SUCCESS` ÷ plans run (pooled), and their mean per request. |
+| `goal_intents_mean`, `goals_refused_mean` | refused/request | Mean goals structured, and refused, per request. |
+| `execution_check_rate`, `judge_rate` | exec check, judge | Infeasible episodes in the group: share passing the execution check, and the judge. |
+| `<phase>_s`, `<phase>_calls`, `<phase>_tok_in`, `<phase>_tok_out` | *phase* s, *phase* in/out, calls | Mean per episode, for every phase and `total`. `n_costed` is the number of episodes these means cover. |
+| `total_s_median`, `total_s_p95` | median, p95 | Median and 95th percentile of `total_s`. The p95 is the slow tail: 95% of the episodes took less. |
+
+`stats.py` also runs on its own, over any records directory, with no LLM calls:
+
+```bash
+conda run -n ami-agents python -m tests.simuhome.bench.stats --records tests/simuhome/results/harness/<name>
+```
+
 ### Harness config
 
 ```yaml
