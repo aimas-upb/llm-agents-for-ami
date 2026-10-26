@@ -102,6 +102,19 @@ def load(directory: Path) -> List[Tuple[Dict[str, Any], Optional[Dict[str, Any]]
     return out
 
 
+def run_environment(directory: Path) -> Optional[str]:
+    """The environment mode (``on`` | ``off``) the run in ``directory`` served, from
+    the ``run.json`` beside its records, or None when it does not say (a SimuHome run,
+    an older run, no run.json). The mode changes what the agents see, so it belongs in
+    the header of every table made from the records."""
+    try:
+        settings = json.loads((directory / "run.json").read_text(encoding="utf-8"))
+        mode = settings["settings"]["environment"]
+    except (OSError, KeyError, TypeError, ValueError):
+        return None
+    return str(mode) if mode else None
+
+
 # --------------------------------------------------------------------------
 # One episode
 # --------------------------------------------------------------------------
@@ -558,10 +571,12 @@ def official_table(buckets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def write(directory: Path, rows: List[Dict[str, Any]],
-          summary: List[Dict[str, Any]], title: str) -> Path:
+          summary: List[Dict[str, Any]], title: str,
+          environment: Optional[str] = None) -> Path:
     """episodes.csv, summary.csv, summary.json and summary.md in ``directory``/stats (and
     buckets.csv for HomeBench records: the official metrics per bucket); returns that
-    directory."""
+    directory. ``environment`` (``on`` | ``off``), when the run recorded it, heads the
+    report."""
     out = directory / "stats"
     out.mkdir(parents=True, exist_ok=True)
 
@@ -581,8 +596,9 @@ def write(directory: Path, rows: List[Dict[str, Any]],
         notes = "".join(f"- {note}\n" for note in homebench_notes(rows))
         official = (f"\n## Official HomeBench metrics (per bucket)\n\n"
                     f"{_table(official_table(buckets))}\n{notes}")
+    mode = f"Environment: **{environment}**\n\n" if environment else ""
     (out / "summary.md").write_text(
-        f"# {title}\n\n{legend}\n## Score and goals\n\n{_table(shown['score'])}{official}"
+        f"# {title}\n\n{mode}{legend}\n## Score and goals\n\n{_table(shown['score'])}{official}"
         f"\n## Seconds per phase (mean per episode)\n\n{_table(shown['seconds'])}"
         f"\n## Tokens per phase (mean per episode, input / output)\n\n"
         f"{_table(shown['tokens'])}", encoding="utf-8")
@@ -602,7 +618,11 @@ def compute(directory: Path, title: Optional[str] = None) -> Optional[Path]:
 
     # 2. The groups, written and the headline table shown.
     summary = aggregate(rows)
-    out = write(directory, rows, summary, title or f"Bench statistics: {directory.name}")
+    environment = run_environment(directory)
+    out = write(directory, rows, summary, title or f"Bench statistics: {directory.name}",
+                environment)
+    if environment:
+        print(f"environment: {environment}")
     print(_table(tables(summary)["score"]))
     buckets = bucket_rows(rows)
     if buckets:

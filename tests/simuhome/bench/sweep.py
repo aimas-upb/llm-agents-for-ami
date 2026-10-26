@@ -22,6 +22,7 @@ A grid file:
       context: none
       memory: off
       guidelines: homebench               # homebench suite only: homebench | default
+      environment: on                     # homebench suite only: on | off
     evaluate: {judge: true}
 
 Every variant runs with the same episodes and a shared step cache: variants
@@ -125,7 +126,7 @@ def main() -> int:
         if suite.name != DEFAULT_SUITE:
             run += ["--suite", suite.name]
         for key in ("episodes", "seeds", "limit", "workers", "context", "memory",
-                    "step_seconds", "exec_timeout", "guidelines"):
+                    "step_seconds", "exec_timeout", "guidelines", "environment"):
             if run_options.get(key) is not None:
                 run += [f"--{key.replace('_', '-')}", str(run_options[key])]
         evaluate = [sys.executable, "-m", "tests.simuhome.bench.evaluate",

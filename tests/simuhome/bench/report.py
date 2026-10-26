@@ -81,6 +81,15 @@ def load(root: Path, variants: Optional[Iterable[str]]) -> Dict[str, List[Dict[s
     return out
 
 
+def environments(root: Path, variants: Iterable[str]) -> Dict[str, str]:
+    """{variant: environment mode} for the variants whose ``run.json`` records one
+    (HomeBench runs): the mode changes what the agents see, so the report names it."""
+    from .stats import run_environment
+
+    modes = {name: run_environment(root / name) for name in variants}
+    return {name: mode for name, mode in modes.items() if mode}
+
+
 def _step_values(record: Dict[str, Any], step: str) -> Optional[Dict[str, float]]:
     """One episode's total for a step, or None when the step did not run."""
     meter = record.get("meter") or {}
@@ -284,10 +293,17 @@ def main() -> int:
                   "request asked to turn off, met by the device being off): our criterion, not "
                   "HomeBench's. Episodes scored with --no-judge have the execution check alone "
                   "for their infeasible parts, which is weaker.\n" if official_rows else "")
-    report = ("# Bench report\n\n## Success rates\n\n" + _table(rate_rows) + hb_section
+    # The environment mode per variant, when the runs recorded one.
+    modes = environments(root, data)
+    mode_line = ("Environment: " + ", ".join(f"{v} = **{m}**" for v, m in modes.items())
+                 + "\n\n") if modes else ""
+    report = ("# Bench report\n\n" + mode_line + "## Success rates\n\n"
+              + _table(rate_rows) + hb_section
               + "\n## Time per step (seconds per episode)\n\n" + _table(step_rows)
               + "\n## Outcomes\n\n" + _table(outcome_rows))
     (root / "report.md").write_text(report, encoding="utf-8")
+    if modes:
+        print("environment: " + ", ".join(f"{v}={m}" for v, m in modes.items()))
     print(_table(rate_rows))
     print(f"written: {root / 'report.md'}, rates.csv, steps.csv, outcomes.csv")
     return 0

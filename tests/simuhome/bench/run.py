@@ -59,7 +59,9 @@ from dotenv import load_dotenv  # noqa: E402
 if (PROJECT_ROOT / ".env").exists():
     load_dotenv(PROJECT_ROOT / ".env")
 
-from .suites import DEFAULT_SUITE, SUITE_NAMES, Suite, get_suite  # noqa: E402
+from .suites import (  # noqa: E402
+    DEFAULT_ENVIRONMENT, DEFAULT_SUITE, ENVIRONMENT_MODES, SUITE_NAMES, Suite, get_suite,
+)
 
 AGENTS_YAML = PROJECT_ROOT / "ami_agents" / "config" / "agents.yaml"
 
@@ -252,7 +254,8 @@ def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> Li
                       memory=memory, cache=cache, debug=settings["debug"],
                       execution=settings.get("execution", "ticks"),
                       dry_step_seconds=float(settings.get("dry_step_seconds", 1.0)),
-                      real_read_seconds=float(settings.get("real_read_seconds", 10.0)))
+                      real_read_seconds=float(settings.get("real_read_seconds", 10.0)),
+                      environment=settings.get("environment") if suite.environment else None)
 
     # 2. The simulator: one the run starts (a worker), or one already running.
     written = []
@@ -264,7 +267,11 @@ def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> Li
                 f"{settings['shtd'].rstrip('/')}/_shtd/status", timeout=10).read())
             fixed = (settings["shtd"].rstrip("/"), status["home"])
         else:
-            worker = suite.worker_cls(benchmark=benchmark, worker_id=worker_id).start()
+            # The environment mode goes only to a worker whose suite has the option
+            # (SimuHomeWorker has no such argument).
+            extra = {"environment": settings["environment"]} if suite.environment else {}
+            worker = suite.worker_cls(benchmark=benchmark, worker_id=worker_id,
+                                      **extra).start()
             sim = worker.client
             fixed = None
 
@@ -334,6 +341,11 @@ def main(execution: str = "ticks", out: Optional[Path] = None) -> int:
     parser.add_argument("--guidelines",
                         help="the planning conditions: homebench (HomeBench's default: none) "
                              "or default (the agents' own file, as deployed)")
+    parser.add_argument("--environment", choices=ENVIRONMENT_MODES,
+                        help="HomeBench: on (default) serves the room environments and "
+                             "action effects, off the flat graph; recorded in run.json. "
+                             "With --sim/--shtd the server you started decides what is "
+                             "served, this only sets the TDs the bench builds itself")
     parser.add_argument("--out", help="records directory (default: <suite results>/bench)")
     parser.add_argument("--benchmark", help="the benchmark directory (default: the suite's)")
     parser.add_argument("--skip-existing", action="store_true")
@@ -354,6 +366,9 @@ def main(execution: str = "ticks", out: Optional[Path] = None) -> int:
         suite.guidelines_path(args.guidelines)
     except ValueError as exc:
         parser.error(str(exc))
+    if args.environment and not suite.environment:
+        parser.error(f"--environment is for a suite with room environments: the "
+                     f"{suite.title} suite has none to switch")
     args.out = args.out or str(out or suite.results_root / "bench")
 
     # 2. The episodes: one, or the suite's selection, kept together by home.
@@ -373,6 +388,9 @@ def main(execution: str = "ticks", out: Optional[Path] = None) -> int:
                 "cache": args.cache, "execution": args.execution,
                 "dry_step_seconds": args.dry_step_seconds,
                 "real_read_seconds": args.real_read_seconds}
+    # The mode is recorded (run.json) only for a suite that has it.
+    if suite.environment:
+        settings["environment"] = args.environment or DEFAULT_ENVIRONMENT
 
     from .models import load_variant
     variant = load_variant(args.variant)

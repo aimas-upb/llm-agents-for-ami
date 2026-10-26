@@ -106,12 +106,15 @@ class Home:
 
     def __init__(self, shtd_base: str, home_id: str, state: Dict[str, Any],
                  config: Dict[str, Any], logger,
-                 builder_cls: Any = SimuHomeTD) -> None:
+                 builder_cls: Any = SimuHomeTD,
+                 builder_kwargs: Optional[Dict[str, Any]] = None) -> None:
         """``builder_cls`` is the suite's TD builder (`SimuHomeTD`, or HomeBench's
-        `HomeBenchTD`), called as ``builder_cls(base, home_id, state)``."""
+        `HomeBenchTD`), called as ``builder_cls(base, home_id, state, **builder_kwargs)``
+        (HomeBench: ``environment``, the room environments and effects on or off)."""
         self.shtd_base = shtd_base.rstrip("/")
         self.home_id = home_id
-        self.builder = builder_cls(self.shtd_base, home_id, state)
+        self.builder = builder_cls(self.shtd_base, home_id, state,
+                                   **(builder_kwargs or {}))
         # What each room workspace lists, as the EnvExplorer's crawl finds it:
         # the simulator's devices and SHTD's virtual ambient sensors (one per
         # room variable -- what a room-state question is answered from). A

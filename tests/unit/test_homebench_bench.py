@@ -500,6 +500,171 @@ class TestHomeStub:
         assert default.__module__.endswith("SimuHome.td_builder")
 
 
+# -- the environment option --------------------------------------------------------------------
+
+
+class FakeWorker:
+    """A worker that records how it was built (the suite's ``worker_cls``)."""
+
+    built = []
+
+    def __init__(self, **kwargs):
+        FakeWorker.built.append(kwargs)
+        self.client = object()
+
+    def start(self):
+        return self
+
+    def stop(self):
+        pass
+
+
+def _settings(tmp_path, **extra):
+    """The settings dict ``run_worker`` reads, with no episodes to run."""
+    return {"suite": "homebench", "guidelines": None, "variant": None,
+            "out": str(tmp_path / "out"), "benchmark": str(tmp_path), "memory": "off",
+            "context": "none", "step_seconds": 10.0, "exec_timeout": 60.0,
+            "stop_after": None, "debug": False, "sim": None, "skip_existing": False,
+            **extra}
+
+
+class TestEnvironmentOption:
+    """``--environment on|off``: the suite's option, the worker, the TD builder the
+    pipeline discovers with, ``run.json`` and the statistics header."""
+
+    def test_only_homebench_has_the_option(self):
+        from tests.simuhome.bench import suites
+        assert HOMEBENCH.environment is True and SIMUHOME.environment is False
+        assert suites.ENVIRONMENT_MODES == ("on", "off")
+
+    def test_run_refuses_the_option_for_simuhome(self, monkeypatch, capsys):
+        monkeypatch.setattr(sys, "argv", ["run", "--environment", "off"])
+        with pytest.raises(SystemExit) as stop:
+            run.main()
+        assert stop.value.code == 2
+        assert "has none to switch" in capsys.readouterr().err
+
+    def test_run_refuses_another_mode(self, monkeypatch, capsys):
+        monkeypatch.setattr(sys, "argv", ["run", "--suite", "homebench", "--environment",
+                                          "maybe"])
+        with pytest.raises(SystemExit) as stop:
+            run.main()
+        assert stop.value.code == 2
+
+    @pytest.mark.parametrize("argv, expected", [
+        ([], "on"), (["--environment", "on"], "on"), (["--environment", "off"], "off")])
+    def test_run_json_records_the_mode(self, bench_dir, tmp_path, monkeypatch, argv,
+                                       expected):
+        """The mode is a setting of the run: on by default, as given otherwise."""
+        monkeypatch.setattr(run, "run_worker", lambda *a, **k: [])
+        out = tmp_path / "records"
+        monkeypatch.setattr(sys, "argv", [
+            "run", "--suite", "homebench", "--benchmark", str(bench_dir), "--out", str(out),
+            "--episodes", "hb1_feasible_seed_1", *argv])
+        assert run.main() == 0
+        settings = json.loads(next(out.glob("*/run.json")).read_text(encoding="utf-8"))
+        assert settings["settings"]["environment"] == expected
+
+    def test_run_json_of_simuhome_has_no_environment(self, tmp_path, monkeypatch):
+        """SimuHome's settings are what they were: no new key."""
+        bench = tmp_path / "bench"
+        bench.mkdir()
+        (bench / "qt1_feasible_seed_1.json").write_text("{}", encoding="utf-8")
+        monkeypatch.setattr(run, "run_worker", lambda *a, **k: [])
+        out = tmp_path / "records"
+        monkeypatch.setattr(sys, "argv", ["run", "--benchmark", str(bench), "--out", str(out),
+                                          "--episodes", "qt1_feasible"])
+        assert run.main() == 0
+        settings = json.loads(next(out.glob("*/run.json")).read_text(encoding="utf-8"))
+        assert "environment" not in settings["settings"]
+
+    @pytest.mark.parametrize("mode", ["on", "off"])
+    def test_a_homebench_worker_gets_the_mode_and_simuhomes_does_not(self, tmp_path,
+                                                                    monkeypatch, mode):
+        """``run_worker`` builds the worker with ``environment`` only when the suite has
+        the option (``SimuHomeWorker`` has no such argument)."""
+        import dataclasses
+        FakeWorker.built.clear()
+        fake = "tests.unit.test_homebench_bench:FakeWorker"
+        monkeypatch.setattr(run, "get_suite", lambda name=None: dataclasses.replace(
+            HOMEBENCH if name == "homebench" else SIMUHOME, worker_path=fake))
+        run.run_worker(0, [], _settings(tmp_path, environment=mode))
+        assert FakeWorker.built[-1]["environment"] == mode
+        run.run_worker(0, [], _settings(tmp_path, suite="simuhome"))
+        assert "environment" not in FakeWorker.built[-1]
+
+    def test_the_pipeline_discovers_with_the_mode(self, home_config):
+        """``Home`` builds the suite's TD builder with the keyword arguments given:
+        the environment on (the default) or off."""
+        state = HomeBenchEngine(home_config).home_state()
+        on = Home("http://hb.test", "home7", state, {}, logging.getLogger("t"),
+                  builder_cls=HomeBenchTD)
+        off = Home("http://hb.test", "home7", state, {}, logging.getLogger("t"),
+                   builder_cls=HomeBenchTD, builder_kwargs={"environment": False})
+        assert on.builder.environment is True and off.builder.environment is False
+
+    def test_options_default_to_no_environment(self):
+        from tests.simuhome.bench.pipeline import Options
+        assert Options().environment is None
+
+    def test_harness_passes_the_mode_on_and_checks_it(self, tmp_path):
+        run_cmd, _eval = harness.commands(Path("c.yaml"), tmp_path / "r", tmp_path,
+                                          {"episodes": "hb1_*", "environment": "off"},
+                                          True, tmp_path, HOMEBENCH)
+        assert run_cmd[run_cmd.index("--environment") + 1] == "off"
+        harness.check_environment({"environment": "on"}, HOMEBENCH)
+        harness.check_environment({}, HOMEBENCH)
+        harness.check_environment({}, SIMUHOME)
+        with pytest.raises(ValueError, match="quote it"):
+            harness.check_environment({"environment": False}, HOMEBENCH)   # bare YAML off
+        with pytest.raises(ValueError, match="no environment option"):
+            harness.check_environment({"environment": "on"}, SIMUHOME)
+
+    def test_a_config_with_an_unquoted_off_is_refused(self, monkeypatch, capsys, tmp_path):
+        config = yaml.safe_load((VARIANTS / "homebench.quick.yaml").read_text(encoding="utf-8"))
+        config["run"]["environment"] = False
+        path = tmp_path / "bad.yaml"
+        path.write_text(yaml.safe_dump(config), encoding="utf-8")
+        monkeypatch.setattr(sys, "argv", ["harness", "--config", str(path), "--dry-run"])
+        assert harness.main() == 2
+        assert "environment must be one of" in capsys.readouterr().out
+
+    def test_the_three_configs_state_the_flat_baseline(self):
+        """The existing configs keep their flat graph: ``environment: "off"`` (a string:
+        YAML reads a bare off as false)."""
+        for name in ("quick", "spread", "full"):
+            config = yaml.safe_load((VARIANTS / f"homebench.{name}.yaml")
+                                    .read_text(encoding="utf-8"))
+            assert config["run"]["environment"] == "off"
+
+    def test_sweep_passes_the_mode(self, monkeypatch, capsys, tmp_path):
+        grid = {"suite": "homebench", "name": "g", "base": {},
+                "vary": {"segmentation": [{"model": "a"}]},
+                "run": {"episodes": "hb1_*", "environment": "off"}}
+        path = tmp_path / "grid.yaml"
+        path.write_text(yaml.safe_dump(grid), encoding="utf-8")
+        monkeypatch.setattr(sys, "argv", ["sweep", "--grid", str(path), "--out",
+                                          str(tmp_path / "out"), "--dry-run"])
+        assert sweep.main() == 0
+        assert "--environment off" in capsys.readouterr().out
+
+    def test_stats_and_report_name_the_mode(self, tmp_path):
+        """The mode of ``run.json`` heads ``summary.md`` and the report; None when the
+        run does not say."""
+        variant = tmp_path / "v"
+        variant.mkdir()
+        assert stats.run_environment(variant) is None
+        (variant / "run.json").write_text(
+            json.dumps({"settings": {"environment": "off"}}), encoding="utf-8")
+        assert stats.run_environment(variant) == "off"
+        assert report.environments(tmp_path, ["v", "absent"]) == {"v": "off"}
+        rows = [_row("a", "hb1", "feasible", 1)]
+        out = stats.write(variant, rows, stats.aggregate(rows), "t", "off")
+        assert "Environment: **off**" in (out / "summary.md").read_text(encoding="utf-8")
+        out = stats.write(tmp_path / "w", rows, stats.aggregate(rows), "t")
+        assert "Environment:" not in (out / "summary.md").read_text(encoding="utf-8")
+
+
 # -- harness.py and sweep.py -------------------------------------------------------------------
 
 

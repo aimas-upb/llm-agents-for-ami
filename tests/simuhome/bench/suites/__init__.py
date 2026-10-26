@@ -13,7 +13,9 @@ code runs both, and SimuHome stays the default:
     evaluators       {(query_type, case): object with `evaluate(payload, judges)`}
     plus the defaults a run needs: benchmark directory, episode pattern, results
     directory, which types are timed, which errors are infrastructure, the planning
-    guidelines files, whether scheduled execution applies, and the cost estimate.
+    guidelines files, whether scheduled execution applies, whether the suite has the
+    `environment` option (HomeBench: the room environments and action effects on or
+    off), and the cost estimate.
 
 The classes are named by import path and imported on first use, so reading a suite
 (for `--dry-run`, say) does not import a TD builder or start anything.
@@ -40,6 +42,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_SUITE = "simuhome"
 #: Every suite name (the CLI's `--suite` choices).
 SUITE_NAMES = ("simuhome", "homebench")
+#: The values of the `environment` option of a suite that has it, and its default. The
+#: same as HomeBench's `td_builder.ENVIRONMENT_MODES` (a test pins them together): they
+#: are repeated here so reading the options does not import the HomeBench module.
+ENVIRONMENT_MODES = ("on", "off")
+DEFAULT_ENVIRONMENT = "on"
 
 
 def _import(path: str) -> Any:
@@ -71,6 +78,7 @@ class Suite:
     guidelines: Mapping[str, Optional[Path]] = field(default_factory=dict)
     default_guidelines: str = "default"
     home_key: Optional[Callable[[Path, str], str]] = None
+    environment: bool = False
 
     @property
     def worker_cls(self) -> Any:

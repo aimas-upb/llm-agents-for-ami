@@ -171,4 +171,6 @@ SUITE = Suite(
     guidelines={"homebench": GUIDELINES, "default": None},
     default_guidelines="homebench",
     home_key=home_key,
+    # The room environments and action effects can be switched off (`--environment`).
+    environment=True,
 )

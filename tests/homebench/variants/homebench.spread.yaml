@@ -35,6 +35,9 @@ run:
   context: none
   memory: "off"
   guidelines: homebench    # homebench: no device conditions | default: as deployed
+  environment: "off"       # the flat graph, as in the ECAI evaluation | "on": room
+                           # environments and action effects (quote it: YAML reads
+                           # a bare off as false)
 
 evaluate:
   judge: true

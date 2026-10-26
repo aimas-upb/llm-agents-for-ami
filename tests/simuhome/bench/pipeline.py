@@ -109,6 +109,7 @@ class Options:
     execution: str = "ticks"              # ticks (immediate / lockstep) | scheduled
     dry_step_seconds: float = 1.0         # scheduled: the dry run's step (virtual seconds)
     real_read_seconds: float = 10.0       # scheduled: how long a simulator reading is reused
+    environment: Optional[str] = None     # on | off (HomeBench's TDs); None: not an option
 
 
 @dataclass
@@ -223,8 +224,11 @@ async def _run(name, episode, variant, config, target, options, logger, record, 
     current["step"] = "load"
     started = time.perf_counter()
     sim.reset(home_config)
+    # The suite's TD builder, with its environment mode when the suite has one.
+    builder_kwargs = ({"environment": options.environment == "on"}
+                      if options.environment else None)
     home = Home(target.shtd_base, target.home_id, sim.home_state(), config, logger,
-                builder_cls=suite.td_cls)
+                builder_cls=suite.td_cls, builder_kwargs=builder_kwargs)
     record["discovery_seconds"] = time.perf_counter() - started
     record["ambient_sensors"] = home.sensors
     tools.sensors = home.sensors

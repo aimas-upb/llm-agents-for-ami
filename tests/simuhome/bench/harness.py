@@ -20,6 +20,7 @@ or a local OpenAI-compatible server through `provider:`), plus how to run it:
       episodes: "qt*"                  # patterns: qt3_feasible, qt4-2_*, full names
       limit: null                      # at most N episodes per (type, case)
       guidelines: homebench            # homebench only: homebench | default (below)
+      environment: on                  # homebench only: on | off (room environments, effects)
       workers: 4
     evaluate: {judge: true}            # false: infeasible scored without the LLM judge
 
@@ -59,11 +60,12 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 from .run import PROJECT_ROOT, select_episodes
-from .suites import DEFAULT_SUITE, SUITE_NAMES, Suite, get_suite
+from .suites import DEFAULT_SUITE, ENVIRONMENT_MODES, SUITE_NAMES, Suite, get_suite
 
 # The run.py options a config's `run:` section may set.
 RUN_OPTIONS = ("episodes", "seeds", "limit", "workers", "context", "memory", "step_seconds",
-               "dry_step_seconds", "real_read_seconds", "exec_timeout", "guidelines")
+               "dry_step_seconds", "real_read_seconds", "exec_timeout", "guidelines",
+               "environment")
 
 
 # --------------------------------------------------------------------------
@@ -80,6 +82,20 @@ def run_options(config: Dict[str, Any], args: argparse.Namespace,
             options[key] = getattr(args, key)
     options.setdefault("episodes", (suite or get_suite(DEFAULT_SUITE)).default_episodes)
     return options
+
+
+def check_environment(options: Dict[str, Any], suite: Suite) -> None:
+    """Raise ValueError for an ``environment`` option the suite lacks or a value it
+    does not offer, so a typo never runs with the other mode (``off`` read as ``on``)."""
+    mode = options.get("environment")
+    if mode is None:
+        return
+    if not suite.environment:
+        raise ValueError(f"the {suite.title} suite has no environment option")
+    if str(mode) not in ENVIRONMENT_MODES:
+        # YAML reads a bare on / off as a boolean, hence the hint.
+        raise ValueError(f"environment must be one of {', '.join(ENVIRONMENT_MODES)}, "
+                         f"got {mode!r} (quote it in YAML: environment: 'off')")
 
 
 def commands(config_path: Path, records: Path, out: Path, options: Dict[str, Any],
@@ -169,6 +185,7 @@ def main() -> int:
         suite = get_suite(args.suite or config.get("suite"))
         options = run_options(config, args, suite)
         suite.guidelines_path(options.get("guidelines"))
+        check_environment(options, suite)
     except ValueError as exc:
         print(f"config {config_path.name}: {exc}")
         return 2
