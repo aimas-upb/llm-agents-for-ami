@@ -958,14 +958,31 @@ class SimuHomeTD:
             claims.setdefault(
                 str(row["affectsObservableProperty"]), set()).add(row.get("direction"))
 
+        self._write_effects(g, action, room_id, {
+            sosa_property: directions.pop() if len(directions) == 1 else None
+            for sosa_property, directions in claims.items()})
+
+    def _write_effects(self, g: Graph, action: BNode, room_id: str,
+                       claims: Dict[str, Optional[str]]) -> None:
+        """Write one `tdsosa:hasEffectActuation` node per claimed room variable.
+
+        `claims` maps a `sosa_property` name (`air_temperature`) to the direction the
+        action moves it: `"increase"`, `"decrease"`, or `None` for a directionless
+        action (the outcome depends on the value carried). The node acts on the room's
+        variable (`room_property_uri`), the same IRI the environment's `ssn:hasProperty`
+        names, so an agent can walk from the action to the variable. Split out of
+        `_action_effects` so HomeBench, which has no Matter cluster to match rows by,
+        writes the same shape from its own tables.
+        """
+        # One effect per variable, in a stable order, so a re-render is identical.
         for sosa_property in sorted(claims):
-            directions = claims[sosa_property]
-            direction = directions.pop() if len(directions) == 1 else None
+            direction = claims[sosa_property]
             observed = self.room_property_uri(room_id, sosa_property)
             actuation = BNode()
             g.add((action, TDSOSA.hasEffectActuation, actuation))
             g.add((actuation, RDF.type, SOSA.Actuation))
             g.add((actuation, SOSA.actsOnProperty, observed))
+            # The typed direction, when the claim has one; else the plain "affects".
             if direction == "increase":
                 g.add((actuation, RDF.type, TDSOSA.IncreasingActuation))
                 g.add((actuation, TDSOSA.increasesObservableProperty, observed))
@@ -1250,11 +1267,17 @@ class SimuHomeTD:
         return schema
 
     def _room_state_properties(self, g: Graph, room_id: str,
-                               state: Dict[str, Any], foi: URIRef) -> None:
-        """The four environmental variables, as properties of the room.
+                               state: Dict[str, Any], foi: URIRef,
+                               readable: bool = True) -> None:
+        """The environmental variables of `state`, as properties of the room.
 
         Only their shape is described here; the values are read through each
-        property's form, since they change on every simulator tick.
+        property's form, since they change on every simulator tick. Only the keys of
+        `state` are read, never its values.
+
+        `readable=False` declares the variables without making them observable:
+        `td:isObservable false` and no read form, as HASP does for a variable no device
+        observes. HomeBench uses it, as it has no room values to serve.
         """
         for token in sorted(state):
             row = self.m.room_state_property(token) or {}
@@ -1273,7 +1296,7 @@ class SimuHomeTD:
                 g.add((prop, RDF.type, prop_class))
             g.add((prop, TD.name, Literal(name)))
             g.add((prop, TD.title, Literal(name)))
-            g.add((prop, TD.isObservable, Literal(True, datatype=XSD.boolean)))
+            g.add((prop, TD.isObservable, Literal(readable, datatype=XSD.boolean)))
             # `ssn:isPropertyOf` is the correct link: this property belongs to
             # the environment. (`sosa:isObservedBy` would name the SENSOR that
             # observes it, not the feature of interest -- pointing it back at
@@ -1295,6 +1318,9 @@ class SimuHomeTD:
             # divided, and `qudt:unit` names the unit the value is in.
             g.add((prop, TD.hasOutputSchema, schema))
 
+            # A declared-only variable has nothing to read, so it gets no form.
+            if not readable:
+                continue
             form = BNode()
             g.add((prop, TD.hasForm, form))
             g.add((form, HTV.methodName, Literal("GET")))
