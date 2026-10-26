@@ -2,7 +2,8 @@
 
 This document covers the setup needed to run AmI HMAS against a home: a Home Assistant
 deployment through HASP, or a SimuHome episode through SHTD. The SimuHome evaluation suite
-needs only Steps 1, 2 and 5; it runs without XMPP.
+needs only Steps 1, 2 and 5; it runs without XMPP. The HomeBench evaluation suite needs Steps 1,
+2, 5a and 5-HB (it imports SimuHome's evaluators, so the SimuHome clone of Step 5a is needed too).
 
 ## Prerequisites
 
@@ -33,6 +34,29 @@ conda run -n ami-agents pip install -r agents-requirements.txt
 
 Run every Python command through `conda run -n ami-agents …`. A plain `venv` works too, if you
 install the same requirements into it.
+
+**Problems seen on Windows** (found installing on Windows 10 with Python 3.12):
+
+- **`conda` may not be on `PATH`.** Call it by path
+  (`C:\Users\<you>\miniconda3\Scripts\conda.exe run -n ami-agents …`) or call the env's
+  interpreter directly (`C:\Users\<you>\miniconda3\envs\ami-agents\python.exe …`).
+- **`pip install -r agents-requirements.txt` fails on Windows.** `uvloop` has no Windows build, and
+  one failing wheel aborts the whole install. Install from a copy of the file without it:
+
+  ```powershell
+  (Get-Content agents-requirements.txt) -notmatch '^uvloop' | Set-Content -Encoding utf8 $env:TEMP\agents-requirements-win.txt
+  conda run -n ami-agents pip install -r $env:TEMP\agents-requirements-win.txt
+  ```
+- **`agents-requirements.txt` lacks two packages the code imports.** `greenlet` (SQLAlchemy's
+  asyncio support fails without it) and `py-trees` (the BT planning code fails to import). They are
+  not in that file; `requirements.txt` lists `py-trees`. Install both:
+
+  ```bash
+  conda run -n ami-agents pip install greenlet py-trees
+  ```
+
+  `requirements.txt` also lists `chromadb`, `anthropic` and `zeroconf`; the unit tests and the
+  bench did not need them here.
 
 Put your key in a `.env` file at the repo root, or export it:
 
@@ -181,6 +205,67 @@ Set `SHTD_AMBIENT_SENSORS=0` to serve the home without the virtual ambient senso
 worker model and units are documented in
 [ami_agents/environment/integration/SimuHome/README.md](../ami_agents/environment/integration/SimuHome/README.md).
 
+## Step 5-HB — HomeBench (benchmark)
+
+[HomeBench](https://github.com/BITHLP/HomeBench) (ACL 2025) is a set of 17,366 smart-home requests
+over 100 homes. The agents see it through the same kind of platform as SimuHome (Thing Descriptions
+from a small engine and a TD server, both in this repo), and the bench runs it with
+`--suite homebench`. Home Assistant is not involved, and nothing here needs XMPP.
+
+### 5-HB a. Clone HomeBench next to this repo
+
+The conversion step looks for HomeBench at `../HomeBench`; `--homebench DIR` points elsewhere.
+
+```bash
+cd ..
+git clone --depth 1 https://github.com/BITHLP/HomeBench.git      # → ../HomeBench, data in dataset/
+cd llm-agents-for-ami
+```
+
+The data used while building the suite is commit `6d650ca` (2025-05-22, the only commit). The
+HomeBench repository has no licence file and no citation block: settle both before publishing
+numbers. SimuHome must be cloned too (Step 5a), because the feasible and judge scoring import its
+evaluators.
+
+### 5-HB b. Convert the dataset
+
+The converter turns each row into a bench episode and each home into a home file, and writes the
+mapping tables the TD layer reads. It costs nothing (no LLM, no server) and takes about 35 s:
+
+```bash
+conda run -n ami-agents python tests/homebench/convert.py --homebench ../HomeBench --out tests/homebench/data
+```
+
+It writes 17,366 episode files and 100 home files (about 22 MB) under `tests/homebench/data/`,
+which is git-ignored, plus `manifest.json` (the shuffle's RNG seed, the SHA-256 of both source
+files, the counts, and the result of replaying every gold call on the engine: 18,832 calls, 70
+unreachable, 0 errors). The conversion is deterministic: running it again gives the same names and
+the same content. To check the data layer, the environment, the bench and the scoring without an
+LLM:
+
+```bash
+conda run -n ami-agents pytest tests/unit -q -k homebench
+```
+
+### 5-HB c. Run one home by hand
+
+The evaluation suite starts its own servers. You only need these to talk to a home from the
+console or look at its TDs. One command starts the engine (port 8099) and HBTD, the TD server
+(port 8097), for home 42:
+
+```bash
+conda run -n ami-agents python ami_agents/environment/integration/HomeBench/run_engine.py \
+    --home 42 --sim-port 8099 --hbtd-port 8097
+```
+
+Then point the agents at HBTD: `YGGDRASIL_URL=http://127.0.0.1:8097`. HomeBench has no clock, so
+there is no `CLOCK_SOURCE` to set. The servers, the shape of a device TD and the error codes are
+in [ami_agents/environment/integration/HomeBench/README.md](../ami_agents/environment/integration/HomeBench/README.md).
+The agents' environment definition `environments/homebench.yaml` describes an older
+Home Assistant / Yggdrasil setup (Yggdrasil on 8090, Home Assistant on 8124). The HomeBench
+evaluation suite does not read it: it reaches HBTD through the worker, or through `YGGDRASIL_URL`
+for the console runner, so no key was added to it or to `configuration.md`.
+
 ## Step 6 — Talk to the agents
 
 With an XMPP server and one environment running:
@@ -200,7 +285,8 @@ For scripted end-to-end cases against HASP's lab308e home, see
 
 ## Step 7 — Evaluation
 
-See [evaluation-simuhome.md](evaluation-simuhome.md).
+See [evaluation-simuhome.md](evaluation-simuhome.md) for SimuHome and
+[evaluation-homebench.md](evaluation-homebench.md) for HomeBench.
 
 ---
 

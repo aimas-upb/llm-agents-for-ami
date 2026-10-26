@@ -288,5 +288,8 @@ What carries over:
   the type list `qt1` … `qt4-3` in `stats.py`, and the `../SimuHome` location. Generalise those
   points, or keep the same naming, and the rest applies as it is.
 
+HomeBench is the second worked example, and the bench's `--suite` switch is how a benchmark
+plugs in: [evaluation-homebench.md](evaluation-homebench.md#adding-another-benchmark).
+
 The design rationale is in
 [docs/plans/simuhome_reasoning_harness.md](plans/simuhome_reasoning_harness.md).

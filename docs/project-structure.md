@@ -66,6 +66,7 @@ tests/
 │   ├── bench/                       # The evaluation suite (see evaluation-simuhome.md)
 │   ├── td/                          # Matter → SAREF / SOSA / TD-SOSA mapping tables for SHTD
 │   └── *.py                         # Component evaluations (segmentation, structuring, dependency plans)
+├── homebench/                       # HomeBench: converter, mapping tables, scoring rules, subset configs (see evaluation-homebench.md)
 ├── e2e-lab308e/                     # JSON-driven end-to-end cases against HASP (lab308e)
 └── manual_interactive_cli.py        # Console chat with the three agents
 ```
@@ -92,4 +93,4 @@ tests/
 | an LLM step in an agent | Copy the `BTPlanGenerationBehaviour` pattern. Build the client with the agent's `utils/llm_client.py:build_llm_client`. Put the model under that agent's `llm:` / `planning:` section in `agents.yaml`. |
 | a device condition | Add an entry under `conditions:` in `config/planning_guidelines.yaml`, sourced from the Matter (or Home Assistant) specification. |
 | an environment | Serve it as an HMAS platform of TDs (HASP and SHTD are the two examples) and point `YGGDRASIL_URL` at it. |
-| a benchmark | See [evaluation-simuhome.md § Adding another benchmark](evaluation-simuhome.md#adding-another-benchmark). |
+| a benchmark | See [evaluation-simuhome.md § Adding another benchmark](evaluation-simuhome.md#adding-another-benchmark) and, for the second worked example, [evaluation-homebench.md § Adding another benchmark](evaluation-homebench.md#adding-another-benchmark). |

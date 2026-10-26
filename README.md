@@ -166,6 +166,7 @@ Setup, every command, the config formats, outputs, and how to add another benchm
 | [docs/prompts.md](docs/prompts.md) | Every LLM prompt: when it is called, what it returns, its config key |
 | [docs/project-structure.md](docs/project-structure.md) | Directory layout and extension points |
 | [docs/evaluation-simuhome.md](docs/evaluation-simuhome.md) | Running the evaluation suite on SimuHome, and on new benchmarks |
+| [docs/evaluation-homebench.md](docs/evaluation-homebench.md) | Running the same suite on HomeBench: setup, the three subset configs, the three metric families and their caveats |
 
 ---
 

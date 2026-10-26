@@ -10,26 +10,26 @@ This document explains how to reproduce the two evaluation experiments from the 
 
 **What it tests:** Correct parsing of explicit user requests into structured intents, and BT plan generation for single and compound, feasible and infeasible requests, using the HomeBench benchmark.
 
-**Setup:**
-```bash
-export OPENAI_API_KEY="<your-key>"
-export OPENAI_MODEL="gpt-4o-mini"    # or gpt-4o, gpt-5-mini, gpt-5-nano
-```
+**How to run it:** the HomeBench evaluation harness is described in
+[evaluation-homebench.md](evaluation-homebench.md): setup (the HomeBench clone and the dataset
+conversion), the three configs (a 44-episode quick subset, a 27-episode spread, the full
+17,366 rows), the exact commands, what each costs, and how the results are scored. It runs
+through the same suite as the SimuHome evaluation, on HomeBench homes served as Thing
+Descriptions; there is nothing to run from `tests/e2e/test_demo_homebench.py` for this
+experiment. That file has three tests with hand-written affordances for a "Home 17" and calls the
+BT planner directly; it is a demo fixture, not a 400-case evaluation, and no 400-case fixture
+exists in this repository.
 
-**Run:**
-```bash
-pytest tests/e2e/test_demo_homebench.py -v -m e2e
-```
+**Table 1 below is the paper's, not this repository's.** It was produced by an older harness
+that is not in this repo, on a 400-case set that is not in it either. The harness in this
+repository does not reproduce it, and its numbers are not comparable with Table 1:
+- the primary score (a SimuHome-style pass / fail per episode) and the generic per-part rates
+  are defined by this harness, not by the paper;
+- the official HomeBench EM / Precision / Recall / F1 are re-implemented from the public
+  `code/eval.py`, over the dataset's 17,366 test rows (or a named subset), with the caveats in
+  [evaluation-homebench.md](evaluation-homebench.md#scoring).
 
-**What it does:**
-- Loads HomeBench Home 17 environment fixture (study room: light, climate, entertainment)
-- Feeds 400 test utterances (single/compound, feasible/infeasible)
-- Each utterance is parsed by UserAssistant via `INTENT_EXTRACTION_SYSTEM_PROMPT`
-- Structured intents are routed through the dual-path BT builder (Algorithm 1)
-- `set` intents → direct BT leaf nodes; `modify` intents → LLM BT generation
-- Evaluates: full success, partial success, impossible detection, precision, recall, F1, latency
-
-**Expected results (paper Table 1):**
+**Paper results (Table 1, older harness, quoted for reference):**
 | Model | Full succ. | Full+Partial | Imp. det. | F1 |
 |---|---|---|---|---|
 | GPT-4o | 76.8% | 95.8% | 99.3% | 0.929 |
