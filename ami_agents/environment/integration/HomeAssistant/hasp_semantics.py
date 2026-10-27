@@ -53,18 +53,14 @@ MAPPINGS_PATH = HERE / "semantic_mappings.yaml"
 HOMEONT_PATH = Path(os.getenv(
     "HOMEONT_PATH", str(HERE.parents[2] / "shared" / "ontologies" / "homeont.ttl")))
 
-HOMEONT = Namespace("http://example.org/homeont/")
-SAREF = Namespace("https://saref.etsi.org/core/")
-SOSA = Namespace("http://www.w3.org/ns/sosa/")
-SSN = Namespace("http://www.w3.org/ns/ssn/")
-QUDT = Namespace("http://qudt.org/schema/qudt/")
-UNIT = Namespace("http://qudt.org/vocab/unit/")
-QUANTITYKIND = Namespace("http://qudt.org/vocab/quantitykind/")
-TD = Namespace("https://www.w3.org/2019/wot/td#")
-HCTL = Namespace("https://www.w3.org/2019/wot/hypermedia#")
-HTV = Namespace("http://www.w3.org/2011/http#")
-JS = Namespace("https://www.w3.org/2019/wot/json-schema#")
-TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
+# The adapter's one namespace module; re-exported, since hasp.py and
+# hasp_cache.py read `hasp_semantics.SAREF` / `.HOMEONT`.
+try:
+    from .hasp_namespaces import (HCTL, HOMEONT, HTV, JS, QUANTITYKIND, QUDT, SAREF,
+                                  SOSA, SSN, TD, TDSOSA, UNIT)
+except ImportError:  # pragma: no cover - run from this directory
+    from hasp_namespaces import (HCTL, HOMEONT, HTV, JS, QUANTITYKIND, QUDT, SAREF,
+                                 SOSA, SSN, TD, TDSOSA, UNIT)
 
 _PREFIXES = {
     "homeont": str(HOMEONT),

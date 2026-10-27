@@ -23,6 +23,14 @@ from ami_agents.agents.interaction_solver.utils.specific_capability_context impo
 )
 from ami_agents.shared.models.goal_structure import GoalSpec
 from ami_agents.shared.utils.vocabulary import close_types
+from ami_agents.shared.utils.namespaces import (  # noqa: E402
+    HCTL,
+    HMAS,
+    HOMEONT,
+    JS,
+    SAREF,
+    TD,
+)
 
 REPO = Path(__file__).resolve().parents[2]
 EPISODE = REPO.parent / "SimuHome" / "data" / "benchmark" / "qt1_feasible_seed_1.json"
@@ -124,13 +132,13 @@ class TestDispatch:
         assert "parameter" not in brief           # "NA": no parameter to name
 
 
-ODD_HOME = """
-@prefix hmas: <https://purl.org/hmas/> .
-@prefix homeont: <http://example.org/homeont/> .
-@prefix saref: <https://saref.etsi.org/core/> .
-@prefix td: <https://www.w3.org/2019/wot/td#> .
-@prefix hctl: <https://www.w3.org/2019/wot/hypermedia#> .
-@prefix js: <https://www.w3.org/2019/wot/json-schema#> .
+ODD_HOME = f"""
+@prefix hmas: <{HMAS}> .
+@prefix homeont: <{HOMEONT}> .
+@prefix saref: <{SAREF}> .
+@prefix td: <{TD}> .
+@prefix hctl: <{HCTL}> .
+@prefix js: <{JS}> .
 
 <http://h/colour#artifact> a hmas:Artifact, homeont:ColorLight ; td:title "light" ;
     td:hasActionAffordance [ a td:ActionAffordance, saref:SetLevelCommand ;

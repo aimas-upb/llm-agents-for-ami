@@ -52,6 +52,7 @@ from ....shared.utils.vocabulary import vocabulary
 from ....shared.utils.namespaces import (
     HCTL,
     HMAS,
+    HTV,
     HOMEONT,
     JS,
     QUDT,
@@ -64,6 +65,7 @@ from ....shared.utils.namespaces import (
     expand,
     in_namespace,
     shorten,
+    sparql_prefixes,
 )
 
 # A direct-value input is sent wrapped: SHTD reads `{"value": ...}` (see
@@ -99,10 +101,7 @@ class SpecificCapabilityContext:
 # Primitives: finding devices
 # --------------------------------------------------------------------------
 
-_ARTIFACT_QUERY = """
-PREFIX td:      <https://www.w3.org/2019/wot/td#>
-PREFIX hmas:    <https://purl.org/hmas/>
-PREFIX homeont: <http://example.org/homeont/>
+_ARTIFACT_QUERY = "\n" + sparql_prefixes("td", "hmas", "homeont") + """\
 SELECT DISTINCT ?artifact WHERE {
   ?artifact a hmas:Artifact .
   %(name_block)s
@@ -195,7 +194,7 @@ def _form(graph: Graph, affordance: Any) -> Tuple[str, Optional[str]]:
     """The affordance's target URL and HTTP method, from its first form."""
     for form in graph.objects(affordance, TD.hasForm):
         target = graph.value(form, HCTL.hasTarget)
-        method = graph.value(form, URIRef("http://www.w3.org/2011/http#methodName"))
+        method = graph.value(form, HTV.methodName)
         if target is not None:
             return str(target), (str(method) if method is not None else None)
     return "", None
@@ -444,9 +443,7 @@ def _incomplete_achievement(graph: Graph, goal: GoalSpec) -> Optional[SpecificCa
 # The variable, starting from the hmas workspace: the workspace's space is of the
 # goal's room class, its environment has the variable, the variable is of the
 # goal's class. (Closed graph: subclasses count, as plain `a`.)
-_VARIABLE_QUERY = """
-PREFIX homeont: <http://example.org/homeont/>
-PREFIX ssn:     <http://www.w3.org/ns/ssn/>
+_VARIABLE_QUERY = "\n" + sparql_prefixes("homeont", "ssn") + """\
 SELECT DISTINCT ?workspace ?var WHERE {
   ?workspace homeont:hasSpace ?space .
   ?space a ?spaceClass ;
@@ -458,11 +455,7 @@ SELECT DISTINCT ?workspace ?var WHERE {
 
 # The actions acting on that variable, of artifacts the workspace contains. Any
 # effect actuation counts: most only say they influence it, not which way.
-_AFFECTING_QUERY = """
-PREFIX hmas:   <https://purl.org/hmas/>
-PREFIX td:     <https://www.w3.org/2019/wot/td#>
-PREFIX sosa:   <http://www.w3.org/ns/sosa/>
-PREFIX tdsosa: <https://example.org/hmas/td-sosa-ext#>
+_AFFECTING_QUERY = "\n" + sparql_prefixes("hmas", "td", "sosa", "tdsosa") + """\
 SELECT DISTINCT ?artifact ?action ?actuation WHERE {
   ?workspace hmas:contains ?artifact .
   ?artifact td:hasActionAffordance ?action .
@@ -473,9 +466,7 @@ SELECT DISTINCT ?artifact ?action ?actuation WHERE {
 
 # The readings of that variable, of artifacts the workspace contains: property
 # affordances of the variable's class (a device-specific subclass counts).
-_READING_QUERY = """
-PREFIX hmas: <https://purl.org/hmas/>
-PREFIX td:   <https://www.w3.org/2019/wot/td#>
+_READING_QUERY = "\n" + sparql_prefixes("hmas", "td") + """\
 SELECT DISTINCT ?artifact ?prop WHERE {
   ?workspace hmas:contains ?artifact .
   ?artifact td:hasPropertyAffordance ?prop .

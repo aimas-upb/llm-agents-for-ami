@@ -11,6 +11,9 @@ from ami_agents.agents.env_explorer.utils.data_formatting import (
     format_capabilities_summary,
 )
 from ami_agents.shared.models.environment import AffordanceType
+from ami_agents.shared.utils.namespaces import (  # noqa: E402
+    JS,
+)
 
 
 def _affordance(aff_type, name, href, method, description="", input_schema=None, output_schema=None):
@@ -102,7 +105,7 @@ class TestCompactSummary:
         action.input_schema = {
             "type": "object",
             "properties": {
-                "brightness_pct": {"type": "https://www.w3.org/2019/wot/json-schema#NumberSchema"}
+                "brightness_pct": {"type": f"{JS}NumberSchema"}
             },
         }
         summary = format_capabilities_summary(agent)

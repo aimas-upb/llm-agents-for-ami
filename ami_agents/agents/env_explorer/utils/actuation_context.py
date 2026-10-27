@@ -46,6 +46,7 @@ from ....shared.utils.namespaces import (
     JS,
     QUDT,
     SAREF,
+    SCHEMA,
     SSN,
     SOSA,
     TD,
@@ -249,6 +250,13 @@ def _property(graph: Graph, affordance: Any,
 
 def _artifact(graph: Graph, artifact: Any,
               with_properties: bool = False) -> Dict[str, Any]:
+    """One artifact as the goal context lists it: title, types, label, vendor,
+    actions and, on request, its properties with the action that writes each.
+
+    The structuring model copies classes and names from this entry, so it holds
+    only what the TD graph states about the artifact.
+    """
+    # 1. Identity: title and the types from each vocabulary.
     homeont = _types_in(graph, artifact, HOMEONT)
     entry: Dict[str, Any] = {
         "title": _title(graph, artifact),
@@ -256,15 +264,18 @@ def _artifact(graph: Graph, artifact: Any,
         "saref_types": _types_in(graph, artifact, SAREF),
         "homeont_types": homeont,
     }
+    # 2. The family's human label, from the ontology.
     if homeont:
         label = _label(graph, URIRef(HOMEONT[homeont[0].split(":", 1)[1]]))
         if label:
             entry["label"] = label
-    for key, predicate in (("manufacturer", URIRef("https://schema.org/manufacturer")),
-                           ("model", URIRef("https://schema.org/model"))):
+    # 3. Vendor metadata (schema.org, as the TD specification recommends).
+    for key, predicate in (("manufacturer", SCHEMA.manufacturer),
+                           ("model", SCHEMA.model)):
         value = graph.value(artifact, predicate)
         if value is not None:
             entry[key] = str(value)
+    # 4. The domain actions and, optionally, the properties they write.
     actions = _domain_actions(graph, artifact)
     entry["actions"] = [_action(graph, a) for a in actions]
     if with_properties:

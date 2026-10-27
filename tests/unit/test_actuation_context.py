@@ -24,6 +24,18 @@ from ami_agents.agents.env_explorer.utils.actuation_context import (
 )
 from ami_agents.agents.env_explorer.utils.state_resolution import load_vocabulary
 from ami_agents.shared.utils.namespaces import action_types
+from ami_agents.shared.utils.namespaces import (  # noqa: E402
+    HCTL,
+    HMAS,
+    HOMEONT,
+    JS,
+    QUDT,
+    SAREF,
+    SSN,
+    TD,
+    UNIT,
+    WEBSUB,
+)
 
 REPO = Path(__file__).resolve().parents[2]
 EPISODE = (REPO.parent / "SimuHome" / "data" / "benchmark"
@@ -55,16 +67,16 @@ def graph() -> Graph:
 
 # One workspace, one lamp whose colour action takes an object with a nested
 # object inside it, plus a protocol action that must never be shown.
-SMALL_HOME = """
-@prefix hmas: <https://purl.org/hmas/> .
-@prefix homeont: <http://example.org/homeont/> .
-@prefix saref: <https://saref.etsi.org/core/> .
-@prefix td: <https://www.w3.org/2019/wot/td#> .
-@prefix js: <https://www.w3.org/2019/wot/json-schema#> .
-@prefix hctl: <https://www.w3.org/2019/wot/hypermedia#> .
-@prefix websub: <https://purl.org/hmas/websub/> .
-@prefix qudt: <http://qudt.org/schema/qudt/> .
-@prefix unit: <http://qudt.org/vocab/unit/> .
+SMALL_HOME = f"""
+@prefix hmas: <{HMAS}> .
+@prefix homeont: <{HOMEONT}> .
+@prefix saref: <{SAREF}> .
+@prefix td: <{TD}> .
+@prefix js: <{JS}> .
+@prefix hctl: <{HCTL}> .
+@prefix websub: <{WEBSUB}> .
+@prefix qudt: <{QUDT}> .
+@prefix unit: <{UNIT}> .
 
 <http://h/office#workspace> a hmas:Workspace ; td:title "Office" ;
     homeont:hasSpace <http://h/office#place> ;
@@ -218,7 +230,7 @@ class TestParameterizedCall:
 
 def test_action_types_keeps_both_vocabularies():
     assert action_types(["td:ActionAffordance", "saref:OnCommand",
-                         "http://example.org/homeont/SetModeCommand",
+                         f"{HOMEONT}SetModeCommand",
                          "http://example.org/StatusCommand"]) == [
         "saref:OnCommand", "homeont:SetModeCommand"]
 
@@ -358,16 +370,16 @@ class TestSingleWorkspace:
 # Home Assistant's shape: the room has an environment but no room-level
 # variables; a reading exists only as a sensor's affordance that is
 # `ssn:isPropertyOf` that environment. The sensor offers no action.
-SENSOR_HOME = """
-@prefix hmas: <https://purl.org/hmas/> .
-@prefix homeont: <http://example.org/homeont/> .
-@prefix saref: <https://saref.etsi.org/core/> .
-@prefix td: <https://www.w3.org/2019/wot/td#> .
-@prefix js: <https://www.w3.org/2019/wot/json-schema#> .
-@prefix ssn: <http://www.w3.org/ns/ssn/> .
+SENSOR_HOME = f"""
+@prefix hmas: <{HMAS}> .
+@prefix homeont: <{HOMEONT}> .
+@prefix saref: <{SAREF}> .
+@prefix td: <{TD}> .
+@prefix js: <{JS}> .
+@prefix ssn: <{SSN}> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix qudt: <http://qudt.org/schema/qudt/> .
-@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix qudt: <{QUDT}> .
+@prefix unit: <{UNIT}> .
 
 <http://h/office#workspace> a hmas:Workspace ; td:title "Office" ;
     homeont:hasSpace <http://h/office#place> ;

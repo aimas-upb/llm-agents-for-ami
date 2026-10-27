@@ -18,15 +18,17 @@ from fastapi.testclient import TestClient
 from rdflib import Graph, Literal, Namespace, RDF, URIRef
 
 import hasp as appmod
+from ami_agents.shared.utils.namespaces import (  # noqa: E402
+    HOMEONT,
+    QUDT,
+    SAREF,
+    SOSA,
+    SSN,
+    TD,
+    TDSOSA,
+)
 
 
-SOSA = Namespace("http://www.w3.org/ns/sosa/")
-SSN = Namespace("http://www.w3.org/ns/ssn/")
-TD = Namespace("https://www.w3.org/2019/wot/td#")
-QUDT = Namespace("http://qudt.org/schema/qudt/")
-SAREF = Namespace("https://saref.etsi.org/core/")
-HOMEONT = Namespace("http://example.org/homeont/")
-TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
 
 WS = "http://testserver/workspaces/lab308"
 BASE = "http://localhost:8080/workspaces/lab308"

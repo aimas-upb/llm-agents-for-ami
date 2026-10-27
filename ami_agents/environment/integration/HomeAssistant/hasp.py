@@ -15,7 +15,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response, JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
+from rdflib import BNode, Graph, Literal, RDF, URIRef
+from rdflib.namespace import XSD
 
 from http import HTTPStatus
 from hasp_utils import (HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST,
@@ -24,36 +25,20 @@ from hasp_utils import (HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST,
 from hasp_cache import HASPGraphCache
 import hasp_semantics
 from hasp_utils import entity_field_options, state_property_names
+from hasp_namespaces import (HCTL, HMAS, HTV, JACAMO, JS, QUDT, SCHEMA, SOSA, SSN, TD,
+                             TDSOSA, UNIT, WEBSUB, WOTSEC)
 
 # Re-read semantic_mappings.yaml and the home's SEMANTIC_CONFIG.
 reload_semantics = hasp_semantics.reload
 
-# Namespaces
 BASE_FALLBACK = "http://localhost:8080/"
-WEBSUB = Namespace("https://purl.org/hmas/websub/")
-HCTL   = Namespace("https://www.w3.org/2019/wot/hypermedia#")
-JS     = Namespace("https://www.w3.org/2019/wot/json-schema#")
-HMAS   = Namespace("https://purl.org/hmas/")
-WOTSEC = Namespace("https://www.w3.org/2019/wot/security#")
-HTV    = Namespace("http://www.w3.org/2011/http#")
-JACAMO = Namespace("https://purl.org/hmas/jacamo/")
-TD     = Namespace("https://www.w3.org/2019/wot/td#")
-SOSA   = Namespace("http://www.w3.org/ns/sosa/")
-SSN    = Namespace("http://www.w3.org/ns/ssn/")
-QUDT   = Namespace("http://qudt.org/schema/qudt/")
-UNIT   = Namespace("http://qudt.org/vocab/unit/")
-TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
-# Thing-level device metadata (manufacturer, product name). The TD spec mints no
-# vendor vocabulary of its own and points at schema.org for it.
-SCHEMA = Namespace("https://schema.org/")
-
 WEBHOOK_VERIFY_TIMEOUT = 5.0
 
 # XSD value type URIs for event payloads
-XSD_BOOL   = "http://www.w3.org/2001/XMLSchema#boolean"
-XSD_INT    = "http://www.w3.org/2001/XMLSchema#integer"
-XSD_DOUBLE = "http://www.w3.org/2001/XMLSchema#double"
-XSD_STRING = "http://www.w3.org/2001/XMLSchema#string"
+XSD_BOOL   = str(XSD.boolean)
+XSD_INT    = str(XSD.integer)
+XSD_DOUBLE = str(XSD.double)
+XSD_STRING = str(XSD.string)
 
 # ---------------- Config & App -----------------
 HA_URL = os.getenv("HA_URL", "ws://localhost:8123/api/websocket")

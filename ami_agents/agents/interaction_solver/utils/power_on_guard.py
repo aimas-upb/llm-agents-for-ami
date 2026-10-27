@@ -55,7 +55,7 @@ import yaml
 from rdflib import Graph, URIRef
 from rdflib.namespace import RDF
 
-from ....shared.utils.namespaces import HOMEONT, SAREF, TD, expand
+from ....shared.utils.namespaces import HOMEONT, SAREF, SCHEMA, TD, expand
 from .dependency_context import artifact_of_url
 from .plan_order import satisfies, walk_in_order
 from .specific_capability_context import DIRECT_VALUE_KEY, _form, _title
@@ -76,7 +76,7 @@ GUARDED_COMMANDS = (HOMEONT.SetModeCommand, SAREF.SetAbsoluteLevelCommand,
 SET_ON_OFF = HOMEONT.SetOnOffCommand
 
 # The TD annotation naming a device's manufacturer.
-SCHEMA_MANUFACTURER = URIRef("https://schema.org/manufacturer")
+SCHEMA_MANUFACTURER = SCHEMA.manufacturer
 
 # The name of a guard's sequence; also how an already guarded action is recognised.
 GUARD_NAME = "power on first"

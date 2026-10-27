@@ -25,6 +25,9 @@ from ami_agents.shared.models.environment import (
     ArtifactCategory,
     ThingDescription,
 )
+from ami_agents.shared.utils.namespaces import (  # noqa: E402
+    HMAS,
+)
 
 
 class TestYggdrasilIntegration:
@@ -127,8 +130,8 @@ class TestYggdrasilIntegration:
 
     @pytest.mark.asyncio
     async def test_initialize_accepts_resource_profile_without_trailing_slash(self, monkeypatch):
-        sample_ttl = """
-        @prefix hmas: <https://purl.org/hmas/> .
+        sample_ttl = f"""
+        @prefix hmas: <{HMAS}> .
 
         <http://localhost:8080> a hmas:ResourceProfile ;
             hmas:isProfileOf <http://localhost:8080/#platform> .
@@ -137,7 +140,7 @@ class TestYggdrasilIntegration:
         """
 
         class FakeOntology:
-            base_iri = "https://purl.org/hmas/"
+            base_iri = f"{HMAS}"
 
             def get_namespace(self, base):
                 return SimpleNamespace(
@@ -660,8 +663,8 @@ def sample_hmas_platform_rdf():
     This can be used to set up a test server or mock the HTTP response.
     The server can serve this in any RDF format - rdflib will parse it.
     """
-    return """
-    @prefix hmas: <https://purl.org/hmas/> .
+    return f"""
+    @prefix hmas: <{HMAS}> .
     @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 
     <http://localhost:8080/> a hmas:HypermediaMASPlatform ;
@@ -677,8 +680,8 @@ def sample_resource_profile_rdf():
     This represents Case B where the URL is a profile pointing to a platform.
     The server can serve this in any RDF format - rdflib will parse it.
     """
-    return """
-    @prefix hmas: <https://purl.org/hmas/> .
+    return f"""
+    @prefix hmas: <{HMAS}> .
     @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 
     <http://localhost:8080/> a hmas:ResourceProfile ;

@@ -38,6 +38,12 @@ from ami_agents.agents.env_explorer.utils.state_resolution import (  # noqa: E40
     load_vocabulary,
     resolve_state_request,
 )
+from ami_agents.shared.utils.namespaces import (  # noqa: E402
+    HMAS,
+    SAREF,
+    SCHEMA,
+    TD,
+)
 
 FIXTURE = Path(__file__).parent / "fixtures" / "lab308e_ha.json"
 HOME_CONFIG = Path(__file__).resolve().parents[1] / "lab308e.yaml"
@@ -243,9 +249,9 @@ class TestCapabilities:
 class TestPropertyNames:
     def test_no_artifact_advertises_a_bare_state_property(self, graph):
         """Every entity's state has its own name (decided: always rename)."""
-        rows = graph.query("""
-            PREFIX td: <https://www.w3.org/2019/wot/td#>
-            SELECT ?name WHERE { ?a td:hasPropertyAffordance ?p . ?p td:name ?name }
+        rows = graph.query(f"""
+            PREFIX td: <{TD}>
+            SELECT ?name WHERE {{ ?a td:hasPropertyAffordance ?p . ?p td:name ?name }}
         """)
         names = {str(r.name) for r in rows}
         assert "state" not in names
@@ -265,12 +271,12 @@ class TestArtifactNames:
     device, schema:model the product."""
 
     def _labels(self, graph, title):
-        rows = graph.query("""
-            PREFIX td: <https://www.w3.org/2019/wot/td#>
-            PREFIX hmas: <https://purl.org/hmas/>
+        rows = graph.query(f"""
+            PREFIX td: <{TD}>
+            PREFIX hmas: <{HMAS}>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            SELECT ?label WHERE { ?a a hmas:Artifact ; td:title ?t ; rdfs:label ?label .
-                                  FILTER(STR(?t) = "%s") }""" % title)
+            SELECT ?label WHERE {{ ?a a hmas:Artifact ; td:title ?t ; rdfs:label ?label .
+                                  FILTER(STR(?t) = "%s") }}""" % title)
         return sorted(str(r.label) for r in rows)
 
     def test_the_label_is_the_kind_of_device(self, graph):
@@ -283,30 +289,30 @@ class TestArtifactNames:
 
 def test_no_action_carries_the_legacy_status_command(graph):
     """Actions are typed with their homeont / SAREF command, nothing else."""
-    rows = graph.query("""
-        PREFIX td: <https://www.w3.org/2019/wot/td#>
-        ASK { ?a td:hasActionAffordance ?x . ?x a <http://example.org/StatusCommand> }""")
+    rows = graph.query(f"""
+        PREFIX td: <{TD}>
+        ASK {{ ?a td:hasActionAffordance ?x . ?x a <http://example.org/StatusCommand> }}""")
     assert not rows.askAnswer
 
 
 def test_the_thermostat_read_is_a_get_command(graph):
-    rows = graph.query("""
-        PREFIX td: <https://www.w3.org/2019/wot/td#>
-        PREFIX saref: <https://saref.etsi.org/core/>
-        SELECT ?name WHERE { ?a td:hasActionAffordance ?x . ?x td:name ?name ; a saref:GetCommand }""")
+    rows = graph.query(f"""
+        PREFIX td: <{TD}>
+        PREFIX saref: <{SAREF}>
+        SELECT ?name WHERE {{ ?a td:hasActionAffordance ?x . ?x td:name ?name ; a saref:GetCommand }}""")
     assert {str(r.name) for r in rows} == {"getThermostatState"}
 
 
 
 class TestActsUpon:
     def test_light_turn_on_changes_state_and_brightness(self, graph):
-        rows = graph.query("""
-            PREFIX td: <https://www.w3.org/2019/wot/td#>
-            PREFIX saref: <https://saref.etsi.org/core/>
-            SELECT ?pn WHERE { ?a td:title "ambient_lights_308e" ;
+        rows = graph.query(f"""
+            PREFIX td: <{TD}>
+            PREFIX saref: <{SAREF}>
+            SELECT ?pn WHERE {{ ?a td:title "ambient_lights_308e" ;
                                   td:hasActionAffordance ?x .
                                ?x td:name "LightTurnOn" ; saref:actsUpon ?p .
-                               ?p td:name ?pn }""")
+                               ?p td:name ?pn }}""")
         assert {str(r.pn) for r in rows} >= {"lightState", "brightness"}
 
     def test_play_answers_through_the_playback_state_it_changes(self, graph):
@@ -345,8 +351,8 @@ def test_entity_only_covers_publish_canonical_names_for_the_unmodified_planner(m
     monkeypatch.setattr(FixtureHAWS, "get_devices", AsyncMock(return_value=[]))
     monkeypatch.setattr(FixtureHAWS, "get_entities", AsyncMock(return_value=entities))
     monkeypatch.setattr(FixtureHAREST, "get_states", AsyncMock(return_value=states))
-    td = Namespace("https://www.w3.org/2019/wot/td#")
-    schema = Namespace("https://schema.org/")
+    td = Namespace(f"{TD}")
+    schema = Namespace(f"{SCHEMA}")
 
     # 2. Every document names each cover the same way.
     graph = Graph()

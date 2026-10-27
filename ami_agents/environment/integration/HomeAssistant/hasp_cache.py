@@ -10,26 +10,21 @@ from rdflib import Graph, Literal, Namespace, RDF, URIRef
 try:
     from .hasp_utils import HomeAssistantRDF, state_property_names
     from . import hasp_semantics
+    from .hasp_namespaces import HCTL, HMAS, SCHEMA, SOSA, SSN, TD, TDSOSA
 except ImportError:  # pragma: no cover
     from hasp_utils import HomeAssistantRDF, state_property_names
     import hasp_semantics
+    from hasp_namespaces import HCTL, HMAS, SCHEMA, SOSA, SSN, TD, TDSOSA
 
 
-HMAS = Namespace("https://purl.org/hmas/")
-TD = Namespace("https://www.w3.org/2019/wot/td#")
-SCHEMA = Namespace("https://schema.org/")
-HCTL = Namespace("https://www.w3.org/2019/wot/hypermedia#")
-SOSA = Namespace("http://www.w3.org/ns/sosa/")
-SSN = Namespace("http://www.w3.org/ns/ssn/")
-TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
 
 
 ArtifactBuilder = Callable[[str, str, str, List[Dict[str, Any]], Dict[str, Dict[str, Any]], Dict[str, Any]], str]
 
 
 def _curie(uri: Any) -> str:
-    """`http://example.org/homeont/Illuminance` -> `homeont:Illuminance`; any
-    other IRI as it is (matches nothing in the homeont tables)."""
+    """A homeont IRI as a CURIE (`HOMEONT.Illuminance` -> `homeont:Illuminance`);
+    any other IRI as it is (matches nothing in the homeont tables)."""
     text = str(uri)
     homeont = str(hasp_semantics.HOMEONT)
     return "homeont:" + text[len(homeont):] if text.startswith(homeont) else text

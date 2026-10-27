@@ -21,12 +21,7 @@ from ...shared.models.environment import Affordance, AffordanceType, AffordanceF
 from ...shared.models.environment import WorkspaceCategory, ArtifactCategory
 from ...shared.ontologies import get_hmas_ontology, get_td_ontology, get_hctl_ontology, get_http_ontology
 from ...shared.utils import parse_jsonschema_from_rdf, extract_subgraph
-from ...shared.utils.namespaces import HMAS, TD, shorten_all
-
-# Thing-level device metadata. Declared here rather than resolved through the
-# ontology loaders: those exist to pull TD/HMAS vocabulary via owlready2, and
-# schema.org is not loaded that way.
-SCHEMA = Namespace("https://schema.org/")
+from ...shared.utils.namespaces import HMAS, SCHEMA, TD, WEBSUB, shorten_all
 
 EXCLUDED_ACTION_NAMES = {
     "getArtifactRepresentation",
@@ -188,7 +183,7 @@ class IIntegrationEngine(ABC):
         # Load TD ontology for vocabulary (cache will make this fast)
         td_onto = get_td_ontology()
         if td_onto:
-            td_ns = td_onto.get_namespace("https://www.w3.org/2019/wot/td#")
+            td_ns = td_onto.get_namespace(str(TD))
 
             # 1. Try td:title
             title = td_graph.value(resource_uri, URIRef(td_ns.title.iri))
@@ -978,7 +973,7 @@ class YggdrasilIntegration(IIntegrationEngine):
             logger.debug(f"HMAS ontology loaded: {hmas_onto.base_iri}")
 
             # Get the hmas namespace in owlready2
-            hmas_ns = hmas_onto.get_namespace("https://purl.org/hmas/")
+            hmas_ns = hmas_onto.get_namespace(str(HMAS))
 
             # Extract vocabulary IRIs from the ontology
             HypermediaMASPlatform_iri = URIRef(hmas_ns.HypermediaMASPlatform.iri)
@@ -1097,7 +1092,7 @@ class YggdrasilIntegration(IIntegrationEngine):
 
         # Get the HMAS namespace from the ontology
         # The namespace is accessible via the ontology's get_namespace method
-        hmas_ns = hmas_onto.get_namespace("https://purl.org/hmas/")
+        hmas_ns = hmas_onto.get_namespace(str(HMAS))
 
         # Get vocabulary IRIs using owlready2 namespace
         Workspace_iri = URIRef(hmas_ns.Workspace.iri)
@@ -1238,7 +1233,7 @@ class YggdrasilIntegration(IIntegrationEngine):
             return {}
 
         # Get the HMAS namespace from the ontology
-        hmas_ns = hmas_onto.get_namespace("https://purl.org/hmas/")
+        hmas_ns = hmas_onto.get_namespace(str(HMAS))
 
         # Get vocabulary IRIs using owlready2 namespace
         Artifact_iri = URIRef(hmas_ns.Artifact.iri)
@@ -1740,8 +1735,8 @@ class YggdrasilIntegration(IIntegrationEngine):
 
     # WebSub subscription affordance types, matched by RDF type rather than by
     # name: the type is what the vocabulary guarantees, a name is convention.
-    WEBSUB_SUBSCRIBE_ARTIFACT = "https://purl.org/hmas/websub/subscribeToArtifact"
-    WEBSUB_SUBSCRIBE_WORKSPACE = "https://purl.org/hmas/websub/subscribeToWorkspace"
+    WEBSUB_SUBSCRIBE_ARTIFACT = str(WEBSUB.subscribeToArtifact)
+    WEBSUB_SUBSCRIBE_WORKSPACE = str(WEBSUB.subscribeToWorkspace)
 
     def _find_focus_affordance(self, artifact: "Artifact") -> Optional[str]:
         """A JaCaMo/CArtAgO `focus` action, if this environment offers one."""

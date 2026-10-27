@@ -25,11 +25,16 @@ from ami_agents.agents.env_explorer.utils.state_resolution import (
     resolve_state_request,
 )
 from ami_agents.environment.integration.SimuHome.mappings import load_mappings
+from ami_agents.shared.utils.namespaces import (  # noqa: E402
+    HCTL,
+    HMAS,
+    HOMEONT,
+    SAREF,
+    SCHEMA,
+    SOSA,
+    TD,
+)
 
-SAREF = Namespace("https://saref.etsi.org/core/")
-SOSA = Namespace("http://www.w3.org/ns/sosa/")
-SCHEMA = Namespace("https://schema.org/")
-TD = Namespace("https://www.w3.org/2019/wot/td#")
 
 REPO = Path(__file__).resolve().parents[2]
 EPISODE = (REPO.parent / "SimuHome" / "data" / "benchmark"
@@ -92,18 +97,18 @@ class TestTheGraph:
         art = URIRef("http://localhost:8097/workspaces/test/kitchen"
                      "/artifacts/kitchen_light_sensor_1#artifact")
         assert (art, RDF.type, SAREF.Sensor) in graph
-        ask = graph.query("""
-            PREFIX saref: <https://saref.etsi.org/core/>
+        ask = graph.query(f"""
+            PREFIX saref: <{SAREF}>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            PREFIX homeont: <http://example.org/homeont/>
-            ASK { homeont:LightSensor rdfs:subClassOf* saref:Device }""")
+            PREFIX homeont: <{HOMEONT}>
+            ASK {{ homeont:LightSensor rdfs:subClassOf* saref:Device }}""")
         assert bool(ask.askAnswer), "the SAREF path must close, or nothing resolves"
 
     def test_it_carries_its_homeont_class(self, graph):
         art = URIRef("http://localhost:8097/workspaces/test/kitchen"
                      "/artifacts/kitchen_air_quality_sensor_1#artifact")
         assert (art, RDF.type,
-                URIRef("http://example.org/homeont/AirQualitySensor")) in graph
+                URIRef(f"{HOMEONT}AirQualitySensor")) in graph
 
     def test_it_observes_the_rooms_own_property(self, graph):
         """Not a second copy of the reading -- the environment's property."""
@@ -126,7 +131,7 @@ class TestTheGraph:
         """Discovery walks the workspace, so an unlisted sensor is invisible."""
         ws = URIRef("http://localhost:8097/workspaces/test/kitchen#workspace")
         contained = {str(o) for o in graph.objects(
-            ws, URIRef("https://purl.org/hmas/contains"))}
+            ws, URIRef(f"{HMAS}contains"))}
         assert any("light_sensor" in c for c in contained)
 
     def test_the_affordance_reads_from_the_sensors_own_url(self, graph):
@@ -136,7 +141,7 @@ class TestTheGraph:
         prop = next(graph.objects(art, TD.hasPropertyAffordance))
         form = next(graph.objects(prop, TD.hasForm))
         target = str(next(graph.objects(
-            form, URIRef("https://www.w3.org/2019/wot/hypermedia#hasTarget"))))
+            form, URIRef(f"{HCTL}hasTarget"))))
         assert "/artifacts/kitchen_light_sensor_1/properties/" in target
 
 

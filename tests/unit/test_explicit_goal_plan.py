@@ -27,6 +27,14 @@ from ami_agents.agents.interaction_solver.utils.plan_envelope import (
 from ami_agents.shared.models.goal_structure import GoalSpec, GoalStructure
 from ami_agents.shared.models.intents import Intent
 from ami_agents.shared.utils.vocabulary import close_types
+from ami_agents.shared.utils.namespaces import (  # noqa: E402
+    HCTL,
+    HMAS,
+    HOMEONT,
+    JS,
+    SAREF,
+    TD,
+)
 
 REPO = Path(__file__).resolve().parents[2]
 EPISODE = REPO.parent / "SimuHome" / "data" / "benchmark" / "qt1_feasible_seed_1.json"
@@ -142,13 +150,13 @@ class TestSimuHome:
         assert "homeont:Kitchen" in result["explanation"]
 
 
-ODD_HOME = """
-@prefix hmas: <https://purl.org/hmas/> .
-@prefix homeont: <http://example.org/homeont/> .
-@prefix saref: <https://saref.etsi.org/core/> .
-@prefix td: <https://www.w3.org/2019/wot/td#> .
-@prefix hctl: <https://www.w3.org/2019/wot/hypermedia#> .
-@prefix js: <https://www.w3.org/2019/wot/json-schema#> .
+ODD_HOME = f"""
+@prefix hmas: <{HMAS}> .
+@prefix homeont: <{HOMEONT}> .
+@prefix saref: <{SAREF}> .
+@prefix td: <{TD}> .
+@prefix hctl: <{HCTL}> .
+@prefix js: <{JS}> .
 
 <http://h/office/lamp#artifact> a hmas:Artifact ; td:title "lamp" ;
     td:hasActionAffordance [
@@ -223,13 +231,13 @@ class TestEnvelopes:
 
 # Two devices that share a title and an action name, told apart only by class:
 # an on/off light and a colour light (which homeont makes a dimmable light).
-TWO_LIGHTS = """
-@prefix hmas: <https://purl.org/hmas/> .
-@prefix homeont: <http://example.org/homeont/> .
-@prefix saref: <https://saref.etsi.org/core/> .
-@prefix td: <https://www.w3.org/2019/wot/td#> .
-@prefix hctl: <https://www.w3.org/2019/wot/hypermedia#> .
-@prefix js: <https://www.w3.org/2019/wot/json-schema#> .
+TWO_LIGHTS = f"""
+@prefix hmas: <{HMAS}> .
+@prefix homeont: <{HOMEONT}> .
+@prefix saref: <{SAREF}> .
+@prefix td: <{TD}> .
+@prefix hctl: <{HCTL}> .
+@prefix js: <{JS}> .
 
 <http://h/onoff#artifact> a hmas:Artifact, homeont:OnOffLight ; td:title "light" ;
     td:hasActionAffordance [ a td:ActionAffordance, homeont:SetOnOffCommand ;
@@ -317,12 +325,12 @@ class TestGenericClassOnTwoLights:
 
 
 # Home Assistant's shape: the action is the value, and takes no input.
-SWITCH = """
-@prefix hmas: <https://purl.org/hmas/> .
-@prefix homeont: <http://example.org/homeont/> .
-@prefix saref: <https://saref.etsi.org/core/> .
-@prefix td: <https://www.w3.org/2019/wot/td#> .
-@prefix hctl: <https://www.w3.org/2019/wot/hypermedia#> .
+SWITCH = f"""
+@prefix hmas: <{HMAS}> .
+@prefix homeont: <{HOMEONT}> .
+@prefix saref: <{SAREF}> .
+@prefix td: <{TD}> .
+@prefix hctl: <{HCTL}> .
 
 <http://h/switch#artifact> a hmas:Artifact ; td:title "desk_switch" ;
     td:hasActionAffordance [ a td:ActionAffordance, saref:OnCommand ;

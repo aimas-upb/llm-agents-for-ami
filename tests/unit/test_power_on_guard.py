@@ -30,6 +30,9 @@ from ami_agents.agents.interaction_solver.utils.power_on_guard import (
 from ami_agents.bt_planning.serialization import validate_tree
 from ami_agents.shared.utils.vocabulary import close_types
 from tests.unit.test_dependency_compiler import PREFIXES, _prop, _room
+from ami_agents.shared.utils.namespaces import (  # noqa: E402
+    SCHEMA,
+)
 
 APPLIES_TO = {"classes": ["homeont:LaundryDryer", "homeont:LaundryWasher"],
               "manufacturers": ["Acme"]}
@@ -48,7 +51,7 @@ def _device(name, cls, extra=""):
     return f"<http://h/{name}#artifact> a hmas:Artifact, homeont:{cls} ; td:title \"{name}\" {extra}.\n"
 
 
-HOME = PREFIXES + "@prefix schema: <https://schema.org/> .\n" + "".join([
+HOME = PREFIXES + f"@prefix schema: <{SCHEMA}> .\n" + "".join([
     _room("utility", "Utility Room", "UtilityRoom", ["dryer_1", "washer_1"]),
     _room("living", "Living Room", "LivingRoom", ["light_1", "acme_1"]),
     # The dryer: on/off command acting upon its on/off state, and a level command.

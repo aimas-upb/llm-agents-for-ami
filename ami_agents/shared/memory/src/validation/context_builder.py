@@ -13,8 +13,6 @@ from rdflib.namespace import XSD
 
 logger = logging.getLogger(__name__)
 
-RDF_NS = Namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#")
-XSD_NS = Namespace("http://www.w3.org/2001/XMLSchema#")
 
 
 class ContextGraphBuilder:

@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Set
 
-from rdflib import Graph, Namespace, RDF, URIRef
+from rdflib import Graph, RDF, URIRef
 
 try:
     from .mappings import load_mappings
@@ -34,11 +34,13 @@ except ImportError:  # pragma: no cover
     from mappings import load_mappings  # type: ignore
     from sim_client import SimuHomeClient  # type: ignore
 
-TD = Namespace("https://www.w3.org/2019/wot/td#")
-SOSA = Namespace("http://www.w3.org/ns/sosa/")
-SSN = Namespace("http://www.w3.org/ns/ssn/")
-TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
-HOME = Namespace("http://example.org/homeont/")
+# Every vocabulary IRI comes from the adapter's one namespace module.
+try:
+    from .shtd_namespaces import (HOMEONT, SOSA, SSN, TD, TDSOSA)
+except ImportError:  # pragma: no cover - direct script use
+    from shtd_namespaces import (HOMEONT, SOSA, SSN, TD, TDSOSA)  # type: ignore
+# The scripts' short name for homeont.
+HOME = HOMEONT
 
 PASS, FAIL = "PASS", "FAIL"
 _results: List[tuple] = []

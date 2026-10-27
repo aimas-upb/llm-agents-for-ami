@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional
 
+from ....shared.utils.namespaces import turtle_prefixes
+
 
 def generate_shacl_shapes_from_conditions(structured_conditions: List[Dict[str, Any]]) -> Optional[str]:
     """
@@ -37,11 +39,7 @@ def generate_shacl_shapes_from_conditions(structured_conditions: List[Dict[str, 
         return None
 
     # Build SHACL Turtle
-    shapes_lines = [
-        "@prefix sh: <http://www.w3.org/ns/shacl#> .",
-        "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .",
-        "",
-    ]
+    shapes_lines = turtle_prefixes("sh", "xsd").splitlines() + [""]
 
     for idx, (artifact_uri, conditions) in enumerate(artifact_conditions.items()):
         shape_id = f"<urn:signifier:shape:{idx}>"

@@ -4,15 +4,13 @@ Initial discovery behavior for EnvExplorer agent.
 
 import asyncio
 import json
-from rdflib import Graph, Namespace
+from rdflib import Graph
 from spade.behaviour import OneShotBehaviour
 from spade.message import Message as SpadeMessage
 
 from ....shared.models.messages import MessageType, META_CORRELATION_ID, ensure_correlation_id
 from ....shared.utils.demo_log import demo
-
-
-TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
+from ....shared.utils.namespaces import TDSOSA
 
 
 def _detect_tdsosa_support(agent) -> bool:

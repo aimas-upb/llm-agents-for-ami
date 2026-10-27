@@ -9,10 +9,12 @@ from ami_agents.shared.utils.vocabulary import (
     close_types,
     vocabulary,
 )
+from ami_agents.shared.utils.namespaces import HOMEONT as _HOMEONT, SAREF as _SAREF, TD as _TD
 
-HOMEONT = "http://example.org/homeont/"
-SAREF = "https://saref.etsi.org/core/"
-TD = "https://www.w3.org/2019/wot/td#"
+# The tests build terms by concatenation, so they hold the namespaces as text.
+HOMEONT = str(_HOMEONT)
+SAREF = str(_SAREF)
+TD = str(_TD)
 
 LIGHT = URIRef("http://h/light#artifact")
 AC = URIRef("http://h/ac#artifact")
@@ -70,7 +72,7 @@ def test_rooms_and_commands_close_too():
 
 def test_a_generic_class_matches_each_device_once():
     rows = list(_graph().query(
-        "SELECT ?x WHERE { ?x a <https://saref.etsi.org/core/Device> }"))
+        f"SELECT ?x WHERE {{ ?x a <{SAREF}Device> }}"))
     assert sorted(str(r.x) for r in rows) == sorted([str(LIGHT), str(AC)])
 
 

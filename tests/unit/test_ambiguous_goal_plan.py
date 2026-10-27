@@ -29,17 +29,28 @@ from ami_agents.agents.interaction_solver.utils.specific_capability_context impo
 )
 from ami_agents.shared.models.goal_structure import GoalSpec, GoalStructure
 from ami_agents.shared.utils.vocabulary import close_types
+from ami_agents.shared.utils.namespaces import (  # noqa: E402
+    HCTL,
+    HMAS,
+    HOMEONT,
+    JS,
+    SAREF,
+    SOSA,
+    SSN,
+    TD,
+    TDSOSA,
+)
 
-PREFIXES = """
-@prefix hmas: <https://purl.org/hmas/> .
-@prefix homeont: <http://example.org/homeont/> .
-@prefix saref: <https://saref.etsi.org/core/> .
-@prefix td: <https://www.w3.org/2019/wot/td#> .
-@prefix hctl: <https://www.w3.org/2019/wot/hypermedia#> .
-@prefix js: <https://www.w3.org/2019/wot/json-schema#> .
-@prefix ssn: <http://www.w3.org/ns/ssn/> .
-@prefix sosa: <http://www.w3.org/ns/sosa/> .
-@prefix tdsosa: <https://example.org/hmas/td-sosa-ext#> .
+PREFIXES = f"""
+@prefix hmas: <{HMAS}> .
+@prefix homeont: <{HOMEONT}> .
+@prefix saref: <{SAREF}> .
+@prefix td: <{TD}> .
+@prefix hctl: <{HCTL}> .
+@prefix js: <{JS}> .
+@prefix ssn: <{SSN}> .
+@prefix sosa: <{SOSA}> .
+@prefix tdsosa: <{TDSOSA}> .
 """
 
 

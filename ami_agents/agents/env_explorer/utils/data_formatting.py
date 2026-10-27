@@ -5,9 +5,22 @@ Data formatting utilities for EnvExplorer agent.
 import re
 from typing import Any, Dict, List
 
-from rdflib import Graph, Namespace, RDF, URIRef
+from rdflib import Graph, RDF, URIRef
+from rdflib.namespace import RDFS
 from ....shared.models.environment import AffordanceType
-from ....shared.utils.namespaces import NAMESPACE_MANAGER
+from ....shared.utils.namespaces import (
+    EX,
+    HCTL,
+    HMAS,
+    HOMEONT,
+    HTV,
+    JACAMO,
+    JS,
+    NAMESPACE_MANAGER,
+    TD,
+    WEBSUB,
+    WOTSEC,
+)
 
 
 def _short_iri(value: Any) -> str:
@@ -62,29 +75,19 @@ from ....shared.utils.namespaces import shorten as _shorten
 
 
 def _define_standard_namespaces(graph: Graph) -> dict:
-    """Bind all standard RDF namespaces to a graph and return them as a dict."""
-    ex = Namespace("http://example.org/")
-    hctl = Namespace("https://www.w3.org/2019/wot/hypermedia#")
-    hmas = Namespace("https://purl.org/hmas/")
-    http = Namespace("http://www.w3.org/2011/http#")
-    jacamo = Namespace("https://purl.org/hmas/jacamo/")
-    td = Namespace("https://www.w3.org/2019/wot/td#")
-    websub = Namespace("https://purl.org/hmas/websub/")
-    wotsec = Namespace("https://www.w3.org/2019/wot/security#")
+    """Bind the discovery formatter's prefixes to a graph and return them by name.
 
-    graph.bind("ex", ex)
-    graph.bind("hctl", hctl)
-    graph.bind("hmas", hmas)
-    graph.bind("http", http)
-    graph.bind("jacamo", jacamo)
-    graph.bind("td", td)
-    graph.bind("websub", websub)
-    graph.bind("wotsec", wotsec)
-
-    return {
-        "ex": ex, "hctl": hctl, "hmas": hmas, "http": http,
-        "jacamo": jacamo, "td": td, "websub": websub, "wotsec": wotsec
+    The namespaces themselves come from `namespaces`; only the prefix names
+    (`ex`, `http`) are this formatter's own, kept so serialized output reads as
+    it always has.
+    """
+    namespaces = {
+        "ex": EX, "hctl": HCTL, "hmas": HMAS, "http": HTV,
+        "jacamo": JACAMO, "td": TD, "websub": WEBSUB, "wotsec": WOTSEC,
     }
+    for prefix, namespace in namespaces.items():
+        graph.bind(prefix, namespace)
+    return namespaces
 
 
 
@@ -310,28 +313,29 @@ def format_capabilities_payload(agent_instance) -> Dict[str, Any]:
 
 
 def _ensure_rdf_prefixes(rdf_str: str) -> str:
-    """Ensure RDF/Turtle string has necessary namespace declarations before parsing."""
-    # Standard prefix block for common namespaces
-    prefix_block = """\
-@prefix hmas: <https://purl.org/hmas/> .
-@prefix ex: <http://example.org/> .
-@prefix td: <https://www.w3.org/2019/wot/td#> .
-@prefix hctl: <https://www.w3.org/2019/wot/hypermedia#> .
-@prefix jsonschema: <https://www.w3.org/2019/wot/json-schema#> .
-@prefix http: <http://www.w3.org/2011/http#> .
-@prefix homeont: <https://example.org/homeont#> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+    """The Turtle document, with a standard prefix block prepended when it
+    declares no prefixes of its own; a document that declares any is returned
+    as is.
 
-"""
-
-    # Check if RDF already has @prefix declarations
+    Some TDs arrive as bare Turtle fragments that use CURIEs without declaring
+    them. The prefix NAMES below are the ones such fragments use (`jsonschema:`,
+    `http:`); the IRIs are the shared constants, so they cannot drift from the
+    rest of the system.
+    """
+    # 1. A document that declares prefixes is trusted to declare all it uses.
     if "@prefix" in rdf_str.lower():
-        # Already has prefixes, return as-is
         return rdf_str
 
-    # Prepend standard prefixes
-    return prefix_block + rdf_str
+    # 2. Otherwise, prepend every prefix a bare fragment may use.
+    prefix_block = "".join(
+        f"@prefix {prefix}: <{namespace}> .\n"
+        for prefix, namespace in (
+            ("hmas", HMAS), ("ex", EX), ("td", TD), ("hctl", HCTL),
+            ("jsonschema", JS), ("http", HTV), ("homeont", HOMEONT),
+            ("rdfs", RDFS), ("rdf", RDF),
+        )
+    )
+    return prefix_block + "\n" + rdf_str
 
 
 def format_capabilities_summary_hierarchical(agent_instance) -> Dict[str, Any]:

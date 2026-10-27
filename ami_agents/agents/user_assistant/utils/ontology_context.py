@@ -34,8 +34,20 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 
-from rdflib import Graph, Namespace, URIRef
+from rdflib import Graph, URIRef
 from rdflib.namespace import OWL, RDF, RDFS
+
+from ....shared.utils.namespaces import (
+    HOMEONT,
+    QUANTITYKIND,
+    QUDT,
+    SAREF,
+    SCHEMA,
+    SOSA,
+    SSN,
+    SSN_SYSTEM,
+    UNIT,
+)
 
 from ....shared.utils.vocabulary import (
     ACTUATABLE_PROPERTY_ROOT,
@@ -50,14 +62,6 @@ from ....shared.utils.vocabulary import (
     vocabulary,
 )
 
-HOMEONT = Namespace("http://example.org/homeont/")
-SOSA = Namespace("http://www.w3.org/ns/sosa/")
-SAREF = Namespace("https://saref.etsi.org/core/")
-SSN = Namespace("http://www.w3.org/ns/ssn/")
-SSN_SYSTEM = Namespace("http://www.w3.org/ns/ssn/systems/")
-QUDT = Namespace("http://qudt.org/schema/qudt/")
-
-
 # Prefixes the context renders identifiers with. The parser quotes these back
 # verbatim and the resolver puts them straight into SPARQL, so they must match
 # the prefixes the served graphs use.
@@ -67,9 +71,9 @@ _PREFIXES = (
     ("saref:", str(SAREF)),
     ("ssn-system:", str(SSN_SYSTEM)),
     ("ssn:", str(SSN)),
-    ("schema:", "https://schema.org/"),
-    ("quantitykind:", "http://qudt.org/vocab/quantitykind/"),
-    ("unit:", "http://qudt.org/vocab/unit/"),
+    ("schema:", str(SCHEMA)),
+    ("quantitykind:", str(QUANTITYKIND)),
+    ("unit:", str(UNIT)),
 )
 
 # The SAREF classes homeont hangs its device families from. SAREF defines
@@ -94,7 +98,8 @@ DEVICE_METADATA = (
 
 
 def _curie(uri: Any) -> str:
-    """`http://example.org/homeont/Kitchen` -> `homeont:Kitchen`."""
+    """A homeont, SOSA, SAREF, SSN, schema.org or QUDT IRI as a CURIE
+    (`HOMEONT.Kitchen` -> `homeont:Kitchen`); any other IRI unchanged."""
     text = str(uri)
     for prefix, namespace in _PREFIXES:
         if text.startswith(namespace):

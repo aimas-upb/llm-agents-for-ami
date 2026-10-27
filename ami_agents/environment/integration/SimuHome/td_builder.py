@@ -29,8 +29,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
-from rdflib.namespace import RDFS, XSD
+from rdflib import BNode, Graph, Literal, RDF, URIRef
+from rdflib.namespace import OWL, RDFS, XSD
 
 try:
     from .classify import classify_device
@@ -44,28 +44,16 @@ except ImportError:  # pragma: no cover - direct script use
 # here. Every Matter fact comes from it, never from model memory.
 from matter_model.registry import load_registry  # noqa: E402
 
-HCTL = Namespace("https://www.w3.org/2019/wot/hypermedia#")
-JS = Namespace("https://www.w3.org/2019/wot/json-schema#")
-HMAS = Namespace("https://purl.org/hmas/")
-# All SHTD vocabulary -- spaces, device families, environmental properties
-# and Matter provenance -- lives in one ontology:
-# ami_agents/shared/ontologies/homeont.ttl
-HOME = Namespace("http://example.org/homeont/")
-WOTSEC = Namespace("https://www.w3.org/2019/wot/security#")
-HTV = Namespace("http://www.w3.org/2011/http#")
-JACAMO = Namespace("https://purl.org/hmas/jacamo/")
-WEBSUB = Namespace("https://purl.org/hmas/websub/")
-TD = Namespace("https://www.w3.org/2019/wot/td#")
-SOSA = Namespace("http://www.w3.org/ns/sosa/")
-SSN = Namespace("http://www.w3.org/ns/ssn/")
-QUDT = Namespace("http://qudt.org/schema/qudt/")
-UNIT = Namespace("http://qudt.org/vocab/unit/")
-QK = Namespace("http://qudt.org/vocab/quantitykind/")
-TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
-SAREF = Namespace("https://saref.etsi.org/core/")
-# Thing-level device metadata (manufacturer, product name). The TD spec mints no
-# vendor vocabulary of its own and points at schema.org for it.
-SCHEMA = Namespace("https://schema.org/")
+# Every vocabulary IRI comes from the adapter's one namespace module.
+try:
+    from .shtd_namespaces import (HCTL, HMAS, HOMEONT, HTV, JACAMO, JS, QUANTITYKIND, QUDT, SAREF, SCHEMA,
+                                  SOSA, SSN, TD, TDSOSA, UNIT, WEBSUB, WOTSEC)
+except ImportError:  # pragma: no cover - direct script use
+    from shtd_namespaces import (HCTL, HMAS, HOMEONT, HTV, JACAMO, JS, QUANTITYKIND, QUDT, SAREF, SCHEMA,
+                                  SOSA, SSN, TD, TDSOSA, UNIT, WEBSUB, WOTSEC)  # type: ignore
+# The scripts' short name for homeont.
+HOME = HOMEONT
+QK = QUANTITYKIND
 
 # Ambient sensors are an addition SHTD makes to what SimuHome models. Off, and
 # the graph is exactly what it was before them -- which is how the "no sensor,
@@ -97,6 +85,8 @@ _NS_BY_PREFIX = {
 # Building-space classes homeont defines. Read from the ontology itself rather
 # than hardcoded, so adding a space type there is enough to make it usable here.
 def _load_home_space_classes() -> set:
+    """The local names of every OWL class homeont defines; empty when the
+    ontology cannot be read, since the set only ever widens what is accepted."""
     path = (Path(__file__).resolve().parents[3]
             / "shared" / "ontologies" / "homeont.ttl")
     try:
@@ -107,7 +97,7 @@ def _load_home_space_classes() -> set:
     return {
         str(subject).rsplit("/", 1)[-1]
         for subject in onto.subjects(RDF.type,
-                                     URIRef("http://www.w3.org/2002/07/owl#Class"))
+                                     OWL.Class)
         if str(subject).startswith(str(HOME))
     }
 

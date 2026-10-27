@@ -18,10 +18,13 @@ from ami_agents.shared.utils import (
     SchemaParsingError,
     SchemaValidationError
 )
+from ami_agents.shared.utils.namespaces import (  # noqa: E402
+    JS,
+)
+JSONSCHEMA = JS
 
 
 # Define namespaces
-JSONSCHEMA = Namespace("http://www.w3.org/2019/wot/json-schema#")
 EX = Namespace("http://example.org/")
 
 

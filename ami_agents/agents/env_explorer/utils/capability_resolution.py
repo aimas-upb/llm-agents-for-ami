@@ -28,8 +28,21 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from rdflib import Graph, Namespace, URIRef
+from rdflib import Graph, URIRef
 from rdflib.namespace import RDF, RDFS
+
+from ....shared.utils.namespaces import (
+    HMAS,
+    HOMEONT,
+    JS,
+    SAREF,
+    SCHEMA,
+    SOSA,
+    SSN,
+    TD,
+    TDSOSA,
+    sparql_prefixes,
+)
 
 from .state_resolution import (
     METADATA_LINES,
@@ -40,18 +53,8 @@ from .state_resolution import (
     scope_lines,
 )
 
-HOMEONT = Namespace("http://example.org/homeont/")
-HMAS = Namespace("https://purl.org/hmas/")
-SOSA = Namespace("http://www.w3.org/ns/sosa/")
-SSN = Namespace("http://www.w3.org/ns/ssn/")
-TD = Namespace("https://www.w3.org/2019/wot/td#")
-JS = Namespace("https://www.w3.org/2019/wot/json-schema#")
-TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
-SAREF = Namespace("https://saref.etsi.org/core/")
-
-_PREFIXES = SPARQL_PREFIXES + """PREFIX sosa:    <http://www.w3.org/ns/sosa/>
-PREFIX tdsosa:  <https://example.org/hmas/td-sosa-ext#>
-"""
+# The state resolver's prefixes, plus the two the effect queries need.
+_PREFIXES = SPARQL_PREFIXES + sparql_prefixes("sosa", "tdsosa")
 
 # The root a matched property class descends from says what kind of capability
 # it is, which is what the answer has to say: changeable, reported, supported.
@@ -66,7 +69,7 @@ _PROPERTY_BRANCHES = (
 METADATA_PROPERTIES = ("schema:manufacturer", "schema:model")
 
 # Types every affordance carries, which say nothing about what it does.
-_DOMAIN_NAMESPACES = ("http://example.org/homeont/", "https://saref.etsi.org/core/")
+_DOMAIN_NAMESPACES = (str(HOMEONT), str(SAREF))
 
 
 class CapabilityOutcome(str, Enum):
@@ -285,7 +288,7 @@ _CURIE_NAMESPACES = {
     "homeont": str(HOMEONT),
     "saref": str(SAREF),
     "sosa": str(SOSA),
-    "schema": "https://schema.org/",
+    "schema": str(SCHEMA),
 }
 
 

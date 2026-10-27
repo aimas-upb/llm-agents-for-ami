@@ -41,7 +41,7 @@ from rdflib import Graph, Literal, URIRef
 from rdflib.namespace import RDF
 
 from ....shared.models.goal_structure import NA, GoalSpec, GoalStructure
-from ....shared.utils.namespaces import JS, expand, shorten
+from ....shared.utils.namespaces import JS, expand, shorten, sparql_prefixes
 from .specific_capability_context import DIRECT_VALUE_KEY, json_schema
 
 # A direct-value input is sent wrapped as {DIRECT_VALUE_KEY: value}; a
@@ -97,11 +97,7 @@ def deterministic_goal(structure: GoalStructure) -> Optional[GoalSpec]:
 # left empty. Once pasted they are ordinary required patterns, not SPARQL
 # OPTIONALs: a class that does not fit removes the row. (Only the input schema
 # is OPTIONAL -- an action may take no input.)
-_QUERY = """
-PREFIX td:      <https://www.w3.org/2019/wot/td#>
-PREFIX hctl:    <https://www.w3.org/2019/wot/hypermedia#>
-PREFIX hmas:    <https://purl.org/hmas/>
-PREFIX homeont: <http://example.org/homeont/>
+_QUERY = "\n" + sparql_prefixes("td", "hctl", "hmas", "homeont") + """\
 SELECT DISTINCT ?artifact ?artifactTitle ?aff ?target ?schema WHERE {
   ?artifact td:title ?artifactTitle ;
             td:hasActionAffordance ?aff .
