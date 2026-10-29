@@ -251,7 +251,10 @@ class TestMatching:
 
     def test_alt_labels_and_plurals(self, small_home):
         labels = device_family_labels(small_home)
-        assert match_classes("close the blinds", labels) == ["homeont:WindowCoveringController"]
+        # "blinds" is an alt label of the generic controller and the label of the
+        # HomeBench Blinds subclass: one mention, two classes, as "lamps" is two.
+        assert set(match_classes("close the blinds", labels)) == {
+            "homeont:WindowCoveringController", "homeont:Blinds"}
         assert set(match_classes("turn off both lamps", labels)) == {
             "homeont:OnOffLight", "homeont:DimmableLight"}
         assert match_classes("run the washing machine", labels) == ["homeont:LaundryWasher"]
@@ -499,9 +502,13 @@ class TestWrittenProperties:
         assert "OffLowMedHigh" not in text
 
     def test_a_state_keeps_its_gloss(self, graph):
+        """A readable state no action writes keeps its enum gloss: a window
+        covering's end product type. (A TV's playbackState used to be the
+        example; Play / Pause / Stop now write it, so it shows as the action's
+        values instead.)"""
         text = render_actuation_context(
             build_actuation_context(graph, with_properties=True))
-        assert re.search(r'name: "playbackState"\n\s+property class: \S+\n'
+        assert re.search(r'name: "endProductType"\n\s+property class: \S+\n'
                          r'\s+kind: state\n'
                          r'\s+output: direct value; type: \S+; description: ', text)
 

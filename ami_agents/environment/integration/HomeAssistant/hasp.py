@@ -915,7 +915,8 @@ def _build_cached_artifact_ttl(
             # The entity's own accepted values (its modes, presets, options)
             # go into the schema; the service definition cannot know them.
             input_schema = rdf._build_input_schema_from_fields(
-                supported_fields, entity_field_options(domain, svc_name, domain_entity_attrs))
+                supported_fields, entity_field_options(domain, svc_name, domain_entity_attrs),
+                domain=domain)
             action_affordance = rdf._add_action(
                 art,
                 action_name,
@@ -1006,7 +1007,8 @@ def _build_cached_artifact_ttl(
                     continue
                 emitted.add(attr_name)
                 property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/{urllib.parse.quote(attr_name, safe='')}")
-                schema = rdf._build_property_schema(attr_name, attr_value, entity_attrs)
+                schema = rdf._build_property_schema(attr_name, attr_value, entity_attrs,
+                                                    entity_domain=domain)
                 op_prop = rdf._add_property(
                     art, attr_name, property_uri, output_schema=schema,
                     description=f"{attr_name} of {entity_id}", observable=True
@@ -1028,7 +1030,8 @@ def _build_cached_artifact_ttl(
                 default = rule.get("default")
                 property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/{urllib.parse.quote(attr_name, safe='')}")
                 schema = rdf._build_property_schema(
-                    attr_name, default, {**entity_attrs, attr_name: default})
+                    attr_name, default, {**entity_attrs, attr_name: default},
+                    entity_domain=domain)
                 declared_prop = rdf._add_property(
                     art, attr_name, property_uri, output_schema=schema,
                     description=f"{attr_name} of {entity_id}", observable=True

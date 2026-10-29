@@ -3,6 +3,11 @@ Async BehaviorTree Planner
 
 Generates JSON IR behavior trees using async OpenAI API,
 adapted for the SPADE multi-agent context in the AAMAS 2026 demo.
+
+The model is made to call the generate_behavior_tree tool through a
+`ToolCallSession` (shared/utils/llm_tool_call.py), which uses the Responses
+API on OpenAI's endpoint and Chat Completions on any other endpoint (for
+example Ollama), so the planner itself does not depend on the backend.
 """
 
 import json
@@ -12,7 +17,7 @@ from typing import Any, Optional
 
 from openai import AsyncOpenAI
 
-from ami_agents.shared.utils.llm_models import is_reasoning_model
+from ami_agents.shared.utils.llm_tool_call import ToolCallSession
 
 from .affordance_refs import CLASS_FIELD, DEVICE_FIELD, READING_NODES, TITLE_FIELD, AffordanceCatalog
 from .schema import GENERATE_BT_TOOL
@@ -26,6 +31,49 @@ from .prompts import (
 logger = logging.getLogger(__name__)
 
 SETTLING_WAIT_MARGIN_SECONDS = 5.0
+
+# JSON-schema types and the Python values that are of them. A bool is not a
+# number here, though Python counts it as an int.
+_JSON_TYPES = {
+    "boolean": lambda v: isinstance(v, bool),
+    "integer": lambda v: (isinstance(v, int) and not isinstance(v, bool))
+                         or (isinstance(v, float) and v.is_integer()),
+    "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
+    "string": lambda v: isinstance(v, str),
+    "object": lambda v: isinstance(v, dict),
+    "array": lambda v: isinstance(v, list),
+}
+
+
+# --------------------------------------------------------------------------
+# An action parameter against its schema
+# --------------------------------------------------------------------------
+
+def _value_problem(value: Any, schema: Any) -> Optional[str]:
+    """What is wrong with ``value`` for ``schema`` -- its JSON type, its enum,
+    its minimum / maximum -- as words for the planner's retry ("must be a
+    boolean; got {...}"), or None when it fits or the schema says too little
+    to check (no type, or a type this check does not know)."""
+    if not isinstance(schema, dict):
+        return None
+    got = json.dumps(value)[:120]
+    # 1. The type: the commonest slip is the schema itself in the value's place.
+    kind = schema.get("type")
+    check = _JSON_TYPES.get(kind) if isinstance(kind, str) else None
+    if check is not None and not check(value):
+        return f"must be a{'n' if kind[0] in 'aeiou' else ''} {kind}; got {got}"
+    # 2. One of the listed values, when there is a list.
+    enum = schema.get("enum")
+    if isinstance(enum, list) and enum and value not in enum:
+        return f"must be one of {json.dumps(enum)}; got {got}"
+    # 3. Within the stated bounds, for a number.
+    if _JSON_TYPES["number"](value):
+        low, high = schema.get("minimum"), schema.get("maximum")
+        if isinstance(low, (int, float)) and value < low:
+            return f"must be at least {low}; got {got}"
+        if isinstance(high, (int, float)) and value > high:
+            return f"must be at most {high}; got {got}"
+    return None
 
 
 class AsyncBTPlanner:
@@ -85,7 +133,8 @@ class AsyncBTPlanner:
             state: Optional current state dict
             signifier_hints: Optional signifier match data for context injection
             affected_env_vars: Optional mapping of intent_str -> list of {variable, direction} for implicit intents
-            client: AsyncOpenAI client
+            client: AsyncOpenAI client; its endpoint decides the API (Responses
+                on api.openai.com, Chat Completions elsewhere, `api_for`)
             model: Model name (e.g., "o3", "gpt-4o")
             temperature: Optional temperature override
             reasoning_effort: Optional reasoning effort ("low", "medium", "high")
@@ -117,18 +166,16 @@ class AsyncBTPlanner:
         if goal_brief:
             user_message += f"\n\nStructured goal:\n{goal_brief}"
 
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ]
-
-        # Build API kwargs
-        api_kwargs = self._build_api_kwargs(
-            model=model,
-            messages=messages,
+        # The conversation with the model, over the API its endpoint serves.
+        session = ToolCallSession(
+            client,
+            model,
+            system=system_prompt,
+            user=user_message,
+            tool=GENERATE_BT_TOOL,
             temperature=temperature,
             reasoning_effort=reasoning_effort,
-            max_completion_tokens=max_completion_tokens,
+            max_output_tokens=max_completion_tokens,
         )
 
         # Retry loop for validation
@@ -139,6 +186,7 @@ class AsyncBTPlanner:
         observable_result_count = len((observable_property_hints or {}).get("results", [])) if isinstance(observable_property_hints, dict) else 0
         prompt_debug = {
             "model": model,
+            "api": session.api,
             "temperature": temperature,
             "reasoning_effort": reasoning_effort,
             "max_completion_tokens": max_completion_tokens,
@@ -153,8 +201,9 @@ class AsyncBTPlanner:
         }
 
         for attempt in range(self.max_attempts):
+            # 1. One call; an API error ends the planning, reported as such.
             try:
-                response = await client.chat.completions.create(**api_kwargs)
+                reply = await session.ask()
             except Exception as e:
                 logger.error(
                     "LLM call failed on attempt %d/%d: %s (%s) context=%s",
@@ -171,28 +220,18 @@ class AsyncBTPlanner:
                     "intents": intents,
                 }
 
-            message = response.choices[0].message
-
-            # Append assistant message for potential retry
-            assistant_msg: dict[str, Any] = {"role": "assistant", "content": message.content}
-            if message.tool_calls:
-                assistant_msg["tool_calls"] = message.tool_calls
-            messages.append(assistant_msg)
-
+            # 2. The tool's arguments: from the tool call, or recovered from
+            #    the text when the model wrote the call instead of making it.
             args: Optional[dict] = None
-            tool_call_id: Optional[str] = None
-            if message.tool_calls:
-                tool_call = message.tool_calls[0]
-                tool_call_id = tool_call.id
-                try:
-                    args = json.loads(tool_call.function.arguments)
-                except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse tool call arguments: {e}")
-                    validation_errors = [f"the tool call arguments were not valid JSON: {e}"]
+            if reply.called:
+                args = reply.arguments
+                if args is None:
+                    logger.warning(f"Failed to parse tool call arguments: {reply.error}")
+                    validation_errors = [reply.error or "the tool call arguments were invalid"]
             else:
                 # Small local models often emit the tool call as fenced JSON
                 # text instead of a structured tool call; recover it.
-                args = self._parse_tool_call_content(message.content)
+                args = self._parse_tool_call_content(reply.content)
                 if args is not None:
                     logger.info("Recovered generate_behavior_tree arguments from message content")
                 else:
@@ -206,6 +245,7 @@ class AsyncBTPlanner:
                         "nor parseable JSON arguments"
                     ]
 
+            # 3. The tree: resolved, normalised and validated.
             if args is not None:
                 tree_spec = args.get("tree", {})
                 last_explanation = args.get("explanation", "")
@@ -256,23 +296,12 @@ class AsyncBTPlanner:
                     "; ".join(validation_errors),
                 )
 
-            # Provide feedback for retry
-            feedback = (
+            # 4. Feedback for the retry, on the reply it corrects.
+            session.correct(
                 "The previous response was invalid:\n- "
                 + "\n- ".join(validation_errors)
                 + "\nPlease call generate_behavior_tree again with a corrected, non-empty tree."
             )
-            if tool_call_id:
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call_id,
-                    "content": feedback,
-                })
-            else:
-                messages.append({"role": "user", "content": feedback})
-
-            # Update kwargs with new messages
-            api_kwargs["messages"] = messages
 
         return {
             "tree": {},
@@ -333,38 +362,6 @@ class AsyncBTPlanner:
             "Please handle the following requests:\n"
             + "\n".join(f"- {intent}" for intent in intents)
         )
-
-    def _build_api_kwargs(
-        self,
-        model: str,
-        messages: list[dict],
-        temperature: Optional[float],
-        reasoning_effort: Optional[str],
-        max_completion_tokens: Optional[int],
-    ) -> dict:
-        """Build kwargs for the OpenAI API call."""
-        kwargs: dict[str, Any] = {
-            "model": model,
-            "messages": messages,
-            "tools": [GENERATE_BT_TOOL],
-            "tool_choice": {
-                "type": "function",
-                "function": {"name": "generate_behavior_tree"},
-            },
-        }
-
-        # Reasoning models (o-series, gpt-5 and later) don't support temperature
-        is_reasoning = is_reasoning_model(model)
-        if not is_reasoning and temperature is not None:
-            kwargs["temperature"] = temperature
-
-        if is_reasoning and reasoning_effort:
-            kwargs["reasoning_effort"] = reasoning_effort
-
-        if max_completion_tokens is not None:
-            kwargs["max_completion_tokens"] = max_completion_tokens
-
-        return kwargs
 
     def _resolve_affordance_refs(
         self, spec: dict, catalog: AffordanceCatalog, path: str = "tree"
@@ -441,6 +438,13 @@ class AsyncBTPlanner:
                     f"{path}: unknown parameter(s) {', '.join(unknown)} -- "
                     f"allowed: {', '.join(sorted(props))}"
                 )
+            # Each known parameter's value against its own schema: a value of
+            # the wrong shape (the schema copied in place of a boolean) would
+            # otherwise be sent, and read by the device as something else.
+            for key in sorted(k for k in params if k in props):
+                problem = _value_problem(params[key], props[key])
+                if problem:
+                    errors.append(f"{path}: parameter '{key}' {problem}")
 
         name = str(aff.get("action_name") or aff.get("name") or "")
         target = str(aff.get("target") or "")

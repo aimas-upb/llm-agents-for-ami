@@ -8,7 +8,7 @@ generator:
   table: sensing
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-10-14T19:50:09.145692+00:00'
+  generated_at_utc: '2026-10-28T23:24:56.404308+00:00'
 rows:
 - key: AirConditioner:Thermostat.LocalTemperature
   family: AirConditioner
@@ -33,7 +33,7 @@ rows:
   status: approved
 - key: Dehumidifier:RelativeHumidityMeasurement.MeasuredValue
   family: Dehumidifier
-  matter:
+  matter: &id001
     cluster_id: 1029
     cluster_id_hex: '0x0405'
     cluster_name: Relative Humidity Measurement
@@ -52,6 +52,16 @@ rows:
     readings_differing_from_room: 0
     verdict: 'observes the room''s air: readings equal the room state on every instance'
   status: approved
+  _drift:
+    matter:
+    - *id001
+    - cluster_id: 1029
+      cluster_id_hex: '0x0405'
+      cluster_name: Relative Humidity Measurement
+      attribute_id: 0
+      attribute_id_hex: '0x0000'
+      attribute_name: MeasuredValue
+      type: percent100ths
 - key: Freezer:TemperatureMeasurement.MeasuredValue
   family: Freezer
   matter:
@@ -97,7 +107,7 @@ rows:
   status: approved
 - key: Humidifier:RelativeHumidityMeasurement.MeasuredValue
   family: Humidifier
-  matter:
+  matter: &id002
     cluster_id: 1029
     cluster_id_hex: '0x0405'
     cluster_name: Relative Humidity Measurement
@@ -116,6 +126,16 @@ rows:
     readings_differing_from_room: 0
     verdict: 'observes the room''s air: readings equal the room state on every instance'
   status: approved
+  _drift:
+    matter:
+    - *id002
+    - cluster_id: 1029
+      cluster_id_hex: '0x0405'
+      cluster_name: Relative Humidity Measurement
+      attribute_id: 0
+      attribute_id_hex: '0x0000'
+      attribute_name: MeasuredValue
+      type: percent100ths
 - key: Refrigerator:TemperatureMeasurement.MeasuredValue
   family: Refrigerator
   matter:

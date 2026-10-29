@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import os
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse, urlunparse
@@ -258,6 +259,10 @@ _COMMAND_FOR = {
     ("RVCRunMode", "CurrentMode"): lambda v: "ChangeToMode",
     ("RVCCleanMode", "CurrentMode"): lambda v: "ChangeToMode",
     ("RTCCMode", "CurrentMode"): lambda v: "ChangeToMode",
+    # A TV's playback: played / paused / stopped by the state to reach
+    # (`_playback_command`). Its channel is written, not commanded: see
+    # `_channel_write`.
+    ("MediaPlayback", "CurrentState"): lambda v: _playback_command(v),
 }
 
 # Command argument names, taken from SimuHome's own cluster handlers rather than
@@ -279,6 +284,7 @@ _COMMAND_ARGS = {
     # The TD serves the lift in percent; the simulator takes hundredths of one.
     "GoToLiftPercentage": lambda v: {"lift_percent_100ths": wire_value("percent100ths", v)},
     "ChangeToMode": lambda v: {"new_mode": int(v)},
+    #   media_playback._play() / _pause() / _stop()   no arguments
 }
 
 # Two of the five Mode Base derivatives name the argument `mode` where the other
@@ -310,6 +316,119 @@ def _operational_state_command(value: Any, current: Any) -> Optional[str]:
     return {2: "Pause", 0: "Stop"}.get(target)
 
 
+# -- a TV's channel and playback -------------------------------------------------
+
+# PlaybackStateEnum values the commands reach: Playing 0 is Play, Paused 1 is
+# Pause, NotPlaying 2 is Stop. Buffering (3) is reported, never commanded.
+_PLAYBACK_COMMANDS = {0: "Play", 1: "Pause", 2: "Stop"}
+_PLAYBACK_NAMES = {"playing": 0, "play": 0, "paused": 1, "pause": 1,
+                   "notplaying": 2, "stopped": 2, "stop": 2}
+
+
+def _playback_command(value: Any) -> Optional[str]:
+    """The Media Playback command reaching ``value``: the enum number, or its
+    name in any case or spacing ("Playing", "not_playing"). None for anything
+    else, which the caller reports as a 400."""
+    if isinstance(value, str):
+        key = "".join(ch for ch in value.lower() if ch.isalpha())
+        target = _PLAYBACK_NAMES.get(key)
+    else:
+        try:
+            target = int(value)
+        except (TypeError, ValueError):
+            target = None
+    return _PLAYBACK_COMMANDS.get(target) if target is not None else None
+
+
+def _channel_number(value: Any) -> Optional[Tuple[int, int]]:
+    """(major, minor) when ``value`` names a channel by number: an int (3), a
+    "major.minor" string ("3.0") or a ChannelInfoStruct with MajorNumber. None
+    when it names the channel some other way."""
+    # 1. A struct: its numbers, if it gives them.
+    if isinstance(value, dict):
+        major = value.get("MajorNumber", value.get("major_number"))
+        minor = value.get("MinorNumber", value.get("minor_number", 0))
+        try:
+            return (int(major), int(minor or 0)) if major is not None else None
+        except (TypeError, ValueError):
+            return None
+    # 2. A bare number, or "major.minor".
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value, 0
+    text = str(value).strip()
+    major, _, minor = text.partition(".")
+    if major.isdigit() and (not minor or minor.isdigit()):
+        return int(major), int(minor or 0)
+    return None
+
+
+def _channel_match(value: Any) -> str:
+    """What ChangeChannel matches on: a struct's name, call sign or identifier,
+    or the text given ("MBC")."""
+    if isinstance(value, dict):
+        for key in ("Name", "CallSign", "AffiliateCallSign", "Identifier"):
+            if value.get(key):
+                return str(value[key])
+    return str(value).strip()
+
+
+def _find_channel(channels: Any, value: Any) -> Optional[Dict[str, Any]]:
+    """The entry of a TV's ChannelList that ``value`` names: by its numbers,
+    else by identifier, affiliate call sign, call sign or name (any case) --
+    the fields and order SimuHome's own ChangeChannel matches on. None when no
+    entry, or more than one, matches."""
+    entries = [c for c in channels or [] if isinstance(c, dict)]
+    # 1. By number: (major, minor).
+    number = _channel_number(value)
+    if number is not None:
+        hits = [c for c in entries
+                if (c.get("MajorNumber"), c.get("MinorNumber", 0)) == number]
+        return hits[0] if len(hits) == 1 else None
+    # 2. By text, field by field in SimuHome's priority; the first field with
+    #    exactly one match decides.
+    text = _channel_match(value).lower()
+    for field in ("Identifier", "AffiliateCallSign", "CallSign", "Name"):
+        hits = [c for c in entries if str(c.get(field) or "").lower() == text]
+        if hits:
+            return hits[0] if len(hits) == 1 else None
+    return None
+
+
+def _channel_write(td: SimuHomeTD, room: str, device: str, endpoint: int,
+                   value: Any) -> Dict[str, Any]:
+    """A TV's channel change as a write of CurrentChannel: the ChannelList
+    entry ``value`` names, whole.
+
+    Why a write and not Matter's ChangeChannel: SimuHome's Channel cluster
+    reads its ChannelList entries as objects (`channel.MajorNumber`), but a
+    home loaded from an episode holds them as plain dicts, so ChangeChannel and
+    ChangeChannelByNumber fail on every benchmark TV ("'dict' object has no
+    attribute 'MajorNumber'"). CurrentChannel itself is writable in the
+    simulator, and writing the entry the command would have selected leaves
+    the TV in the same state. This is the simulator binding's concern only:
+    the TD still offers the same `currentChannel` action, and a binding to a
+    working device (Home Assistant, Matter) sends the command.
+
+    Raises HTTPException 400 when no single channel of this TV matches."""
+    # 1. The TV's own channel list, as the home holds it now.
+    attributes = (td.find_device(room, device) or {}).get("attributes") or {}
+    channels = attributes.get(f"{endpoint}.Channel.ChannelList")
+    # 2. The entry the value names, or a 400 saying what the TV has.
+    entry = _find_channel(channels, value)
+    if entry is None:
+        names = ", ".join(f"{c.get('Name')} ({c.get('MajorNumber')}.{c.get('MinorNumber', 0)})"
+                          for c in channels or [] if isinstance(c, dict))
+        raise HTTPException(status_code=400,
+                            detail=f"no single channel of {device} matches {value!r}; "
+                                   f"it has: {names or 'none'}")
+    # 3. The write, in the shape a scheduled workflow step takes.
+    return {"tool": "write_attribute",
+            "args": {"device_id": device, "endpoint_id": endpoint, "cluster_id": "Channel",
+                     "attribute_id": "CurrentChannel", "value": dict(entry)}}
+
+
 def _truthy(value: Any) -> bool:
     if isinstance(value, bool):
         return value
@@ -330,6 +449,15 @@ def _dispatch_call(td: SimuHomeTD, room: str, device: str, name: str, value: Any
     # 1. The Matter coordinates of the action.
     record, cluster, attribute, endpoint = _resolve_action(td, room, device, name)
 
+    # 1b. Every action but a channel change takes one value. A structure in its
+    #     place (an input schema copied as the value) is refused, not read: read
+    #     as a value, {"type": "boolean", "value": true} switches a light OFF.
+    if (cluster, attribute) != ("Channel", "CurrentChannel") and isinstance(value, (dict, list)):
+        raise HTTPException(
+            status_code=400,
+            detail=f"action '{name}' on {device} takes a single value, not "
+                   f"{json.dumps(value)[:200]}")
+
     # 2. An attribute write: the value in the simulator's units.
     if str(record.get("mechanism")) == "attribute_write":
         if value is None:
@@ -339,7 +467,12 @@ def _dispatch_call(td: SimuHomeTD, room: str, device: str, name: str, value: Any
                          "attribute_id": attribute,
                          "value": wire_value(record.get("type"), value)}}
 
-    # 3. A command: which one, and its arguments.
+    # 3. A TV's channel: written as the channel-list entry it names, since the
+    #    simulator's channel commands fail (`_channel_write`).
+    if (cluster, attribute) == ("Channel", "CurrentChannel"):
+        return _channel_write(td, room, device, endpoint, value)
+
+    # 4. A command: which one, and its arguments.
     if (cluster, attribute) == ("OperationalState", "OperationalState"):
         # Which command depends on the state the cycle is in when it is sent.
         if current_state is None:
@@ -363,14 +496,22 @@ def _dispatch_call(td: SimuHomeTD, room: str, device: str, name: str, value: Any
 
 async def _action_value(request: Request) -> Tuple[Dict[str, Any], Any]:
     """(the request body, the value it carries): {"value": ...} or
-    {"input": ...} (or {"payload": ...})."""
+    {"input": ...} (or {"payload": ...}); or, for an action whose input is an
+    object schema (a TV's channel: MajorNumber, MinorNumber), the body itself,
+    which is how a plan's action node sends named parameters."""
+    # 1. The body, as a dict.
     try:
         body = await request.json()
     except Exception:
         body = {}
     if not isinstance(body, dict):
         body = {}
-    return body, body.get("value", body.get("input", body.get("payload")))
+    # 2. A wrapped value, else the named fields themselves; an empty body is
+    #    no value.
+    for key in ("value", "input", "payload"):
+        if key in body:
+            return body, body[key]
+    return body, (body or None)
 
 
 @app.post("/workspaces/{home}/{room}/artifacts/{device}/actions/{name}")

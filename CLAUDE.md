@@ -177,6 +177,12 @@ There are two LLM clients (UA and ISA), both built by their respective
 If you add a new agent that needs an LLM, copy this pattern; do NOT
 re-implement client construction inline.
 
+A call that forces a tool (the BT planner's `generate_behavior_tree`) goes
+through `shared/utils/llm_tool_call.py:ToolCallSession`: the Responses API
+on api.openai.com (newer models reject tools + `reasoning_effort` on Chat
+Completions), Chat Completions on any other endpoint (for example Ollama).
+Count tokens on both `AsyncCompletions.create` and `AsyncResponses.create`.
+
 ### 3.8 Memory (signifiers)
 
 Goals are remembered under an exact key built by

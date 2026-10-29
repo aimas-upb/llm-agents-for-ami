@@ -5,6 +5,7 @@
 
 A grid file:
 
+    suite: simuhome                       # simuhome (default) | homebench
     name: planning-models                 # results under <out>/<name>/
     base: {segmentation: {model: gpt-5-mini, reasoning_effort: low}}   # or a variant file
     vary:                                 # per step, the alternatives
@@ -20,12 +21,18 @@ A grid file:
       workers: 2
       context: none
       memory: off
+      guidelines: homebench               # homebench suite only: homebench | default
+      environment: on                     # homebench suite only: on | off
     evaluate: {judge: true}
 
 Every variant runs with the same episodes and a shared step cache: variants
 whose segmentation and structuring models are the same reuse those results
 (and their measured times, marked `cached`), so a planning-only sweep pays for
 them once. `--dry-run` lists the variants and the commands without running.
+
+A sweep always runs the tick-based `run.py` (never the scheduled runner), so it
+serves HomeBench as it is: `suite: homebench` adds `--suite homebench` to the run and
+the scoring commands, and the results go under `tests/homebench/results/sweeps`.
 """
 
 from __future__ import annotations
@@ -43,7 +50,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-DEFAULT_OUT = PROJECT_ROOT / "tests" / "simuhome" / "results" / "sweeps"
+from tests.simuhome.bench.suites import DEFAULT_SUITE, SUITE_NAMES, get_suite  # noqa: E402
 
 
 def _label(spec: Dict[str, Any]) -> str:
@@ -88,14 +95,23 @@ def variants(grid: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def main() -> int:
+    """Run and score every variant of a grid, then report (module docstring); 2 for
+    a grid naming an unknown suite."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--grid", required=True)
-    parser.add_argument("--out", default=str(DEFAULT_OUT))
+    parser.add_argument("--out", help="results root (default: <suite results>/sweeps)")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
+    # 1. The grid, and its suite (a name it does not know is an error, not SimuHome).
     grid = yaml.safe_load(Path(args.grid).read_text(encoding="utf-8")) or {}
-    root = Path(args.out) / str(grid.get("name") or Path(args.grid).stem)
+    suite_name = str(grid.get("suite") or DEFAULT_SUITE)
+    if suite_name not in SUITE_NAMES:
+        print(f"{args.grid}: unknown suite {suite_name!r}; choose from {', '.join(SUITE_NAMES)}")
+        return 2
+    suite = get_suite(suite_name)
+    out = Path(args.out) if args.out else suite.results_root / "sweeps"
+    root = out / str(grid.get("name") or Path(args.grid).stem)
     root.mkdir(parents=True, exist_ok=True)
     run_options = grid.get("run") or {}
     judge = bool((grid.get("evaluate") or {}).get("judge", True))
@@ -107,12 +123,17 @@ def main() -> int:
         path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
         run = [sys.executable, "-m", "tests.simuhome.bench.run", "--variant", str(path),
                "--out", str(root), "--cache", str(root / "cache"), "--skip-existing"]
+        if suite.name != DEFAULT_SUITE:
+            run += ["--suite", suite.name]
         for key in ("episodes", "seeds", "limit", "workers", "context", "memory",
-                    "step_seconds", "exec_timeout"):
+                    "step_seconds", "exec_timeout", "guidelines", "environment"):
             if run_options.get(key) is not None:
                 run += [f"--{key.replace('_', '-')}", str(run_options[key])]
         evaluate = [sys.executable, "-m", "tests.simuhome.bench.evaluate",
-                    "--records", str(root / raw["name"])] + ([] if judge else ["--no-judge"])
+                    "--records", str(root / raw["name"])]
+        if suite.name != DEFAULT_SUITE:
+            evaluate += ["--suite", suite.name]
+        evaluate += [] if judge else ["--no-judge"]
         plans.append((raw["name"], run, evaluate))
 
     print(f"{len(plans)} variant(s) -> {root}")

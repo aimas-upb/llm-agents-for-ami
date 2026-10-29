@@ -1,4 +1,4 @@
-"""Run SimuHome episodes through our agents' reasoning, one record per episode.
+"""Run SimuHome or HomeBench episodes through our agents' reasoning, one record per episode.
 
     conda run -n ami-agents python -m tests.simuhome.bench.run \\
         --variant tests/simuhome/bench/variants/default.yaml \\
@@ -10,10 +10,20 @@ One episode, for debugging, printing every step (and scoring it):
         --episode qt4-2_feasible_seed_1 --debug [--stop-after planning] \\
         [--sim http://127.0.0.1:14000/api --shtd http://localhost:8097]
 
+The benchmark is `--suite simuhome` (the default) or `--suite homebench`
+(`suites/`): the episodes, the worker, the TD builder, the scoring and the
+planning conditions come from the suite. HomeBench episodes are `hb<N>_<case>_seed_<n>`
+(N parts; case feasible / infeasible / mixed), converted by `tests/homebench/convert.py`:
+
+    conda run -n ami-agents python -m tests.simuhome.bench.run --suite homebench \\
+        --episode hb1_feasible_seed_1 --variant <variant.yaml> --stop-after planning
+
 Each worker is a process with its own simulator and SHTD (started and stopped
 by the run, on free ports), so its clock and home are its own and the py_trees
 blackboard is never shared. `--sim/--shtd` use servers you already run instead
-(one worker; SHTD keeps the home id it was started with).
+(one worker; SHTD keeps the home id it was started with). For HomeBench the
+simulator is the engine and SHTD is HBTD (`ami_agents/.../HomeBench/worker.py`),
+and a worker's episodes are kept together by home.
 
 Output: <out>/<variant>/<episode>.json per episode, and run.json. Score them
 with `evaluate.py`; summarise with `report.py`. The run itself ends with a
@@ -49,9 +59,11 @@ from dotenv import load_dotenv  # noqa: E402
 if (PROJECT_ROOT / ".env").exists():
     load_dotenv(PROJECT_ROOT / ".env")
 
-DEFAULT_BENCHMARK = PROJECT_ROOT.parent / "SimuHome" / "data" / "benchmark"
+from .suites import (  # noqa: E402
+    DEFAULT_ENVIRONMENT, DEFAULT_SUITE, ENVIRONMENT_MODES, SUITE_NAMES, Suite, get_suite,
+)
+
 AGENTS_YAML = PROJECT_ROOT / "ami_agents" / "config" / "agents.yaml"
-DEFAULT_OUT = PROJECT_ROOT / "tests" / "simuhome" / "results" / "bench"
 
 
 # --------------------------------------------------------------------------
@@ -72,10 +84,11 @@ def _seeds(spec: Optional[str]) -> Optional[set]:
 
 
 def select_episodes(benchmark: Path, patterns: str, seeds: Optional[str],
-                    limit: Optional[int]) -> List[str]:
-    """Episode names matching any pattern ('qt3_feasible', 'qt4-2_*', a full
-    name), filtered by seed, at most ``limit`` per (type, case)."""
-    names = sorted(p.stem for p in benchmark.glob("qt*_seed_*.json"))
+                    limit: Optional[int], suite: Optional[Suite] = None) -> List[str]:
+    """Episode names of ``suite`` (SimuHome when None) matching any pattern
+    ('qt3_feasible', 'qt4-2_*', 'hb2_*', a full name), filtered by seed, at most
+    ``limit`` per (type, case)."""
+    names = (suite or get_suite(DEFAULT_SUITE)).names(benchmark)
     wanted = _seeds(seeds)
     chosen, per_group = [], {}
     for name in sorted(names, key=lambda n: (n.rsplit("_seed_", 1)[0],
@@ -91,6 +104,57 @@ def select_episodes(benchmark: Path, patterns: str, seeds: Optional[str],
         per_group[group] = per_group.get(group, 0) + 1
         chosen.append(name)
     return chosen
+
+
+def group_by_home(names: List[str], suite: Suite, benchmark: Path) -> List[str]:
+    """``names`` with the episodes of one home next to each other (HomeBench's
+    hundred homes repeat across its episodes); the order within a home, and of
+    the homes by first appearance, is kept. A suite without homes to group by
+    (SimuHome: one home per episode) gets ``names`` back unchanged."""
+    if suite.home_key is None:
+        return list(names)
+    by_home: Dict[str, List[str]] = {}
+    for name in names:
+        by_home.setdefault(suite.home_key(benchmark, name), []).append(name)
+    return [name for group in by_home.values() for name in group]
+
+
+def split_for_workers(names: List[str], workers: int, suite: Suite,
+                      benchmark: Path) -> List[List[str]]:
+    """One list of episodes per worker. SimuHome's are dealt out round-robin, as
+    ever. HomeBench's are dealt out by home -- a home's episodes all go to one
+    worker, the largest homes first, each to the worker with the fewest episodes --
+    and a worker left without episodes is not started."""
+    # 1. No homes to keep together: round-robin.
+    if suite.home_key is None:
+        return [names[i::workers] for i in range(workers)]
+    # 2. Whole homes, largest first, to the lightest worker.
+    by_home: Dict[str, List[str]] = {}
+    for name in names:
+        by_home.setdefault(suite.home_key(benchmark, name), []).append(name)
+    chunks: List[List[str]] = [[] for _ in range(workers)]
+    for home in sorted(by_home, key=lambda h: (-len(by_home[h]), h)):
+        min(chunks, key=len).extend(by_home[home])
+    return [chunk for chunk in chunks if chunk]
+
+
+# --------------------------------------------------------------------------
+# The planning conditions
+# --------------------------------------------------------------------------
+
+def apply_guidelines(config: Dict[str, Any], path: Optional[Path]) -> None:
+    """Point the ISA's planning conditions at the guidelines file ``path`` (None:
+    leave the agents' own: the repo file, or `PLANNING_GUIDELINES_PATH`).
+
+    ``config`` is agents.yaml as the bench loaded it; `isa_agent` hands its
+    `interaction_solver` section to the planning behaviours, and the power-on guard
+    and the condition guard read `planning.guidelines.path` from it
+    (`power_on_guard.guidelines_path`), so this is the one place the choice has to land.
+    """
+    if path is None:
+        return
+    planning = config.setdefault("interaction_solver", {}).setdefault("planning", {})
+    planning.setdefault("guidelines", {})["path"] = str(path)
 
 
 # --------------------------------------------------------------------------
@@ -158,16 +222,18 @@ def _logger(debug: bool):
 
 
 def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> List[str]:
-    """Run ``names`` on one simulator; the record paths written."""
-    from ami_agents.environment.integration.SimuHome.sim_client import SimuHomeClient
-    from ami_agents.environment.integration.SimuHome.worker import SimuHomeWorker
+    """Run ``names`` on one simulator (SimuHome's, or HomeBench's engine); the
+    record paths written."""
     from ami_agents.shared.utils.config_loader import ConfigLoader
 
     from .models import load_variant
     from .pipeline import Options, Target, run_episode
 
+    # 1. The suite, and the agents' config with the suite's planning conditions.
+    suite = get_suite(settings.get("suite"))
     logger = _logger(settings["debug"])
     config = ConfigLoader.load_with_env_vars(str(AGENTS_YAML))
+    apply_guidelines(config, suite.guidelines_path(settings.get("guidelines")))
     variant = load_variant(settings["variant"])
     out = Path(settings["out"]) / variant.name
     out.mkdir(parents=True, exist_ok=True)
@@ -188,34 +254,42 @@ def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> Li
                       memory=memory, cache=cache, debug=settings["debug"],
                       execution=settings.get("execution", "ticks"),
                       dry_step_seconds=float(settings.get("dry_step_seconds", 1.0)),
-                      real_read_seconds=float(settings.get("real_read_seconds", 10.0)))
+                      real_read_seconds=float(settings.get("real_read_seconds", 10.0)),
+                      environment=settings.get("environment") if suite.environment else None)
 
+    # 2. The simulator: one the run starts (a worker), or one already running.
     written = []
     worker = None
     try:
         if settings.get("sim"):
-            sim = SimuHomeClient(settings["sim"])
+            sim = suite.client_cls(settings["sim"])
             status = json.loads(urllib.request.urlopen(
                 f"{settings['shtd'].rstrip('/')}/_shtd/status", timeout=10).read())
             fixed = (settings["shtd"].rstrip("/"), status["home"])
         else:
-            worker = SimuHomeWorker(benchmark=benchmark, worker_id=worker_id).start()
+            # The environment mode goes only to a worker whose suite has the option
+            # (SimuHomeWorker has no such argument).
+            extra = {"environment": settings["environment"]} if suite.environment else {}
+            worker = suite.worker_cls(benchmark=benchmark, worker_id=worker_id,
+                                      **extra).start()
             sim = worker.client
             fixed = None
 
+        # 3. Each episode: loaded by the suite, served by the worker, run, recorded.
         for count, name in enumerate(names, 1):
             path = out / f"{name}.json"
             if settings["skip_existing"] and path.exists():
                 continue
-            episode = json.loads((benchmark / f"{name}.json").read_text(encoding="utf-8"))
+            episode = suite.load_episode(benchmark, name)
             if worker is not None:
-                worker.load(name)               # SHTD bound to this episode's id
-                target = Target(sim, worker.shtd_base, name)
+                worker.load(name)               # TD server bound to this episode's home id
+                # SimuHome's home id is the episode's name; HomeBench's is home<id>.
+                target = Target(sim, worker.shtd_base, getattr(worker, "home_id", None) or name)
             else:
                 target = Target(sim, *fixed)
             started = time.perf_counter()
             record = asyncio.run(run_episode(name, episode, variant, config, target,
-                                             options, logger))
+                                             options, logger, suite))
             record["wall_seconds"] = time.perf_counter() - started
             path.write_text(json.dumps(record, default=str), encoding="utf-8")
             written.append(str(path))
@@ -233,9 +307,12 @@ def main(execution: str = "ticks", out: Optional[Path] = None) -> int:
     `--execution` and `--out`: `run_scheduled.py` calls this with
     "scheduled" and its own results directory."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--suite", choices=SUITE_NAMES, default=DEFAULT_SUITE,
+                        help="the benchmark: simuhome (default) or homebench")
     parser.add_argument("--variant", help="variant YAML (default: the agents' models)")
-    parser.add_argument("--episodes", default="qt*",
-                        help="comma-separated patterns: qt3_feasible, qt4-2_*, full names")
+    parser.add_argument("--episodes",
+                        help="comma-separated patterns: qt3_feasible, qt4-2_*, hb2_*, full "
+                             "names (default: the suite's all: qt* / hb*)")
     parser.add_argument("--episode", help="one episode, in the foreground (debugging)")
     parser.add_argument("--seeds", help="e.g. 1-10,15")
     parser.add_argument("--limit", type=int, help="at most N episodes per (type, case)")
@@ -261,8 +338,16 @@ def main(execution: str = "ticks", out: Optional[Path] = None) -> int:
     parser.add_argument("--sim", help="an already running simulator API, e.g. "
                                       "http://127.0.0.1:14000/api")
     parser.add_argument("--shtd", help="its SHTD, e.g. http://localhost:8097")
-    parser.add_argument("--out", default=str(out or DEFAULT_OUT))
-    parser.add_argument("--benchmark", default=str(DEFAULT_BENCHMARK))
+    parser.add_argument("--guidelines",
+                        help="the planning conditions: homebench (HomeBench's default: none) "
+                             "or default (the agents' own file, as deployed)")
+    parser.add_argument("--environment", choices=ENVIRONMENT_MODES,
+                        help="HomeBench: on (default) serves the room environments and "
+                             "action effects, off the flat graph; recorded in run.json. "
+                             "With --sim/--shtd the server you started decides what is "
+                             "served, this only sets the TDs the bench builds itself")
+    parser.add_argument("--out", help="records directory (default: <suite results>/bench)")
+    parser.add_argument("--benchmark", help="the benchmark directory (default: the suite's)")
     parser.add_argument("--skip-existing", action="store_true")
     parser.add_argument("--cache", help="reuse segmentation + structuring results kept in "
                                         "this directory (sweeps share one)")
@@ -272,13 +357,30 @@ def main(execution: str = "ticks", out: Optional[Path] = None) -> int:
     if bool(args.sim) != bool(args.shtd):
         parser.error("--sim and --shtd go together")
 
-    benchmark = Path(args.benchmark)
+    # 1. The suite, and what it offers: scheduled execution, the guidelines choices.
+    suite = get_suite(args.suite)
+    if args.execution == "scheduled" and not suite.scheduled:
+        parser.error(f"--execution scheduled is SimuHome's: the {suite.title} suite has "
+                     "no timed episodes, so the trees are ticked (--execution ticks)")
+    try:
+        suite.guidelines_path(args.guidelines)
+    except ValueError as exc:
+        parser.error(str(exc))
+    if args.environment and not suite.environment:
+        parser.error(f"--environment is for a suite with room environments: the "
+                     f"{suite.title} suite has none to switch")
+    args.out = args.out or str(out or suite.results_root / "bench")
+
+    # 2. The episodes: one, or the suite's selection, kept together by home.
+    benchmark = Path(args.benchmark) if args.benchmark else suite.default_benchmark
     names = [args.episode.removesuffix(".json")] if args.episode else \
-        select_episodes(benchmark, args.episodes, args.seeds, args.limit)
+        group_by_home(select_episodes(benchmark, args.episodes or suite.default_episodes,
+                                      args.seeds, args.limit, suite), suite, benchmark)
     if not names:
         print("No episodes match.")
         return 1
-    settings = {"variant": args.variant, "out": args.out, "benchmark": str(benchmark),
+    settings = {"suite": suite.name, "guidelines": args.guidelines,
+                "variant": args.variant, "out": args.out, "benchmark": str(benchmark),
                 "memory": args.memory, "context": args.context,
                 "step_seconds": args.step_seconds, "exec_timeout": args.exec_timeout,
                 "stop_after": args.stop_after, "debug": args.debug or bool(args.episode),
@@ -286,6 +388,9 @@ def main(execution: str = "ticks", out: Optional[Path] = None) -> int:
                 "cache": args.cache, "execution": args.execution,
                 "dry_step_seconds": args.dry_step_seconds,
                 "real_read_seconds": args.real_read_seconds}
+    # The mode is recorded (run.json) only for a suite that has it.
+    if suite.environment:
+        settings["environment"] = args.environment or DEFAULT_ENVIRONMENT
 
     from .models import load_variant
     variant = load_variant(args.variant)
@@ -303,18 +408,23 @@ def main(execution: str = "ticks", out: Optional[Path] = None) -> int:
     if workers == 1:
         written = run_worker(0, names, settings)
     else:
-        chunks = [names[i::workers] for i in range(workers)]
+        chunks = split_for_workers(names, workers, suite, benchmark)
         written = []
-        with ProcessPoolExecutor(max_workers=workers) as pool:
-            for paths in pool.map(run_worker, range(workers), chunks,
-                                  [settings] * workers):
+        with ProcessPoolExecutor(max_workers=len(chunks)) as pool:
+            for paths in pool.map(run_worker, range(len(chunks)), chunks,
+                                  [settings] * len(chunks)):
                 written += paths
     print(f"done: {len(written)} record(s) in {time.perf_counter() - started:.0f}s")
 
     if args.episode and written and not args.no_evaluate and not args.stop_after:
         # Scored at once, in its own process (SimuHome's evaluator imports as `src`).
-        subprocess.run([sys.executable, "-m", "tests.simuhome.bench.evaluate",
-                        "--records", written[0], "--explain"], cwd=PROJECT_ROOT)
+        command = [sys.executable, "-m", "tests.simuhome.bench.evaluate",
+                   "--records", written[0], "--explain"]
+        if suite.name != DEFAULT_SUITE:
+            command += ["--suite", suite.name]
+        if args.benchmark:
+            command += ["--benchmark", args.benchmark]
+        subprocess.run(command, cwd=PROJECT_ROOT)
 
     # The time per stage, last, so it ends the output.
     print("\n" + stage_summary(written), flush=True)

@@ -8,8 +8,37 @@ generator:
   table: property_classes
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-10-14T19:50:08.818833+00:00'
+  generated_at_utc: '2026-10-28T23:24:56.063491+00:00'
 rows:
+- key: homeont:ChannelCurrentChannel
+  homeont_class: homeont:ChannelCurrentChannel
+  subClassOf: sosa:ActuatableProperty
+  affordance_name: currentChannel
+  yaml_path: Channel.CurrentChannel
+  matter:
+    cluster_id: 1284
+    cluster_id_hex: '0x0504'
+    cluster_name: Channel
+    attribute_id: 2
+    attribute_id_hex: '0x0002'
+    attribute_name: CurrentChannel
+    type: ChannelInfoStruct
+  unit: null
+  carries_constraints: false
+  action_class: homeont:SetModeCommand
+  evidence: &id001
+    rationale: read-only in the spec but driven by ChangeChannel / ChangeChannelByNumber (command_targets
+      1284.0, 1284.2); the only family with it is Tv, so no per-family leaf
+    action_class: choosing one channel from the list the TV declares is homeont:SetModeCommand's "one
+      named alternative from a set the device declares"; no new command class needed
+  status: approved
+  _orphaned: true
+  _drift:
+    evidence:
+    - *id001
+    - rationale: Matter clusters name processes, not things; this class is what 1 device family have in
+        common
+      approving_this: promotes every leaf below it to `auto`
 - key: homeont:DishwasherModeCurrentMode
   homeont_class: homeont:DishwasherModeCurrentMode
   subClassOf: sosa:ActuatableProperty
@@ -353,6 +382,28 @@ rows:
   - homeont:TvStartUpCurrentLevel
   evidence:
     rationale: Matter clusters name processes, not things; this class is what 2 device families have in
+      common
+    approving_this: promotes every leaf below it to `auto`
+  status: auto
+- key: homeont:MediaPlaybackPlaybackState
+  homeont_class: homeont:MediaPlaybackPlaybackState
+  subClassOf: sosa:ActuatableProperty
+  affordance_name: playbackState
+  yaml_path: MediaPlayback.CurrentState
+  matter:
+    cluster_id: 1286
+    cluster_id_hex: '0x0506'
+    cluster_name: Media Playback
+    attribute_id: 0
+    attribute_id_hex: '0x0000'
+    attribute_name: CurrentState
+    type: PlaybackStateEnum
+  unit: null
+  carries_constraints: false
+  specialised_by:
+  - homeont:TvPlaybackState
+  evidence:
+    rationale: Matter clusters name processes, not things; this class is what 1 device family have in
       common
     approving_this: promotes every leaf below it to `auto`
   status: auto

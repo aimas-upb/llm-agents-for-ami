@@ -62,3 +62,41 @@ def test_a_field_without_listed_values_is_unchanged():
     field = _field(rdf, schema, "brightness")
     assert list(rdf.g.objects(field, JS.enum)) == []
     assert str(rdf.g.value(field, JS.description)) == "Brightness."
+
+
+# -- which way a scale runs (SCALE_MEANINGS) -----------------------------------
+
+COVER_POSITION = "Percent open: 0 is fully closed, 100 is fully open."
+
+
+def test_a_cover_position_field_says_it_counts_open():
+    """set_cover_position's `position` says 100 is open: Home Assistant counts
+    the reverse of Matter, so the TD states its own direction."""
+    # 1. The service field, as Home Assistant defines it, for a cover.
+    rdf = HomeAssistantRDF("http://h/")
+    schema = rdf._build_input_schema_from_fields(
+        {"position": {"description": "Target position",
+                      "selector": {"number": {"min": 0, "max": 100}}}}, domain="cover")
+    # 2. The direction follows the service's own description.
+    assert str(rdf.g.value(_field(rdf, schema, "position"), JS.description)) == \
+        "Target position. " + COVER_POSITION
+
+
+def test_the_same_field_name_in_another_domain_gets_no_direction():
+    """The table is keyed by domain: a `position` elsewhere is not a cover's."""
+    rdf = HomeAssistantRDF("http://h/")
+    schema = rdf._build_input_schema_from_fields(
+        {"position": {"selector": {"number": {}}}}, domain="valve")
+    assert rdf.g.value(_field(rdf, schema, "position"), JS.description) is None
+
+
+def test_a_cover_current_position_says_it_counts_open():
+    """The attribute the field sets reads the same way; a cover's other
+    numbers, and a fan's percentage, stay undescribed."""
+    # 1. The cover's position attribute.
+    rdf = HomeAssistantRDF("http://h/")
+    position = rdf._build_property_schema("current_position", 40, {}, entity_domain="cover")
+    assert str(rdf.g.value(position, JS.description)) == COVER_POSITION
+    # 2. Another domain's percentage.
+    percentage = rdf._build_property_schema("percentage", 40, {}, entity_domain="fan")
+    assert rdf.g.value(percentage, JS.description) is None

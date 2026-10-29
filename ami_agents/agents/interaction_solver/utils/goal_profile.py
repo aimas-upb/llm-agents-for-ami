@@ -30,6 +30,8 @@ Checklist rules:
       a stated start / end clock time                  stated-time check)
     a predicate a goal completes_with                  time_to_event (for the
                                                        completion check)
+    a trigger of a goal whose device the request       time_to_event (for the
+      also starts by the clock                         trigger check)
 
 Unresolved means the model could not name, from the TDs, the property a
 question needs. The question gets a fallback, and only completion_timing's
@@ -61,6 +63,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from ....shared.models.goal_structure import GoalSpec, GoalStructure, PredicateSpec
 from ..prompts import GOAL_PROFILE_PROMPT
+from .time_consistency import triggered_after_timed
 
 # "at_event" or "skip"; see the fallback table above.
 TIME_TO_EVENT_FALLBACK = "at_event"
@@ -150,12 +153,15 @@ def build_checklist(structure: GoalStructure) -> List[Dict[str, Any]]:
         goal.timing.stated_start_time_text or goal.timing.stated_end_time_text)}
     completed_with = {goal.timing.completes_with for goal in goals.values()
                       if goal.timing and goal.timing.completes_with}
+    # So is the trigger of a goal whose device the request also starts by the
+    # clock: the trigger check compares the two before planning.
+    against_start = {pid for pid, _ in triggered_after_timed(structure).values()}
     for pid, pred in predicates.items():
         if pred.role == "trigger" and pred.offset_direction == "before":
             add("time_to_event", pid)
         elif pred.role in ("trigger", "termination") and stated & set(pred.applies_to or []):
             add("time_to_event", pid)
-        elif pid in completed_with:
+        elif pid in completed_with or pid in against_start:
             add("time_to_event", pid)
 
     return items

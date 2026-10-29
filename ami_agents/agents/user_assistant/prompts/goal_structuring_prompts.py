@@ -40,7 +40,7 @@ A goal is ONE change to ONE device affordance (or, for an ambiguous goal, a desi
 
 `goal_specificity` starts from the segmenter's label, given with the request. The segmenter sees only the words; you see the home. Change "explicit" to "incomplete" when the home context does not single out one device and one action:
 - several devices fit the request ("the living room lights" with two lights in the living room) — even when the request names their room and kind;
-- no device in the home context fits it ("the bathroom blinds" in a bathroom without blinds);
+- no device in the home context fits it ("the bathroom blinds" in a bathroom without blinds). A device called by name fits only if it has that name: "the Hue Go" in a home whose only lamp is a Hue Iris fits no device;
 - the device fits, but none of its actions can make the change ("make the hallway light blue" on an on/off light);
 - several of its actions fit, and the request does not say which ("set the AC to 22 degrees" with a cooling and a heating setpoint).
 Never pick one of several fitting devices or actions to keep a goal explicit: leave artifact_name (or affordance_name) null and let the quantifier say how many the request means.
@@ -52,6 +52,7 @@ Never pick one of several fitting devices or actions to keep a goal explicit: le
 - **location_class**: the room class of the device's workspace.
 - **artifact_class**: the device's homeont class.
 - **artifact_name**: the `name` of the device's `Artifact`.
+- **device_reference**: how the request picks out the device: "name" when it calls the device by its own name, for example "the Hue Go" or "kitchen light 2"; "description" when it describes the device by its kind, its room or another property, for example "the fan" or "the lights in the kitchen"; null when the request refers to no device.
 - **affordance_class**: the command class of the action that performs the change, copied from its action's `command class`. Its `acts upon` property tells you what the action changes — use it to choose the right action, never as the affordance_class.
 - **parent_class**: the class `affordance_class` sits under (e.g. saref:Command); null if unknown.
 - **affordance_name**: the `name` of the `Action`.
@@ -132,7 +133,7 @@ Give every goal an id G1, G2, … and every predicate an id P1, P2, … in the o
   - "filter" — "any / all … that are X": selects which candidates of the goal's device pool the goal applies to.
 - **applies_to**: the ids of the goals it conditions.
 - **connective**: "and" (default) or "or" — how it combines with the other predicates of the same role on the same goals ("while A and B" → both "and").
-- for a **trigger** only: **offset_text** (the words, e.g. "23 minutes"; null if none) and **offset_direction** ("after" | "before").
+- for a **trigger** only: **offset_text** (the span, e.g. "23 minutes"; null if none) and **offset_direction** ("after" | "before").
 
 State a trigger or termination as the condition that BECOMES TRUE: "after I close it" is a trigger on "the light is off".
 
@@ -149,12 +150,13 @@ A trigger predicate is used only by a goal that starts "on_trigger", or that nam
   - optional **completes_with**: the id of a goal or trigger predicate this goal's run must finish together with — "so A and B finish at the same time", "time it so it's done when the dishwasher is". It is about a run that ends by itself (a wash or drying cycle): nothing is stopped. Record **starts** only for a start the user actually gave ("now", "at 10:30", after another goal). When the start is left to the system ("at the right time", "soon", or no start said), leave **starts** out: the system chooses the start so both finish together.
   - optional **ends**: {"kind": "duration" | "at_time", "text": …} — "for the next 5 hours", "until 6 PM".
   - optional **stated_start_time_text** / **stated_end_time_text** — see "Absolute and relative timing together" below.
+- Times are written in digits, however the user said them: a clock time (time_text, an "at_time" ends text, stated_*) as a 24-hour "HH:MM", for example "1 59 PM" or "one fifty-nine PM" is "13:59", keeping a day word the user gave ("tomorrow 07:00"); a span (offset_text, a "duration" ends text) as a number and a unit, for example "fourteen minutes" is "14 minutes". The user's own words stay in intent_text.
 - **rationale** (optional): the words giving a purpose or occasion ("so the laundry area is lit", "I'm clearing the table").
 
 ### Absolute and relative timing together
 When the user describes the start of a goal with a concrete clock time AND ALSO relative to an anchor — another moment in time ("20 minutes from now"), another goal ("5 minutes after the lights go off") or another event ("23 minutes before washer 1 finishes", "when the dryer stops") — record BOTH:
 - **starts** (with its fields, and any trigger predicate) records the RELATIVE description;
-- **stated_start_time_text** records the ABSOLUTE clock time, exactly as the user wrote it.
+- **stated_start_time_text** records the ABSOLUTE clock time, in digits as above.
 
 The same holds for the end of a goal: when the user gives a clock time for the end AND describes the end relative to an anchor ("for 2 hours, until 8 PM"; "until 6 PM, when the dryer finishes"), **ends** (or the termination predicate, or **completes_with** when the end is the moment another device's run finishes: "so both finish together by 11:39") records the RELATIVE description and **stated_end_time_text** records the ABSOLUTE clock time.
 
@@ -183,12 +185,12 @@ DEPENDENCY_EXAMPLES = """\
 - no predicates.
 
 "At 7:40 PM, that is 25 minutes from now, switch on the bedroom heater, and keep it on for an hour, until 8:40 PM."
-- G1 heater on: timing {"starts": "after_delay", "offset_text": "25 minutes", "stated_start_time_text": "7:40 PM", "ends": {"kind": "duration", "text": "an hour"}, "stated_end_time_text": "8:40 PM"}
+- G1 heater on: timing {"starts": "after_delay", "offset_text": "25 minutes", "stated_start_time_text": "19:40", "ends": {"kind": "duration", "text": "1 hour"}, "stated_end_time_text": "20:40"}
 - no predicates.
 
 "At 9:10 PM, which is 5 minutes after the dryer 1 in the laundry room finishes, turn on hallway light 2."
 - P1 dryer 1 finished: role "trigger", applies_to ["G1"], offset_text "5 minutes", offset_direction "after".
-- G1 hallway light on: timing {"starts": "on_trigger", "stated_start_time_text": "9:10 PM"}
+- G1 hallway light on: timing {"starts": "on_trigger", "stated_start_time_text": "21:10"}
 
 "Set dimmer light 1 in the living room to power on at level 30 at 13 minutes from now, and 8 minutes after the previous action drop it to level 20 while keeping it powered on."
 - G1 power on: timing {"starts": "after_delay", "offset_text": "13 minutes"}
@@ -218,7 +220,7 @@ For example, "Dishwasher 1 in the kitchen is running; start dryer 1 in the bathr
 - P1 dishwasher 1 finished: role "trigger", applies_to ["G3"].
 - G1 switch on dryer 1: timing {"starts": "now"}
 - G2 Normal dryness: timing {"starts": "after_goal", "ref_goal": "G1", "offset_text": null}
-- G3 start the cycle (operational state Running): timing {"starts": "after_goal", "ref_goal": "G2", "offset_text": null, "completes_with": "P1", "stated_end_time_text": "11:39 AM"}
+- G3 start the cycle (operational state Running): timing {"starts": "after_goal", "ref_goal": "G2", "offset_text": null, "completes_with": "P1", "stated_end_time_text": "11:39"}
 
 "Keep the living room at 22 degrees Celsius while the light is on, then 2 minutes after that set the heating pump level to 20 degrees."
 - P1 a living room light is on: predicate_subject "device_property", predicate_specificity "incomplete", quantifier "any", role "scope", applies_to ["G1"].
@@ -239,6 +241,7 @@ Return ONLY one JSON object — no prose, no markdown fences. For an explicit or
 
 {"goal_specificity": "explicit" | "incomplete", "goal_kind": "achievement", "intent_text": string,
  "location_class": string | null, "artifact_class": string | null, "artifact_name": string | null,
+ "device_reference": "name" | "description" | null,
  "affordance_class": string | null, "parent_class": string | null, "affordance_name": string | null,
  "parameter_name": string | "NA" | null, "goal_effect": "set" | "modify" | null,
  "target_value_text": string | null, "target_value_determined": string | null,

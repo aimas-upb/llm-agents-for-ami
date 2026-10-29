@@ -8,7 +8,7 @@ generator:
   table: internal_properties
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-10-14T19:50:08.983818+00:00'
+  generated_at_utc: '2026-10-28T23:24:56.238076+00:00'
 rows:
 - key: '8.2'
   yaml_path: LevelControl.MinLevel
@@ -1159,7 +1159,7 @@ rows:
     attribute_id: 1
     attribute_id_hex: '0x0001'
     attribute_name: MinMeasuredValue
-    type: uint16
+    type: percent100ths
   category: sensor_capability
   sosa_role: sensor_metadata
   quantity: null
@@ -1180,7 +1180,7 @@ rows:
     attribute_id: 2
     attribute_id_hex: '0x0002'
     attribute_name: MaxMeasuredValue
-    type: uint16
+    type: percent100ths
   category: sensor_capability
   sosa_role: sensor_metadata
   quantity: null
@@ -1201,7 +1201,7 @@ rows:
     attribute_id: 3
     attribute_id_hex: '0x0003'
     attribute_name: Tolerance
-    type: uint16
+    type: percent100ths
   category: sensor_capability
   sosa_role: sensor_metadata
   quantity: null

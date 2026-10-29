@@ -281,6 +281,12 @@ class PromptDumpState:
                 else:
                     parts.append(json.dumps(message, ensure_ascii=False, indent=2, default=str))
         elif "input" in kwargs:
+            # The Responses API: the system prompt travels as `instructions`.
+            if kwargs.get("instructions"):
+                parts.append("Instructions:")
+                parts.append(str(kwargs["instructions"]))
+            if kwargs.get("previous_response_id"):
+                parts.append(f"Previous response: {kwargs['previous_response_id']}")
             parts.append("Input:")
             parts.append(json.dumps(kwargs.get("input"), ensure_ascii=False, indent=2, default=str))
         else:
@@ -325,11 +331,23 @@ class PromptDumpState:
         answer = ""
         tool_calls = None
         try:
+            # 1. Chat Completions: the first choice's text and tool calls.
             choices = getattr(response, "choices", None) or []
             if choices:
                 message = getattr(choices[0], "message", None)
                 answer = getattr(message, "content", None) or ""
                 tool_calls = getattr(message, "tool_calls", None)
+            # 2. The Responses API: its text and its function-call items, shown
+            #    in the Chat Completions tool-call shape.
+            elif getattr(response, "output", None) is not None:
+                answer = getattr(response, "output_text", None) or ""
+                tool_calls = [
+                    {"id": getattr(item, "call_id", None), "type": "function",
+                     "function": {"name": getattr(item, "name", None),
+                                  "arguments": getattr(item, "arguments", None)}}
+                    for item in response.output
+                    if getattr(item, "type", None) == "function_call"
+                ] or None
         except Exception:
             answer = ""
 
@@ -359,33 +377,40 @@ class PromptDumpState:
 
 
 def _install_openai_call_counter() -> None:
+    """Count and dump every LLM call: Chat Completions, and the Responses API
+    the BT planner uses on OpenAI's endpoint. Each API names its token counts
+    differently in `usage`, hence the names passed per API."""
+    # 1. The two `create` methods; neither is wrapped twice.
     try:
         from openai.resources.chat.completions.completions import AsyncCompletions
+        from openai.resources.responses import AsyncResponses
     except Exception:
         return
+    apis = ((AsyncCompletions, "prompt_tokens", "completion_tokens"),
+            (AsyncResponses, "input_tokens", "output_tokens"))
 
-    if getattr(AsyncCompletions.create, "_ami_counting_wrapped", False):
-        return
+    for api, tokens_in, tokens_out in apis:
+        if getattr(api.create, "_ami_counting_wrapped", False):
+            continue
+        # 2. The wrapper: dump the call, count it in the phase running.
+        def wrap(original_create, tokens_in=tokens_in, tokens_out=tokens_out):
+            async def counted_create(self, *args, **kwargs):
+                phase = _infer_llm_phase_from_stack(LLMCallCounter.current_phase)
+                PromptDumpState.append_call(kwargs)
+                response = await original_create(self, *args, **kwargs)
+                PromptDumpState.append_response(response)
+                usage = getattr(response, "usage", None)
+                LLMCallCounter.increment(
+                    input_tokens=getattr(usage, tokens_in, 0) if usage is not None else 0,
+                    output_tokens=getattr(usage, tokens_out, 0) if usage is not None else 0,
+                    phase=phase,
+                )
+                return response
 
-    original_create = AsyncCompletions.create
+            counted_create._ami_counting_wrapped = True  # type: ignore[attr-defined]
+            return counted_create
 
-    async def counted_create(self, *args, **kwargs):
-        phase = _infer_llm_phase_from_stack(LLMCallCounter.current_phase)
-        PromptDumpState.append_call(kwargs)
-        response = await original_create(self, *args, **kwargs)
-        PromptDumpState.append_response(response)
-        usage = getattr(response, "usage", None)
-        prompt_tokens = getattr(usage, "prompt_tokens", 0) if usage is not None else 0
-        completion_tokens = getattr(usage, "completion_tokens", 0) if usage is not None else 0
-        LLMCallCounter.increment(
-            input_tokens=prompt_tokens,
-            output_tokens=completion_tokens,
-            phase=phase,
-        )
-        return response
-
-    counted_create._ami_counting_wrapped = True  # type: ignore[attr-defined]
-    AsyncCompletions.create = counted_create
+        api.create = wrap(api.create)
 
 
 def _require_env(var: str) -> str:
