@@ -235,6 +235,11 @@ def _declared_values(attribute: str, attributes: Dict[str, Any]) -> Optional[set
         return FAN_MODE_SEQUENCES.get(value)
     if name == "SupportedModes" and isinstance(value, list):
         return {m.get("mode", m.get("Mode")) for m in value if isinstance(m, dict)}
+    # Other "Supported..." lists name the values of their setting outright
+    # (a dryer's SupportedDrynessLevels [0, 1, 2, 3] for SelectedDrynessLevel).
+    if name.startswith("Supported") and isinstance(value, list) \
+            and all(isinstance(v, int) and not isinstance(v, bool) for v in value):
+        return set(value)
     return None
 
 
@@ -246,11 +251,39 @@ def _close(read: Any, expected: Any) -> bool:
     return abs(read - expected) <= max(VALUE_TOLERANCE_ABS, VALUE_TOLERANCE_REL * abs(expected))
 
 
-def _room_state_ok(goal: Dict[str, Any], reads: List[Dict[str, Any]]) -> bool:
+def _stated(value: Any, answer: Any) -> bool:
+    """Does the answer give this attribute's value in words? Only for a text
+    value ("LG Electronics"): a bare number in an answer could be any number."""
+    if not isinstance(value, str) or not value.strip() or not isinstance(answer, str):
+        return False
+    return value.strip().lower() in answer.lower()
+
+
+_NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
+
+
+def _reported(value: Any, answer: Any) -> bool:
+    """Does the answer report this read value -- some number in it within the
+    tolerance of it?"""
+    if not isinstance(answer, str):
+        return False
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return False
+    return any(_close(float(number), value) for number in _NUMBER.findall(answer))
+
+
+def _room_state_ok(goal: Dict[str, Any], reads: List[Dict[str, Any]], answer: Any) -> bool:
+    """A room's state, as SimuHome's qt1 judge scores it ("values match tool
+    observations"): the right variable of the right room read, and the value
+    read given in the answer. Not the episode's `current_value`: the simulator
+    runs in real time, so a room with a purifier on has another PM10 by the
+    time any agent reads it -- the episode's value is the state at reset."""
     name = ROOM_STATE_NAMES.get(goal.get("room_state"), goal.get("room_state"))
     return any(r["room"] == goal["room_id"] and (not r["device"] or r["sensor"])
                and r["name"] == name
-               and r["has_value"] and _close(r["value"], goal.get("current_value"))
+               and r["has_value"] and _reported(r["value"], answer)
                for r in reads)
 
 
@@ -270,7 +303,7 @@ def check_qt1(record, episode, payload, feasible: bool) -> Dict[str, Any]:
     for goal in episode["eval"]["goals"]:
         read = None
         if goal.get("variant") == "room_state":
-            ok = _room_state_ok(goal, reads)
+            ok = _room_state_ok(goal, reads, record.get("response"))
             name = ROOM_STATE_NAMES.get(goal.get("room_state"), goal.get("room_state"))
             read = any(r["room"] == goal["room_id"] and (not r["device"] or r["sensor"])
                        and r["name"] == name and r["has_value"] for r in reads)
@@ -284,9 +317,17 @@ def check_qt1(record, episode, payload, feasible: bool) -> Dict[str, Any]:
                 ok = any(c["values"] == declared for c in listed)
                 read = bool(listed) or any(r["device"] == device and r["has_value"]
                                            for r in reads)
+            elif attributes[device].get(goal.get("attribute")) is None:
+                # The device reports nothing for it (a dishwasher's phase while
+                # it is not running): reading it and finding no value is right.
+                read = any(r["device"] == device for r in reads)
+                ok = read
             else:
-                ok = any(r["device"] == device and r["has_value"] for r in reads)
-                read = ok
+                # Read from the device, or -- a fact the TD itself states, such
+                # as who made it -- given in the answer without a read.
+                read = any(r["device"] == device and r["has_value"] for r in reads)
+                ok = read or _stated(attributes[device].get(goal.get("attribute")),
+                                     record.get("response"))
         else:
             # The device does not exist: nothing read from a device of its kind in
             # its room may stand in for it.
@@ -759,6 +800,8 @@ def main() -> int:
                         help="infeasible: the execution check only (no LLM calls)")
     parser.add_argument("--judge-model", help="override the variant's judge model")
     parser.add_argument("--explain", action="store_true", help="print each verdict in full")
+    parser.add_argument("--episodes", help="only the records matching this pattern, "
+                                           "e.g. 'qt1_*' (default: all)")
     parser.add_argument("--skip-scored", action="store_true",
                         help="leave records whose .eval.json is newer than the record "
                              "(a resumed run: no judge calls paid twice)")
@@ -770,6 +813,9 @@ def main() -> int:
     files = [target] if target.is_file() else sorted(
         p for p in target.glob("*.json") if not p.name.endswith(".eval.json")
         and p.name not in ("run.json", "summary.json"))
+    if args.episodes:
+        files = [p for p in files if p.match(args.episodes + ".json")
+                 or p.match(args.episodes)]
     if args.skip_scored:
         files = [p for p in files if not _scored_since(p)]
         if not files:

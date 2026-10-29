@@ -341,8 +341,42 @@ def resolve_state_request(
     device_class: Optional[str] = None,
     device_property: Optional[Dict[str, Any]] = None,
     environment_variable: Optional[Dict[str, Any]] = None,
+    artifact_name: Optional[str] = None,
 ) -> StateResolution:
-    """Find what can answer one structured state request.
+    """Find what can answer one structured state request, narrowed to the
+    device titled `artifact_name` when the request calls one by name -- as
+    `capability_resolution.resolve_capability_request` does. A name no match
+    has is no answer: another device of the same kind never stands in."""
+    # 1. The request by its classes.
+    resolution = _resolve_state(graph, location_class, device_class,
+                                device_property, environment_variable)
+    if not artifact_name:
+        return resolution
+    # 2. Only the named device's entries, or nothing.
+    resolution.query = dict(resolution.query or {}, artifact_name=artifact_name)
+    named = [a for a in resolution.affordances if a.artifact_name == artifact_name]
+    if named:
+        resolution.affordances = named
+        resolution.property_classes = sorted(
+            {a.affordance_type for a in named if a.affordance_type})
+        # Several property types over many devices may be one on this device.
+        if resolution.outcome == StateOutcome.MISMATCHED \
+                and len(resolution.property_classes) == 1:
+            resolution.outcome = StateOutcome.RESOLVED
+        return resolution
+    return StateResolution(
+        outcome=StateOutcome.NONE, query=resolution.query,
+        detail=f"no device titled {artifact_name!r} matches: {resolution.detail}")
+
+
+def _resolve_state(
+    graph: Graph,
+    location_class: Optional[str] = None,
+    device_class: Optional[str] = None,
+    device_property: Optional[Dict[str, Any]] = None,
+    environment_variable: Optional[Dict[str, Any]] = None,
+) -> StateResolution:
+    """Find what can answer one structured state request, by its classes.
 
     Usually that is a property affordance. When the request names a device but
     no affordance reports what was asked, the device itself is the answer --

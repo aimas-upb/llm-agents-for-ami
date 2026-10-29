@@ -68,9 +68,10 @@ DEFAULT_GUIDELINES_PATH = str(Path(__file__).resolve().parents[3] / "config"
                               / "planning_guidelines.yaml")
 
 # The commands guarded: settings and lifecycle commands, the ones a device that
-# is switched off may refuse (Matter "dead front").
+# is switched off may refuse (Matter "dead front") -- an appliance's cycle, and
+# a media device's playback.
 GUARDED_COMMANDS = (HOMEONT.SetModeCommand, SAREF.SetAbsoluteLevelCommand,
-                    HOMEONT.SetOperationalStateCommand)
+                    HOMEONT.SetOperationalStateCommand, HOMEONT.SetPlaybackStateCommand)
 
 # The device's on/off command, whose `saref:actsUpon` is its on/off state.
 SET_ON_OFF = HOMEONT.SetOnOffCommand

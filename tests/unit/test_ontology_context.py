@@ -71,11 +71,15 @@ class TestSections:
         assert len(devices["subclasses"]) == 5
         assert len(list(_descendants(devices))) == 5 + 20 + 6 + 6
         assert len(list(_descendants(properties["homeont:DeviceCapabilityProperty"]))) == 19
-        assert len(list(_descendants(properties["homeont:DeviceStateProperty"]))) == 47 + 1 + 1   # + HomeBench VacuumState
-        assert len(list(_descendants(properties["homeont:ActuatableDeviceProperty"]))) == 93 + 5 + 4 + 7   # + OperationalState and its 3 appliance leaves; + 7 HomeBench
+        # A TV's channel and playback state moved from state to actuatable
+        # (ChangeChannel, Play / Pause / Stop drive them): -2 here, and +2 below
+        # with their TV leaves (TvCurrentChannel, TvPlaybackState).
+        assert len(list(_descendants(properties["homeont:DeviceStateProperty"]))) == 47 + 1 + 1 - 2   # + HomeBench VacuumState
+        assert len(list(_descendants(properties["homeont:ActuatableDeviceProperty"]))) == 93 + 5 + 4 + 7 + 4   # + OperationalState and its 3 appliance leaves; + 7 HomeBench; + TV channel, playback
         assert len(list(_descendants(properties["sosa:ObservableProperty"]))) == 10 + 2  # + HomeBench battery, tank
+        # + AirQuality, above PM10 and CO2: "the air quality" asks for both.
         assert len(list(_descendants(
-            context["environment_variables"]["sosa:ObservableProperty"]))) == 8
+            context["environment_variables"]["sosa:ObservableProperty"]))) == 8 + 1
 
     def test_the_ambient_sensors_are_saref_sensors(self, context):
         """The parent is what closes the path to saref:Device for a resolver."""
@@ -100,16 +104,19 @@ class TestSections:
 
     def test_environment_variables_are_the_room_variables(self, context):
         root = context["environment_variables"]["sosa:ObservableProperty"]
+        # CO2 and PM10 sit under AirQuality: "the air quality" asks for both.
         assert [n["class"] for n in root["subclasses"]] == [
+            "homeont:AirQuality",
             "homeont:AirTemperature",
-            "homeont:CarbonDioxideConcentration",
             "homeont:Glare",
             "homeont:Illuminance",
             "homeont:Occupancy",
             "homeont:OccupantCount",
-            "homeont:Pm10MassConcentration",
             "homeont:RelativeHumidity",
         ]
+        (air,) = [n for n in root["subclasses"] if n["class"] == "homeont:AirQuality"]
+        assert [n["class"] for n in air["subclasses"]] == [
+            "homeont:CarbonDioxideConcentration", "homeont:Pm10MassConcentration"]
 
     def test_compartment_temperature_is_a_device_measurement(self, context):
         """The distinction the whole feature-of-interest edit exists for.

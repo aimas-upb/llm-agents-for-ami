@@ -87,6 +87,7 @@ def resolve_payload(agent, payload: Dict[str, Any]) -> StateResolution:
             device_class=payload.get("device_class"),
             device_property=payload.get("device_property"),
             environment_variable=payload.get("environment_variable"),
+            artifact_name=payload.get("artifact_name"),
         )
     except Exception as exc:
         agent.logger.error("State resolution failed: %s", exc, exc_info=True)

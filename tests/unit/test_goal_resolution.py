@@ -135,6 +135,63 @@ class TestGoalPromotion:
         assert goal.goal_specificity == "incomplete"
 
 
+class TestNamedDeviceMissing:
+    """A device called by name fits only the device that has that name: when
+    the structurer found none ("living room fan 1" in a living room with only
+    living_room_fan_2), the lookup never completes the goal with another device
+    and the goal is held back with a question, so it never reaches the solver."""
+
+    FAN_2 = {"artifact_name": "living_room_fan_2", "artifact_type": "homeont:Fan",
+             "workspace_class": "homeont:LivingRoom", "affordance_name": "onOff"}
+
+    def _named_fan(self, **fields):
+        """The structurer's goal for "turn on living room fan 1": room, class and
+        action known, no device of that name."""
+        base = {"intent_text": "turn on living room fan 1", "device_reference": "name",
+                "location_class": "homeont:LivingRoom", "artifact_class": "homeont:Fan",
+                "affordance_class": ONOFF}
+        return _goal(**{**base, **fields})
+
+    def test_the_one_device_of_its_kind_is_listed_not_used(self):
+        # 1. The lookup finds exactly one fan: today's promotion case.
+        goal = self._named_fan()
+        assert apply_goal_resolution(goal, _found(self.FAN_2)) is False
+        # 2. Not promoted, and asked about with what the room has.
+        assert goal.artifact_name is None and goal.goal_specificity == "incomplete"
+        assert clarification_question(goal) == (
+            "I can't find the fan you named in the living room. "
+            "It has: living_room_fan_2. Which do you mean?")
+
+    def test_nothing_found_still_asks(self):
+        # The lookup finds nothing of that kind: the question says so.
+        goal = self._named_fan()
+        apply_goal_resolution(goal, {"outcome": "not_found", "entries": []})
+        assert clarification_question(goal) == "I can't find the fan you named in the living room."
+
+    def test_held_back_even_where_no_lookup_runs(self):
+        # Without an action there is no lookup; the named device still holds
+        # the goal back (it would otherwise go to the solver as VALUE_ONLY).
+        goal = _goal(device_reference="name", location_class="homeont:LivingRoom",
+                     artifact_class="homeont:Fan", target_value_text="30 percent")
+        assert clarification_question(goal) == "I can't find the fan you named in the living room."
+        assert structure_clarification(
+            GoalStructure(intent_text="set the fan to 30 percent", goals={"G1": goal})) is not None
+
+    def test_a_description_is_completed_as_before(self):
+        # "the fan": a description, so the one fan in the room is it.
+        goal = self._named_fan(device_reference="description")
+        assert apply_goal_resolution(goal, _found(self.FAN_2)) is True
+        assert goal.artifact_name == "living_room_fan_2"
+
+    def test_a_named_device_that_was_found_goes_on(self):
+        # Named and found: an explicit goal, nothing to ask.
+        goal = self._named_fan(goal_specificity="explicit", artifact_name="living_room_fan_2")
+        assert clarification_question(goal) is None
+
+    def test_an_unknown_reference_is_dropped(self):
+        assert _goal(device_reference="label").device_reference is None
+
+
 class TestMissingRoom:
     """A goal naming its device class and action but not its room."""
 

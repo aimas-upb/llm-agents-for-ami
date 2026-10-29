@@ -81,7 +81,7 @@ from ami_agents.agents.user_assistant.utils.plan import (
 
 from . import execution as bench_execution
 from .meter import Meter
-from .models import Variant
+from .models import Variant, close_clients
 from .stubs import (
     Explorer,
     Home,
@@ -179,7 +179,9 @@ async def run_episode(name: str, episode: Dict[str, Any], variant: Variant,
                       config: Dict[str, Any], target: Target, options: Options,
                       logger, suite: Optional[Suite] = None) -> Dict[str, Any]:
     """Run one episode of ``suite`` (SimuHome when None), already loaded by the
-    suite's `load_episode`; the record of everything it did."""
+    suite's `load_episode`; the record of everything it did. The LLM clients
+    the episode made are closed before it returns, in its own event loop."""
+    # 1. The record, filled as the steps run.
     suite = suite or get_suite(DEFAULT_SUITE)
     record: Dict[str, Any] = {
         "suite": suite.name,
@@ -194,6 +196,7 @@ async def run_episode(name: str, episode: Dict[str, Any], variant: Variant,
     tools = ToolLog()
     current = {"step": "load"}
 
+    # 2. The steps; an error is recorded with the step it happened in.
     try:
         with meter.installed():
             await _run(name, episode, variant, config, target, options, logger,
@@ -204,6 +207,10 @@ async def run_episode(name: str, episode: Dict[str, Any], variant: Variant,
         record["traceback"] = traceback.format_exc()
         record["outcome"] = "error"
         _say(options, f"ERROR in {current['step']}", record["traceback"])
+    finally:
+        # The episode's LLM clients, closed while their event loop still runs.
+        await close_clients()
+    # 3. What was measured along the way.
     record["tools_invoked"] = tools.tools_invoked()
     record["tool_log"] = tools.entries
     record["meter"] = meter.as_dict()
@@ -276,7 +283,10 @@ async def _run(name, episode, variant, config, target, options, logger, record, 
         for item in front["goals"]:
             if item.get("structure"):
                 structure = GoalStructure.from_dict(item["structure"])
-                question = structure_clarification(structure)
+                # The question asked of the UA's own structure; a step cache
+                # written before it was kept falls back to the rebuilt one.
+                question = (item["question"] if "question" in item
+                            else structure_clarification(structure))
                 if question:
                     item["clarification"] = question
                     ua_questions.append(f"About \"{item['text']}\": {question}")
@@ -295,13 +305,15 @@ async def _run(name, episode, variant, config, target, options, logger, record, 
             extraction = dict(item.get("result") or {}, text_intent=item["text"])
             async with meter.step("state_read", kind=item["kind"]):
                 if item["kind"] == "state":
-                    response = await explorer.state(extraction)
+                    # As the UA asks: a named device the home lacks is listed,
+                    # not read (`device_names.state_lookup`).
+                    response = await explorer.state(queries.state_lookup(extraction))
                 else:
                     response = await explorer.resolve_candidates(None, logger, extraction)
             record["queries"].append({"kind": item["kind"], "text": item["text"],
                                       "extraction": item.get("result"),
                                       "error": item.get("error"), "response": response})
-            pending_answers.append((item["kind"], response, item["text"]))
+            pending_answers.append((item["kind"], response, extraction, item["text"]))
         if record["queries"]:
             _say(options, "state / capability queries", record["queries"])
         if options.stop_after == "structuring":
@@ -349,6 +361,11 @@ async def _run(name, episode, variant, config, target, options, logger, record, 
         record["plans"] = [{**{k: v for k, v in e.items() if k != "goal_context"},
                             "outcome": _entry_outcome(e), "devices": _devices(e.get("tree"))}
                            for e in ordered]
+        # The properties the planner read to check a request's timing (an
+        # anchor's countdown, say) are reads of the home like any other.
+        for entry in ordered:
+            for read in entry.get("reads") or []:
+                tools.read(read.get("url"), None, "planning")
         _say(options, "planning", record["plans"])
         if options.stop_after == "planning":
             record["outcome"] = "stopped"
@@ -390,12 +407,14 @@ async def _run(name, episode, variant, config, target, options, logger, record, 
         # 5. Response: what the UA would say.
         current["step"] = "response"
         async with meter.step("response"):
-            for kind, response, intent_text in pending_answers:
+            # The UA's own replies, a named device the home lacks included.
+            for kind, response, extraction, intent_text in pending_answers:
                 if kind == "state":
-                    answers.append(await queries._phrase(responder, response, intent_text))
+                    answers.append(await queries.state_reply(
+                        responder, response, extraction, intent_text))
                 else:
-                    answers.append(await queries._phrase_capabilities(
-                        responder, response, intent_text))
+                    answers.append(await queries.capabilities_reply(
+                        responder, response, extraction, intent_text))
             summary = None
             if ordered:
                 envelope = envelope_plan_entries(
@@ -456,11 +475,19 @@ async def _understand(text, ua, logger, meter, options, current) -> Dict[str, An
               for i in states],
             *[structure(EnvCapabilityStructuringBehaviour(i.text, logger=logger),
                         "capabilities") for i in capabilities])
+    # The UA's question is asked of the structure it built, as UserRequestBehaviour
+    # does: the wire dict leaves out what stays in the UA (a question set by
+    # resolution, how the request picks out its device), so a structure rebuilt
+    # from it would never be held back for them.
     for behaviour in done[:len(goals)]:
+        result = behaviour.result
         front["goals"].append({
             "text": behaviour.intent_text, "error": behaviour.error,
             "context_unavailable": behaviour.context_unavailable,
-            "structure": behaviour.result.to_wire_dict() if behaviour.result else None})
+            "structure": result.to_wire_dict() if result else None,
+            "question": structure_clarification(result) if result else None,
+            "device_references": ({gid: g.device_reference for gid, g in result.goals.items()}
+                                  if result else None)})
     for kind, behaviour in [("state", b) for b in done[len(goals):len(goals) + len(states)]] + \
             [("capabilities", b) for b in done[len(goals) + len(states):]]:
         front["queries"].append({"kind": kind, "text": behaviour.intent_text,
@@ -634,7 +661,8 @@ def _trace(record: Dict[str, Any], explorer: Explorer) -> List[Dict[str, Any]]:
         add(plan.get("explanation") or "Planned.", "planning",
             {"intent": (plan.get("intent") or {}).get("text_intent"),
              "route": plan.get("route")},
-            {"outcome": plan["outcome"], "devices": plan.get("devices")})
+            {"outcome": plan["outcome"], "devices": plan.get("devices"),
+             **({"reads": plan["reads"]} if plan.get("reads") else {})})
     for action in (record.get("execution") or {}).get("actions", []):
         add("Executed an action of the plan.", "execute_action",
             {"url": action["url"], "parameters": action.get("parameters")},

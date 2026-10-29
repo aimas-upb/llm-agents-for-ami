@@ -50,6 +50,16 @@ from .goal_profile import (
 
 # -- call helpers ------------------------------------------------------------
 
+# JSON mode: the reply is always one syntactically valid JSON object. Without
+# it a model can slip inside its free-text `evidence` (an unescaped quote, a
+# missing comma) and the whole checklist falls back -- a "10 minutes before the
+# dishwasher finishes" goal then waits for the finish (gpt-6-luna, SimuHome
+# qt4-2). Not a strict schema: each question type answers in its own shape,
+# which `resolve_profile` checks. OpenAI requires the word "JSON" in the
+# prompt, which GOAL_PROFILE_PROMPT has ("Return only this JSON"); Ollama maps
+# it to its JSON format.
+RESPONSE_FORMAT = {"type": "json_object"}
+
 def _is_reasoning(model: str) -> bool:
     """True for reasoning models (o-series, gpt-5 and later): they reject
     `temperature` and take `reasoning_effort` / `max_completion_tokens` instead."""
@@ -123,7 +133,8 @@ async def ask_profile(agent, logger, structure: GoalStructure,
     #    against its question and the devices of its context.
     try:
         response = await cfg.client.chat.completions.create(
-            model=cfg.model, messages=[{"role": "user", "content": prompt}], **kwargs)
+            model=cfg.model, messages=[{"role": "user", "content": prompt}],
+            response_format=RESPONSE_FORMAT, **kwargs)
         choice = response.choices[0]
         trace["answer"] = choice.message.content or ""
         trace["finish_reason"] = getattr(choice, "finish_reason", None)

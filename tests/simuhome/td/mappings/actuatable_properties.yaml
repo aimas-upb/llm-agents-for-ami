@@ -8,7 +8,7 @@ generator:
   table: actuatable_properties
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-10-14T19:50:08.901285+00:00'
+  generated_at_utc: '2026-10-28T23:24:56.152661+00:00'
 rows:
 - key: AirConditioner:6.0
   family: AirConditioner
@@ -1862,3 +1862,86 @@ rows:
     status_source: own classification
   status: auto
   action_class: saref:SetAbsoluteLevelCommand
+- key: Tv:1284.2
+  family: Tv
+  yaml_path: Channel.CurrentChannel
+  affordance_name: currentChannel
+  td_name: tvCurrentChannel
+  sosa_type: sosa:ActuatableProperty
+  sosa_role: device_state
+  property_node: anonymous
+  property_type: homeont:TvCurrentChannel
+  subClassOf: homeont:ChannelCurrentChannel
+  constraints_source: per-instance, from the device's HA entity
+  has_immediate_effect: true
+  no_effect_reason: null
+  quantity: null
+  mechanism: command
+  writable: false
+  matter:
+    cluster_id: 1284
+    cluster_id_hex: '0x0504'
+    cluster_name: Channel
+    attribute_id: 2
+    attribute_id_hex: '0x0002'
+    attribute_name: CurrentChannel
+    type: ChannelInfoStruct
+  unit: null
+  evidence: &id019
+    rationale: read-only in the spec but driven by cluster commands
+    hierarchy: family leaf under homeont:ChannelCurrentChannel, which generalises the Matter process cluster
+      across families
+    status_source: inherited from approved homeont:ChannelCurrentChannel
+    action_class: choosing one channel from the list the TV declares is homeont:SetModeCommand's "one
+      named alternative from a set the device declares"
+  status: approved
+  action_class: homeont:SetModeCommand
+  _drift:
+    evidence:
+    - *id019
+    - rationale: read-only in the spec but driven by cluster commands
+      hierarchy: family leaf under homeont:ChannelCurrentChannel, which generalises the Matter process
+        cluster across families
+      status_source: inherited from approved homeont:ChannelCurrentChannel
+- key: Tv:1286.0
+  family: Tv
+  yaml_path: MediaPlayback.CurrentState
+  affordance_name: playbackState
+  td_name: tvPlaybackState
+  sosa_type: sosa:ActuatableProperty
+  sosa_role: device_state
+  property_node: anonymous
+  property_type: homeont:TvPlaybackState
+  subClassOf: homeont:MediaPlaybackCurrentState
+  constraints_source: per-instance, from the device's HA entity
+  has_immediate_effect: true
+  no_effect_reason: null
+  quantity: null
+  mechanism: command
+  writable: false
+  matter:
+    cluster_id: 1286
+    cluster_id_hex: '0x0506'
+    cluster_name: Media Playback
+    attribute_id: 0
+    attribute_id_hex: '0x0000'
+    attribute_name: CurrentState
+    type: PlaybackStateEnum
+  unit: null
+  evidence: &id020
+    rationale: read-only in the spec but driven by cluster commands
+    hierarchy: family leaf under homeont:MediaPlaybackCurrentState, the class homeont already has for
+      this attribute (the generator's homeont:MediaPlaybackPlaybackState, named from the affordance, would
+      be a second class for it)
+    status_source: approved by hand
+    action_class: one action reaching Playing, Paused or NotPlaying by the state to reach; its own class,
+      not homeont:SetOperationalStateCommand, which the appliance-cycle guards act on
+  status: approved
+  action_class: homeont:SetPlaybackStateCommand
+  _drift:
+    evidence:
+    - *id020
+    - rationale: read-only in the spec but driven by cluster commands
+      hierarchy: family leaf under homeont:MediaPlaybackPlaybackState, which generalises the Matter process
+        cluster across families
+      status_source: inherited from approved homeont:MediaPlaybackPlaybackState

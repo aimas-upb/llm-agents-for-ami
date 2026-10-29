@@ -380,6 +380,59 @@ class TestActionParameterValidation:
         assert errors == []
 
 
+# A SimuHome light's on/off and an AC's mode, as their TDs give the inputs.
+ONOFF_ACTION = {
+    "name": "onOff", "type": "action_affordance", "artifact_name": "kitchen_light_1",
+    "artifact_id": f"{BASE}/kitchen_light_1#artifact",
+    "semantic_types": ["homeont:SetOnOffCommand"],
+    "target": f"{BASE}/kitchen_light_1/actions/onOff",
+    "input_schema": {"type": "object", "properties": {"value": {"type": "boolean"}},
+                     "required": ["value"]},
+}
+MODE_ENUM_ACTION = {
+    "name": "hvacMode", "type": "action_affordance", "artifact_name": "ac_1",
+    "artifact_id": f"{BASE}/ac_1#artifact", "semantic_types": ["homeont:SetModeCommand"],
+    "target": f"{BASE}/ac_1/actions/hvacMode",
+    "input_schema": {"type": "object", "properties": {"value": {
+        "type": "integer", "enum": [0, 3, 4]}}, "required": ["value"]},
+}
+LEVEL_ACTION = {
+    "name": "brightness", "type": "action_affordance", "artifact_name": "tv_1",
+    "artifact_id": f"{BASE}/tv_1#artifact", "semantic_types": ["saref:SetLevelCommand"],
+    "target": f"{BASE}/tv_1/actions/brightness",
+    "input_schema": {"type": "object", "properties": {"value": {
+        "type": "integer", "minimum": 1, "maximum": 254}}, "required": ["value"]},
+}
+
+
+class TestParameterValues:
+    """Each parameter's value against its own schema, so a malformed one goes
+    back to the model in the retry instead of reaching the device."""
+
+    def _errors(self, planner, affordance, value):
+        spec = _leaf("action", affordance["artifact_name"], affordance["name"],
+                     affordance["semantic_types"][0], parameters={"value": value})
+        return planner._resolve_affordance_refs(spec, AffordanceCatalog([affordance]))
+
+    def test_the_schema_copied_as_a_boolean_is_an_error(self, planner):
+        """qt2 seed 45's slip: {"type": "boolean", "value": true} for true."""
+        (error,) = self._errors(planner, ONOFF_ACTION, {"type": "boolean", "value": True})
+        assert "parameter 'value' must be a boolean" in error
+
+    def test_a_boolean_passes(self, planner):
+        assert self._errors(planner, ONOFF_ACTION, True) == []
+
+    @pytest.mark.parametrize("value, ok", [(3, True), (3.0, True), (2, False),
+                                           ("3", False), (True, False)])
+    def test_an_enum_takes_only_its_values_as_integers(self, planner, value, ok):
+        """3.0 is the integer 3; a string or a bool is not an integer."""
+        assert (self._errors(planner, MODE_ENUM_ACTION, value) == []) is ok
+
+    @pytest.mark.parametrize("value, ok", [(1, True), (254, True), (0, False), (300, False)])
+    def test_a_number_within_its_bounds(self, planner, value, ok):
+        assert (self._errors(planner, LEVEL_ACTION, value) == []) is ok
+
+
 class TestEqualityGateDetection:
     def _seq(self, condition, action=None):
         action = action or {"name": "Act", "type": "action", "action_url": "http://x/a"}

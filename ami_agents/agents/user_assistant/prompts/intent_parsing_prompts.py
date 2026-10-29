@@ -6,7 +6,7 @@ structured separately (see `goal_structuring_prompts`).
 """
 
 ENV_CAPABILITIES_REQUEST_PARSER_PROMPT = """\
-You parse a single smart home intent already classified as `ENV_CAPABILITIES_REQUEST` (a question about what the environment is **able** to do, sense, report or be set to, not about a current value). The intent is atomic, so do not split it. Output ontology **class identifiers** only, never the name of an individual device or room. A later stage turns your output into a graph query over the devices' descriptions.
+You parse a single smart home intent already classified as `ENV_CAPABILITIES_REQUEST` (a question about what the environment is **able** to do, sense, report or be set to, not about a current value). The intent is atomic, so do not split it. Output ontology **class identifiers**, never the name of a room; the one name you may output is a device's, in `artifact_name`. A later stage turns your output into a graph query over the devices' descriptions.
 
 ## Output fields
 
@@ -16,6 +16,8 @@ You parse a single smart home intent already classified as `ENV_CAPABILITIES_REQ
   - `"query"` when it asks **what / which / how** and expects the matching things listed ("which devices can I switch on?", "what fan modes does the purifier have?", "what can you control in the kitchen?").
 - **location_class** (the space the question is scoped to, from the `locations` section). Use `null` if it names no place.
 - **device_class** (the kind of device the question is about, from the `device_types` section). Use `null` if it names no device kind.
+- **device_reference** (how the request picks out the device): `"name"` when it calls the device by its own name, for example "the Hue Go" or "kitchen light 2"; `"description"` when it describes the device by its kind, its room or another property, for example "the fan" or "the lights in the kitchen"; `null` when it refers to no device.
+- **artifact_name** (only for a device called by name): the name of the device in "The home's devices" that has the name the request uses, copied exactly. A device called by name fits only the device that has it: "the Hue Go" in a home whose only lamp is a Hue Iris is `null`. `null` too when the device is described, not named.
 - **device_property** as `{{"class": ..., "parent_class": ...}}`: the property of a device the question is about. Either
   - a device's own property, from a tree under `device_properties`, or
   - a fact about the device itself, from `device_metadata` (`schema:manufacturer` for who made it, `schema:model` for its product name); then `parent_class` is `null`.
@@ -56,6 +58,12 @@ The same walk applies to `location_class` (under `homeont:BuildingSpace`) and `d
 
 Every class you emit must appear verbatim in the ontology context. If nothing fits, emit `null` (never construct an identifier).
 
+## The home's devices
+
+The devices of the rooms this request concerns, by name. Use it only for `device_reference` and `artifact_name`.
+
+{home_devices}
+
 ## Ontology context
 
 Every class you may use, with its meaning and its place in the taxonomy. Select only from here, and copy `class`, `property` and `measurement_quantity` exactly as written.
@@ -73,6 +81,8 @@ Return ONLY a JSON object, no prose, no markdown fences:
   "request_performative": "query" | "query_if",
   "location_class": string | null,
   "device_class": string | null,
+  "device_reference": "name" | "description" | null,
+  "artifact_name": string | null,
   "device_property": {{"class": string, "parent_class": string | null}} | null,
   "environment_variable": {{"class": string, "measurement_quantity": string}} | null,
   "command": {{"class": string, "parent_class": string}} | null,
@@ -81,13 +91,15 @@ Return ONLY a JSON object, no prose, no markdown fences:
 """
 
 ENV_STATE_REQUEST_PARSER_PROMPT = """\
-You parse a single smart home intent already classified as `ENV_STATE_REQUEST` (a request to read the current state of a device, or the current environment of a space). The intent is atomic, so do not split it. Output ontology **class identifiers** only, never the name of an individual device or room. A later stage turns your output into a graph query.
+You parse a single smart home intent already classified as `ENV_STATE_REQUEST` (a request to read the current state of a device, or the current environment of a space). The intent is atomic, so do not split it. Output ontology **class identifiers**, never the name of a room; the one name you may output is a device's, in `artifact_name`. A later stage turns your output into a graph query.
 
 ## Output fields
 
 - **text_intent** (the fragment of natural language for this intent, copied verbatim from the input).
 - **location_class** (the space the request is scoped to, from the `locations` section). Use `null` if the request names no place.
 - **device_class** (the kind of device targeted, from the `device_types` section). Use `null` if the request names no device kind.
+- **device_reference** (how the request picks out the device): `"name"` when it calls the device by its own name, for example "the Hue Go" or "kitchen light 2"; `"description"` when it describes the device by its kind, its room or another property, for example "the fan" or "the lights in the kitchen"; `null` when it refers to no device.
+- **artifact_name** (only for a device called by name): the name of the device in "The home's devices" that has the name the request uses, copied exactly. A device called by name fits only the device that has it: "the Hue Go" in a home whose only lamp is a Hue Iris is `null`. `null` too when the device is described, not named.
 - **device_property** as `{{"class": ..., "parent_class": ...}}` (a property a device reports about itself). Use `null` if the request asks about a space's environment, or names no property.
 - **environment_variable** as `{{"class": ..., "measurement_quantity": ...}}` (a property of a space's environment). Use `null` if the request asks about a device property, or names no variable.
 - **reason** (one sentence stating why you chose these classes).
@@ -119,6 +131,12 @@ The same walk applies to `location_class` (under `homeont:BuildingSpace`) and `d
 
 Every class you emit must appear verbatim in the ontology context. If nothing fits, emit `null` (never construct an identifier).
 
+## The home's devices
+
+The devices of the rooms this request concerns, by name. Use it only for `device_reference` and `artifact_name`.
+
+{home_devices}
+
 ## Ontology context
 
 Every class you may use, with its meaning and its place in the taxonomy. Select only from here, and copy `class` and `measurement_quantity` exactly as written.
@@ -135,6 +153,8 @@ Return ONLY a JSON object, no prose, no markdown fences:
   "text_intent": string,
   "location_class": string | null,
   "device_class": string | null,
+  "device_reference": "name" | "description" | null,
+  "artifact_name": string | null,
   "device_property": {{"class": string, "parent_class": string}} | null,
   "environment_variable": {{"class": string, "measurement_quantity": string}} | null,
   "reason": string

@@ -277,3 +277,17 @@ def test_ambiguous_goals_find_room_actuators(graph, variable, direction, actuato
                for a in context.affordances)
     assert any(a["artifact_name"] == sensor and a["type"] == "property_affordance"
                for a in context.affordances)
+
+
+def test_the_blinds_say_which_way_their_position_runs(graph):
+    """lab308e's covers state Home Assistant's direction (percent open) in
+    their own schemas, and nothing in the home claims Matter's (percent closed)."""
+    JS_DESCRIPTION = URIRef("https://www.w3.org/2019/wot/json-schema#description")
+    # 1. Every value-schema description in the served home.
+    descriptions = [str(d) for d in graph.objects(None, JS_DESCRIPTION)]
+    # 2. Some say percent open (the set_cover_position input, current_position);
+    #    none says percent closed.
+    assert any("Percent open: 0 is fully closed, 100 is fully open." in d
+               for d in descriptions)
+    assert not any("Percent closed" in d for d in descriptions)
+

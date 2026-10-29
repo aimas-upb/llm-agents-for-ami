@@ -1,7 +1,7 @@
 # Harness config: every phase on the OpenAI API (harness.py; models.py for the format).
 #   conda run -n ami-agents python -m tests.simuhome.bench.harness \
 #       --config tests/simuhome/bench/variants/harness.example.yaml --dry-run
-name: harness-openai-nano
+name: harness-openai-5-nano
 
 # "openai" and "local" are built in; redefine or add endpoints here.
 providers:
@@ -22,7 +22,7 @@ run:
   episodes: "qt*"          # every type, feasible and infeasible
   limit: null              # at most N episodes per (type, case); null = all 100
   workers: 4
-  context: none
+  context: prepend
   memory: "off"
 
 evaluate:

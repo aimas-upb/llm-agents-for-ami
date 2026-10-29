@@ -8,7 +8,7 @@ generator:
   table: attribute_map
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-10-14T19:50:08.680185+00:00'
+  generated_at_utc: '2026-10-28T23:24:55.916354+00:00'
 rows:
 - key: '6.0'
   yaml_path: OnOff.OnOff
@@ -3246,7 +3246,7 @@ rows:
     attribute_id: 0
     attribute_id_hex: '0x0000'
     attribute_name: MeasuredValue
-    type: uint16
+    type: percent100ths
   writable: false
   affordance: observable
   mechanism: read
@@ -3276,7 +3276,7 @@ rows:
     attribute_id: 1
     attribute_id_hex: '0x0001'
     attribute_name: MinMeasuredValue
-    type: uint16
+    type: percent100ths
   writable: false
   affordance: observable
   mechanism: read
@@ -3306,7 +3306,7 @@ rows:
     attribute_id: 2
     attribute_id_hex: '0x0002'
     attribute_name: MaxMeasuredValue
-    type: uint16
+    type: percent100ths
   writable: false
   affordance: observable
   mechanism: read
@@ -3336,7 +3336,7 @@ rows:
     attribute_id: 3
     attribute_id_hex: '0x0003'
     attribute_name: Tolerance
-    type: uint16
+    type: percent100ths
   writable: false
   affordance: observable
   mechanism: read
@@ -3445,8 +3445,8 @@ rows:
     attribute_name: CurrentChannel
     type: ChannelInfoStruct
   writable: false
-  affordance: observable
-  mechanism: read
+  affordance: actuatable
+  mechanism: command
   role: affordance
   sosa_role: device_state
   quantity: null
@@ -3476,8 +3476,8 @@ rows:
     attribute_name: CurrentState
     type: PlaybackStateEnum
   writable: false
-  affordance: observable
-  mechanism: read
+  affordance: actuatable
+  mechanism: command
   role: affordance
   sosa_role: device_state
   quantity: null

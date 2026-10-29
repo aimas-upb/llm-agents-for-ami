@@ -8,7 +8,7 @@ generator:
   table: observable_properties
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-10-14T19:50:08.777005+00:00'
+  generated_at_utc: '2026-10-28T23:24:56.014360+00:00'
 rows:
 - key: room_state.humidity
   room_state_token: Humidity

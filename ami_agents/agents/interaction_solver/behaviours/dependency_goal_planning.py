@@ -104,7 +104,7 @@ from ..utils.profiling import ask_profile
 from ..utils.incomplete_goal_plan import as_explicit, candidates, incomplete_goal
 from ..utils.time_consistency import DEFAULT_TOLERANCE_SECONDS as DEFAULT_STATED_TIME_TOLERANCE
 from ..utils.time_consistency import check as check_times
-from ..utils.time_consistency import check_completion
+from ..utils.time_consistency import check_completion, check_triggers, triggered_after_timed
 from .ambiguous_goal_planning import AmbiguousGoalPlanningBehaviour
 from .explicit_goal_planning import ExplicitGoalPlanningBehaviour
 from .incomplete_goal_planning import IncompleteGoalPlanningBehaviour
@@ -119,6 +119,16 @@ class _Stop(Exception):
     def __init__(self, entry: Dict[str, Any]) -> None:
         super().__init__(entry.get("explanation"))
         self.entry = entry
+
+
+def _with_reads(questions: List[str], reads: List[Dict[str, Any]]) -> str:
+    """The questions for the user, then what they rest on: each property read
+    and its value ("I read utility_room_laundry_washer_2's countdownTime: 3540."),
+    so the user can tell where a time came from. A read with no value is said
+    too: an empty countdown is why a run length is unknown."""
+    said = "; ".join(f"{r['artifact']}'s {r['property']}: "
+                     f"{'no value' if r.get('value') is None else r['value']}" for r in reads)
+    return " ".join(questions) + (f" (I read {said}.)" if said else "")
 
 
 def _actions(tree: Any) -> List[str]:
@@ -309,8 +319,9 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
     async def _check_times(self, graph: Graph, structure: GoalStructure,
                            profile: Dict[str, Any], planning: Dict[str, Any]) -> List[str]:
         """Check each stated start / end clock time against the goal's relative
-        timing, and each goal that completes with a goal or event against its
-        run length (`utils/time_consistency.py`). Raises _Stop with a
+        timing, each trigger against the clock-timed start of its own device,
+        and each goal that completes with a goal or event against its run
+        length (`utils/time_consistency.py`). Raises _Stop with a
         clarification on the first question; returns the notes otherwise.
         Reads the clock, each anchor's time left and each run length once --
         only for structures that have something to check."""
@@ -318,7 +329,8 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
                      for g in structure.goals.values())
         completing = [gid for gid, g in structure.goals.items()
                       if g.timing and g.timing.completes_with]
-        if not stated and not completing:
+        triggered = triggered_after_timed(structure)
+        if not stated and not completing and not triggered:
             return []
         # 1. The current time, from the configured clock (the simulator's in
         #    SimuHome). Without one, stated times are only noted; a "finish
@@ -335,9 +347,13 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
             return [f"could not verify the stated times: no clock ({exc})"]
         # 2. How far away each predicate's event is, and how long each
         #    completing goal runs, where a property tells.
-        remaining = {pid: await self._remaining(graph, profile, pid, now)
+        #    Every read is kept: a question to the user says what it rests on,
+        #    and the entry carries them.
+        reads: List[Dict[str, Any]] = []
+        remaining = {pid: await self._remaining(graph, profile, pid, now, reads)
                      for pid in structure.predicates}
-        durations = {gid: await self._duration(graph, profile, gid, now) for gid in completing}
+        durations = {gid: await self._duration(graph, profile, gid, now, reads)
+                     for gid in completing}
         tolerance = float(planning.get("stated_time_tolerance_seconds",
                                        DEFAULT_STATED_TIME_TOLERANCE))
         # 3. The stated times first: a request whose own times disagree is
@@ -345,18 +361,25 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
         result = check_times(structure, now, remaining, tolerance, durations)
         if result.conflicts:
             raise _Stop({"tree": None, "requires_clarification": True,
-                         "error": "stated_time_conflict",
-                         "explanation": " ".join(result.conflicts)})
-        # 4. Then whether each "finish together" goal can, and can be timed.
+                         "error": "stated_time_conflict", "reads": reads,
+                         "explanation": _with_reads(result.conflicts, reads)})
+        # 4. Then whether each trigger happens after its device is started: one
+        #    due before would act on a device the request has not started yet.
+        triggers = check_triggers(structure, now, remaining, tolerance)
+        if triggers.conflicts:
+            raise _Stop({"tree": None, "requires_clarification": True,
+                         "error": "trigger_before_start", "reads": reads,
+                         "explanation": _with_reads(triggers.conflicts, reads)})
+        # 5. Then whether each "finish together" goal can, and can be timed.
         completion = check_completion(structure, now, remaining, durations, tolerance)
         if completion.conflicts:
             raise _Stop({"tree": None, "requires_clarification": True,
-                         "error": "completion_unverifiable",
-                         "explanation": " ".join(completion.conflicts)})
-        return result.notes + completion.notes
+                         "error": "completion_unverifiable", "reads": reads,
+                         "explanation": _with_reads(completion.conflicts, reads)})
+        return result.notes + triggers.notes + completion.notes
 
     async def _remaining(self, graph: Graph, profile: Dict[str, Any], pid: str,
-                         now) -> Optional[float]:
+                         now, reads: Optional[List[Dict[str, Any]]] = None) -> Optional[float]:
         """Seconds until predicate ``pid``'s event, read now from the property
         the profile names for it: its `time_to_event`, else the `ref_remaining`
         of a goal completing with it. None when nothing does, or the read has
@@ -368,10 +391,10 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
                 source = answer.get("time_to_event") or source
             elif item.get("question") == "completion_timing" and item.get("ref") == pid:
                 source = source or answer.get("ref_remaining")
-        return await self._read_seconds(graph, source, now)
+        return await self._read_seconds(graph, source, now, reads)
 
     async def _duration(self, graph: Graph, profile: Dict[str, Any], gid: str,
-                        now) -> Optional[float]:
+                        now, reads: Optional[List[Dict[str, Any]]] = None) -> Optional[float]:
         """Seconds goal ``gid``'s run takes, read now from the property its
         `completion_timing` answer names (`target_duration`); None when none
         does, or it has no value (a cycle's countdown while it is stopped)."""
@@ -379,11 +402,13 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
                        if item.get("question") == "completion_timing"
                        and item.get("target") == gid and isinstance(item.get("answer"), dict)),
                       None)
-        return await self._read_seconds(graph, source, now)
+        return await self._read_seconds(graph, source, now, reads)
 
-    async def _read_seconds(self, graph: Graph, source: Any, now) -> Optional[float]:
+    async def _read_seconds(self, graph: Graph, source: Any, now,
+                            reads: Optional[List[Dict[str, Any]]] = None) -> Optional[float]:
         """A TimeSource ({ref, reads_as}) read once, as seconds from now; None
-        when it names no known property, the read fails or has no value."""
+        when it names no known property, the read fails or has no value. Each
+        read made is appended to ``reads`` ({artifact, property, url, value})."""
         # 1. The property it names.
         if not isinstance(source, dict) or not isinstance(source.get("ref"), dict):
             return None
@@ -401,6 +426,10 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
         field_name = ref.get("property_field")
         if isinstance(value, dict) and field_name and field_name != "NA":
             value = value.get(field_name)
+        if reads is not None:
+            reads.append({"artifact": ref.get("artifact_name"),
+                          "property": ref.get("property_name"), "url": info.url,
+                          "value": value})
         # 3. To seconds from now: an end time minus now, or a span in the
         #    property's own unit.
         if source.get("reads_as") == "timestamp":

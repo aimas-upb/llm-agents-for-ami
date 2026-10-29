@@ -238,7 +238,8 @@ class HomeAssistantRDF:
 
     # ---- Dynamic schema builders for HA services ----
     def _build_input_schema_from_fields(self, fields: Dict[str, Any],
-                                        entity_options: Optional[Dict[str, List[str]]] = None
+                                        entity_options: Optional[Dict[str, List[str]]] = None,
+                                        domain: Optional[str] = None,
                                         ) -> Optional[BNode]:
         """Build JSON Schema from HA service field definitions.
 
@@ -247,7 +248,10 @@ class HomeAssistantRDF:
         a service definition is shared by every entity of its domain, so it
         cannot say which modes this one has. Such a field -- and a select
         field with static options -- gets them as `js:enum` and as its
-        description, the way an enum is described."""
+        description, the way an enum is described.
+
+        ``domain`` is the service's domain, for the fields whose scale
+        direction `SCALE_MEANINGS` states (a cover's `position`)."""
         if not fields:
             return None
         entity_options = entity_options or {}
@@ -322,6 +326,10 @@ class HomeAssistantRDF:
                 if field_def.get("description") else []
             if allowed:
                 sentences.append("Values on this device: " + ", ".join(allowed) + ".")
+            # Which way the number runs, where the domain fixes it.
+            meaning = SCALE_MEANINGS.get((domain or "", field_name))
+            if meaning:
+                sentences.append(meaning)
             if sentences:
                 self.g.add((prop, JS.description, Literal(" ".join(sentences))))
 
@@ -454,7 +462,8 @@ class HomeAssistantRDF:
             attr_name: The attribute name (e.g., "state", "brightness")
             attr_value: The current value of the attribute
             entity_attributes: All entity attributes for context
-            entity_domain: Optional entity domain (e.g., "sensor", "light") for domain-specific logic
+            entity_domain: Optional entity domain (e.g., "sensor", "light") for domain-specific
+                logic: a state's values, and a scale's direction (SCALE_MEANINGS)
         """
         schema = BNode()
 
@@ -574,6 +583,13 @@ class HomeAssistantRDF:
             # For other types, default to string
             self.g.add((schema, RDF.type, JS.StringSchema))
 
+        # Which way the number runs, where the domain fixes it (a cover's
+        # current_position). Only attributes, never a state, are in the table,
+        # so no other description is overwritten.
+        meaning = SCALE_MEANINGS.get((entity_domain or "", attr_name))
+        if meaning:
+            self.g.add((schema, JS.description, Literal(meaning)))
+
         return schema
 
     def platform_to_rdf(self, areas: List[Dict[str, Any]]) -> None:
@@ -655,6 +671,21 @@ STATE_VALUES = {
     "binary_sensor": ["on", "off"],
     "cover": ["open", "closed", "opening", "closing"],
     "media_player": ["off", "on", "idle", "playing", "paused", "standby"],
+}
+
+# Which way a scale runs, for the (domain, field or attribute) pairs whose
+# number alone does not say it. Home Assistant's cover position counts how
+# far the cover is OPEN, the reverse of Matter's lift percentage (percent
+# closed), so each TD states its own device's direction in the value schema
+# (`js:description`), not on the homeont class both deployments share. The
+# service field (`position`) and the attribute it sets (`current_position`)
+# say the same.
+SCALE_MEANINGS = {
+    ("cover", "position"): "Percent open: 0 is fully closed, 100 is fully open.",
+    ("cover", "current_position"): "Percent open: 0 is fully closed, 100 is fully open.",
+    ("cover", "tilt_position"): "Percent tilted open: 0 is fully closed, 100 is fully open.",
+    ("cover", "current_tilt_position"):
+        "Percent tilted open: 0 is fully closed, 100 is fully open.",
 }
 
 

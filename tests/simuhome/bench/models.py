@@ -37,6 +37,7 @@ Flow:
     ModelSpec.ua_config()    the UA's LLMClientConfig for that step
     ModelSpec.isa_config()   the ISA's LLMClientConfig for that step
     ModelSpec.call_kwargs()  temperature, or reasoning effort + token budget
+    close_clients()          close the clients made so far, in the loop that used them
 
 Reasoning models are recognised by name, as the agents do (`o*`, `gpt-5*`):
 they get `reasoning_effort` and `max_completion_tokens`, the others
@@ -51,7 +52,7 @@ import json
 import os
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 import yaml
@@ -82,6 +83,27 @@ PROVIDERS: Dict[str, Dict[str, Any]] = {
 # the agents do (`agent.explicit_llm`).
 INHERIT_EXPLICIT = ("profiling", "guarding")
 
+# The clients `ModelSpec.client` has made and not yet closed. Each episode runs
+# in its own event loop (`asyncio.run`), so its clients must be closed in that
+# loop: left to the garbage collector, they would be closed during a later
+# episode, on the dead loop's connections ("Event loop is closed").
+_OPEN_CLIENTS: List[AsyncOpenAI] = []
+
+
+async def close_clients() -> None:
+    """Close every client made since the last call. Called at the end of an
+    episode, inside its event loop; a client that fails to close is dropped
+    (its connections die with the loop anyway)."""
+    # 1. Take the list first, so a client made while closing is kept for next time.
+    clients = list(_OPEN_CLIENTS)
+    _OPEN_CLIENTS.clear()
+    # 2. Close each one; a failure only loses an idle connection.
+    for client in clients:
+        try:
+            await client.close()
+        except Exception:  # noqa: BLE001 - best effort at teardown
+            pass
+
 
 @dataclass(frozen=True)
 class ModelSpec:
@@ -103,14 +125,19 @@ class ModelSpec:
         return bool(self.base_url) and "openai.com" not in self.base_url
 
     def client(self) -> AsyncOpenAI:
-        """A client for this spec. A local endpoint never inherits the
-        environment's proxies or OpenAI key."""
+        """A client for this spec, registered for `close_clients`. A local
+        endpoint never inherits the environment's proxies or OpenAI key."""
+        # 1. The client: a local endpoint without proxies, or OpenAI.
         if self.local:
-            return AsyncOpenAI(api_key=os.getenv(self.api_key_env or "", "") or "ollama",
-                               base_url=self.base_url, timeout=REQUEST_TIMEOUT,
-                               max_retries=0, http_client=httpx.AsyncClient(trust_env=False))
-        return AsyncOpenAI(api_key=os.getenv(self.api_key_env or "OPENAI_API_KEY"),
-                           base_url=self.base_url or OPENAI_URL, timeout=REQUEST_TIMEOUT)
+            client = AsyncOpenAI(api_key=os.getenv(self.api_key_env or "", "") or "ollama",
+                                 base_url=self.base_url, timeout=REQUEST_TIMEOUT,
+                                 max_retries=0, http_client=httpx.AsyncClient(trust_env=False))
+        else:
+            client = AsyncOpenAI(api_key=os.getenv(self.api_key_env or "OPENAI_API_KEY"),
+                                 base_url=self.base_url or OPENAI_URL, timeout=REQUEST_TIMEOUT)
+        # 2. Registered, so the episode closes it in its own loop (`close_clients`).
+        _OPEN_CLIENTS.append(client)
+        return client
 
     def call_kwargs(self) -> Dict[str, Any]:
         if self.reasoning:

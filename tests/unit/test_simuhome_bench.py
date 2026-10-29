@@ -122,12 +122,45 @@ class TestMeter:
         assert summary["structuring"]["calls"] == 2 and summary["structuring"]["count"] == 1
         assert summary["structuring.intent"]["tokens_in"] == 10
 
-    def test_the_openai_method_is_restored(self):
+    def test_the_openai_methods_are_restored(self):
+        """Both APIs' `create` are wrapped while a meter is installed, and
+        restored after: Chat Completions, and the Responses API the BT planner
+        uses on OpenAI's endpoint."""
         from openai.resources.chat.completions import AsyncCompletions
-        original = AsyncCompletions.create
+        from openai.resources.responses import AsyncResponses
+        # 1. The originals, then wrapped while installed.
+        originals = (AsyncCompletions.create, AsyncResponses.create)
         with Meter().installed():
-            assert AsyncCompletions.create is not original
-        assert AsyncCompletions.create is original
+            assert AsyncCompletions.create is not originals[0]
+            assert AsyncResponses.create is not originals[1]
+        # 2. Restored on exit.
+        assert (AsyncCompletions.create, AsyncResponses.create) == originals
+
+    def test_responses_calls_are_booked_with_their_tokens(self):
+        """A Responses API call is booked to the step open when it was made,
+        with its tokens read under that API's names (input/output_tokens)."""
+        from openai.resources.responses import AsyncResponses
+        meter = Meter()
+        usage = SimpleNamespace(input_tokens=120, output_tokens=30)
+
+        # 1. A fake `create` under the meter's wrapper, called inside a step.
+        async def fake_create(self, **kwargs):
+            return SimpleNamespace(usage=usage)
+
+        async def scenario():
+            original = AsyncResponses.create
+            AsyncResponses.create = fake_create
+            try:
+                with meter.installed():
+                    async with meter.step("planning"):
+                        await AsyncResponses.create(None, model="gpt-6-luna")
+            finally:
+                AsyncResponses.create = original
+
+        asyncio.run(scenario())
+        # 2. One call, in planning, with both token counts.
+        assert meter.calls[0]["step"] == "planning"
+        assert (meter.calls[0]["tokens_in"], meter.calls[0]["tokens_out"]) == (120, 30)
 
 
 class TestShim:
@@ -486,3 +519,94 @@ class TestQt1DeclaredValues:
     def test_the_specs_full_enum_is_a_wrong_value(self):
         result = self._check([0, 1, 2, 3, 4, 5, 6])
         assert result["score"] == 0 and result["goals"][0]["read"] is True
+
+
+class TestQt1StatedFacts:
+    """qt1_feasible_seed_34: "what brand is dehumidifier 1?". The vendor is
+    stated on the TD, so the answer gives it without a read; it counts when it
+    gives the device's own value. A number is never matched in an answer."""
+
+    def _check(self, attribute, value, answer):
+        """The qt1 check on a record that read nothing and answered ``answer``."""
+        from tests.simuhome.bench import evaluate
+        episode = {"initial_home_config": {"rooms": {"utility_room": {"devices": [
+            {"device_id": "dehumidifier_1", "attributes": {attribute: value}}]}}},
+            "eval": {"goals": [{"variant": "device_attribute", "room_id": "utility_room",
+                                "device_id": "dehumidifier_1", "attribute": attribute}]}}
+        record = {"queries": [], "response": answer}
+        with patch.object(evaluate, "required_actions", return_value=(True, [])):
+            return evaluate.check_qt1(record, episode, {}, feasible=True)
+
+    def test_the_vendor_given_in_the_answer_passes(self):
+        result = self._check("0.BasicInformation.VendorName", "LG Electronics",
+                             "The Dehumidifier in the Utility Room is made by LG Electronics.")
+        assert result["score"] == 1 and result["goals"][0]["read"] is False
+
+    def test_another_vendor_fails(self):
+        assert self._check("0.BasicInformation.VendorName", "LG Electronics",
+                           "It is made by Samsung.")["score"] == 0
+
+    def test_a_number_in_the_answer_is_not_matched(self):
+        """"its product ID is 4" could be any 4: numbers need a read."""
+        assert self._check("0.BasicInformation.ProductID", 4, "Its ID is 4.")["score"] == 0
+
+
+class TestQt1RoomState:
+    """A room's state is scored as SimuHome's judge scores it: against what the
+    agent read, not the episode's value at reset (the simulator runs in real
+    time; a purifier takes PM10 from 20 to 0 before any agent reads it)."""
+
+    EPISODE = {"initial_home_config": {"rooms": {"kitchen": {"devices": []}}},
+               "eval": {"goals": [{"variant": "room_state", "room_id": "kitchen",
+                                   "room_state": "pm10", "current_value": 20.0}]}}
+
+    def _check(self, read, answer):
+        """The qt1 check on a record that read ``read`` and answered ``answer``."""
+        from tests.simuhome.bench import evaluate
+        record = {"ambient_sensors": {"kitchen_air_quality_sensor_1": "kitchen"},
+                  "response": answer,
+                  "queries": [{"kind": "state", "response": {"affordances": [{
+                      "target": "http://h/workspaces/home/kitchen/artifacts/"
+                                "kitchen_air_quality_sensor_1/properties/pm10",
+                      "value": read}]}}]}
+        with patch.object(evaluate, "required_actions", return_value=(True, [])), \
+                patch.dict(evaluate.ROOM_STATE_NAMES, {"pm10": "pm10"}):
+            return evaluate.check_qt1(record, self.EPISODE, {}, feasible=True)
+
+    def test_the_value_read_and_reported_passes_though_the_room_moved(self):
+        assert self._check(0.0, "The PM10 in the Kitchen is 0.0.")["score"] == 1
+
+    def test_a_number_other_than_the_one_read_fails(self):
+        assert self._check(0.0, "The PM10 in the Kitchen is 20.0.")["score"] == 0
+
+
+class TestQt1DeviceFacts:
+    """Two device answers that are right without a value read: a dryer's
+    levels listed from its SupportedDrynessLevels (seed 9), and a phase the
+    dishwasher does not report while stopped, read and found empty (seed 50)."""
+
+    def _check(self, attribute, value, record):
+        """The qt1 check of one device attribute against ``record``."""
+        from tests.simuhome.bench import evaluate
+        episode = {"initial_home_config": {"rooms": {"kitchen": {"devices": [
+            {"device_id": "d_1", "attributes": {attribute: value}}]}}},
+            "eval": {"goals": [{"variant": "device_attribute", "room_id": "kitchen",
+                                "device_id": "d_1", "attribute": attribute}]}}
+        with patch.object(evaluate, "required_actions", return_value=(True, [])):
+            return evaluate.check_qt1(record, episode, {}, feasible=True)
+
+    def test_supported_levels_listed_exactly_pass(self):
+        record = {"queries": [{"kind": "capabilities", "response": {"entries": [
+            {"artifact_name": "d_1", "affordance_name": "selectedDrynessLevel",
+             "permitted_values": {"enum": [0, 1, 2, 3]}}]}}]}
+        result = self._check("1.LaundryDryerControls.SupportedDrynessLevels", [0, 1, 2, 3],
+                             record)
+        assert result["score"] == 1
+
+    def test_an_empty_attribute_read_and_found_empty_passes(self):
+        record = {"queries": [{"kind": "state", "response": {"affordances": [
+            {"target": "http://h/workspaces/home/kitchen/artifacts/d_1/properties/currentPhase",
+             "value": None}]}}]}
+        assert self._check("1.OperationalState.CurrentPhase", None, record)["score"] == 1
+        # Not read at all: still a miss.
+        assert self._check("1.OperationalState.CurrentPhase", None, {"queries": []})["score"] == 0
