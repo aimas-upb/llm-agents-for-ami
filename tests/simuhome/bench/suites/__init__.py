@@ -79,6 +79,9 @@ class Suite:
     default_guidelines: str = "default"
     home_key: Optional[Callable[[Path, str], str]] = None
     environment: bool = False
+    # Whether a judge panel reads the replies to the requests that cannot be done
+    # (HomeBench: no, a refusal is scored as an `error_input` token).
+    judge: bool = True
 
     @property
     def worker_cls(self) -> Any:

@@ -192,6 +192,62 @@ class TestNamedDeviceMissing:
         assert _goal(device_reference="label").device_reference is None
 
 
+class TestUnmatched:
+    """A device the request mentions by kind that the home does not have, or a change
+    a present device cannot make: asked about, never completed with another device."""
+
+    def _no_ac(self, **fields):
+        """"Set the air conditioner in the master bedroom to 16": no AC there, so the
+        structurer kept only the room and the value, and the user's words for the AC."""
+        return _goal(intent_text="set the air conditioner to 16 degrees",
+                     location_class="homeont:MasterBedroom", target_value_text="16 degrees",
+                     unmatched_device="the air conditioner", **fields)
+
+    def test_the_fields_are_read_and_never_sent(self):
+        """Both are the UA's own: parsed from the structurer, left out of the wire."""
+        goal = self._no_ac(unmatched_action="brightness")
+        assert (goal.unmatched_device, goal.unmatched_action) == ("the air conditioner",
+                                                                 "brightness")
+        wire = goal.to_wire_dict()
+        assert "unmatched_device" not in wire and "unmatched_action" not in wire
+
+    def test_a_missing_device_is_asked_about_with_and_without_a_room(self):
+        """The user's words, the room when there is one, and what to do instead."""
+        assert clarification_question(self._no_ac()) == (
+            "I can't find the air conditioner in the master bedroom. What should I do instead?")
+        no_room = _goal(intent_text="turn on the heating", unmatched_device="heating",
+                        target_value_text="on")
+        assert clarification_question(no_room) == (
+            "I can't find the heating. What should I do instead?")
+
+    def test_a_change_the_device_cannot_make_is_asked_about(self):
+        """The garage light is there, but has no brightness: the device by its name
+        (else by its kind and room), and the user's words for the change."""
+        goal = _goal(intent_text="set the garage light brightness to 90",
+                     location_class="homeont:Garage", artifact_class="homeont:OnOffLight",
+                     artifact_name="garage_light", target_value_text="90",
+                     unmatched_action="brightness")
+        assert clarification_question(goal) == (
+            "The garage light has no brightness setting. What should I do instead?")
+        goal.artifact_name = None
+        assert clarification_question(goal).startswith(
+            "The on off light in the garage has no brightness setting.")
+
+    def test_the_whole_structure_is_held_back(self):
+        """One such goal holds back its request, as any question does."""
+        structure = GoalStructure(intent_text="set the air conditioner to 16 degrees",
+                                  goals={"G1": self._no_ac()})
+        assert structure_clarification(structure) is not None
+
+    def test_it_is_never_looked_up(self):
+        """Even naming a room and an action (a NO_CLASS goal), a lookup could find the
+        heater's setpoint and promote the goal onto it: no query is made."""
+        goal = self._no_ac(affordance_class="saref:SetLevelCommand")
+        assert goal_query(goal) is None
+        goal.unmatched_device = None
+        assert goal_query(goal) is not None          # without it, looked up as before
+
+
 class TestMissingRoom:
     """A goal naming its device class and action but not its room."""
 

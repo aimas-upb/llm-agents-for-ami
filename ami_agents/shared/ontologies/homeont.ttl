@@ -243,6 +243,16 @@ an attribute as type "list" and puts the element type in a child <entry>, so
 	rdfs:domain js:ArraySchema ;
 	rdfs:range xsd:string .
 
+:orderedValues a owl:ObjectProperty ;
+	rdfs:label "ordered values"@en ;
+	rdfs:comment """The values of an enum that form a scale, lowest first, as an
+rdf:List -- a fan speed low, medium, high. A request to change such a value "by one
+level" moves one place along the list. A value of the enum outside the list (an
+automatic mode) has no position on the scale. The js:enum values are a set, so the
+order is stated here and nowhere else."""@en ;
+	rdfs:domain js:DataSchema ;
+	rdfs:range rdf:List .
+
 
 # NOTE -- units are carried by `qudt:unit` alone.
 #
@@ -1802,5 +1812,5 @@ closed a CloseCommand."""@en ;
 
 :VacuumState a owl:Class ;
 	rdfs:label "Vacuum State"@en ;
-	rdfs:comment "The state a robot vacuum reports. Read only: it has no command to change it."@en ;
+	rdfs:comment "The operating state of a robot vacuum, for example cleaning, paused or charging. Its start, pause, stop and charge commands change it."@en ;
 	rdfs:subClassOf :DeviceStateProperty .

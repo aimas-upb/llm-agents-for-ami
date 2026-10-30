@@ -32,20 +32,17 @@ Prefix each command with `conda run -n ami-agents`.
   conditions: HomeBench's file lists none (`tests/homebench/guidelines.yaml`), `default` is
   the agents' own, as deployed.
 - **HomeBench scoring** (`tests/homebench/scoring.py`, `gold_log.py`, `homebench_metrics.py`).
-  Feasible episodes use SimuHome's qt3 check unchanged. Infeasible ones: an execution check
-  per part (no accepted action in the part's scope that no feasible part asks for, and the
-  agents answered impossible or asked) plus a judge panel -- SimuHome's own for a missing
-  device, HomeBench's prompt (`tests/homebench/judge_prompt.py`) for a missing attribute.
-  Mixed episodes: both, each on its own parts, all must pass. `score` is the benchmark's own
-  reading of each label; `score_extra` also accepts one extra reading (a gold
-  `set_brightness(0)` / `set_intensity(0)` for a request that says turn off / switch off is
-  met by the device being off: our criterion, not HomeBench's), and every check records which
-  reading `matched`. Each verdict carries a `homebench` block (gold and predicted tokens, the
+  One rule for every case, with no judge: every gold call met by an accepted action that is
+  exactly that call (or by a value that held before and after, so no action was needed), and
+  every `error_input` by a goal answered impossible or with a question; other actions are not
+  counted. `score` is the benchmark's own reading of each label; `score_extra` also accepts one
+  extra reading (a gold `set_brightness(0)` / `set_intensity(0)` for a request that says turn
+  off / switch off is met by that device's `turn_off()`: our criterion, not HomeBench's), and
+  every check records how it was `matched`. Each verdict carries a `homebench` block (gold and predicted tokens, the
   official bucket, per-part counts) from which `stats.py` computes HomeBench's official EM /
   Precision / Recall / F1 per bucket (`buckets.csv`, a table in `summary.md`) with no LLM
   call; `gold_log.py` turns the accepted actions into the gold's `room.device.op(args)`
-  strings. `--no-judge` leaves the execution check alone for the infeasible parts, which is
-  weaker, and every table says so.
+  strings.
 - **Variants** (`variants/*.yaml`) set one model per step, including local Ollama models
   via `base_url` or `provider: local`. A step a variant doesn't name uses the agents'
   default; profiling and guarding, unnamed, use the variant's `planning.explicit` model.

@@ -280,10 +280,16 @@ class TestMappings:
         with pytest.raises(MappingTableError):
             m.gold_string("kitchen_curtain", "light", "onOff", True)  # id/type mismatch
 
-    def test_vacuum_commands_the_home_does_not_offer_have_no_action(self):
-        for command in ("start", "stop", "pause", "charge"):
-            with pytest.raises(MappingTableError):
-                load_mappings().action_for_command("vacuum_robot", command, None)
+    def test_the_vacuum_operation_commands_are_its_state_action(self):
+        """start / pause / stop / charge are the vacuum's ``state`` action, both ways."""
+        m = load_mappings()
+        for command, state in (("start", "cleaning"), ("pause", "paused"),
+                               ("stop", "stopped"), ("charge", "charging")):
+            # 1. The gold call names the action and its value ...
+            assert m.action_for_command("vacuum_robot", command, None) == ("state", state)
+            # 2. ... and that action and value give the gold call back.
+            assert m.gold_string("household_vacuum_robot", "vacuum_robot", "state",
+                                 state) == f"vacuum_robot.{command}()"
 
     def test_read_and_write_attribute_are_inverse(self):
         m = load_mappings()
@@ -327,7 +333,7 @@ class TestGenerator:
         assert all(r["status"] == "auto" for rows in tables.values() for r in rows)
         keys = {r["key"] for r in tables["command_map"]}
         assert {"light.onOff", "light.brightness", "trash.pack"} <= keys
-        assert "vacuum_robot.state" not in keys        # read only: no command
+        assert "vacuum_robot.state" in keys        # start / pause / stop / charge
 
     def test_a_device_type_attribute_or_room_without_a_specification_fails(self, home):
         for edit in (
@@ -505,10 +511,19 @@ class TestTD:
                                 TD.hasPropertyAffordance, TD.hasOutputSchema)
         assert {str(o) for o in g.objects(schema, JS.enum)} == {
             "empty", "not_full", "full"}
-        # The vacuum's state is readable and has no action.
+        # The vacuum's state: an operational-state action over the four operations,
+        # and a read that also lists the `on` every vacuum starts in.
+        g, action, schema = shape("household", "household_vacuum_robot", "state",
+                                  TD.hasActionAffordance, TD.hasInputSchema)
+        assert {str(o) for o in g.objects(schema, JS.enum)} == {
+            "cleaning", "paused", "stopped", "charging"}
+        assert (action, RDF.type, HOMEONT.SetOperationalStateCommand) in g
+        g, prop, schema = shape("household", "household_vacuum_robot", "state",
+                                TD.hasPropertyAffordance, TD.hasOutputSchema)
+        assert {str(o) for o in g.objects(schema, JS.enum)} == {
+            "on", "cleaning", "paused", "stopped", "charging"}
+        # Battery and tank stay read only.
         g, art = thing(td, "household", "household_vacuum_robot")
-        assert "state" in affordances(g, art, TD.hasPropertyAffordance)
-        assert "state" not in affordances(g, art, TD.hasActionAffordance)
         assert {"battery", "tank"} & set(affordances(g, art, TD.hasActionAffordance)) == set()
 
     def test_numeric_schema_carries_the_devices_own_range_and_unit(self, td):
@@ -521,6 +536,76 @@ class TestTD:
         assert g.value(schema, URIRef("http://qudt.org/schema/qudt/unit")) is not None
         assert (action, RDF.type, SAREF.SetAbsoluteLevelCommand) in g
         assert (g.value(action, SAREF.actsUpon), RDF.type, HOMEONT.HeaterHeatingSetpoint) in g
+
+    @pytest.mark.parametrize("device, name", [
+        ("living_room_light", "brightness"),
+        ("living_room_media_player", "volume"),
+        ("living_room_curtain", "degree"),
+        ("living_room_aromatherapy", "intensity"),
+        ("living_room_humidifier", "intensity"),
+        ("living_room_dehumidifiers", "intensity"),
+    ])
+    def test_a_level_is_in_percent(self, td, device, name):
+        """A 0-100 level states ``unit:PERCENT`` on both its schemas: HomeBench reads
+        "by N percent" as percentage points, and the modify planner adds points only
+        on a property in percent (else it scales the current value)."""
+        g, art = thing(td, "living_room", device)
+        percent = URIRef("http://qudt.org/vocab/unit/PERCENT")
+        # 1. The read: the output schema of the property.
+        prop = affordances(g, art, TD.hasPropertyAffordance)[name]
+        assert g.value(g.value(prop, TD.hasOutputSchema), QUDT.unit) == percent
+        # 2. The write: the input schema of the action of the same name.
+        action = affordances(g, art, TD.hasActionAffordance)[name]
+        assert g.value(g.value(action, TD.hasInputSchema), QUDT.unit) == percent
+
+    @pytest.mark.parametrize("device, name", [
+        ("living_room_fan", "speed"),
+        ("living_room_air_conditioner", "fanSpeed"),
+        ("living_room_air_purifiers", "fanSpeed"),
+    ])
+    def test_a_fan_speed_states_its_scale(self, td, device, name):
+        """A fan speed's schemas state low < medium < high (`homeont:orderedValues`),
+        as the planner reads them; `auto`, one of the device's options, is not on it."""
+        from ami_agents.agents.interaction_solver.utils.specific_capability_context import (
+            json_schema,
+        )
+        g, art = thing(td, "living_room", device)
+        # 1. The write and the read schema carry the same scale.
+        for predicate, slot in ((TD.hasActionAffordance, TD.hasInputSchema),
+                                (TD.hasPropertyAffordance, TD.hasOutputSchema)):
+            schema = json_schema(g, g.value(affordances(g, art, predicate)[name], slot))
+            assert schema["order"] == ["low", "medium", "high"]
+            # 2. `auto` is a value of the device, off the scale.
+            assert "auto" in schema["enum"]
+
+    def test_a_curtain_degree_says_it_is_a_percentage(self, td):
+        """HomeBench calls a curtain's 0-100 position its "degree"; the schema says so
+        (`js:description`), next to its unit, so "50 degrees" is read as 50."""
+        from ami_agents.agents.interaction_solver.utils.specific_capability_context import (
+            json_schema,
+        )
+        g, art = thing(td, "living_room", "living_room_curtain")
+        # The write and the read schema both carry the unit and the sentence.
+        for predicate, slot in ((TD.hasActionAffordance, TD.hasInputSchema),
+                                (TD.hasPropertyAffordance, TD.hasOutputSchema)):
+            schema = json_schema(g, g.value(affordances(g, art, predicate)["degree"], slot))
+            assert schema["unit"] == "unit:PERCENT"
+            assert "calls its degree: '50 degrees' means 50" in schema["description"]
+
+    def test_a_swing_states_no_scale(self, td):
+        """Swing has no order: HomeBench's own labels step it both ways."""
+        from ami_agents.agents.interaction_solver.utils.specific_capability_context import (
+            json_schema,
+        )
+        g, art = thing(td, "living_room", "living_room_fan")
+        schema = g.value(affordances(g, art, TD.hasActionAffordance)["swing"], TD.hasInputSchema)
+        assert "order" not in json_schema(g, schema)
+
+    def test_an_interval_is_not_in_percent(self, td):
+        """The aromatherapy interval is a 10-60 duration, not a share: no unit."""
+        g, art = thing(td, "living_room", "living_room_aromatherapy")
+        action = affordances(g, art, TD.hasActionAffordance)["interval"]
+        assert g.value(g.value(action, TD.hasInputSchema), QUDT.unit) is None
 
     def test_enum_options_are_the_devices_own(self, td):
         g, art = thing(td, "household", "household_vacuum_robot")
@@ -882,11 +967,13 @@ class TestEngineApp:
                      if d["device_id"] == "kitchen_light")
         assert light["attributes"]["brightness"] == 20
 
-    def test_unreachable_vacuum_command_is_reported_not_applied(self, app_client, home):
+    def test_a_vacuum_command_sets_its_state(self, app_client, home):
+        """``start`` is applied like any state command: the vacuum is then cleaning."""
         app_client.post("/api/simulation/reset", json=home)
         reply = app_client.post("/api/devices/household_vacuum_robot/commands",
                                 json={"command_id": "start"}).json()["data"]
-        assert reply["status"] == "unreachable" and reply["attribute"] is None
+        assert reply["status"] == "applied"
+        assert (reply["attribute"], reply["value"]) == ("state", "cleaning")
 
     def test_reset_restores_the_home_and_rejects_a_bad_body(self, app_client, home):
         app_client.post("/api/simulation/reset", json=home)
@@ -1132,7 +1219,7 @@ class TestHBTD:
         # no such thing
         ("kitchen", "kitchen_light", "swing", {"value": "up"}, 404),
         ("bathroom", "bathroom_light", "brightness", {"value": 5}, 404),
-        ("household", "household_vacuum_robot", "state", {"value": "off"}, 404),
+        ("household", "household_vacuum_robot", "state", {"value": "off"}, 422),
         ("kitchen", "kitchen_ghost", "onOff", {"value": True}, 404),
     ])
     def test_bad_invocations_are_rejected_and_change_nothing(
@@ -1226,7 +1313,7 @@ class TestVerifyHelpers:
                 ("'''error_input,living_room.curtain.close(),'''", True),
                 ("'''vacuum_robot.start()'''", False)]
         report = verify_phase2.gold_round_trip(rows)
-        assert report["calls"] == 3 and report["unreachable"] == 1
+        assert report["calls"] == 3
         assert report["failures"] == []
         # Break the table: the template writes the wrong op.
         m = load_mappings()
@@ -1241,6 +1328,6 @@ class TestVerifyHelpers:
                 for r in convert.read_jsonl(HOMEBENCH / convert.TEST_DATA)]
         report = verify_phase2.gold_round_trip(rows)
         assert report["failures"] == []
-        assert report["calls"] == 18832 and report["unreachable"] == 70
+        assert report["calls"] == 18832
         # A sample of every op the gold uses, not only the common ones.
         assert len(report["ops"]) >= 50

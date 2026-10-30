@@ -12,8 +12,9 @@ This engine therefore follows the *gold*, not the generator:
   range of ``heating.temperature`` is corrected to 16-30 (the data declares 30-100
   on 99 of 129 heaters, yet every gold heating value is 16-30);
 * no side effects between attributes, no clock, no physics;
-* gold vacuum-robot calls the home does not offer (``start``, ``stop``, ``pause``,
-  ``charge``: 70 calls) are *reported* as ``unreachable`` and never exposed.
+* the vacuum robot's ``start``, ``stop``, ``pause`` and ``charge`` (70 gold calls) set
+  its ``state`` (``cleaning``, ``stopped``, ``paused``, ``charging``): the gold uses them,
+  so a home that follows the gold offers them.
 
 A home is the ``initial_home_config`` dictionary written by
 ``tests/homebench/convert.py``: ``rooms -> {room: {"state": {}, "devices": [...]}}``,
@@ -60,6 +61,8 @@ STATE_COMMANDS: Dict[str, str] = {
     "open": "open", "close": "closed",
     "play": "playing", "pause": "paused", "stop": "stopped",
     "pack": "empty",
+    # The vacuum's operation; `pause` and `stop` are the media player's own above.
+    "start": "cleaning", "charge": "charging",
 }
 
 #: Which state commands each device type offers (the home's method list agrees).
@@ -78,7 +81,7 @@ DEVICE_STATE_COMMANDS: Dict[str, frozenset] = {
     "garage_door": frozenset({"open", "close"}),
     "media_player": frozenset({"play", "pause", "stop"}),
     "trash": frozenset({"pack"}),
-    "vacuum_robot": frozenset(),
+    "vacuum_robot": frozenset({"start", "stop", "pause", "charge"}),
 }
 
 #: Attributes a ``set_<attribute>`` command can write, per device type. Read-only
@@ -100,18 +103,12 @@ SETTABLE_ATTRIBUTES: Dict[str, frozenset] = {
     "vacuum_robot": frozenset({"mode", "cleaning_area"}),
 }
 
-#: Gold vacuum calls the home's method list does not contain; reported, not exposed.
-UNREACHABLE_COMMANDS: Dict[str, frozenset] = {
-    "vacuum_robot": frozenset({"start", "stop", "pause", "charge"}),
-}
-
 #: Declared ranges the gold contradicts: (device_type, attribute) -> (low, high).
 RANGE_CORRECTIONS: Dict[Tuple[str, str], Tuple[int, int]] = {
     ("heating", "temperature"): (16, 30),
 }
 
 STATUS_APPLIED = "applied"
-STATUS_UNREACHABLE = "unreachable"
 
 
 # -- errors and results -----------------------------------------------------------
@@ -123,8 +120,7 @@ class EngineError(ValueError):
 
 @dataclass(frozen=True)
 class ApplyResult:
-    """Outcome of one ``apply``: ``applied`` with the attribute written, or
-    ``unreachable`` (a gold call the home does not offer; the state is unchanged)."""
+    """Outcome of one ``apply``: ``applied`` with the attribute written."""
 
     status: str
     attribute: Optional[str]
@@ -146,8 +142,8 @@ def make_device_id(room: Optional[str], device: str) -> str:
 def command_effect(command: str, arg: Any = None) -> Optional[Tuple[str, Any]]:
     """Return ``(attribute, value)`` a successful command writes, or ``None``.
 
-    ``None`` means the command writes nothing the engine models (an unreachable
-    vacuum command); the converter marks such gold parts as unreachable.
+    ``None`` means the command writes nothing the engine models (a command no device
+    offers); the engine refuses it before it gets here.
     """
     # 1. State commands write ``state``; setters write the attribute they name.
     if command in STATE_COMMANDS:
@@ -270,31 +266,26 @@ class HomeBenchEngine:
     def apply(self, device_id: str, command: str, arg: Any = None) -> ApplyResult:
         """Apply one command to one device, or raise ``EngineError``.
 
-        Unreachable vacuum commands return ``status="unreachable"`` and leave the
-        state alone. Nothing else is rejected for the device's current state.
+        Nothing is rejected for the device's current state.
         """
         # 1. Resolve the device.
         device = self._devices.get(device_id)
         if device is None:
             raise EngineError(f"unknown device {device_id!r}")
-        dtype = device["device_type"]
-        # 2. Gold calls the home does not offer are reported, not applied.
-        if command in UNREACHABLE_COMMANDS.get(dtype, ()):
-            return ApplyResult(STATUS_UNREACHABLE, None, None)
-        # 3. The command must be one the home offers on this device.
+        # 2. The command must be one the home offers on this device.
         if command not in self.exposed_commands(device_id):
             raise EngineError(f"{device_id} offers no command {command!r}")
         effect = command_effect(command, arg)
         if effect is None:  # pragma: no cover - exposed commands always have one
             raise EngineError(f"{command!r} has no modelled effect")
         attribute, value = effect
-        # 4. State commands take no argument; setters validate theirs.
+        # 3. State commands take no argument; setters validate theirs.
         if attribute == "state":
             if arg is not None:
                 raise EngineError(f"{command!r} takes no argument, got {arg!r}")
         else:
             value = _validate(device, attribute, arg)
-        # 5. Write it. No precondition on the device's current state.
+        # 4. Write it. No precondition on the device's current state.
         device["attributes"][attribute] = value
         return ApplyResult(STATUS_APPLIED, attribute, value)
 

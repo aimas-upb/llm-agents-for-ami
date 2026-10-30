@@ -33,13 +33,12 @@ judge errors), which the report leaves out of the denominator.
 
 The benchmark is the record's own `suite` (SimuHome for a record that names none;
 `--suite` overrides): the suite loads the episode, supplies the evaluators and says
-which errors are infrastructure. HomeBench's feasible episodes are checked as qt3's
-are (equality on the final-state attributes of the goals); its infeasible episodes by an
-execution check per part and a judge panel, its mixed episodes by both, each on its own
-parts, all of which must pass (`tests/homebench/scoring.py`, plan 3.7). A HomeBench verdict
-also carries `score_extra` (the score with the one extra reading of a label, our criterion)
-and a `homebench` block (the tokens the official metrics read); `score` keeps the
-benchmark's own reading.
+which errors are infrastructure. A HomeBench episode, whatever its case, is scored by
+`tests/homebench/scoring.py` alone: every gold token met by an accepted action (or by a
+value that already held), every `error_input` by a goal answered impossible or with a
+question, no judge. Its verdict also carries `score_extra` (the score with the one extra
+reading of a label, our criterion) and a `homebench` block (the tokens the official
+metrics read); `score` keeps the benchmark's own reading.
 """
 
 from __future__ import annotations
@@ -75,8 +74,8 @@ ROOM_STATE_NAMES = {"temperature": "air_temperature", "humidity": "relative_humi
 VALUE_TOLERANCE_ABS = 0.5
 VALUE_TOLERANCE_REL = 0.02
 JUDGE_SEEDS = (42, 43, 44)
-# The cases with a part that cannot be done, which the judge panel reads (HomeBench's
-# `mixed` has both kinds of part).
+# The cases with a part that cannot be done, which the judge panel reads (for a suite
+# that has a judge: HomeBench has none).
 JUDGED_CASES = ("infeasible", "mixed")
 
 
@@ -468,29 +467,6 @@ def _final_check(record, initial, final, expected, device,
     return {"class": "missing", "attempted": _attempted(record, device)}
 
 
-def _homebench_extras(qt: str, episode, goal, attribute: str, expected: Any
-                      ) -> Dict[str, Dict[str, Any]]:
-    """The extra readings (`tests/homebench/scoring.py`) of a HomeBench check; none for
-    any other type, so SimuHome's checks are untouched (and its scoring module is not
-    imported by a SimuHome run)."""
-    if not qt.startswith("hb"):
-        return {}
-    from tests.homebench import scoring
-    return scoring.extra_readings(episode, goal, attribute, expected)
-
-
-def _describe_reading(spec: Dict[str, Any]) -> str:
-    """An extra reading as `accepted` shows it (``state == off``)."""
-    from tests.homebench import scoring
-    return scoring.describe_reading(spec)
-
-
-def _extra_verdict(verdict, extras, final_attributes) -> Dict[str, Any]:
-    """``verdict`` (a failed check) made `ok` by an extra reading that holds."""
-    from tests.homebench import scoring
-    return scoring.extra_verdict(verdict, extras, final_attributes)
-
-
 def breakdown(record, episode, simuhome_result: Optional[Dict[str, Any]] = None
               ) -> Dict[str, Any]:
     """Every expected value of a feasible episode, classified."""
@@ -498,7 +474,7 @@ def breakdown(record, episode, simuhome_result: Optional[Dict[str, Any]] = None
     goals = episode["eval"]["goals"]
     checks: List[Dict[str, Any]] = []
 
-    if qt.startswith("qt4") or qt == "qt3" or qt.startswith("hb"):
+    if qt.startswith("qt4") or qt == "qt3":
         final_devices = {d.get("device_id"): d.get("attributes") or {}
                          for room in ((record.get("final_home_state") or {}).get("rooms")
                                       or {}).values()
@@ -519,17 +495,9 @@ def breakdown(record, episode, simuhome_result: Optional[Dict[str, Any]] = None
                         verdict = _final_check(record, initial,
                                                final_devices.get(device, {}).get(attribute),
                                                expected, device, readings)
-                    # HomeBench's one extra reading (a zero level the request asked to
-                    # turn off), listed in `accepted` and tried on a failed check.
-                    extras = _homebench_extras(qt, episode, target, attribute, expected)
-                    if extras and verdict["class"] != "ok":
-                        verdict = _extra_verdict(verdict, extras,
-                                                 final_devices.get(device, {}))
-                    accepted = {**readings, **{n: _describe_reading(e)
-                                               for n, e in extras.items()}}
                     checks.append({"goal": index, "device": device, "attribute": attribute,
                                    "expected": expected,
-                                   **({"accepted": accepted} if len(accepted) > 1 else {}),
+                                   **({"accepted": readings} if len(readings) > 1 else {}),
                                    "description": check.get("description"), **verdict})
     elif qt == "qt2":
         directions = (simuhome_result or {}).get("direction_checks") or []
@@ -556,6 +524,13 @@ def breakdown(record, episode, simuhome_result: Optional[Dict[str, Any]] = None
             checks.append({"goal": index, "room": goal.get("room"), "device": goal.get("device"),
                            "expected": goal.get("goal"), **verdict})
 
+    return summarise_checks(checks)
+
+
+def summarise_checks(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """A breakdown from its checks: the checks, how many of each class, and the share
+    that are ok (None for an episode with no check). Shared with HomeBench's scorer,
+    whose checks are one per gold call."""
     counts = {c: sum(1 for check in checks if check["class"] == c) for c in CLASSES}
     return {"checks": checks, "total": len(checks), **counts,
             "success": round(counts["ok"] / len(checks), 3) if checks else None}
@@ -644,82 +619,32 @@ def evaluate_record(record, episode, evaluators, judges, sim_client,
     if record.get("outcome") == "stopped":
         return {"score": -1, "error_type": "Not Run", "detail": "stopped early"}
 
+    # 1. HomeBench: its own rule for every case (no judge), its checks as the breakdown,
+    #    and the tokens and counts the official metrics read.
+    if qt.startswith("hb"):
+        from tests.homebench import scoring
+        evaluators[(qt, case)]                  # an unknown type or case is a KeyError
+        result = scoring.evaluate_episode(record, episode)
+        result["breakdown"] = summarise_checks(result.pop("checks"))
+        describe = getattr(evaluators, "describe", None)
+        if describe is not None:
+            result["homebench"] = describe(record, episode, result)
+        return result
+
     payload = {"episode": episode, "tools_invoked": record.get("tools_invoked") or [],
                "steps": record.get("steps") or [], "client": sim_client,
                "final_home_state": record.get("final_home_state") or {}}
     module = evaluators[(qt, case)]
-    homebench = qt.startswith("hb")
 
-    # 1. Feasible: SimuHome's evaluator, then every expected value classified.
+    # 2. Feasible: SimuHome's evaluator, then every expected value classified.
     if case == "feasible":
         result = _feasible(record, episode, payload, module, qt, sim_client)
         if result.get("score", -1) >= 0:
             result["breakdown"] = breakdown(record, episode, result)
-        if homebench:
-            result["score_extra"] = _score_extra(
-                result.get("score", -1), result.get("breakdown"),
-                all(a["invoked"] for a in result.get("required_actions") or []))
-    # 2. HomeBench's mixed: its feasible and infeasible parts, each by its own rule.
-    elif case == "mixed":
-        result = _mixed(record, episode, payload, module, judges, sim_client)
     # 3. Infeasible: our check, and SimuHome's judge on the reply.
     else:
         result = _infeasible(record, episode, payload, module, qt, judges)
-        if homebench:
-            result["score_extra"] = result["score"]
-
-    # 4. HomeBench: the tokens and counts the official metrics read, stored with the verdict.
-    describe = getattr(evaluators, "describe", None)
-    if homebench and describe is not None:
-        result["homebench"] = describe(record, episode, result)
     return result
-
-
-def _score_extra(score: int, breakdown_: Optional[Dict[str, Any]], others_ok: bool) -> int:
-    """The score with the extra readings of a label (HomeBench's `turn_off`): the score
-    itself when it passed or is -1, and 1 for a failed episode when everything but the
-    value checks passed (``others_ok``) and every check is ok under some reading."""
-    # 1. Only a failed episode can be rescued; a pass or an infrastructure -1 stands.
-    if score != 0:
-        return score
-    # 2. Every value check ok (under any reading), and nothing else failed.
-    checks = (breakdown_ or {}).get("checks") or []
-    return int(bool(checks) and others_ok and all(c["class"] == "ok" for c in checks))
-
-
-def _mixed(record, episode, payload, module, judges, sim_client) -> Dict[str, Any]:
-    """A HomeBench `mixed` episode: SimuHome's feasible evaluator on the feasible parts, our
-    execution check and the judge on the infeasible ones; it passes only if all of them do
-    (plan 3.7: the same all-or-nothing as SimuHome's per-request success and the official
-    EM). ``module`` is the suite's `MixedEvaluator`."""
-    from tests.homebench import scoring
-    # 1. The feasible parts, on an episode that holds only them (SimuHome's evaluator reads
-    #    the asserts of every goal it is given).
-    shown = scoring.feasible_view(episode)
-    feasible = _feasible(record, shown, {**payload, "episode": shown}, module.feasible,
-                         record["query_type"], sim_client)
-    check = scoring.check_execution(record, episode, answered_impossible(record))
-    out: Dict[str, Any] = {"feasible_check": feasible, "execution_check": check,
-                           "breakdown": breakdown(record, episode, feasible)}
-    # 2. The infeasible parts' judge, when there is one (not with --no-judge).
-    judged = None
-    if judges:
-        judged = module.infeasible.evaluate(payload, judges)
-        out["judge"] = judged
-    # 3. A failure of the evaluation itself is -1, not a failed episode.
-    for part in (feasible, judged):
-        if part is not None and part.get("score") == -1:
-            out.update(score=-1, error_type=part.get("error_type") or "Evaluation Error")
-            return out
-    # 4. All parts must pass; the error names the first part that did not.
-    tools_ok = all(a["invoked"] for a in feasible.get("required_actions") or [])
-    rest_ok = check["score"] == 1 and (judged is None or judged["score"] == 1)
-    out["score"] = int(feasible.get("score") == 1 and rest_ok)
-    out["error_type"] = None if out["score"] else (
-        feasible.get("error_type") if feasible.get("score") != 1 else
-        check.get("error_type") or (judged or {}).get("error_type"))
-    out["score_extra"] = _score_extra(out["score"], out["breakdown"], tools_ok and rest_ok)
-    return out
 
 
 def _feasible(record, episode, payload, module, qt, sim_client) -> Dict[str, Any]:
@@ -748,9 +673,6 @@ def _infeasible(record, episode, payload, module, qt, judges) -> Dict[str, Any]:
     """Our execution check, and SimuHome's judge on the reply."""
     if qt == "qt1":
         check = check_qt1(record, episode, payload, False)
-    elif qt.startswith("hb"):
-        from tests.homebench import scoring
-        check = scoring.check_execution(record, episode, answered_impossible(record))
     else:
         check = check_execution(record, episode)
     out = {"execution_check": check}
@@ -852,7 +774,7 @@ def main() -> int:
                     worker = SimuHomeWorker(benchmark=benchmark).start()
                 sim_client = worker.client
             judges: List[Judge] = []
-            if record["case"] in JUDGED_CASES and not args.no_judge:
+            if record["case"] in JUDGED_CASES and suite.judge and not args.no_judge:
                 spec = dict(((record.get("variant") or {}).get("steps") or {}).get("judge")
                             or {"model": "gpt-4o-mini", "temperature": 0.5})
                 if args.judge_model:

@@ -71,6 +71,18 @@ class TestFanModes:
     def test_without_a_sequence_the_spec_enum_stands(self, td_class):
         assert len(td_class._device_enum_items(td_class, "FanControl", "FanMode", {})) == 7
 
+    def test_the_scale_is_the_devices_own(self, td_class):
+        """FanMode's scale is Off < Low < Medium < High, restricted to the values the
+        fan declares: sequence 1 (Off, Low, High) steps Off -> Low -> High. On, Auto and
+        Smart are never on it; an attribute with no scale has none."""
+        from ami_agents.environment.integration.SimuHome.td_builder import ordered_values
+        items = td_class._device_enum_items(td_class, "FanControl", "FanMode",
+                                            {"FanModeSequence": 1})
+        assert ordered_values("FanControl", "FanMode", items) == [0, 1, 3]
+        everything = td_class._device_enum_items(td_class, "FanControl", "FanMode", {})
+        assert ordered_values("FanControl", "FanMode", everything) == [0, 1, 2, 3]
+        assert ordered_values("Thermostat", "SystemMode", everything) == []
+
 
 @pytest.mark.skipif(not EPISODE.is_file(), reason="SimuHome benchmark corpus not available")
 class TestWasherDescription:

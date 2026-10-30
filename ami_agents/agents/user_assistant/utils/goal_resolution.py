@@ -29,6 +29,15 @@ it never reaches the InteractionSolver. The user is asked, with the devices of
 its kind in its room listed when the lookup found any ("I can't find the fan
 you named in the living room. It has: living_room_fan_2.").
 
+The same holds for a device the request mentions by its kind, and for a change
+the request asks of a device that cannot make it. The structurer copies the
+user's words for what is missing (`unmatched_device`: "air conditioner";
+`unmatched_action`: "brightness" on an on/off light); such a goal is not looked
+up and is asked about, never completed with another device that could do the
+same ("I can't find the air conditioner in the master bedroom. What should I do
+instead?"). A request for an effect alone ("warm up the bedroom") mentions no
+device: it is an ambiguous goal, planned on whichever devices can.
+
 An environment predicate missing its room ("while the humidity is above 60%")
 is looked up by its variable's class: if devices read that variable in one room
 only, that room is filled in; several rooms make it quantify over them. A
@@ -92,6 +101,28 @@ def _missing_device_question(goal: GoalSpec, names: List[str]) -> str:
     return question
 
 
+def unmatched_question(goal: GoalSpec) -> Optional[str]:
+    """The question for a goal whose request mentions a device the home does not
+    have (`unmatched_device`), or asks a device for a change none of its actions
+    can make (`unmatched_action`); None for any other goal. Such a goal is never
+    completed with another device, however capable."""
+    room = f" in the {_words(goal.location_class)}" if goal.location_class else ""
+    # 1. The device itself is not there: the user's words for it.
+    if goal.unmatched_device:
+        device = goal.unmatched_device.strip()
+        device = device[4:] if device.lower().startswith("the ") else device
+        return f"I can't find the {device}{room}. What should I do instead?"
+    # 2. The device is there, but cannot make the change asked for: named by
+    #    its own name when the structurer found it ("the garage light"), else
+    #    by its kind and room.
+    if goal.unmatched_action:
+        device = (goal.artifact_name.replace("_", " ") if goal.artifact_name
+                  else f"{_words(goal.artifact_class) or 'device'}{room}")
+        return (f"The {device} has no {goal.unmatched_action} setting. "
+                f"What should I do instead?")
+    return None
+
+
 def clarification_question(goal: GoalSpec) -> Optional[str]:
     """The question to ask the user about this goal, or None when the goal can
     go on to planning."""
@@ -103,7 +134,12 @@ def clarification_question(goal: GoalSpec) -> Optional[str]:
     #    lookup): asked about without a list.
     if named_device_missing(goal):
         return _missing_device_question(goal, [])
-    # 3. What only the user can say: which device, or what to do with it.
+    # 3. A device mentioned by kind that is not there, or that cannot make the
+    #    change: asked about before the solver could pick another device.
+    unmatched = unmatched_question(goal)
+    if unmatched:
+        return unmatched
+    # 4. What only the user can say: which device, or what to do with it.
     case = incomplete_case(goal)
     if case == UNNAMED:
         return "Which device do you mean, and in which room?"
@@ -135,8 +171,13 @@ def structure_clarification(structure: GoalStructure) -> Optional[str]:
 def goal_query(goal: GoalSpec) -> Optional[Dict[str, Any]]:
     """The ENV_CAPABILITY_QUERY payload for an incomplete goal, or None when it
     is not to be looked up: only goals whose action is known are, since
-    without one nothing can be promoted."""
+    without one nothing can be promoted -- and never a goal the user is asked
+    about (`unmatched_question`)."""
     if incomplete_case(goal) not in (NO_LOCATION, NO_CLASS, NO_NAME):
+        return None
+    # A goal the user is asked about is never looked up: a lookup by room and
+    # action could promote it onto another device.
+    if unmatched_question(goal):
         return None
     payload: Dict[str, Any] = {
         "text_intent": goal.intent_text,

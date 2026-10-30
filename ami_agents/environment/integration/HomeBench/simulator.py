@@ -193,8 +193,7 @@ async def apply_command(device_id: str, request: Request) -> JSONResponse:
     """Apply one command: body ``{"command_id": str, "args": {"value": v}?}``.
 
     404 for an unknown device, 400 for a malformed body or a command or value the
-    engine refuses (the engine's message is the ``error``). A gold vacuum command the
-    home does not offer answers 200 with ``status: "unreachable"`` and changes nothing.
+    engine refuses (the engine's message is the ``error``).
     """
     missing = _require_engine()
     if missing is not None:

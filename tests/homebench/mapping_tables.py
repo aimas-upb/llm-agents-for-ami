@@ -104,13 +104,13 @@ LIGHT_VARIANTS: Tuple[Tuple[str, str, str], ...] = (
 
 #: What a device's ``state`` attribute is, per device type: the kind selects the
 #: affordance name, the value schema and the gold calls (``STATE_KINDS``).
-DEVICE_STATE_KIND: Dict[str, Optional[str]] = {
+DEVICE_STATE_KIND: Dict[str, str] = {
     "light": "onoff", "air_conditioner": "onoff", "heating": "onoff", "fan": "onoff",
     "air_purifiers": "onoff", "humidifier": "onoff", "dehumidifiers": "onoff",
     "aromatherapy": "onoff", "water_heater": "onoff",
     "curtain": "openclose", "blinds": "openclose", "garage_door": "openclose",
     "media_player": "playback", "trash": "pack",
-    "vacuum_robot": None,  # reports ``on`` and has no command that changes it
+    "vacuum_robot": "operation",
 }
 
 #: The ``state`` kinds: affordance name, value kind, enum values, home value shown to
@@ -141,16 +141,31 @@ STATE_KINDS: Dict[str, Dict[str, Any]] = {
         "property_type": "homeont:TrashFillState",
         "action_class": "homeont:PackCommand", "gold_op": "pack()",
     },
+    # The vacuum's operation: 70 gold calls start / stop / pause / charge it, so the
+    # home offers them. Every vacuum starts in ``on``, which no command sets back: the
+    # read schema still lists it.
+    "operation": {
+        "name": "state", "value_kind": "enum",
+        "values": ["cleaning", "paused", "stopped", "charging"],
+        "read_values": ["on", "cleaning", "paused", "stopped", "charging"],
+        "property_type": "homeont:VacuumState",
+        "action_class": "homeont:SetOperationalStateCommand",
+        "gold_op": {"cleaning": "start()", "paused": "pause()", "stopped": "stop()",
+                    "charging": "charge()"},
+    },
 }
-
-#: The vacuum's read-only ``state``.
-VACUUM_STATE = {"name": "state", "property_type": "homeont:VacuumState"}
 
 #: Settable attribute -> affordance name, value kind, property and command class
 #: (``set_<attribute>`` is the gold method). ``unit`` is the symbol the TD builder
 #: resolves to a QUDT unit. ``PROPERTY_OVERRIDES`` refines a class per device type.
+#: The 0-100 levels carry ``%``: HomeBench reads "by N percent" as percentage points,
+#: and the planner adds points only on a ``unit:PERCENT`` property (else it scales).
+#: ``value_order`` is the scale of an enum, lowest first, which a request can change
+#: "by N levels" (the TD states it as ``homeont:orderedValues``); ``auto`` is not on
+#: it. Swing has none: HomeBench's own labels step it both ways. ``description`` says
+#: what the value means where its name alone misleads (the TD's ``js:description``).
 ATTRIBUTE_SPEC: Dict[str, Dict[str, Any]] = {
-    "brightness": {"name": "brightness", "value_kind": "integer",
+    "brightness": {"name": "brightness", "value_kind": "integer", "unit": "%",
                    "property_type": "homeont:LevelControlBrightness",
                    "action_class": "saref:SetAbsoluteLevelCommand"},
     "color": {"name": "color", "value_kind": "rgb",
@@ -163,24 +178,27 @@ ATTRIBUTE_SPEC: Dict[str, Dict[str, Any]] = {
              "property_type": "homeont:DeviceMode",
              "action_class": "homeont:SetModeCommand"},
     "fan_speed": {"name": "fanSpeed", "value_kind": "enum",
+                  "value_order": ["low", "medium", "high"],
                   "property_type": "homeont:FanControlFanMode",
                   "action_class": "homeont:SetModeCommand"},
     "speed": {"name": "speed", "value_kind": "enum",
+              "value_order": ["low", "medium", "high"],
               "property_type": "homeont:FanControlFanMode",
               "action_class": "homeont:SetModeCommand"},
     "swing": {"name": "swing", "value_kind": "enum",
               "property_type": "homeont:SwingMode",
               "action_class": "homeont:SetModeCommand"},
-    "intensity": {"name": "intensity", "value_kind": "integer",
+    "intensity": {"name": "intensity", "value_kind": "integer", "unit": "%",
                   "property_type": "homeont:OutputIntensity",
                   "action_class": "saref:SetAbsoluteLevelCommand"},
     "interval": {"name": "interval", "value_kind": "integer",
                  "property_type": "homeont:OperatingInterval",
                  "action_class": "saref:SetAbsoluteLevelCommand"},
-    "degree": {"name": "degree", "value_kind": "integer",
+    "degree": {"name": "degree", "value_kind": "integer", "unit": "%",
+               "description": "The curtain's position as a percentage, 0 to 100, which this device calls its degree: '50 degrees' means 50.",
                "property_type": "homeont:WindowCoveringPosition",
                "action_class": "saref:SetAbsoluteLevelCommand"},
-    "volume": {"name": "volume", "value_kind": "integer",
+    "volume": {"name": "volume", "value_kind": "integer", "unit": "%",
                "property_type": "homeont:Volume",
                "action_class": "saref:SetAbsoluteLevelCommand"},
     "cleaning_area": {"name": "cleaningArea", "value_kind": "enum",
@@ -204,8 +222,7 @@ READONLY_SPEC: Dict[str, Dict[str, Any]] = {
 #: Property classes the rows use and how a TD marks them (``kind``): an actuatable
 #: property gets ``tdsosa:ActuatablePropertyAffordance`` and an action; an observable
 #: or state one ``tdsosa:ObservablePropertyAffordance`` and no action.
-OBSERVABLE_CLASSES = ("homeont:BatteryLevel", "homeont:WaterTankLevel",
-                      "homeont:VacuumState")
+OBSERVABLE_CLASSES = ("homeont:BatteryLevel", "homeont:WaterTankLevel")
 
 #: Which ambient variable the devices of a type can affect: device type -> the
 #: ``sosa_property`` of the variable. Exactly SimuHome's effect table, without the
@@ -288,27 +305,20 @@ def room_rows(rooms: Iterable[str]) -> List[Dict[str, Any]]:
 def _attribute_rows(dtype: str, attrs: Iterable[str]) -> List[Dict[str, Any]]:
     """The affordance rows of one device type: its state, then its attributes."""
     rows: List[Dict[str, Any]] = []
-    # 1. The ``state`` attribute.
-    kind = DEVICE_STATE_KIND[dtype]
-    if kind is not None:
-        spec = STATE_KINDS[kind]
-        row = {"key": f"{dtype}.{spec['name']}", "device_type": dtype,
-               "attribute": "state", "affordance_name": spec["name"],
-               "value_kind": spec["value_kind"], "actuatable": True,
-               "property_type": spec["property_type"],
-               "action_class": spec["action_class"]}
-        if "read_map" in spec:
-            row["read_map"] = dict(spec["read_map"])
-        if "values" in spec:
-            row["values"] = list(spec["values"])
-        if "read_values" in spec:
-            row["read_values"] = list(spec["read_values"])
-        rows.append(row)
-    else:
-        rows.append({"key": f"{dtype}.{VACUUM_STATE['name']}", "device_type": dtype,
-                     "attribute": "state", "affordance_name": VACUUM_STATE["name"],
-                     "value_kind": "enum", "actuatable": False,
-                     "property_type": VACUUM_STATE["property_type"]})
+    # 1. The ``state`` attribute: every device type has a command that sets it.
+    spec = STATE_KINDS[DEVICE_STATE_KIND[dtype]]
+    row = {"key": f"{dtype}.{spec['name']}", "device_type": dtype,
+           "attribute": "state", "affordance_name": spec["name"],
+           "value_kind": spec["value_kind"], "actuatable": True,
+           "property_type": spec["property_type"],
+           "action_class": spec["action_class"]}
+    if "read_map" in spec:
+        row["read_map"] = dict(spec["read_map"])
+    if "values" in spec:
+        row["values"] = list(spec["values"])
+    if "read_values" in spec:
+        row["read_values"] = list(spec["read_values"])
+    rows.append(row)
     # 2. Every other attribute: settable ones get an action, the rest only a read.
     for attr in sorted(a for a in attrs if a != "state"):
         if attr in engine.SETTABLE_ATTRIBUTES.get(dtype, ()):
@@ -329,6 +339,10 @@ def _attribute_rows(dtype: str, attrs: Iterable[str]) -> List[Dict[str, Any]]:
             raise MappingError(f"{dtype}.{attr}: attribute has no specification")
         if "unit" in spec:
             row["unit"] = spec["unit"]
+        if "value_order" in spec:
+            row["value_order"] = list(spec["value_order"])
+        if "description" in spec:
+            row["description"] = spec["description"]
         rows.append(row)
     for row in rows:
         row["status"] = "auto"

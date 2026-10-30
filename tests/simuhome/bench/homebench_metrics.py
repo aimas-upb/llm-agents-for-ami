@@ -29,9 +29,9 @@ What the prediction is, for our agents (caveat, printed next to every table): th
 a request into atomic intents and answer in prose, so there is no `{...}` text. The
 prediction of an episode is built from what happened (`prediction`): one gold token per
 action the home accepted (`gold_log.py`) plus one `error_input` per goal answered
-"impossible". That approximates the official token stream, it is not the stream itself.
-A goal the agent asked a question about (clarification) is *not* an `error_input`: the
-official metric has no such answer, so it counts as no output.
+"impossible" or with a question (a clarification): either way the request was reported
+to the user instead of executed, which is what HomeBench's `error_input` stands for. That
+approximates the official token stream, it is not the stream itself.
 
 Everything is computed from stored data (the record, or the `homebench` block that
 `evaluate.py` stores in each .eval.json), so it re-runs without LLM calls.
@@ -64,9 +64,8 @@ CAVEAT_OFFICIAL = (
     "script reads a field `output2` that no dataset file has, so the numbers cannot be "
     "reproduced bit for bit. Our agents answer in prose, so the prediction is built from "
     "what happened: one gold token per accepted action plus one `error_input` per goal "
-    "answered impossible (a goal answered with a question is no output). This approximates "
-    "the official token stream; it is not that stream. Rows whose gold holds a vacuum call "
-    "no action can issue (`unreachable`) cannot reach EM 1.0 by construction."
+    "answered impossible or with a question. This approximates the official token stream; "
+    "it is not that stream."
 )
 
 _BRACES = re.compile(r"\{(.*?)\}")
@@ -136,8 +135,10 @@ def refused_goals(record: Dict[str, Any]) -> Dict[str, int]:
 
 def prediction(action_tokens: Iterable[str], record: Dict[str, Any]) -> List[str]:
     """The predicted tokens of an episode: the gold token of every accepted action, then
-    one ``error_input`` per goal answered impossible (module docstring, caveat)."""
-    return [*action_tokens, *[ERROR_INPUT] * refused_goals(record)[IMPOSSIBLE]]
+    one ``error_input`` per goal answered impossible or with a question (module
+    docstring, caveat)."""
+    refused = refused_goals(record)
+    return [*action_tokens, *[ERROR_INPUT] * (refused[IMPOSSIBLE] + refused[CLARIFY])]
 
 
 # -- scoring ------------------------------------------------------------------------------------
@@ -197,10 +198,10 @@ def parts_rates(blocks: Iterable[Dict[str, Any]]) -> Dict[str, Optional[float]]:
     """The generic rates, pooled over episodes (our definitions, not HomeBench's).
 
     Each block holds ``parts`` = ``{"feasible", "feasible_ok", "infeasible",
-    "infeasible_ok"}`` (see `evaluate.py`): ``parts_rate`` is the parts passed over all
-    parts, ``feasible_rate`` the feasible parts whose checks all held, and
-    ``impossible_rate`` the infeasible parts answered as impossible with nothing executed
-    on them. A rate over no parts is None.
+    "infeasible_ok"}`` (see `tests/homebench/scoring.py`): ``parts_rate`` is the parts
+    passed over all parts, ``feasible_rate`` the gold calls met, and ``impossible_rate``
+    the `error_input` parts met by a goal answered impossible or with a question. A rate
+    over no parts is None.
     """
     totals = Counter()
     for block in blocks:

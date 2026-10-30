@@ -23,6 +23,7 @@ or a local OpenAI-compatible server through `provider:`), plus how to run it:
       environment: on                  # homebench only: on | off (room environments, effects)
       workers: 4
     evaluate: {judge: true}            # false: infeasible scored without the LLM judge
+                                       # (SimuHome only: HomeBench has no judge)
 
 Flow, each step its own process (as `sweep.py` runs them):
 
@@ -121,7 +122,7 @@ def commands(config_path: Path, records: Path, out: Path, options: Dict[str, Any
                 "--records", str(records), "--benchmark", str(benchmark), "--skip-scored"]
     if suite.name != DEFAULT_SUITE:
         evaluate += ["--suite", suite.name]
-    if not judge:
+    if not judge and suite.judge:
         evaluate.append("--no-judge")
     return [run, evaluate]
 
@@ -131,8 +132,9 @@ def estimate(names: List[str], records: Path, judge: bool,
     """What the run would cost: the episodes still to run, and a count of LLM
     calls (the steps' and the judge's), from the suite's per-episode estimate:
     a range for SimuHome, exact for HomeBench (one segmentation call and one
-    structuring call per part)."""
+    structuring call per part). A suite without a judge (HomeBench) shows none."""
     suite = suite or get_suite(DEFAULT_SUITE)
+    judge = judge and suite.judge
     # 1. What is still to run, and its calls by the suite's estimate.
     todo = [n for n in names if not (records / f"{n}.json").exists()]
     estimates = [suite.estimate(n) for n in todo]
@@ -192,7 +194,9 @@ def main() -> int:
     out = Path(args.out).resolve() if args.out else suite.results_root / "harness"
     benchmark = Path(args.benchmark) if args.benchmark else suite.default_benchmark
     records = out / variant.name
-    judge = bool((config.get("evaluate") or {}).get("judge", True)) and not args.no_judge
+    # A suite without a judge (HomeBench) never has one, whatever the config says.
+    judge = bool((config.get("evaluate") or {}).get("judge", True)) and not args.no_judge \
+        and suite.judge
     title = f"{suite.title} harness: {variant.name}"
 
     # 2. Statistics only: nothing to run.
@@ -211,6 +215,8 @@ def main() -> int:
     print(f"config {config_path.name}"
           + (f" ({suite.title})" if suite.name != DEFAULT_SUITE else "") + f" -> {records}")
     for step, spec in variant.specs.items():
+        if step == "judge" and not judge:       # no judge runs (--no-judge, or HomeBench)
+            continue
         print(f"  {step:<18} {spec.label():<28} {'local ' + spec.base_url if spec.local else 'OpenAI'}")
     steps = commands(config_path, records, out, options, judge, benchmark, suite)
     for command in steps:

@@ -26,6 +26,10 @@ rows:
   actuatable: true
   property_type: homeont:FanControlFanMode
   action_class: homeont:SetModeCommand
+  value_order:
+  - low
+  - medium
+  - high
   status: auto
 - key: air_conditioner.mode
   device_type: air_conditioner
@@ -75,6 +79,10 @@ rows:
   actuatable: true
   property_type: homeont:FanControlFanMode
   action_class: homeont:SetModeCommand
+  value_order:
+  - low
+  - medium
+  - high
   status: auto
 - key: air_purifiers.mode
   device_type: air_purifiers
@@ -105,6 +113,7 @@ rows:
   actuatable: true
   property_type: homeont:OutputIntensity
   action_class: saref:SetAbsoluteLevelCommand
+  unit: '%'
   status: auto
 - key: aromatherapy.interval
   device_type: aromatherapy
@@ -147,6 +156,9 @@ rows:
   actuatable: true
   property_type: homeont:WindowCoveringPosition
   action_class: saref:SetAbsoluteLevelCommand
+  unit: '%'
+  description: 'The curtain''s position as a percentage, 0 to 100, which this device calls
+    its degree: ''50 degrees'' means 50.'
   status: auto
 - key: dehumidifiers.onOff
   device_type: dehumidifiers
@@ -168,6 +180,7 @@ rows:
   actuatable: true
   property_type: homeont:OutputIntensity
   action_class: saref:SetAbsoluteLevelCommand
+  unit: '%'
   status: auto
 - key: dehumidifiers.mode
   device_type: dehumidifiers
@@ -207,6 +220,10 @@ rows:
   actuatable: true
   property_type: homeont:FanControlFanMode
   action_class: homeont:SetModeCommand
+  value_order:
+  - low
+  - medium
+  - high
   status: auto
 - key: fan.swing
   device_type: fan
@@ -249,6 +266,10 @@ rows:
   actuatable: true
   property_type: homeont:FanControlFanMode
   action_class: homeont:SetModeCommand
+  value_order:
+  - low
+  - medium
+  - high
   status: auto
 - key: heating.mode
   device_type: heating
@@ -289,6 +310,7 @@ rows:
   actuatable: true
   property_type: homeont:OutputIntensity
   action_class: saref:SetAbsoluteLevelCommand
+  unit: '%'
   status: auto
 - key: humidifier.mode
   device_type: humidifier
@@ -328,6 +350,7 @@ rows:
   actuatable: true
   property_type: homeont:LevelControlBrightness
   action_class: saref:SetAbsoluteLevelCommand
+  unit: '%'
   status: auto
 - key: light.color
   device_type: light
@@ -359,6 +382,7 @@ rows:
   actuatable: true
   property_type: homeont:Volume
   action_class: saref:SetAbsoluteLevelCommand
+  unit: '%'
   status: auto
 - key: trash.pack
   device_type: trash
@@ -378,8 +402,20 @@ rows:
   attribute: state
   affordance_name: state
   value_kind: enum
-  actuatable: false
+  actuatable: true
   property_type: homeont:VacuumState
+  action_class: homeont:SetOperationalStateCommand
+  values:
+  - cleaning
+  - paused
+  - stopped
+  - charging
+  read_values:
+  - 'on'
+  - cleaning
+  - paused
+  - stopped
+  - charging
   status: auto
 - key: vacuum_robot.battery
   device_type: vacuum_robot

@@ -201,6 +201,15 @@ rows:
   action: pack
   gold_op: pack()
   status: auto
+- key: vacuum_robot.state
+  device_type: vacuum_robot
+  action: state
+  gold_op:
+    cleaning: start()
+    paused: pause()
+    stopped: stop()
+    charging: charge()
+  status: auto
 - key: vacuum_robot.cleaningArea
   device_type: vacuum_robot
   action: cleaningArea

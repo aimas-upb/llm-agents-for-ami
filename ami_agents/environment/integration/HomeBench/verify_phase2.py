@@ -58,7 +58,6 @@ if __package__ in {None, ""}:  # allow `python .../HomeBench/verify_phase2.py`
 
 from rdflib import Graph, Namespace, RDF, URIRef
 
-from ami_agents.environment.integration.HomeBench import engine as engine_module
 from ami_agents.environment.integration.HomeBench.engine import HomeBenchEngine
 from ami_agents.environment.integration.HomeBench.mappings import (
     MappingTableError, load_mappings,
@@ -196,15 +195,13 @@ def gold_round_trip(rows: Iterable[Tuple[str, bool]]) -> Dict[str, Any]:
     ``rows`` are ``(gold output, is_multi)`` pairs. A gold call
     ``room.device.command(arg)`` is mapped to ``(action, value)`` by
     ``action_for_command`` and back to a gold token by ``gold_string``; the token must
-    equal the call as written. Calls the home does not offer (the vacuum's ``start``,
-    ``stop``, ``pause``, ``charge``) have no action: they are counted as unreachable,
-    not as failures. Returns ``{calls, unreachable, failures, ops}``; ``ops`` lists the
+    equal the call as written. Returns ``{calls, failures, ops}``; ``ops`` lists the
     distinct ``device.command`` pairs seen.
     """
     from tests.homebench.convert import parse_gold
 
     mappings = load_mappings()
-    calls = unreachable = 0
+    calls = 0
     failures: List[str] = []
     ops: set = set()
     for output, multi in rows:
@@ -218,16 +215,12 @@ def gold_round_trip(rows: Iterable[Tuple[str, bool]]) -> Dict[str, Any]:
                 action, value = mappings.action_for_command(
                     call.device, call.command, call.arg)
             except MappingTableError:
-                if call.command in engine_module.UNREACHABLE_COMMANDS.get(call.device, ()):
-                    unreachable += 1
-                else:
-                    failures.append(f"{written}: no action")
+                failures.append(f"{written}: no action")
                 continue
             got = mappings.gold_string(call.device_id, call.device, action, value)
             if got != written:
                 failures.append(f"{written} -> {got}")
-    return {"calls": calls, "unreachable": unreachable, "failures": failures,
-            "ops": sorted(ops)}
+    return {"calls": calls, "failures": failures, "ops": sorted(ops)}
 
 
 # -- HTTP helpers ---------------------------------------------------------------------------------
@@ -421,8 +414,8 @@ def check_gold_dataset(data: Path) -> None:
     report = gold_round_trip(episode_gold_rows(data))
     check("every gold call round-trips (device, action, value) <-> gold string",
           not report["failures"],
-          f"{report['calls']} calls, {report['unreachable']} unreachable by "
-          f"construction, {len(report['failures'])} failures {report['failures'][:3]}")
+          f"{report['calls']} calls, {len(report['failures'])} failures "
+          f"{report['failures'][:3]}")
     check("the ops seen are covered", len(report["ops"]) > 0,
           f"{len(report['ops'])} distinct device.command pairs")
 

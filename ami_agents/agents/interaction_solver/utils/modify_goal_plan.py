@@ -21,6 +21,17 @@ built:
 and the result is kept within the property's range (else the action input's):
 below the minimum it is the minimum, above the maximum the maximum.
 
+A value from an ordered list -- a schema carrying `homeont:orderedValues`, such as
+a fan speed `low < medium < high` -- is changed by steps instead: "up by 1 level"
+moves one place along the list (`step_in_order`), stopping at its ends. The order
+comes from the TD, never from the planner. A current value that is not on the list
+(an `auto` mode) cannot be stepped; the caller reads it before planning and asks
+the user instead (`off_scale_entry`), stating the current value and the choices:
+
+    "fan" speed auto, order low -> medium -> high, "up by 1"
+        -> "The fan's speed is auto, which is not on its scale low -> medium -> high.
+            Which speed do you want: low, medium or high?"
+
 The flow, for one device:
 
     modify_recipe(graph, goal)     the action, the property it acts upon, the
@@ -29,7 +40,10 @@ The flow, for one device:
     plan_modify_goal(graph, goal)  both, as a plan entry -- or None, which hands
                                    the goal to the small model for a recipe
     recipe_from_answer(...)        the small model's recipe, checked against the
-                                   TDs before it is built into the same tree
+                                   TDs before it is built into the same tree; its
+                                   mode is decided here too, never by the model
+    off_scale_entry(recipe, value) for an ordered recipe, the question to ask when
+                                   the current value is not on the scale
 
 Pure functions over the InteractionSolver's closed TD graph.
 """
@@ -37,7 +51,7 @@ Pure functions over the InteractionSolver's closed TD graph.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from rdflib import Graph
 
@@ -64,6 +78,9 @@ class ModifyRecipe:
     minimum: Optional[float] = None
     maximum: Optional[float] = None
     integer: bool = False
+    # The scale of an ordered value, lowest first; when set, `amount` is a whole
+    # number of steps along it and `mode`, `minimum`, `maximum` are unused.
+    order: Optional[List[Any]] = None
 
 
 # --------------------------------------------------------------------------
@@ -100,6 +117,22 @@ def _amount(goal: GoalSpec) -> Optional[float]:
         return None
 
 
+def _mode(graph: Graph, goal: GoalSpec, prop: Any) -> str:
+    """Add or scale, from the goal and the property's unit (module docstring): a
+    percentage scales, unless the property is itself a percentage -- then it is
+    percentage points, added. Decided here for both recipes, so a model's recipe
+    cannot scale a percent property."""
+    if goal.target_value_is_percentage and _property_unit(graph, prop) != PERCENT_UNIT:
+        return "scale"
+    return "add"
+
+
+def _steps(amount: float) -> Optional[int]:
+    """A change along an ordered scale as a whole number of steps, or None when
+    the amount is not whole ("1.5 levels" has no meaning on a list)."""
+    return int(amount) if float(amount).is_integer() else None
+
+
 # --------------------------------------------------------------------------
 # The recipe
 # --------------------------------------------------------------------------
@@ -131,7 +164,15 @@ def modify_recipe(graph: Graph, goal: GoalSpec) -> Union[ModifyRecipe, str]:
         parameter, value_schema = DIRECT_VALUE_KEY, input_schema
     else:
         return "the action takes no input"
-    if value_schema.get("type") not in ("integer", "number"):
+    # An ordered value is stepped along its scale, whatever its type; any other
+    # value must be a number to be changed by an amount.
+    order = value_schema.get("order")
+    if order:
+        if goal.target_value_is_percentage:
+            return "a percentage has no meaning on an ordered scale"
+        if _steps(amount) is None:
+            return f"the change {goal.target_value_determined!r} is not a whole number of steps"
+    elif value_schema.get("type") not in ("integer", "number"):
         return "the action's input is not a number"
 
     # 4. The property the action changes, read to know the current value.
@@ -143,13 +184,18 @@ def modify_recipe(graph: Graph, goal: GoalSpec) -> Union[ModifyRecipe, str]:
     if property_url is None:
         return "the property it acts upon cannot be read"
 
-    # 5. Add or scale: a percentage scales, unless the property is itself a
-    #    percentage -- then it is percentage points, added.
-    mode = "add"
-    if goal.target_value_is_percentage and _property_unit(graph, prop) != PERCENT_UNIT:
-        mode = "scale"
+    # 5. An ordered value: steps along its scale, no mode and no range.
+    if order:
+        return ModifyRecipe(
+            device=goal.artifact_name, action=goal.affordance_name,
+            action_url=action["target"], parameter=parameter, property_url=property_url,
+            amount=_steps(amount), mode="add", order=list(order))
 
-    # 6. The range: the property's own, else the action input's.
+    # 6. Add or scale: a percentage scales, unless the property is itself a
+    #    percentage -- then it is percentage points, added.
+    mode = _mode(graph, goal, prop)
+
+    # 7. The range: the property's own, else the action input's.
     output = graph.value(prop, TD.hasOutputSchema)
     minimum, maximum = _bounds(json_schema(graph, output)) if output is not None else (None, None)
     if minimum is None and maximum is None:
@@ -174,16 +220,21 @@ def modify_tree(recipe: ModifyRecipe) -> Dict[str, Any]:
     # Titles may contain dots (Home Assistant's "light.kitchen"): replaced.
     base = "modify/" + "/".join(t.replace(".", "_") for t in (recipe.device, recipe.action))
     current, new = f"{base}/current", f"{base}/new"
-    args: Dict[str, Any] = {"amount": recipe.amount, "mode": recipe.mode,
-                            "integer": recipe.integer}
-    if recipe.minimum is not None:
-        args["min"] = recipe.minimum
-    if recipe.maximum is not None:
-        args["max"] = recipe.maximum
+    # The compute step: steps along an ordered scale, else arithmetic in range.
+    if recipe.order:
+        op = "step_in_order"
+        args: Dict[str, Any] = {"order": list(recipe.order), "steps": int(recipe.amount)}
+    else:
+        op = "change_clamped"
+        args = {"amount": recipe.amount, "mode": recipe.mode, "integer": recipe.integer}
+        if recipe.minimum is not None:
+            args["min"] = recipe.minimum
+        if recipe.maximum is not None:
+            args["max"] = recipe.maximum
     return {"type": "sequence", "name": f"{where}: change", "children": [
         {"type": "read", "name": f"{where}: read", "property_url": recipe.property_url,
          "output": current},
-        {"type": "compute", "name": f"{where}: compute", "op": "change_clamped",
+        {"type": "compute", "name": f"{where}: compute", "op": op,
          "inputs": [current], "output": new, "args": args},
         {"type": "action", "name": where, "action_url": recipe.action_url,
          "parameter_keys": {recipe.parameter: new}},
@@ -192,6 +243,15 @@ def modify_tree(recipe: ModifyRecipe) -> Dict[str, Any]:
 
 def describe(recipe: ModifyRecipe) -> str:
     """The plan in words, for its explanation."""
+    # An ordered value: the steps and the scale they follow.
+    if recipe.order:
+        steps = int(recipe.amount)
+        way = "up" if steps >= 0 else "down"
+        scale = " -> ".join(str(v) for v in recipe.order)
+        return (f"Read {recipe.device}.{recipe.action}'s value, move it {abs(steps)} "
+                f"step{'s' if abs(steps) != 1 else ''} {way} along {scale} (stopping "
+                f"at the ends), set it.")
+    # A number: the change and the range it is kept in.
     change = (f"{recipe.amount:+g}% of the current value" if recipe.mode == "scale"
               else f"{recipe.amount:+g}")
     bounds = ""
@@ -207,6 +267,33 @@ def plan_modify_goal(graph: Graph, goal: GoalSpec) -> Optional[Dict[str, Any]]:
     if isinstance(recipe, str):
         return None
     return {"tree": modify_tree(recipe), "explanation": describe(recipe), "source": SOURCE}
+
+
+def off_scale_question(recipe: ModifyRecipe, current: Any) -> Optional[str]:
+    """The question for the user when an ordered value is not on its scale (an
+    `auto` fan speed cannot be raised "by one level"), stating the current value
+    and the values on the scale; None when there is nothing to ask -- the recipe
+    is not ordered, the value is on the scale, or it could not be read (unknown,
+    not off the scale: the step itself still refuses a value it cannot place)."""
+    current = getattr(current, "value", current)          # unwrap a PropertyValue
+    if not recipe.order or current is None or current in recipe.order:
+        return None
+    values = [str(v) for v in recipe.order]
+    choices = ", ".join(values[:-1]) + f" or {values[-1]}" if len(values) > 1 else values[0]
+    return (f"The {recipe.device}'s {recipe.action} is {current}, which is not on its "
+            f"scale {' -> '.join(values)}. Which {recipe.action} do you want: {choices}?")
+
+
+def off_scale_entry(recipe: ModifyRecipe, current: Any,
+                    source: str = SOURCE) -> Optional[Dict[str, Any]]:
+    """The plan entry that asks `off_scale_question`, in the shape the
+    UserAssistant turns into a question (`requires_clarification`); None when
+    there is nothing to ask and the recipe's tree is the plan."""
+    question = off_scale_question(recipe, current)
+    if question is None:
+        return None
+    return {"tree": None, "requires_clarification": True, "explanation": question,
+            "source": source}
 
 
 # --------------------------------------------------------------------------
@@ -265,16 +352,27 @@ def recipe_from_answer(graph: Graph, goal: GoalSpec,
         parameter, value_schema = DIRECT_VALUE_KEY, facts
     else:
         return "the action takes no input"
-    if value_schema.get("type") not in ("integer", "number"):
+    order = value_schema.get("order")
+    if not order and value_schema.get("type") not in ("integer", "number"):
         return "the action's input is not a number"
 
-    # 4. The numbers.
+    # 4. The amount, from the model.
     amount = _number(answer.get("amount"))
     if amount is None:
         return f"the amount {answer.get('amount')!r} is not a number"
-    mode = answer.get("mode")
-    if mode not in ("add", "scale"):
-        return f"the mode {mode!r} is neither add nor scale"
+
+    # 5. An ordered value: steps along the TD's scale, never the model's.
+    if order:
+        if _steps(amount) is None:
+            return f"the amount {answer.get('amount')!r} is not a whole number of steps"
+        return ModifyRecipe(
+            device=goal.artifact_name, action=str(answer["action"]), action_url=action_url,
+            parameter=parameter, property_url=property_url, amount=_steps(amount),
+            mode="add", order=list(order))
+
+    # 6. A number: add or scale decided from the property's unit, as the
+    #    deterministic recipe decides it (the model's own `mode` is not read).
+    mode = _mode(graph, goal, prop)
     return ModifyRecipe(
         device=goal.artifact_name, action=str(answer["action"]), action_url=action_url,
         parameter=parameter, property_url=property_url, amount=amount, mode=mode,

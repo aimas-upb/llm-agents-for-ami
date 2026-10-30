@@ -58,7 +58,7 @@ rows:
   kind: actuatable
   status: auto
 - key: homeont:VacuumState
-  kind: observable
+  kind: actuatable
   status: auto
 - key: homeont:Volume
   kind: actuatable

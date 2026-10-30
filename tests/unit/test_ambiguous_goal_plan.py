@@ -209,6 +209,8 @@ class TestSelection:
 # --------------------------------------------------------------------------
 
 MODULE = "ami_agents.agents.interaction_solver.behaviours.ambiguous_goal_planning"
+# Where the property reads are made (`read_property_value`), so where HTTP is faked.
+READ_MODULE = "ami_agents.agents.interaction_solver.utils.property_read"
 
 
 def _agent(result=None, error=None):
@@ -240,7 +242,7 @@ async def _plan(graph, goal, agent, values=None):
     behaviour = AmbiguousGoalPlanningBehaviour([goal])
     behaviour.agent = agent
     with patch(f"{MODULE}.fetch_environment_graph", AsyncMock(return_value=graph)), \
-            patch(f"{MODULE}.HTTPClient", _Home(values).client):
+            patch(f"{READ_MODULE}.HTTPClient", _Home(values).client):
         await behaviour.run()
     (entry,) = behaviour.results
     return entry

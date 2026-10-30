@@ -1,0 +1,136 @@
+# HomeBench harness config, ECAI on gpt-6-luna: the 400 episodes of the ECAI evaluation
+# (tests/homebench/results/HB_gpt6-luna/episodes.csv), every phase on the OpenAI API.
+#
+#   400 episodes, about 1,900 LLM calls (4.8 per episode in the ECAI run), no judge calls,
+#   about 20-25 minutes with 4 workers. Nothing is run by --dry-run:
+#
+#   conda run -n ami-agents python -m tests.simuhome.bench.harness \
+#       --config tests/homebench/variants/homebench.ecai.gpt-6-luna.yaml --dry-run
+#
+# The records directory is named after the file (no `name:` key):
+# <out>/homebench.ecai.gpt-6-luna/.
+
+suite: homebench
+
+providers:
+  openai: {api_key_env: OPENAI_API_KEY}
+
+models:
+  segmentation:  {provider: openai, model: gpt-6-luna, reasoning_effort: low}
+  structuring:   {provider: openai, model: gpt-6-luna, reasoning_effort: low}
+  planning:
+    explicit:    {provider: openai, model: gpt-6-luna, reasoning_effort: low}
+    general:     {provider: openai, model: gpt-6-luna, reasoning_effort: medium}
+  profiling:     {provider: openai, model: gpt-6-luna, reasoning_effort: low}
+  guarding:      {provider: openai, model: gpt-6-luna, reasoning_effort: low}
+  response:      {provider: openai, model: gpt-6-luna, reasoning_effort: low}
+
+run:
+  # The ECAI episodes by name, every one of them (no limit).
+  episodes: >-
+    hb10_mixed_seed_132, hb10_mixed_seed_133, hb10_mixed_seed_188, hb10_mixed_seed_208,
+    hb10_mixed_seed_299, hb10_mixed_seed_459, hb1_feasible_seed_1085, hb1_feasible_seed_1094,
+    hb1_feasible_seed_1106_fixed, hb1_feasible_seed_1134, hb1_feasible_seed_1237, hb1_feasible_seed_1475,
+    hb1_feasible_seed_1715, hb1_feasible_seed_1742, hb1_feasible_seed_1749, hb1_feasible_seed_2088,
+    hb1_feasible_seed_2113, hb1_feasible_seed_2237, hb1_feasible_seed_2269, hb1_feasible_seed_2287,
+    hb1_feasible_seed_2328, hb1_feasible_seed_2415, hb1_feasible_seed_244, hb1_feasible_seed_2520,
+    hb1_feasible_seed_2538, hb1_feasible_seed_2560, hb1_feasible_seed_2788, hb1_feasible_seed_2815,
+    hb1_feasible_seed_2843, hb1_feasible_seed_2853, hb1_feasible_seed_2941, hb1_feasible_seed_3075,
+    hb1_feasible_seed_3191, hb1_feasible_seed_3233, hb1_feasible_seed_3238, hb1_feasible_seed_3241,
+    hb1_feasible_seed_3264, hb1_feasible_seed_3293, hb1_feasible_seed_3297, hb1_feasible_seed_3324,
+    hb1_feasible_seed_3337, hb1_feasible_seed_3360, hb1_feasible_seed_3362, hb1_feasible_seed_3403,
+    hb1_feasible_seed_3460, hb1_feasible_seed_3528, hb1_feasible_seed_3550, hb1_feasible_seed_3575,
+    hb1_feasible_seed_3585, hb1_feasible_seed_3705, hb1_feasible_seed_3734, hb1_feasible_seed_3829,
+    hb1_feasible_seed_383, hb1_feasible_seed_3844, hb1_feasible_seed_385, hb1_feasible_seed_391,
+    hb1_feasible_seed_3915, hb1_feasible_seed_3918, hb1_feasible_seed_395, hb1_feasible_seed_3969,
+    hb1_feasible_seed_4057, hb1_feasible_seed_4062, hb1_feasible_seed_4151, hb1_feasible_seed_4288,
+    hb1_feasible_seed_4333, hb1_feasible_seed_4351, hb1_feasible_seed_4370, hb1_feasible_seed_4383,
+    hb1_feasible_seed_4388, hb1_feasible_seed_4467, hb1_feasible_seed_4480, hb1_feasible_seed_4578,
+    hb1_feasible_seed_460, hb1_feasible_seed_4611, hb1_feasible_seed_4621, hb1_feasible_seed_471,
+    hb1_feasible_seed_4806, hb1_feasible_seed_4890, hb1_feasible_seed_4908, hb1_feasible_seed_4966,
+    hb1_feasible_seed_5066, hb1_feasible_seed_5095, hb1_feasible_seed_5104, hb1_feasible_seed_5120,
+    hb1_feasible_seed_5174, hb1_feasible_seed_5183, hb1_feasible_seed_5201, hb1_feasible_seed_525,
+    hb1_feasible_seed_5275, hb1_feasible_seed_5307, hb1_feasible_seed_5341, hb1_feasible_seed_5402,
+    hb1_feasible_seed_5478, hb1_feasible_seed_5630, hb1_feasible_seed_5698, hb1_feasible_seed_5715,
+    hb1_feasible_seed_5846, hb1_feasible_seed_5968, hb1_feasible_seed_6007, hb1_feasible_seed_6075,
+    hb1_feasible_seed_6127, hb1_feasible_seed_6134, hb1_feasible_seed_6141, hb1_feasible_seed_667,
+    hb1_feasible_seed_707, hb1_feasible_seed_785, hb1_feasible_seed_789, hb1_feasible_seed_851,
+    hb1_infeasible_seed_1121, hb1_infeasible_seed_1303, hb1_infeasible_seed_1424, hb1_infeasible_seed_1508,
+    hb1_infeasible_seed_1562, hb1_infeasible_seed_1579, hb1_infeasible_seed_1644, hb1_infeasible_seed_1701,
+    hb1_infeasible_seed_1796, hb1_infeasible_seed_1854, hb1_infeasible_seed_1858, hb1_infeasible_seed_194,
+    hb1_infeasible_seed_2017, hb1_infeasible_seed_2148, hb1_infeasible_seed_2181, hb1_infeasible_seed_232,
+    hb1_infeasible_seed_240, hb1_infeasible_seed_2456, hb1_infeasible_seed_2537, hb1_infeasible_seed_2545,
+    hb1_infeasible_seed_2569, hb1_infeasible_seed_2580, hb1_infeasible_seed_2595, hb1_feasible_seed_2631_fixed,
+    hb1_infeasible_seed_2686, hb1_infeasible_seed_2700, hb1_feasible_seed_2704_fixed, hb1_infeasible_seed_2721,
+    hb1_infeasible_seed_2972, hb1_infeasible_seed_3034, hb1_infeasible_seed_3053, hb1_feasible_seed_3249_fixed,
+    hb1_infeasible_seed_3310, hb1_infeasible_seed_3386, hb1_infeasible_seed_3582, hb1_infeasible_seed_3613,
+    hb1_infeasible_seed_3619, hb1_infeasible_seed_364, hb1_infeasible_seed_3640, hb1_infeasible_seed_3679,
+    hb1_infeasible_seed_3740, hb1_infeasible_seed_3764, hb1_infeasible_seed_38, hb1_infeasible_seed_3861,
+    hb1_infeasible_seed_3877, hb1_infeasible_seed_3999, hb1_infeasible_seed_400, hb1_infeasible_seed_4026,
+    hb1_infeasible_seed_4080, hb1_feasible_seed_4104_fixed, hb1_infeasible_seed_4134, hb1_infeasible_seed_4138,
+    hb1_infeasible_seed_4227, hb1_infeasible_seed_4263, hb1_infeasible_seed_4274, hb1_infeasible_seed_4506,
+    hb1_feasible_seed_4509_fixed, hb1_infeasible_seed_4532, hb1_infeasible_seed_4644, hb1_infeasible_seed_4786,
+    hb1_infeasible_seed_4851, hb1_infeasible_seed_4902, hb1_infeasible_seed_4940, hb1_infeasible_seed_5093,
+    hb1_feasible_seed_518_fixed, hb1_infeasible_seed_5212, hb1_infeasible_seed_5259, hb1_infeasible_seed_5287,
+    hb1_infeasible_seed_5550, hb1_infeasible_seed_556, hb1_infeasible_seed_5673, hb1_feasible_seed_571_fixed,
+    hb1_infeasible_seed_572, hb1_infeasible_seed_5721, hb1_infeasible_seed_5726, hb1_infeasible_seed_5751,
+    hb1_feasible_seed_5804_fixed, hb1_infeasible_seed_583, hb1_feasible_seed_5901_fixed, hb1_infeasible_seed_5913,
+    hb1_infeasible_seed_6017, hb1_infeasible_seed_6158, hb1_infeasible_seed_6238, hb1_infeasible_seed_6249,
+    hb1_infeasible_seed_6312, hb1_feasible_seed_6340_fixed, hb1_infeasible_seed_6365, hb1_infeasible_seed_6482,
+    hb1_infeasible_seed_6657, hb1_infeasible_seed_6676, hb1_infeasible_seed_6734, hb1_feasible_seed_69_fixed,
+    hb1_infeasible_seed_762, hb1_infeasible_seed_831, hb1_infeasible_seed_857, hb1_infeasible_seed_862,
+    hb1_infeasible_seed_936, hb1_feasible_seed_937_fixed, hb2_feasible_seed_101, hb2_feasible_seed_103,
+    hb2_feasible_seed_106, hb2_feasible_seed_107, hb2_feasible_seed_111, hb2_feasible_seed_114,
+    hb2_feasible_seed_117, hb2_feasible_seed_118, hb2_feasible_seed_119, hb2_feasible_seed_122_fixed,
+    hb2_feasible_seed_124, hb2_feasible_seed_127, hb2_feasible_seed_129, hb2_feasible_seed_13,
+    hb2_feasible_seed_14, hb2_feasible_seed_19, hb2_feasible_seed_20, hb2_feasible_seed_24,
+    hb2_feasible_seed_25, hb2_feasible_seed_28, hb2_feasible_seed_29, hb2_feasible_seed_30,
+    hb2_feasible_seed_31, hb2_feasible_seed_32, hb2_feasible_seed_36, hb2_feasible_seed_40,
+    hb2_feasible_seed_41, hb2_feasible_seed_42, hb2_feasible_seed_43, hb2_feasible_seed_45,
+    hb2_feasible_seed_46, hb2_feasible_seed_48, hb2_feasible_seed_49, hb2_feasible_seed_51,
+    hb2_feasible_seed_59, hb2_feasible_seed_64, hb2_feasible_seed_7, hb2_feasible_seed_70,
+    hb2_feasible_seed_71, hb2_feasible_seed_73, hb2_feasible_seed_74, hb2_feasible_seed_76,
+    hb2_feasible_seed_8, hb2_feasible_seed_88, hb2_feasible_seed_95, hb2_mixed_seed_104,
+    hb2_mixed_seed_107, hb2_mixed_seed_113, hb2_feasible_seed_12_fixed, hb2_mixed_seed_135,
+    hb2_mixed_seed_136, hb2_mixed_seed_137, hb2_mixed_seed_138, hb2_mixed_seed_157,
+    hb2_mixed_seed_175, hb2_mixed_seed_178, hb2_mixed_seed_194, hb2_mixed_seed_197,
+    hb2_feasible_seed_202_fixed, hb2_mixed_seed_215, hb2_mixed_seed_236, hb2_mixed_seed_243,
+    hb2_mixed_seed_27, hb2_mixed_seed_34, hb2_mixed_seed_35, hb2_mixed_seed_36,
+    hb2_feasible_seed_58_fixed, hb2_mixed_seed_65, hb2_mixed_seed_82, hb2_mixed_seed_84,
+    hb2_mixed_seed_95, hb3_feasible_seed_10, hb3_feasible_seed_13, hb3_feasible_seed_18,
+    hb3_feasible_seed_2_fixed, hb3_feasible_seed_22, hb3_feasible_seed_23, hb3_feasible_seed_24,
+    hb3_feasible_seed_25, hb3_feasible_seed_26, hb3_feasible_seed_27, hb3_feasible_seed_28,
+    hb3_feasible_seed_30, hb3_feasible_seed_31, hb3_feasible_seed_32, hb3_feasible_seed_36,
+    hb3_feasible_seed_38, hb3_feasible_seed_39, hb3_feasible_seed_41, hb3_feasible_seed_46,
+    hb3_feasible_seed_49, hb3_feasible_seed_51, hb3_mixed_seed_52_fixed, hb3_feasible_seed_57,
+    hb3_feasible_seed_6, hb3_feasible_seed_8, hb3_feasible_seed_9, hb3_mixed_seed_109,
+    hb3_mixed_seed_124, hb3_mixed_seed_128, hb3_mixed_seed_130, hb3_mixed_seed_147,
+    hb3_mixed_seed_154, hb3_mixed_seed_159, hb3_mixed_seed_170_fixed, hb3_mixed_seed_231,
+    hb3_mixed_seed_253, hb3_mixed_seed_289, hb3_mixed_seed_315, hb3_mixed_seed_325,
+    hb3_mixed_seed_342, hb3_mixed_seed_357, hb3_mixed_seed_36, hb3_mixed_seed_370,
+    hb3_mixed_seed_42, hb3_mixed_seed_55_fixed, hb3_mixed_seed_6, hb4_feasible_seed_1_fixed,
+    hb4_feasible_seed_10, hb4_feasible_seed_11, hb4_feasible_seed_14, hb4_feasible_seed_15,
+    hb4_feasible_seed_17, hb4_feasible_seed_19, hb4_feasible_seed_21, hb4_feasible_seed_25,
+    hb4_feasible_seed_3, hb4_feasible_seed_5, hb4_feasible_seed_6, hb4_feasible_seed_8,
+    hb4_feasible_seed_9, hb4_mixed_seed_115, hb4_mixed_seed_12, hb4_mixed_seed_153,
+    hb4_mixed_seed_191_fixed, hb4_mixed_seed_253_fixed, hb4_mixed_seed_283, hb4_mixed_seed_299,
+    hb4_mixed_seed_303, hb4_mixed_seed_383, hb4_mixed_seed_414, hb4_mixed_seed_79,
+    hb4_mixed_seed_80, hb5_feasible_seed_10, hb5_feasible_seed_12, hb5_feasible_seed_13,
+    hb5_feasible_seed_2, hb5_feasible_seed_5_fixed, hb5_feasible_seed_6_fixed, hb5_feasible_seed_7,
+    hb5_feasible_seed_8, hb5_mixed_seed_239, hb5_mixed_seed_36, hb5_mixed_seed_4,
+    hb5_feasible_seed_439_fixed, hb5_mixed_seed_450, hb5_feasible_seed_456_fixed, hb5_mixed_seed_9,
+    hb6_feasible_seed_1, hb6_feasible_seed_2, hb6_mixed_seed_100, hb6_mixed_seed_166,
+    hb6_mixed_seed_222_fixed, hb6_mixed_seed_343_fixed, hb6_mixed_seed_397, hb6_mixed_seed_45,
+    hb6_mixed_seed_86, hb7_feasible_seed_1, hb7_feasible_seed_2, hb7_feasible_seed_5,
+    hb7_feasible_seed_6, hb7_mixed_seed_251, hb7_mixed_seed_4, hb7_mixed_seed_468,
+    hb8_feasible_seed_1, hb8_mixed_seed_100, hb8_mixed_seed_140, hb8_mixed_seed_177,
+    hb8_mixed_seed_224_fixed, hb8_mixed_seed_245, hb8_mixed_seed_334_fixed, hb8_mixed_seed_373,
+    hb8_mixed_seed_407, hb8_mixed_seed_47, hb8_mixed_seed_77_fixed, hb9_mixed_seed_134,
+    hb9_mixed_seed_147, hb9_mixed_seed_218, hb9_mixed_seed_236, hb9_mixed_seed_312,
+    hb9_mixed_seed_314_fixed, hb9_mixed_seed_482, hb9_mixed_seed_5_fixed, hb9_mixed_seed_51
+  limit: null
+  workers: 4               # remote calls: workers run in parallel
+  context: none
+  memory: "off"
+  guidelines: homebench    # homebench: no device conditions | default: as deployed
+  environment: "on"        # as the ECAI run (env_on): room environments and action effects

@@ -202,8 +202,9 @@ def episode_metrics(record: Dict[str, Any],
 def _homebench(evaluation: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """The HomeBench columns of an episode, from its evaluation's `homebench` block: the
     official bucket, `hb_em` / `hb_tp` / `hb_pred` / `hb_gold` (what the official metrics
-    are computed from), the per-part counts, how many parts were unreachable / unresolved,
-    whether a judge ran, and `score_extra`. Empty for an episode with no block (any
+    are computed from), the per-part counts, how many parts were unresolved, the goals
+    answered with a question, whether the request asks for a change in percent, and
+    `score_extra`. Empty for an episode with no block (any
     SimuHome one, an infrastructure failure, a run stopped early), so those rows -- and
     SimuHome's csv files -- keep their columns."""
     block = (evaluation or {}).get("homebench")
@@ -216,9 +217,8 @@ def _homebench(evaluation: Optional[Dict[str, Any]]) -> Dict[str, Any]:
             "hb_feasible_ok": parts.get("feasible_ok", 0),
             "hb_infeasible": parts.get("infeasible", 0),
             "hb_infeasible_ok": parts.get("infeasible_ok", 0),
-            "hb_unreachable": block.get("unreachable", 0),
             "hb_unresolved": block.get("unresolved", 0),
-            "hb_clarified": block.get("clarified", 0), "hb_judged": block.get("judged"),
+            "hb_clarified": block.get("clarified", 0),
             "hb_percent": int(bool(block.get("percent_relative"))),
             "score_extra": evaluation.get("score_extra")}
 
@@ -345,8 +345,8 @@ def _homebench_summary(rows: List[Dict[str, Any]], scored: List[Dict[str, Any]]
     ``success_rate_extra`` the share passed when the extra reading of a label counts
     (``success_rate`` is the benchmark's own reading), ``n_rescued`` the episodes that
     reading turned from failed to passed, the generic per-part rates (``parts_rate``,
-    ``feasible_rate``, ``impossible_rate``: our definitions), and the counts the table
-    notes need (episodes scored without a judge, with unreachable or unresolved parts).
+    ``feasible_rate``, ``impossible_rate``: our definitions), and how many episodes have
+    an infeasible part the converter could not tie to a room and device.
     """
     blocks = [r for r in rows if "bucket" in r]
     if not blocks:
@@ -355,14 +355,10 @@ def _homebench_summary(rows: List[Dict[str, Any]], scored: List[Dict[str, Any]]
     rescued = sum(1 for r in scored if r.get("score_extra") == 1 and r["score"] == 0)
     # 2. The generic per-part rates, pooled.
     rates = hbm.parts_rates(_part_counts(blocks))
-    # 3. What the notes under the tables count.
-    refusing = [r for r in scored if r["case"] in REFUSING_CASES and "bucket" in r]
     return {"success_rate_extra": _ratio(sum(_extra_scores(scored)), len(scored)),
             "n_rescued": rescued,
             "parts_rate": rates["parts_rate"], "feasible_rate": rates["feasible_rate"],
             "impossible_rate": rates["impossible_rate"],
-            "n_unjudged": sum(1 for r in refusing if not r["hb_judged"]),
-            "n_unreachable": sum(1 for r in blocks if r["hb_unreachable"]),
             "n_unresolved": sum(1 for r in blocks if r["hb_unresolved"])}
 
 
@@ -429,7 +425,7 @@ and every cost mean.
 | plans ok | our plans that ran to SUCCESS / our plans run (our executor's view, every case) |
 | refused/request | mean goals our agents answered "impossible" or with a question |
 | exec check | infeasible (and mixed): share that did nothing on the impossible part and said so |
-| judge | infeasible (and mixed): share SimuHome's judge panel passed on the reply |
+| judge | infeasible (and mixed): share SimuHome's judge panel passed on the reply (SimuHome only) |
 | *phase* s | mean wall seconds per episode in that phase; profiling and guarding are taken out of planning, so the phases add up to total |
 | *phase* in/out | mean input / output tokens per episode in that phase (output includes reasoning tokens) |
 | calls | mean LLM calls per episode |
@@ -448,65 +444,34 @@ HomeBench: `type` is hbN, a request with N parts (hb1 a single command, hb10 ten
 
 | column | meaning (HomeBench records) |
 |---|---|
-| success | the benchmark's own reading of each label: the gold value, exactly |
-| success +readings | the same with the one extra reading of plan 3.7 -- *our criterion, not HomeBench's*: a gold `set_brightness(0)` / `set_intensity(0)` for a request that says turn off / switch off is also met by the device being off (`matched` in each check of the .eval.json says which reading held) |
-| parts ok | parts passed / parts (feasible parts: all checks ok; infeasible parts: nothing done in their scope, at most as many as there were refusals) -- our definition |
-| impossible ok | infeasible parts answered impossible (or asked about) with nothing done on them / infeasible parts -- our definition, not HomeBench's |
+| success | every gold token met: each gold call by an accepted action that is exactly that call (or by a value that held before and after, so no action was needed), each `error_input` by a goal answered impossible or with a question; other actions are not counted. No judge |
+| success +readings | the same with the one extra reading of plan 3.7 -- *our criterion, not HomeBench's*: a gold `set_brightness(0)` / `set_intensity(0)` for a request that says turn off / switch off is also met by that device's `turn_off()` (`matched` in each check of the .eval.json says how it was met) |
+| parts ok | gold tokens met / gold tokens (error_input tokens: at most as many as there were refusals) -- our definition |
+| impossible ok | `error_input` tokens met by a goal answered impossible or with a question / `error_input` tokens |
+| exec check | infeasible and mixed: share whose every `error_input` was met by a refusal |
 | EM, precision, recall, F1 | HomeBench's official metrics, re-implemented (second table) |
 """
 
 
 def homebench_notes(rows: List[Dict[str, Any]]) -> List[str]:
     """The caveats printed under the HomeBench tables, one string each, only those that
-    apply to ``rows``: the official-metrics caveat, and counts of episodes scored without a
-    judge (the --no-judge weakness, plan 3.8), with unresolved infeasible parts, and with
-    an unreachable gold part."""
+    apply to ``rows``: the official-metrics caveat, and the success of the requests for a
+    change "by N percent" next to the others'."""
     blocks = [r for r in rows if "bucket" in r]
     if not blocks:
         return []
     notes = [hbm.CAVEAT_OFFICIAL]
-    # 1. --no-judge: the execution check alone stands in for the judge.
-    refusing = [r for r in blocks if r["case"] in REFUSING_CASES and r["score"] in (0, 1)]
-    unjudged = [r for r in refusing if not r["hb_judged"]]
-    if unjudged:
-        notes.append(
-            f"{len(unjudged)} of {len(refusing)} infeasible / mixed episodes were scored without "
-            "a judge (--no-judge): their score is the execution check alone, which is weaker "
-            "(it can pass a reply that names the wrong device, or none).")
-    # 2. Parts whose target the request text did not reveal.
-    unresolved = [r for r in blocks if r["hb_unresolved"]]
-    if unresolved:
-        notes.append(
-            f"{sum(r['hb_unresolved'] for r in unresolved)} infeasible parts in "
-            f"{len(unresolved)} episodes could not be tied to a room and device from the request "
-            "text: their execution check covers every accepted action no feasible part asks for, "
-            "and a judge reads the request itself.")
-    # 3. Gold parts no action can issue.
-    unreachable = [r for r in blocks if r["hb_unreachable"]]
-    if unreachable:
-        notes.append(
-            f"{len(unreachable)} episodes have a gold part no action can issue (a vacuum start / "
-            "stop / pause / charge): the success rate treats that part as met (nothing to "
-            "assert), while their official EM cannot reach 1.0 by construction.")
-    # 4. Relative changes in percent: the gold adds points, our planner scales (reported
-    #    apart so the gap is visible, never relaxed).
+    # 1. Relative changes in percent: the gold adds N points to the initial value, which
+    #    our planner does only for a property in percent; reported apart so a gap shows.
     doing = [r for r in blocks if r["case"] in ("feasible", "mixed") and r["score"] in (0, 1)]
     percent = [r for r in doing if r["hb_percent"]]
     if percent:
         others = [r for r in doing if not r["hb_percent"]]
         notes.append(
             f"{len(percent)} of {len(doing)} scored feasible / mixed episodes ask for a change 'by N "
-            "percent': the gold adds N points to the initial value, our planner scales the current "
-            f"value by N percent, so they tend to fail whatever the model; success "
+            "percent' (the gold adds N points to the initial value): success "
             f"{_pct(_ratio(sum(r['score'] for r in percent), len(percent)))} against "
-            f"{_pct(_ratio(sum(r['score'] for r in others), len(others))) or '-'} for the others "
-            "(known issue, not relaxed).")
-    # 5. Our agents refusing by asking.
-    clarified = sum(r["hb_clarified"] for r in blocks)
-    if clarified:
-        notes.append(
-            f"{clarified} goals were answered with a question: that passes the execution check "
-            "(asked, nothing done) but is not an `error_input` for the official metrics.")
+            f"{_pct(_ratio(sum(r['score'] for r in others), len(others))) or '-'} for the others.")
     return notes
 
 

@@ -105,29 +105,36 @@ depends on the paper's Table 1.
 
 | Family | What it is | Where |
 |---|---|---|
-| 1. SimuHome-style score (primary) | 1 pass, 0 fail, −1 infrastructure error (left out of the rates, as in SimuHome) | `score` in `<episode>.eval.json`, the `success` columns |
+| 1. Gold-token score (primary) | 1 pass, 0 fail, −1 infrastructure error (left out of the rates, as in SimuHome) | `score` in `<episode>.eval.json`, the `success` columns |
 | 2. Official HomeBench metrics | EM, Precision, Recall, F1 per bucket, re-implemented from the public `code/eval.py` | `buckets.csv`, `official.csv`, a table in `summary.md` / `report.md` |
-| 3. Generic per-part rates | parts passed over parts; infeasible parts answered as impossible with nothing executed | `parts ok`, `impossible ok` columns. **Our definitions** |
+| 3. Generic per-part rates | gold tokens met over gold tokens; `error_input` tokens met by a refusal | `parts ok`, `impossible ok` columns. **Our definitions** |
 
-### 1. The score, per case
+### 1. The score: every gold token met, no judge
 
-| Case | Rule |
+One rule for every case (`tests/homebench/scoring.py`), decided from the record, with **no
+judge**. Our agents do not argue why a request cannot be done; they report it to the user,
+which is what HomeBench's `error_input` stands for.
+
+| Gold token | Met when |
 |---|---|
-| `feasible` | SimuHome's qt3 evaluator, unchanged: the required tool calls were made **and** every goal's asserts equal the final home state. Each part asserts only the attribute the gold call sets. |
-| `infeasible` | our execution check, per part (nothing was executed in the part's scope, and the agents answered impossible or asked), **plus** a judge panel on the reply: SimuHome's own panel for a missing device, HomeBench's prompt (`tests/homebench/judge_prompt.py`) for a missing attribute or a part whose target the request does not reveal |
-| `mixed` | both, each on its own parts; the episode passes only if **every** part passes (the same all-or-nothing as SimuHome's request success and as the official EM) |
+| `room.device.op(arg)` | an accepted action whose gold token is exactly this one (`gold_log.py`), **or**, with no action needed, the part's assert held both before the run and after it (`matched: "held"`; about 9% of the doable parts of a run start at their gold value, and our plans skip a goal that already holds) |
+| `error_input` | a goal answered **impossible or with a question**; k gold `error_input`s need at least k such answers (refusals are not tied to parts) |
 
-The judge panel is three LLM calls (default `gpt-4o-mini`). An episode with a missing-device
-part *and* a missing-attribute part has two panels, so up to six calls: about 21% more judge
-calls than `--dry-run` prints for the full set.
+The episode passes when **every** gold token is met (the same all-or-nothing as SimuHome's
+request success). Anything else the agents did is **not counted against them**: we model the
+general case (a light is switched on before its brightness is set, a request is split into
+more goals than HomeBench has parts), while HomeBench assumes every device is on and one call
+per part. A substitute (the blinds closed for a missing curtain) is such an extra action; the
+episode still fails, because the `error_input` it should have been is missing. SimuHome's
+required `get_room_devices` reads are not part of the rule.
 
-**The extra reading.** The primary reading of every label is the benchmark's own value. As the
-SimuHome bench does for percent levels, HomeBench has **one** named extra reading, which is
-**our criterion, not HomeBench's**: when the gold is `set_brightness(0)` or `set_intensity(0)`
-and the clause of the request asks to turn the device off, the device being off also counts.
-This covers about 62 single rows. `score_extra` is the score with that reading; `score` is the
-strict one; each check records which reading `matched`. Every other disagreement with the gold
-is a failure.
+**The extra reading.** As the SimuHome bench does for percent levels, HomeBench has **one**
+named extra reading, which is **our criterion, not HomeBench's**: when the gold is
+`set_brightness(0)` or `set_intensity(0)` and the clause of the request asks to turn the device
+off, that device's `turn_off()` also counts. This covers about 62 single rows. `score_extra` is
+the score with that reading; `score` is the strict one; each check records how it was met
+(`matched`: `action`, `held` or `turn_off`). Every other disagreement with the gold is a
+failure.
 
 ### 2. The official metrics, and their caveat
 
@@ -143,13 +150,13 @@ Print this caveat next to any number from this family (the tables do):
 > that no dataset file has), so the official numbers cannot be reproduced bit for bit. Our
 > agents segment a request into atomic intents and answer in prose, so the prediction is built
 > from what happened: one gold token per accepted action plus one `error_input` per goal
-> answered impossible. A goal answered with a question is no output. That approximates the
-> official token stream; it is not that stream.
+> answered impossible or with a question. That approximates the official token stream; it is
+> not that stream.
 
 ### 3. Generic rates
 
-`parts ok` (feasible parts: every check right; infeasible parts: nothing done in their scope)
-and `impossible ok` are strict, in the benchmark's reading. If the names of an older paper table
+`parts ok` (gold calls met; `error_input` tokens met by a refusal, at most as many as there were
+refusals) and `impossible ok` are strict, in the benchmark's reading. If the names of an older paper table
 (full success, full + partial, impossible detection) are wanted, derive them from these and
 label them as **our definitions**: they are not set beside the paper's Table 1, which came from
 an older harness that is not in this repository (see [evaluation.md](evaluation.md)).
@@ -161,11 +168,11 @@ Read these before comparing any rate, with SimuHome's or with another model's.
 | Effect | Size | What it does |
 |---|---|---|
 | **Floor of the primary score** | an agent that does nothing passes 10.7% of feasible and 2.3% of mixed episodes; an agent that refuses everything passes 100% of infeasible ones | the gold ignores preconditions, so some gold calls are no-ops on the initial state. Never compare a feasible or infeasible rate without the other side of the table. The official EM has no such floor |
-| **Relative requests in percent** | 5,395 of 17,366 rows ask "by N percent" | the gold adds N *points* to the initial value (2,042 of 2,182 single relative rows equal `current ± N` exactly); our planner scales the current value by N percent. They disagree whatever the model: `hb1_feasible_seed_1` above plans 31 where the gold says 70. Flagged per episode (`percent_relative`) and reported apart in the table notes; **not relaxed** |
-| **Unreachable vacuum calls** | 70 gold calls (`start`, `stop`, `pause`, `charge`) are not in the home's own method list | no action can issue them. The success rate treats such a part as met; the official EM of those 70 rows cannot reach 1.0 (at best 17,296 of 17,366, 99.6%) |
+| **Relative requests in percent** | 5,395 of 17,366 rows ask "by N percent" | the gold adds N *points* to the initial value (2,042 of 2,182 single relative rows equal `current ± N` exactly). Our planner adds points on a property in `unit:PERCENT` and scales otherwise, so the 0-100 levels (brightness, volume, curtain degree, intensity) carry that unit. Flagged per episode (`percent_relative`) and reported apart in the table notes; **not relaxed** |
+| **Vacuum operation calls** | 70 gold calls (`start`, `stop`, `pause`, `charge`) | the home offers them, as the vacuum's `state` action (`cleaning`, `stopped`, `paused`, `charging`), because the gold uses them |
 | **Heating range** | 883 of 1,197 gold heating values are outside the declared range | corrected in the engine (16-30), so a correct answer is not marked wrong |
 | **"Turn off" labelled as level 0** | about 62 single rows | the one extra reading above |
-| **Unresolved infeasible parts** | 1,705 parts in 426 multi rows (8.4% of parts) | the request has fewer or merged clauses than the gold has parts, so room and device of an `error_input` cannot be recovered from the text: their execution check covers every accepted action no feasible part asks for, and a judge reads the request |
+| **Unresolved infeasible parts** | 1,705 parts in 426 multi rows (8.4% of parts) | the request has fewer or merged clauses than the gold has parts, so room and device of an `error_input` cannot be recovered from the text. The score does not need them (refusals are counted, not placed); the count is in `hb_unresolved` |
 | **Duplicates and noise** | 49 duplicate `(home, input)` rows; 3,478 multi gold strings hold more than one `error_input` | label noise; part of what a reader should not take for agent error |
 | **Segmentation granularity** | any request | a model that merges two parts changes the `error_input` count: the official metrics depend on it, the primary score does not |
 
@@ -185,24 +192,14 @@ the agents' own file, use `--guidelines default` (or `run.guidelines: default`) 
 official metrics with the extra-`turn_on` caveat. The two settings are separate record
 directories if the configs are named apart.
 
-### `--no-judge` is weaker
-
-With `--no-judge` the infeasible parts get the execution check alone: nothing was executed in
-the part's scope and the agents said impossible or asked. That passes a reply that names the
-wrong device, or none (the earlier SimuHome run scored 1 although the reply named the wrong
-washer). Every table produced from such records says so in its notes, and so should any number
-quoted from it. Use `--no-judge` for a fully local run; do not set its numbers beside judged
-ones.
-
 ---
 
 ## Prerequisites
 
 1. **HomeBench next to this repo**, at `../HomeBench`, **and the dataset converted**:
-   [installation.md § Step 5-HB](installation.md#step-5-hb--homebench-benchmark). SimuHome must
-   be cloned too (`../SimuHome`): HomeBench's feasible and judge scoring import its evaluators.
-2. **An LLM endpoint**, as for SimuHome: `OPENAI_API_KEY` for OpenAI models and for the judge,
-   or Ollama at `http://localhost:11434/v1` through `provider: local`. **The planner needs tool
+   [installation.md § Step 5-HB](installation.md#step-5-hb--homebench-benchmark). Scoring
+   needs nothing of SimuHome's (no judge, no evaluator module).
+2. **An LLM endpoint**, as for SimuHome: `OPENAI_API_KEY` for OpenAI models, or Ollama at `http://localhost:11434/v1` through `provider: local`. **The planner needs tool
    calling**, so a local model must support tools. On the machine this was written on, `gemma3:12b`
    does not (HTTP 400), `ministral-3:8b` does, and `qwen3:8b` (the model in
    `harness.local.example.yaml`) is not installed.
@@ -219,18 +216,15 @@ conda run -n ami-agents python -m tests.simuhome.bench.run --suite homebench \
     --episode hb1_feasible_seed_1 --variant tests/homebench/variants/homebench.quick.yaml \
     --no-evaluate --debug
 
-# score it without the judge (no LLM call), then the statistics
+# score it (no LLM call: HomeBench has no judge), then the statistics
 conda run -n ami-agents python -m tests.simuhome.bench.evaluate --suite homebench \
-    --records tests/homebench/results/bench/homebench.quick --no-judge --explain
+    --records tests/homebench/results/bench/homebench.quick --explain
 conda run -n ami-agents python -m tests.simuhome.bench.stats \
     --records tests/homebench/results/bench/homebench.quick
 ```
 
-`run.py` has no `--no-judge`: `--episode` scores an episode at once with the judge on, so for a
-local smoke test skip it with `--no-evaluate` and score with `evaluate --no-judge`. Drop
-`--no-evaluate` to score at once (an episode with an infeasible part then makes 3 judge calls, or
-6, on the variant's judge model). `--stop-after segmentation|structuring|planning` stops early,
-with no actuation.
+Drop `--no-evaluate` to score the episode at once (no LLM call either way).
+`--stop-after segmentation|structuring|planning` stops early, with no actuation.
 
 Measured on a local `ministral-3:8b`, one worker: this episode took 12.8 s wall (segmentation
 6.1 s, structuring 3.7 s, planning 0.3 s, execution 0.1 s, the reply 1.2 s), 3 LLM calls, and
@@ -249,15 +243,15 @@ twice (`--skip-existing`, `--skip-scored`).
 ### Three configs, one mechanism
 
 The three configs live in `tests/homebench/variants/`. They differ **only** in `run:`; the model
-blocks are identical (the local `ministral-3:8b` on every step, the OpenAI `gpt-4o-mini` judge).
+blocks are identical (the local `ministral-3:8b` on every step; no judge).
 
-| Config | Selection | Episodes | LLM calls | Judge calls | Wall clock, one local 8B worker |
-|---|---|---|---|---|---|
-| `homebench.quick.yaml` | `hb1`-`hb4`, `limit: 4` per (type, case): 11 groups | 44 | ~160 | ~84 (28 episodes hold an infeasible part) | **~24 min estimated** |
-| `homebench.spread.yaml` | all types, `limit: 1` per (type, case): 27 groups | 27 | ~172 | ~54 (18 episodes) | **~25 min estimated** |
-| `homebench.full.yaml` | all, `limit: null` | 17,366 | ~56,557 | ~32,802 (10,934 episodes) | **~125 h estimated** |
+| Config | Selection | Episodes | LLM calls | Wall clock, one local 8B worker |
+|---|---|---|---|---|
+| `homebench.quick.yaml` | `hb1`-`hb4`, `limit: 4` per (type, case): 11 groups | 44 | ~160 | **~24 min estimated** |
+| `homebench.spread.yaml` | all types, `limit: 1` per (type, case): 27 groups | 27 | ~172 | **~25 min estimated** |
+| `homebench.full.yaml` | all, `limit: null` | 17,366 | ~56,557 | **~125 h estimated** |
 
-The episode, call and judge counts are exact, from `--dry-run`. **The times are estimates, not
+The episode and call counts are exact, from `--dry-run`. **The times are estimates, not
 measurements.** They assume about 8 s per LLM call plus 3-5 s of per-episode overhead. The
 calls above count the steps only (one segmentation + one structuring per part); the one episode
 measured also made a call for the reply. It took 12.8 s for 3 calls, which is
@@ -277,8 +271,7 @@ config), nothing else.
 conda run -n ami-agents python -m tests.simuhome.bench.harness --suite homebench \
     --config tests/homebench/variants/homebench.quick.yaml --dry-run
 
-# ~160 LLM calls on a local model, ~24 min estimated (+ ~84 judge calls unless --no-judge)
-# -- you run this
+# ~160 LLM calls on a local model, ~24 min estimated -- you run this
 conda run -n ami-agents python -m tests.simuhome.bench.harness --suite homebench \
     --config tests/homebench/variants/homebench.quick.yaml --workers 1
 
@@ -298,7 +291,7 @@ conda run -n ami-agents python -m tests.simuhome.bench.harness --suite homebench
 
 `--suite homebench` is optional when the config says `suite: homebench`; the commands above keep
 it so they read the same as the single-episode ones. Overrides: `--episodes hb1_*,hb3_mixed`,
-`--seeds 1-10,15`, `--limit N` (per type and case), `--workers N`, `--no-judge`, `--out DIR`
+`--seeds 1-10,15`, `--limit N` (per type and case), `--workers N`, `--out DIR`
 (default `tests/homebench/results/harness`), `--benchmark DIR` (default `tests/homebench/data`).
 Use one worker with one local model: more workers only queue on it. A home's episodes are kept
 on one worker, so its engine is reset to the same home in a row.
@@ -316,7 +309,6 @@ providers:
 models:
   segmentation:  {provider: local, model: "ministral-3:8b", temperature: 0}
   # ... structuring, planning.explicit, planning.general, profiling, guarding, response ...
-  judge:         {provider: openai, model: gpt-4o-mini, temperature: 0.5}
 run:
   episodes: "hb1_*,hb2_*,hb3_*,hb4_*"
   limit: 4                 # per (type, case); null = every episode
@@ -324,9 +316,10 @@ run:
   context: none
   memory: "off"
   guidelines: homebench    # homebench: no device conditions | default: as deployed
-evaluate:
-  judge: true
 ```
+
+There is no `evaluate:` section and no `judge` model: HomeBench is scored without a judge, so
+nothing would read them.
 
 The configs have no `name:`, so the records directory is the file's name
 (`<out>/homebench.quick/`) and the three never share records. Variant files are read with
@@ -341,7 +334,7 @@ what differs.
 | Command | What it does | Cost |
 |---|---|---|
 | `python -m tests.simuhome.bench.run --suite homebench --variant V --episodes … [--limit N]` | Runs episodes (tick execution), one record per episode in `tests/homebench/results/bench/<variant>/`. `--execution scheduled` is refused for HomeBench. `--guidelines homebench\|default` | 1 + N step calls per episode (N parts), and a call for the reply |
-| `python -m tests.simuhome.bench.evaluate --suite homebench --records DIR [--no-judge] [--skip-scored] [--explain]` | Scores the records, writing `<episode>.eval.json` beside each. `--suite` defaults to each record's own | 3 judge calls per panel |
+| `python -m tests.simuhome.bench.evaluate --suite homebench --records DIR [--skip-scored] [--explain]` | Scores the records, writing `<episode>.eval.json` beside each. `--suite` defaults to each record's own | none |
 | `python -m tests.simuhome.bench.stats --records DIR` | The statistics for one variant in `DIR/stats/`, with the official table | none |
 | `python -m tests.simuhome.bench.report --root DIR [--variants a,b]` | Compares variants: `rates.csv`, `steps.csv`, `outcomes.csv`, `official.csv`, `report.md` | none |
 | `python -m tests.simuhome.bench.sweep --grid G [--dry-run]` | A grid of model variants (run + evaluate each), then `report`. The grid says `suite: homebench` | per variant |
@@ -358,7 +351,6 @@ vary:
     - {model: gpt-4o-mini, temperature: 0}
 combine: one-at-a-time
 run: {episodes: "hb1_*,hb2_*", limit: 4, workers: 1}
-evaluate: {judge: true}
 ```
 
 The sweep runs the `base` variant as well as one variant per value: the grid above is 3
@@ -376,17 +368,16 @@ tests/homebench/results/
 
 An episode record has the same fields as SimuHome's (intents, structures, plan entries,
 outcome, actions, tool log, final state, the per-step meter) plus `suite`. The verdict
-(`<episode>.eval.json`) holds `score`, `score_extra`, `error_type`, the checks (each with
-`matched`, and `accepted` when an extra reading applies), the execution check and the judge
-result for infeasible and mixed episodes, and a **`homebench` block**: `gold_tokens`,
-`predicted_tokens`, `em`, `bucket`, per-part counts, `unreachable`, `unresolved`, `judged`,
-`percent_relative`. The block is absent for infrastructure failures and stopped runs.
+(`<episode>.eval.json`) holds `score`, `score_extra`, `error_type`, the checks (one per gold
+call, each with its `expected` token, its `class` and, when ok, how it was `matched`), the
+refusal check (`execution_check`: `error_inputs` against `refusals`) for an episode with an
+`error_input`, and a **`homebench` block**: `gold_tokens`, `predicted_tokens`, `em`, `bucket`,
+per-part counts, `unresolved`, `percent_relative`. The block is absent for infrastructure failures and stopped runs.
 
 `stats/` holds `summary.md`, `summary.csv`, `summary.json`, `episodes.csv` and, for HomeBench,
 `buckets.csv`; `summary.md` has the per-type table, the official table per bucket, and the notes
-(the official-metrics caveat, how many episodes ran without a judge, the unresolved and
-unreachable parts, the percent requests, the goals answered with a question). The notes are the
-caveats above, printed only when they apply to the records.
+(the official-metrics caveat, and the percent requests' success next to the others'). The
+notes are printed only when they apply to the records.
 
 ## 4. Running against your own servers
 
@@ -447,7 +438,7 @@ planning-conditions file and the results directory.
 | **Environment as TDs** | external simulator + `SimuHome/shtd.py`, `td_builder.py` (Matter devices, room physics, TD-SOSA effects) | `HomeBench/simulator.py` (a dictionary and a few validators) + `hbtd.py`; `HomeBenchTD(SimuHomeTD)` reuses every document builder and overrides the device TD and the attribute handling. No physics |
 | **Worker** | `SimuHome/worker.py` | `HomeBench/worker.py`: the same API; one home repeats over many episodes, so `load` resets the engine to the episode's home and restarts HBTD each time |
 | **Episode pipeline** | `bench/pipeline.py`, `stubs.py`, `execution.py` / `scheduling.py` | the same, through the suite: `Home(builder_cls=suite.td_cls)`, `timed` false, `scheduling` imported only when used |
-| **Scoring** | SimuHome's evaluators + judge, `toollog.py` | SimuHome's qt3 evaluator and judge for the parts that fit, `tests/homebench/scoring.py` (case rules), `judge_prompt.py`, `gold_log.py` (the reverse of `toollog.py`), `homebench_metrics.py` (the official metrics) |
+| **Scoring** | SimuHome's evaluators + judge, `toollog.py` | `tests/homebench/scoring.py` (the gold-token rule, no judge), `gold_log.py` (the reverse of `toollog.py`), `homebench_metrics.py` (the official metrics) |
 
 To add a third benchmark:
 1. Write the data tooling that emits **SimuHome-shaped episodes** (`meta`, `query`,
@@ -476,14 +467,10 @@ what the commands above use.
 | Q2 | the shared ontology | `homeont.ttl` edited, additions only; two existing tests changed (a pinned class count, and "blinds" now naming two classes) |
 | Q3 | branch and commits | branch `feature/homebench-harness`, **nothing committed** |
 | Q4 | the calibration model | `ministral-3:8b` (local); `qwen3:8b` not installed, `gemma3` cannot plan |
-| Q5 | the judge in subset runs | on in the configs (`gpt-4o-mini`); you run it. Local checks here used `--no-judge` |
+| Q5 | the judge in subset runs | superseded: HomeBench is scored without a judge (a refusal is the `error_input` token) |
 
 ## Not verified
 
-- **The judge on HomeBench replies.** No judge call was made while building this, so
-  `judge_prompt.py` and SimuHome's prompt on `mixed` replies, and the 1,689 `unknown`-reason
-  parts of `mix` rows, are untested with a real model. A first paid run should compare the
-  judge verdicts with the execution check on those.
 - **Any subset run** (quick, spread, full) and therefore every wall-clock figure above.
 - **The bench against hand-started servers** (§ 4: `run --sim ... --shtd ...`). `run_engine.py`
   was started and answered (`/_shtd/time`, the engine's health route, the platform document),

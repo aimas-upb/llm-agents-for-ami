@@ -1,0 +1,142 @@
+# HomeBench ground-truth corrections, applied by tests/homebench/convert.py.
+#
+# Each row replaces the gold of one HomeBench test row (`id`, the dataset's own row id,
+# stable across conversions). `episode` is its name before the correction; the corrected
+# episode is renamed for its new case, same seed, with a `_fixed` suffix
+# (hb1_infeasible_seed_2631 -> hb1_feasible_seed_2631_fixed), and its meta records the
+# original gold and the reason (`meta.label_correction`).
+#
+# Two kinds, both in the ECAI-400 episodes only:
+# * labelled `unexist_attribute` ("the light has no brightness") although HomeBench's own
+#   home file gives that light a brightness (0-100) and its method list a set_brightness:
+#   the request can be done, so the gold is the call it asks for. "minimum" / "lowest
+#   level" is the device's lowest value, 0. The same contradiction exists in 653 other
+#   rows of the full set, left as HomeBench labels them.
+# * a part whose request names an attribute the device does not have ("the curtain's
+#   intensity") while the gold sets another one (its degree): by HomeBench's own rule
+#   for a missing attribute, that part is `error_input`. `attribute` names what is
+#   missing; the rest of the gold is unchanged.
+# * a part labelled `error_input` although the device can do it (a light with a
+#   brightness, or one that can be turned off).
+# * a "by N" change whose gold is not the start value changed by N, or ignores a
+#   previous change of the same device the request makes first ("then", "further").
+#   A percent change of a 0-100 percent setting adds points.
+# * a part whose request gives no value ("an unspecified degree"): `error_input`, with
+#   `part_reason: unspecified_value`.
+# Each row's `reason` says which, with the numbers.
+version: 1
+reason: "labelled unexist_attribute, but the home file gives the light a 0-100 brightness"
+rows:
+- {id: home6_one_758,  episode: hb1_infeasible_seed_6340, gold: "''' bathroom.light.set_brightness(60)'''"}
+- {id: home88_one_599, episode: hb1_infeasible_seed_4104, gold: "''' ding_room.light.set_brightness(40)'''"}
+- {id: home69_one_710, episode: hb1_infeasible_seed_3249, gold: "''' store_room.light.set_brightness(20)'''"}
+- {id: home69_one_716, episode: hb1_infeasible_seed_571,  gold: "''' store_room.light.set_brightness(80)'''"}
+- {id: home6_one_563,  episode: hb1_infeasible_seed_69,   gold: "''' master_bedroom.light.set_brightness(10)'''"}
+- {id: home71_one_844, episode: hb1_infeasible_seed_518,  gold: "''' study_room.light.set_brightness(100)'''"}
+- {id: home69_one_702, episode: hb1_infeasible_seed_5901, gold: "''' garage.light.set_brightness(50)'''"}
+- {id: home85_one_916, episode: hb1_infeasible_seed_2631, gold: "''' garage.light.set_brightness(90)'''"}
+- {id: home59_one_849, episode: hb1_infeasible_seed_937,  gold: "''' foyer.light.set_brightness(50)'''"}
+- {id: home71_one_834, episode: hb1_infeasible_seed_2704, gold: "''' study_room.light.set_brightness(0)'''"}
+- {id: home67_one_561, episode: hb1_infeasible_seed_4509, gold: "''' living_room.light.set_brightness(0)'''"}
+- id: home45_multi_52
+  episode: hb3_feasible_seed_52
+  gold: "'''ding_room.trash.pack(),guest_bedroom.air_conditioner.set_temperature(16),error_input,'''"
+  attribute: intensity
+  reason: "the request asks the curtain for an intensity, which it does not have; the gold set its degree"
+- id: home49_multi_374
+  episode: hb9_mixed_seed_314
+  gold: "'''store_room.humidifier.set_mode(sleep),guest_bedroom.aromatherapy.set_intensity(20),corridor.light.set_brightness(80),error_input,master_bedroom.dehumidifiers.set_intensity(60),error_input,living_room.media_player.set_volume(10),error_input,store_room.humidifier.set_intensity(30),'''"
+  attribute: temperature
+  reason: "the request asks the curtain for a temperature, which it does not have; the gold set its degree"
+- id: home19_multi_1
+  episode: hb2_mixed_seed_12
+  gold: "'''living_room.aromatherapy.set_intensity(70),foyer.light.set_brightness(0),'''"
+  reason: "labelled impossible, but the home gives that light a brightness"
+- id: home64_multi_48
+  episode: hb2_mixed_seed_202
+  gold: "'''ding_room.light.set_brightness(50),guest_bedroom.air_conditioner.set_temperature(29),'''"
+  reason: "labelled impossible, but the home gives that light a brightness"
+- id: home47_multi_35
+  episode: hb2_mixed_seed_58
+  gold: "'''ding_room.light.set_brightness(60),guest_bedroom.air_conditioner.set_temperature(18),'''"
+  reason: "labelled impossible, but the home gives that light a brightness"
+- id: home19_multi_126
+  episode: hb4_mixed_seed_253
+  gold: "'''garage.light.set_brightness(70),error_input,corridor.aromatherapy.set_interval(10),guest_bedroom.air_conditioner.set_temperature(22),'''"
+  reason: "labelled impossible, but the home gives that light a brightness"
+- id: home64_multi_176
+  episode: hb5_mixed_seed_439
+  gold: "'''foyer.aromatherapy.set_intensity(40),master_bedroom.media_player.set_volume(50),ding_room.light.set_brightness(90),master_bedroom.dehumidifiers.set_mode(sleep),guest_bedroom.air_conditioner.set_temperature(16),'''"
+  reason: "labelled impossible, but the home gives that light a brightness"
+- id: home35_multi_172
+  episode: hb5_mixed_seed_456
+  gold: "'''vacuum_robot.set_cleaning_area(corridor),study_room.heating.set_fan_speed(low),guest_bedroom.air_conditioner.set_temperature(25),garage.garage_door.close(),kitchen.light.set_brightness(100),'''"
+  reason: "labelled impossible, but the home gives that light a brightness"
+- id: home53_multi_312
+  episode: hb8_mixed_seed_77
+  gold: "'''balcony.curtain.set_degree(100),guest_bedroom.dehumidifiers.set_intensity(80),guest_bedroom.air_conditioner.set_swing(up),master_bedroom.light.set_brightness(20),error_input,study_room.fan.set_speed(low),error_input,balcony.media_player.set_volume(90),'''"
+  reason: "labelled impossible, but the home gives that light a brightness"
+- id: home35_multi_350
+  episode: hb9_mixed_seed_5
+  gold: "'''error_input,corridor.light.set_brightness(60),master_bedroom.dehumidifiers.set_intensity(70),guest_bedroom.air_conditioner.set_temperature(22),corridor.light.set_brightness(50),living_room.air_conditioner.set_temperature(28),store_room.light.set_brightness(0),garage.media_player.set_volume(0),foyer.aromatherapy.set_intensity(70),'''"
+  reason: "labelled impossible, but the home gives that light a brightness"
+- id: home67_one_682
+  episode: hb1_infeasible_seed_5804
+  gold: "''' foyer.light.turn_off()'''"
+  reason: "labelled impossible, but the light has an on/off state"
+- id: home15_one_433
+  episode: hb1_feasible_seed_1106
+  gold: "''' study_room.air_conditioner.set_temperature(19)'''"
+  reason: "the gold is not the start value changed by N (18 + 1)"
+- id: home37_multi_36
+  episode: hb2_feasible_seed_122
+  gold: "'''guest_bedroom.air_conditioner.set_temperature(20),guest_bedroom.light.set_brightness(70),'''"
+  reason: "the gold is not the start value changed by N (21 - 1)"
+- id: home12_multi_64
+  episode: hb3_mixed_seed_55
+  gold: "'''guest_bedroom.air_conditioner.set_temperature(23),error_input,garage.media_player.set_volume(70),'''"
+  reason: "the gold is not the start value changed by N (24 - 1)"
+- id: home69_multi_104
+  episode: hb4_feasible_seed_1
+  gold: "'''guest_bedroom.air_conditioner.set_temperature(16),living_room.curtain.set_degree(80),study_room.air_purifiers.set_fan_speed(high),guest_bedroom.air_conditioner.set_temperature(23),'''"
+  reason: "the gold is not the start value changed by N (19 - 6, kept at the lowest, 16)"
+- id: home49_multi_160
+  episode: hb5_feasible_seed_6
+  gold: "'''living_room.curtain.set_degree(40),master_bedroom.curtain.set_degree(20),study_room.air_conditioner.set_temperature(18),study_room.air_conditioner.set_temperature(16),master_bedroom.media_player.set_volume(80),'''"
+  reason: "the change follows the previous one on the same device ('then', 'further'), not the start value (18 - 2)"
+- id: home19_multi_215
+  episode: hb6_mixed_seed_343
+  gold: "'''error_input,study_room.humidifier.set_intensity(100),corridor.aromatherapy.set_intensity(40),guest_bedroom.air_conditioner.set_temperature(19),kitchen.light.set_brightness(100),guest_bedroom.air_conditioner.set_temperature(18),'''"
+  reason: "the change follows the previous one on the same device ('then', 'further'), not the start value (19 - 1)"
+- id: home49_multi_325
+  episode: hb8_mixed_seed_224
+  gold: "'''guest_bedroom.aromatherapy.set_intensity(46),error_input,error_input,foyer.aromatherapy.set_intensity(60),corridor.aromatherapy.set_interval(20),living_room.curtain.set_degree(30),master_bedroom.curtain.set_degree(70),error_input,'''"
+  reason: "a percent change of a 0-100 percent setting adds points: start + N (26 + 20)"
+- id: home19_multi_108
+  episode: hb4_mixed_seed_191
+  gold: "'''error_input,error_input,guest_bedroom.humidifier.set_intensity(88),study_room.curtain.set_degree(10),'''"
+  reason: "a percent change of a 0-100 percent setting adds points: start + N (8 + 80)"
+- id: home13_multi_231
+  episode: hb6_mixed_seed_222
+  gold: "'''error_input,study_room.fan.set_swing(auto),guest_bedroom.humidifier.set_intensity(88),master_bedroom.fan.set_swing(auto),foyer.aromatherapy.set_interval(10),living_room.light.set_brightness(90),'''"
+  reason: "a percent change of a 0-100 percent setting adds points: start + N (8 + 80)"
+- id: home73_multi_93
+  episode: hb3_feasible_seed_2
+  gold: "'''master_bedroom.media_player.set_volume(0),master_bedroom.media_player.set_volume(0),master_bedroom.curtain.set_degree(50),'''"
+  reason: "the change follows the previous one on the same device ('then', 'further'), not the start value (0 - 14%, kept at the lowest, 0)"
+- id: home81_multi_184
+  episode: hb5_feasible_seed_5
+  gold: "'''kitchen.fan.set_speed(low),bathroom.heating.set_temperature(27),guest_bedroom.air_conditioner.set_temperature(29),bathroom.heating.set_temperature(30),master_bedroom.humidifier.set_intensity(20),'''"
+  reason: "the change follows the previous one on the same device ('then', 'further'), not the start value (27 + 3)"
+- id: home35_multi_95
+  episode: hb3_mixed_seed_170
+  gold: "'''error_input,ding_room.dehumidifiers.set_intensity(40),error_input,'''"
+  attribute: degree
+  part_reason: unspecified_value
+  reason: "the request gives no value for the curtain ('an unspecified degree')"
+- id: home13_multi_319
+  episode: hb8_mixed_seed_334
+  gold: "'''error_input,living_room.air_conditioner.set_temperature(21),error_input,error_input,living_room.dehumidifiers.set_intensity(70),error_input,living_room.aromatherapy.set_intensity(30),error_input,'''"
+  attribute: degree
+  part_reason: unspecified_value
+  reason: "the request gives no value for the curtain ('an unspecified degree')"

@@ -62,7 +62,6 @@ from tests.simuhome.bench.suites.homebench import GUIDELINES, HomeBenchEvaluator
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "tests" / "homebench" / "data"
 HAVE_DATA = (DATA / "manifest.json").is_file()
-SIMUHOME_CHECKOUT = ROOT.parent / "SimuHome"
 VARIANTS = ROOT / "tests" / "homebench" / "variants"
 needs_data = pytest.mark.skipif(not HAVE_DATA, reason="run tests/homebench/convert.py first")
 
@@ -171,13 +170,13 @@ class TestSuites:
 
     @pytest.mark.parametrize("name,expected", [
         ("hb1_feasible_seed_1", (2, 2, 0)),
-        ("hb1_infeasible_seed_4", (2, 2, 3)),
-        ("hb3_mixed_seed_2", (4, 4, 3)),
+        ("hb1_infeasible_seed_4", (2, 2, 0)),
+        ("hb3_mixed_seed_2", (4, 4, 0)),
         ("hb10_feasible_seed_1", (11, 11, 0)),
     ])
     def test_homebench_estimate_is_one_segmentation_plus_one_call_per_part(self, name,
                                                                           expected):
-        """(1 + N) calls, exactly; judge calls only when a part cannot be done."""
+        """(1 + N) calls, exactly; never a judge call (HomeBench has no judge)."""
         assert HOMEBENCH.estimate(name) == expected
 
     def test_homebench_estimate_rejects_a_foreign_name(self):
@@ -230,20 +229,14 @@ class TestEvaluators:
             with pytest.raises(KeyError):
                 registry[key]
 
-    def test_feasible_is_simuhomes_qt3_evaluator(self):
-        """hbN feasible reuses SimuHome's qt3 module (plan 3.7). In a subprocess:
-        SimuHome's evaluator imports as the top-level `src`."""
-        if not SIMUHOME_CHECKOUT.is_dir():
-            pytest.skip("SimuHome checkout not found")
-        code = ("from tests.simuhome.bench.suites import get_suite\n"
-                "from tests.simuhome.bench.evaluate import simuhome_evaluators\n"
-                "h = get_suite('homebench').evaluators()\n"
-                "s = simuhome_evaluators()\n"
-                "print(all(h[(f'hb{n}', 'feasible')] is s[('qt3', 'feasible')]"
-                " for n in (1, 2, 10)))\n")
-        result = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True,
-                                text=True, timeout=120)
-        assert result.stdout.strip().splitlines()[-1] == "True", result.stderr
+    def test_every_case_is_the_scoring_rule(self):
+        """hbN feasible, infeasible and mixed are all `tests/homebench/scoring.py`: one
+        rule, no judge, nothing of SimuHome's imported."""
+        from tests.homebench import scoring
+        registry = HomeBenchEvaluators()
+        assert all(registry[(f"hb{n}", case)] is scoring for n in (1, 2, 10)
+                   for case in ("feasible", "infeasible", "mixed"))
+        assert HOMEBENCH.judge is False
 
     def test_infra_markers_are_a_parameter(self):
         """An error text is infrastructure only when it holds one of the markers given;
@@ -257,8 +250,9 @@ class TestEvaluators:
         verdict = evaluate.evaluate_record(record, {}, {}, [], None, ("SimuHomeError",))
         assert verdict["error_type"] == "Infrastructure"
 
-    def test_breakdown_checks_the_final_state_for_homebench_types(self):
-        """An hbN feasible goal is checked on the final state, as qt3's are."""
+    def test_breakdown_checks_the_final_state_for_qt3_only(self):
+        """A qt3 goal is checked on the final state; an hbN one is not (HomeBench's checks
+        are its gold calls, from `tests/homebench/scoring.py`)."""
         def device(value):
             return {"rooms": {"kitchen": {"devices": [
                 {"device_id": "kitchen_light", "attributes": {"brightness": value}}]}}}
@@ -269,11 +263,14 @@ class TestEvaluators:
                                                     "description": "d"}]}]}}
         classes = {}
         for final in (20, 15, 10):
-            record = {"query_type": "hb1", "final_home_state": device(final),
+            record = {"query_type": "qt3", "final_home_state": device(final),
                       "execution": {"actions": []}}
             checks = evaluate.breakdown(record, episode)["checks"]
             classes[final] = checks[0]["class"]
         assert classes == {20: "ok", 15: "wrong_value", 10: "missing"}
+        record = {"query_type": "hb1", "final_home_state": device(20),
+                  "execution": {"actions": []}}
+        assert evaluate.breakdown(record, episode)["checks"] == []
 
 
 # -- run.py helpers ----------------------------------------------------------------------------
@@ -681,7 +678,7 @@ class TestHarness:
 
     def test_homebench_commands_tick_and_name_the_suite(self, tmp_path):
         """run.py (never run_scheduled) with --suite homebench and the guidelines choice;
-        the scoring step is told the suite too."""
+        the scoring step is told the suite too, and no --no-judge (there is no judge)."""
         options = {"episodes": "hb1_*", "limit": 4, "guidelines": "default"}
         run_cmd, eval_cmd = harness.commands(Path("c.yaml"), tmp_path / "r", tmp_path,
                                              options, False, tmp_path, HOMEBENCH)
@@ -690,11 +687,11 @@ class TestHarness:
         assert run_cmd[run_cmd.index("--guidelines") + 1] == "default"
         assert run_cmd[run_cmd.index("--limit") + 1] == "4"
         assert eval_cmd[eval_cmd.index("--suite") + 1] == "homebench"
-        assert "--no-judge" in eval_cmd
+        assert "--no-judge" not in eval_cmd
 
     def test_estimates(self, tmp_path):
-        """SimuHome: a range, unchanged wording. HomeBench: exact calls per part, the
-        judge only for episodes with a part that cannot be done, recorded ones skipped."""
+        """SimuHome: a range, unchanged wording. HomeBench: exact calls per part, no judge
+        calls even when asked for, recorded ones skipped."""
         sim = harness.estimate(["qt3_feasible_seed_1", "qt3_infeasible_seed_1"], tmp_path, True)
         assert sim == ("2 episode(s) selected, 0 already recorded, 2 to run: ~6-12 LLM calls "
                        "for the steps + ~3 judge calls (1 infeasible) "
@@ -703,7 +700,7 @@ class TestHarness:
         (tmp_path / "hb1_feasible_seed_1.json").write_text("{}", encoding="utf-8")
         text = harness.estimate(names, tmp_path, True, HOMEBENCH)
         assert "3 episode(s) selected, 1 already recorded, 2 to run: ~7 LLM calls" in text
-        assert "~6 judge calls (2 with an infeasible part)" in text
+        assert "judge" not in text
         assert "judge" not in harness.estimate(names, tmp_path, False, HOMEBENCH)
 
     @needs_data
@@ -749,8 +746,8 @@ class TestHarness:
         assert message in capsys.readouterr().out
 
     def test_the_three_configs_differ_only_in_run(self):
-        """Same suite, providers, models and evaluate; no name (the file names the
-        records); run differs in the episodes and the limit."""
+        """Same suite, providers and models; no name (the file names the records); run
+        differs in the episodes and the limit."""
         configs = {name: yaml.safe_load((VARIANTS / f"homebench.{name}.yaml")
                                         .read_text(encoding="utf-8"))
                    for name in ("quick", "spread", "full")}
@@ -767,13 +764,14 @@ class TestHarness:
 
     def test_every_config_key_is_read_by_python(self):
         """No YAML key nobody reads: top-level keys are the harness's and the variant
-        loader's, every run: key is one the harness passes on."""
+        loader's, every run: key is one the harness passes on, and nothing configures a
+        judge HomeBench does not have."""
         for name in ("quick", "spread", "full"):
             config = yaml.safe_load((VARIANTS / f"homebench.{name}.yaml")
                                     .read_text(encoding="utf-8"))
-            assert set(config) <= {"suite", "providers", "models", "run", "evaluate"}
+            assert set(config) <= {"suite", "providers", "models", "run"}
             assert set(config["run"]) <= set(harness.RUN_OPTIONS)
-            assert set(config["evaluate"]) <= {"judge"}
+            assert "judge" not in config["models"]
             variant = load_variant(str(VARIANTS / f"homebench.{name}.yaml"))
             assert variant.name == f"homebench.{name}"           # the file names the records
 

@@ -4,7 +4,7 @@
 #
 #   27 groups (hb1 2, hb2..hb8 3 each, hb9 2, hb10 2) x 1 = 27 episodes, about 172
 #   LLM calls (the sum of 1 + N per group), about 23 minutes at 8 s per call on a
-#   local 8B model, about 50 judge calls. Nothing is run by --dry-run:
+#   local 8B model, no judge calls. Nothing is run by --dry-run:
 #
 #   conda run -n ami-agents python -m tests.simuhome.bench.harness \
 #       --config tests/homebench/variants/homebench.spread.yaml --dry-run
@@ -26,7 +26,6 @@ models:
   profiling:     {provider: local, model: "ministral-3:8b", temperature: 0}
   guarding:      {provider: local, model: "ministral-3:8b", temperature: 0}
   response:      {provider: local, model: "ministral-3:8b", temperature: 0}
-  judge:         {provider: openai, model: gpt-4o-mini, temperature: 0.5}
 
 run:
   episodes: "hb*"
@@ -38,6 +37,3 @@ run:
   environment: "off"       # the flat graph, as in the ECAI evaluation | "on": room
                            # environments and action effects (quote it: YAML reads
                            # a bare off as false)
-
-evaluate:
-  judge: true

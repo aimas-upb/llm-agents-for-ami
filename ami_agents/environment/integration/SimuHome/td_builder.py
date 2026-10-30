@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from rdflib import BNode, Graph, Literal, RDF, URIRef
+from rdflib.collection import Collection
 from rdflib.namespace import OWL, RDFS, XSD
 
 try:
@@ -208,6 +209,34 @@ SCALE_MEANINGS = {
     ("WindowCovering", "TargetPositionTiltPercent100ths"):
         "Percent tilted closed: 0 is fully open, 100 is fully closed.",
 }
+
+# The enum values that form a scale, lowest first, for the attributes a request may
+# change "by one level". Matter's FanModeEnum: Off < Low < Medium < High; On, Auto and
+# Smart are modes, not positions on the scale. Each device's schema states the scale
+# restricted to the values it supports (`_device_enum_items`), so a fan whose
+# FanModeSequence is OffLowHigh steps Off -> Low -> High.
+ORDERED_VALUES = {
+    ("FanControl", "FanMode"): [0, 1, 2, 3],
+}
+
+
+def ordered_values(cluster: str, attribute: str,
+                   items: List[Dict[str, Any]]) -> List[Any]:
+    """The scale of an attribute (`ORDERED_VALUES`) restricted to the enum items a
+    device supports, lowest first; empty when the attribute has no scale."""
+    supported = {item["value"] for item in items}
+    return [v for v in ORDERED_VALUES.get((cluster, attribute), []) if v in supported]
+
+
+def _add_order(g: Graph, schema: BNode, values: List[Any]) -> None:
+    """State the scale of an enum on its schema: `homeont:orderedValues`, an rdf:List
+    of the values, lowest first. Fewer than two values make no scale, so nothing is
+    written. Shared with the HomeBench builder."""
+    if len(values) < 2:
+        return
+    head = BNode()
+    Collection(g, head, [_literal(v) for v in values])
+    g.add((schema, HOME.orderedValues, head))
 
 
 def report_value(matter_type: Optional[str], value: Any) -> Any:
@@ -1284,6 +1313,8 @@ class SimuHomeTD:
             enum_items = self._device_enum_items(cluster_name, attribute_name, siblings or {})
             for item in enum_items:
                 g.add((schema, JS.enum, _literal(item["value"])))
+            # The scale among those values, where the attribute has one.
+            _add_order(g, schema, ordered_values(cluster_name, attribute_name, enum_items))
             sentences.append(self._enum_description(cluster_name, attribute_name,
                                                     enum_items) or "")
         else:

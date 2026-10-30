@@ -60,13 +60,16 @@ planner resolves goals by the command class, so `onOff` stands for `turn_on` and
 | curtain, blinds, garage door | `openClose` | `homeont:SetOpenCloseCommand` | `open` / `closed` |
 | media player | `playback` | `homeont:SetOperationalStateCommand` | `playing` / `paused` / `stopped` |
 | trash | `pack` | `homeont:PackCommand` | none (`pack()`) |
-| vacuum `state` | none (read only) | | |
+| vacuum robot | `state` | `homeont:SetOperationalStateCommand` | `cleaning` / `paused` / `stopped` / `charging` (`start()` / `pause()` / `stop()` / `charge()`) |
 
 Numeric and enum attributes (`brightness`, `temperature`, `mode`, `fanSpeed`, `swing`,
 `speed`, `intensity`, `interval`, `degree`, `volume`, `cleaningArea`, `color`) use
 `saref:SetAbsoluteLevelCommand`, `homeont:SetModeCommand` or `homeont:SetColorCommand`;
-their range or options are the device's own (`constraints` in the home file). `battery` and
-`tank` are read only. `set_song`, `set_artist` and `set_style` never occur in gold and are
+their range or options are the device's own (`constraints` in the home file). Fan speeds
+also state their scale, `low < medium < high` (`homeont:orderedValues`), so "up by one
+level" can be planned; `auto` is off that scale, and swing has none. `battery` and
+`tank` are read only. The vacuum's `start`, `stop`, `pause` and `charge` are offered because
+70 gold calls use them; every vacuum starts in `on`, which the read schema still lists. `set_song`, `set_artist` and `set_style` never occur in gold and are
 not served.
 
 **The gold string is a function of `(device, action, value)`** through the `command_map`

@@ -293,6 +293,16 @@ class GoalSpec:
     # have is asked about, never completed with another
     # (`goal_resolution.named_device_missing`).
     device_reference: Optional[str] = None
+    # UA-local, never on the wire: the request's own words for a device it
+    # mentions (by name or by kind) that the home does not have ("air
+    # conditioner"). Such a goal is asked about, never completed with another
+    # device (`goal_resolution.device_missing`).
+    unmatched_device: Optional[str] = None
+    # UA-local, never on the wire: the request's words for what it asks a
+    # device that IS in the home to change, when none of the device's actions
+    # can ("brightness" on an on/off light). Asked about, never moved to
+    # another device that has such an action.
+    unmatched_action: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Any) -> "GoalSpec":
@@ -305,6 +315,8 @@ class GoalSpec:
             artifact_class=_text(data.get("artifact_class")),
             artifact_name=_text(data.get("artifact_name")),
             device_reference=_choice(data.get("device_reference"), DEVICE_REFERENCES),
+            unmatched_device=_text(data.get("unmatched_device")),
+            unmatched_action=_text(data.get("unmatched_action")),
             affordance_class=_text(data.get("affordance_class")),
             parent_class=_text(data.get("parent_class")),
             affordance_name=_text(data.get("affordance_name")),

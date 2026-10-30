@@ -125,14 +125,18 @@ class TestEngine:
         with pytest.raises(EngineError):
             HomeBenchEngine(_home()).apply(device, command, arg)
 
-    def test_unreachable_vacuum_calls_are_reported_not_exposed(self):
+    def test_the_vacuum_operation_commands_set_its_state(self):
+        """The gold's start / pause / stop / charge are offered and write ``state``."""
         machine = HomeBenchEngine(_home())
-        for command in ("start", "stop", "pause", "charge"):
-            assert command not in machine.exposed_commands("household_vacuum_robot")
-            result = machine.apply("household_vacuum_robot", command)
-            assert result.status == "unreachable" and result.attribute is None
+        # 1. Offered, before the two setters (state commands come first).
         assert machine.exposed_commands("household_vacuum_robot") == [
-            "set_cleaning_area", "set_mode"]
+            "charge", "pause", "start", "stop", "set_cleaning_area", "set_mode"]
+        # 2. Each one writes the state it names.
+        for command, state in (("start", "cleaning"), ("pause", "paused"),
+                               ("stop", "stopped"), ("charge", "charging")):
+            result = machine.apply("household_vacuum_robot", command)
+            assert (result.status, result.attribute, result.value) == (
+                "applied", "state", state)
         machine.apply("household_vacuum_robot", "set_cleaning_area", "masterbedroom")
 
     def test_exposed_commands_follow_the_attributes_present(self):
@@ -271,7 +275,8 @@ class TestEpisodes:
         assert episode["meta"]["gold"] == "''' master_bedroom.light.set_brightness(20)'''"
         assert episode["user_location"] is None and episode["home_id"] == 1
 
-    def test_state_goal_and_unreachable_vacuum_part(self):
+    def test_state_goal_and_vacuum_part(self):
+        """Both parts assert the ``state`` their command writes, the vacuum's too."""
         stats = Counter()
         built = convert.build_episode(
             _row("h1_multi_1", "multi2_normal", "Turn on the light in the master "
@@ -281,9 +286,11 @@ class TestEpisodes:
         first, second = built.episode["eval"]["goals"]
         assert first["asserts"][0]["attribute"] == "state"
         assert first["asserts"][0]["value"] == "on"
-        assert second["unreachable"] and second["asserts"] == []
-        assert built.episode["meta"]["unreachable_parts"] == [1]
-        assert stats["parts_unreachable"] == 1
+        assert second["asserts"][0]["attribute"] == "state"
+        assert second["asserts"][0]["value"] == "cleaning"
+        assert second["asserts"][0]["description"] == "start()"
+        assert "unreachable" not in second
+        assert "unreachable_parts" not in built.episode["meta"]
 
     def test_infeasible_parts_carry_reason_and_target(self):
         stats = Counter()
@@ -349,6 +356,141 @@ class TestEpisodes:
         assert HomeBenchEngine(loaded["initial_home_config"]).device_ids()
 
 
+# -- ground-truth corrections -------------------------------------------------------------------------
+
+
+class TestLabelCorrections:
+    """A gold HomeBench's own home contradicts is replaced by the call the request asks
+    for; the episode keeps its name and records what was there."""
+
+    ROW = _row("h1_one_9", "unexist_attribute",
+               "Set the brightness of the light in the master bedroom to 60.", "'''error_input'''")
+    FIX = {"h1_one_9": {"gold": "''' master_bedroom.light.set_brightness(60)'''",
+                        "reason": "the light has a brightness"}}
+
+    def _episodes(self):
+        """The row as the converter built it, under its converted name."""
+        return {"hb1_infeasible_seed_3": convert.build_episode(self.ROW, _home(),
+                                                               Counter()).episode}
+
+    def test_the_gold_becomes_the_call(self):
+        """Gold, case, label and goals follow the corrected call; the original is kept."""
+        episodes = self._episodes()
+        # 1. Corrected, and renamed for its new case with its seed and a suffix.
+        done = convert.apply_label_corrections(episodes, {1: _home()}, self.FIX)
+        assert done == {"hb1_infeasible_seed_3": "hb1_feasible_seed_3_fixed"}
+        assert list(episodes) == ["hb1_feasible_seed_3_fixed"]
+        episode = episodes["hb1_feasible_seed_3_fixed"]
+        meta = episode["meta"]
+        # 2. The new gold, as a feasible single call with its assert.
+        assert meta["gold"] == "''' master_bedroom.light.set_brightness(60)'''"
+        assert (meta["case"], meta["homebench_type"]) == ("feasible", "normal")
+        (goal,) = episode["eval"]["goals"]
+        assert goal["device_id"] == "master_bedroom_light"
+        assert goal["asserts"][0]["attribute"] == "brightness"
+        assert goal["asserts"][0]["value"] == 60
+        # 3. What was there.
+        assert meta["label_correction"] == {"original_gold": "'''error_input'''",
+                                            "original_type": "unexist_attribute",
+                                            "reason": "the light has a brightness"}
+
+    def test_applying_twice_changes_nothing(self):
+        """An episode already corrected and renamed is left alone, so its original
+        stays the original; one corrected under its old name is only renamed."""
+        # 1. Twice: nothing the second time.
+        episodes = self._episodes()
+        convert.apply_label_corrections(episodes, {1: _home()}, self.FIX)
+        assert convert.apply_label_corrections(episodes, {1: _home()}, self.FIX) == {}
+        original = "'''error_input'''"
+        assert episodes["hb1_feasible_seed_3_fixed"]["meta"]["label_correction"][
+            "original_gold"] == original
+        # 2. Corrected but not yet renamed: renamed, not corrected again.
+        old = {"hb1_infeasible_seed_3": episodes.pop("hb1_feasible_seed_3_fixed")}
+        assert convert.apply_label_corrections(old, {1: _home()}, self.FIX) == {
+            "hb1_infeasible_seed_3": "hb1_feasible_seed_3_fixed"}
+        assert old["hb1_feasible_seed_3_fixed"]["meta"]["label_correction"][
+            "original_gold"] == original
+
+    def test_a_fixed_name_is_a_homebench_name_and_selectable(self, tmp_path):
+        """The suite's name pattern accepts the suffix, and selection reads its seed."""
+        from tests.simuhome.bench import run
+        from tests.simuhome.bench.suites.homebench import NAME, SUITE
+        # 1. A HomeBench name, with the cost of a one-part request.
+        assert NAME.match("hb1_feasible_seed_2631_fixed")
+        assert SUITE.estimate("hb1_feasible_seed_2631_fixed") == (2, 2, 0)
+        # 2. Selected by its group and its seed number.
+        (tmp_path / "episodes").mkdir()
+        for name in ("hb1_feasible_seed_2", "hb1_feasible_seed_2631_fixed"):
+            (tmp_path / "episodes" / f"{name}.json").write_text("{}", encoding="utf-8")
+        assert run.select_episodes(tmp_path, "hb1_feasible", "2631", None, SUITE) == [
+            "hb1_feasible_seed_2631_fixed"]
+
+    def test_the_table_lists_the_ecai_episodes_by_row_id(self):
+        """The repo's table: every row's gold parses as its row's kind (single or multi)
+        and says why it was corrected; a part made `error_input` names what it lacks."""
+        table = convert.load_label_corrections()
+        assert len(table) == 35
+        for row_id, row in table.items():
+            # 1. A well-formed gold for its row, with a reason.
+            calls = convert.parse_gold(row["gold"], multi="_multi_" in row_id)
+            assert calls and row["reason"], row_id
+            # 2. A part corrected to error_input says which attribute is missing.
+            if row.get("part_reason") or row.get("attribute"):
+                assert None in calls and row["attribute"], row_id
+        assert {table[i]["attribute"] for i in ("home45_multi_52", "home49_multi_374")} == {
+            "intensity", "temperature"}
+
+    def test_a_second_correction_keeps_the_original(self):
+        """An episode corrected before and corrected again keeps the dataset's original
+        gold as its original, and keeps its `_fixed` name when its case is unchanged."""
+        # 1. Corrected once.
+        row = _row("h1_one_9", "unexist_attribute",
+                   "Set the brightness of the light in the master bedroom to 60.",
+                   "'''error_input'''")
+        episodes = {"hb1_infeasible_seed_3": convert.build_episode(row, _home(),
+                                                                   Counter()).episode}
+        first = {"h1_one_9": {"gold": "''' master_bedroom.light.set_brightness(60)'''",
+                              "reason": "has brightness"}}
+        convert.apply_label_corrections(episodes, {1: _home()}, first)
+        # 2. Corrected again to another value: same name, original kept.
+        second = {"h1_one_9": {"gold": "''' master_bedroom.light.set_brightness(70)'''",
+                               "reason": "has brightness"}}
+        assert convert.apply_label_corrections(episodes, {1: _home()}, second) == {}
+        meta = episodes["hb1_feasible_seed_3_fixed"]["meta"]
+        assert meta["gold"] == "''' master_bedroom.light.set_brightness(70)'''"
+        assert meta["label_correction"]["original_gold"] == "'''error_input'''"
+
+    def test_a_multi_part_is_made_impossible(self):
+        """"Set the light to 20 and the curtain's intensity to 10": the second part
+        becomes `error_input` on the curtain; the first keeps its goal; the request is
+        now mixed, and renamed so."""
+        # 1. A converted two-part feasible request, and its correction.
+        row = _row("h1_multi_4", "multi2_normal",
+                   "Set the light to 20 in the master bedroom and the curtain intensity to "
+                   "10 in the master bedroom.",
+                   "'''master_bedroom.light.set_brightness(20),"
+                   "master_bedroom.curtain.set_degree(10),'''")
+        episodes = {"hb2_feasible_seed_4": convert.build_episode(row, _home(),
+                                                                 Counter()).episode}
+        first_goal = copy.deepcopy(episodes["hb2_feasible_seed_4"]["eval"]["goals"][0])
+        fix = {"h1_multi_4": {"gold": "'''master_bedroom.light.set_brightness(20),"
+                                      "error_input,'''",
+                              "reason": "no intensity", "attribute": "intensity"}}
+        # 2. Corrected and renamed for its new case.
+        done = convert.apply_label_corrections(episodes, {1: _home()}, fix)
+        assert done == {"hb2_feasible_seed_4": "hb2_mixed_seed_4_fixed"}
+        episode = episodes["hb2_mixed_seed_4_fixed"]
+        assert (episode["meta"]["case"], episode["meta"]["homebench_type"]) == (
+            "mixed", "multi2_mix")
+        # 3. The first part unchanged, the second an impossible part on the curtain.
+        first, second = episode["eval"]["goals"]
+        assert first == first_goal
+        assert second == {"room_id": "master_bedroom", "device_id": "master_bedroom_curtain",
+                          "device_type": "curtain", "feasibility": False,
+                          "reason": "unexist_attribute", "resolved": True,
+                          "attribute": "intensity"}
+
+
 # -- the P1 gate on the real dataset ---------------------------------------------------------------------
 
 
@@ -380,10 +522,8 @@ class TestGate:
         report = convert.verify_gold(conversion, HOMEBENCH)
         assert report["rows"] == 17366
         assert report["errors"] == [], report["errors"][:5]
-        # The only calls not applied are the 70 vacuum calls the home never offers.
-        assert report["unreachable"] == 70
-        assert report["applied"] + report["unreachable"] == report["calls"]
-        assert conversion.manifest["diagnostics"]["parts_unreachable"] == 70
+        # Every call applies, the 70 vacuum operation calls included.
+        assert report["applied"] == report["calls"]
 
     def test_heating_correction_is_what_makes_the_gold_valid(self, rows, conversion):
         values = [c.arg for r in rows for c in convert.parse_gold(
@@ -406,7 +546,8 @@ class TestGate:
 
     def test_engine_offers_exactly_the_homes_methods(self, conversion):
         """Per device, the engine's commands equal the data's method list, minus the
-        three media setters nothing asserts and the unreachable vacuum calls."""
+        three media setters nothing asserts, plus the vacuum's operation commands the
+        gold uses."""
         records = convert.read_jsonl(HOMEBENCH / convert.HOME_DATA)
         for record in records:
             machine = HomeBenchEngine(conversion.homes[record["home_id"]])
@@ -417,8 +558,8 @@ class TestGate:
                 offered.setdefault(device_id, set()).add(m["operation"])
             for device_id in machine.device_ids():
                 expected = offered[device_id] - {"set_song", "set_artist", "set_style"}
-                expected -= engine.UNREACHABLE_COMMANDS.get(
-                    machine.device(device_id)["device_type"], set())
+                if machine.device(device_id)["device_type"] == "vacuum_robot":
+                    expected |= {"start", "stop", "pause", "charge"}
                 assert set(machine.exposed_commands(device_id)) == expected, (
                     record["home_id"], device_id)
             assert set(machine.device_ids()) == set(offered)

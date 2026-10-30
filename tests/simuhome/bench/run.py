@@ -42,13 +42,14 @@ import asyncio
 import fnmatch
 import json
 import logging
+import re
 import subprocess
 import sys
 import time
 import urllib.request
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
@@ -83,6 +84,15 @@ def _seeds(spec: Optional[str]) -> Optional[set]:
     return out
 
 
+def _group_and_seed(name: str) -> Tuple[str, int, str]:
+    """``(group, seed, suffix)`` of an episode name: ``hb1_feasible_seed_2631_fixed``
+    is ``("hb1_feasible", 2631, "_fixed")`` -- a corrected HomeBench episode keeps its
+    seed number, with a suffix after it."""
+    group, rest = name.rsplit("_seed_", 1)
+    digits = re.match(r"\d+", rest)
+    return group, int(digits.group()), rest[digits.end():]
+
+
 def select_episodes(benchmark: Path, patterns: str, seeds: Optional[str],
                     limit: Optional[int], suite: Optional[Suite] = None) -> List[str]:
     """Episode names of ``suite`` (SimuHome when None) matching any pattern
@@ -91,9 +101,8 @@ def select_episodes(benchmark: Path, patterns: str, seeds: Optional[str],
     names = (suite or get_suite(DEFAULT_SUITE)).names(benchmark)
     wanted = _seeds(seeds)
     chosen, per_group = [], {}
-    for name in sorted(names, key=lambda n: (n.rsplit("_seed_", 1)[0],
-                                             int(n.rsplit("_seed_", 1)[1]))):
-        group, seed = name.rsplit("_seed_", 1)
+    for name in sorted(names, key=_group_and_seed):
+        group, seed, _ = _group_and_seed(name)
         if not any(fnmatch.fnmatch(name, p) or fnmatch.fnmatch(group, p) or name == p
                    for p in [p.strip() for p in patterns.split(",") if p.strip()]):
             continue

@@ -33,20 +33,36 @@ What this home offers, by workspace. It may be narrowed to the rooms and devices
 - `Property` — something the device reports. `name` is the **property_name**; `property class` is the **property_class**; `kind` is its branch (actuatable, state, capability, ...). Its `output` is a direct value or an object whose fields are listed beneath it. (Present only when needed.)
 """
 
-GOAL_SPEC_RULES = """\
+# -- Goal rules: one string per section, concatenated into GOAL_SPEC_RULES --------
+
+# The task, the procedure, and when a goal is explicit or incomplete.
+GOAL_SPEC_INTRO = """\
 ## Structuring a goal
 
 A goal is ONE change to ONE device affordance (or, for an ambiguous goal, a desired change to the environment). Fill the fields according to its specificity.
 
-`goal_specificity` starts from the segmenter's label, given with the request. The segmenter sees only the words; you see the home. Change "explicit" to "incomplete" when the home context does not single out one device and one action:
-- several devices fit the request ("the living room lights" with two lights in the living room) — even when the request names their room and kind;
-- no device in the home context fits it ("the bathroom blinds" in a bathroom without blinds). A device called by name fits only if it has that name: "the Hue Go" in a home whose only lamp is a Hue Iris fits no device;
-- the device fits, but none of its actions can make the change ("make the hallway light blue" on an on/off light);
-- several of its actions fit, and the request does not say which ("set the AC to 22 degrees" with a cooling and a heating setpoint).
-Never pick one of several fitting devices or actions to keep a goal explicit: leave artifact_name (or affordance_name) null and let the quantifier say how many the request means.
+`goal_specificity` starts from the segmenter's label, given with the request. The segmenter sees only the words; you see the home.
 
+"""
+
+# The fields of an explicit or incomplete goal.
+EXPLICIT_GOAL_RULES = """\
 ### explicit and incomplete goals
-- **goal_specificity**: "explicit" or "incomplete".
+
+Proceed as follows in the general case:
+1. Find the device: the room the request names, then the device of the kind or name it mentions.
+2. Find the action that enables the change: by its name, its command class and its input; when it lists an `acts upon` property, that is the setting it changes.
+3. Find the value: read the action's input (type, range, unit, description) and express the request's value or change in it.
+4. Only then decide how to fill the fields listed below.
+
+- **goal_specificity**: "explicit" or "incomplete". Values start out from that in the segmenter's label, but may change when you see the home context:
+    - Change "explicit" to "incomplete" when the home context does not single out one device and one action:
+      - several devices fit the request ("the living room lights" with two lights in the living room) — even when the request names their room and kind;
+      - no device in the home context fits it ("the bathroom blinds" in a bathroom without blinds). A device called by name fits only if it has that name: "the Hue Go" in a home whose only lamp is a Hue Iris fits no device;
+      - the device fits, but none of its actions can make the change ("make the hallway light blue" on an on/off light);
+      - several of its actions fit, and the request does not say which ("set the AC to 22 degrees" with a cooling and a heating setpoint).
+      - Never pick one of several fitting devices or actions to keep a goal explicit: leave artifact_name (or affordance_name) null and let the quantifier say how many the request means.
+
 - **goal_kind**: "achievement" when the goal is done once its action is performed or it has a time-bounded objective; "maintenance" when it asks for a state to be kept or held ("keep the room at 22 degrees").
 - **intent_text**: the part of the request this goal comes from, verbatim.
 - **location_class**: the room class of the device's workspace.
@@ -71,13 +87,43 @@ Never pick one of several fitting devices or actions to keep a goal explicit: le
 
 For an **incomplete** goal fill everything the request and the home context support, and leave the rest null. Do not guess a device or a room the request does not point to.
 
-### "Start" on an appliance with a cycle
+- **unmatched_device**: the request's words for the device it names, when no device of that kind is in the home context, for example "the air conditioner"; null otherwise. Then leave artifact_name and artifact_class null.
+- **unmatched_action**: the request's words for a setting its device does not have, for example "brightness" on an on/off light; null otherwise.
+
+"""
+
+# How certain kinds of devices are operated, beyond what their actions say: one
+# string per convention, listed in DEVICE_CONVENTIONS.
+DEVICE_CONVENTIONS_INTRO = """\
+#### Device conventions
+How certain kinds of devices are operated, beyond what their actions say.
+
+"""
+
+CYCLE_START_CONVENTION = """\
+##### "Start" on an appliance with a cycle
 This applies to every device that runs cycles, that is, every device with an operational-state action (`homeont:SetOperationalStateCommand`), e.g. washers, dryers. On such a device, words like "start", "run", "begin" or "get it going" mean starting its cycle: the operational-state action, with the value for Running. They never mean the on/off action alone. Starting a cycle may also imply switching the device on first, and choosing the settings the request names with it, for example "on Heavy mode", "at Max dryness" or "with 1200 rpm spin".
 - When the request may hold several goals (a request with conditions, timing or several instructions): make one goal per instruction, in this order: switch on, then each setting the request names, then the start of the cycle (Running). Each later goal starts "after_goal" the one before it. Settings come before the start, because a running cycle may refuse them.
 - When the request holds exactly one goal: that goal is the start of the cycle (the operational-state action, Running), not switching the device on.
 
+"""
+
+DEVICE_CONVENTIONS = "".join([
+    DEVICE_CONVENTIONS_INTRO,
+    CYCLE_START_CONVENTION,
+])
+
+# The fields of an ambiguous goal.
+AMBIGUOUS_GOAL_RULES = """\
 ### ambiguous goals
 The request expresses a desired change of the environment — a complaint, sensation or wish — without naming what to actuate or how.
+
+How to proceed in the general case:
+1. Find the room the request names, if it names one.
+2. Find the variables: the `Variable`s of the room's `Environment` the request is about ("so damp" is relative humidity).
+3. Find the direction each variable should go.
+4. Name no device and no action: choosing them is the planner's job.
+
 - **goal_specificity**: "ambiguous"; **goal_kind**; **intent_text** as above.
 - **implied_environment_vars**: the environment variables the goal implicitly refers to, each taken from an `Environment`'s `Variable`s:
   - **property_name**: the variable's `name`;
@@ -88,6 +134,13 @@ The request expresses a desired change of the environment — a complaint, sensa
   - **property_change_direction**: "increase" or "decrease" — the way the user wants this variable to go ("so damp" → relative humidity "decrease"; "too dark" → illuminance "increase"; "freezing in here" → air temperature "increase").
   List one entry per variable and room the request implies.
 """
+
+GOAL_SPEC_RULES = "".join([
+    GOAL_SPEC_INTRO,
+    EXPLICIT_GOAL_RULES,
+    DEVICE_CONVENTIONS,
+    AMBIGUOUS_GOAL_RULES,
+])
 
 PREDICATE_SPEC_RULES = """\
 ## Structuring a predicate
@@ -246,7 +299,8 @@ Return ONLY one JSON object — no prose, no markdown fences. For an explicit or
  "parameter_name": string | "NA" | null, "goal_effect": "set" | "modify" | null,
  "target_value_text": string | null, "target_value_determined": string | null,
  "target_value_is_percentage": true | false,
- "quantifier": "all" | "one" | null}
+ "quantifier": "all" | "one" | null,
+ "unmatched_device": string | null, "unmatched_action": string | null}
 
 For an ambiguous goal:
 

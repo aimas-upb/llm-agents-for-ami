@@ -40,13 +40,13 @@ from typing import Any, Dict, List, Tuple
 from rdflib import Graph
 from spade.behaviour import OneShotBehaviour
 
-from ....bt_planning.nodes.http_client import HTTPClient, HTTPClientConfig
 from ....shared.models.goal_structure import GoalSpec
 from ....shared.utils.demo_log import demo
 from ....shared.utils.llm_models import is_reasoning_model
 from ....shared.utils.logger import LoggerFactory
 from ..utils.ambiguous_goal_plan import SOURCE
 from ..utils.environment_graph import fetch_environment_graph
+from ..utils.property_read import read_property_value
 from ..utils.signifier_memory import recall
 from ..utils.specific_capability_context import build_specific_context
 
@@ -144,18 +144,8 @@ class AmbiguousGoalPlanningBehaviour(OneShotBehaviour):
                 if prop.get("url"):
                     properties.setdefault(prop["url"], prop)
 
-        # 2. Read them all at once (blocking HTTP, so off the event loop).
-        loop = asyncio.get_running_loop()
-
-        async def read(url: str) -> Any:
-            try:
-                response = await loop.run_in_executor(
-                    None, HTTPClient(config=HTTPClientConfig()).get, url)
-            except Exception:  # noqa: BLE001 - unknown, not wrong
-                return None
-            return response.body if getattr(response, "is_success", False) else None
-
-        values = await asyncio.gather(*(read(url) for url in properties))
+        # 2. Read them all at once (`read_property_value`: None when a read fails).
+        values = await asyncio.gather(*(read_property_value(url) for url in properties))
 
         # 3. By device and property name, as the planner's Current State takes it.
         state: Dict[str, Dict[str, Any]] = {}

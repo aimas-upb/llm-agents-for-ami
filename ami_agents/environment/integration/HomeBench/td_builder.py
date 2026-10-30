@@ -54,7 +54,7 @@ from ami_agents.environment.integration.HomeBench.mappings import (
     Mappings, load_mappings,
 )
 from ami_agents.environment.integration.SimuHome.td_builder import (
-    HCTL, HMAS, HOME, HTV, JS, SAREF, SOSA, TD, TDSOSA, SimuHomeTD, _add_unit,
+    HCTL, HMAS, HOME, HTV, JS, SAREF, SOSA, TD, TDSOSA, SimuHomeTD, _add_order, _add_unit,
     _literal, _new_graph, _no_security, curie_to_uri,
 )
 
@@ -316,7 +316,10 @@ class HomeBenchTD(SimuHomeTD):
 
         Bounds are this device's own, from its ``constraints`` (heating temperature
         already corrected to 16-30 in the home file). Enum values are listed both as
-        ``js:enum`` and in ``js:description``, which is what the agents read.
+        ``js:enum`` and in ``js:description``, which is what the agents read, followed by
+        the row's own ``description`` where it has one; an enum
+        whose row has a ``value_order`` also states that scale, restricted to this
+        device's options (``homeont:orderedValues``).
         """
         schema = BNode()
         kind = self.schema_kind(row, action)
@@ -339,9 +342,19 @@ class HomeBenchTD(SimuHomeTD):
             if options:
                 g.add((schema, JS.description, Literal(
                     "Values on this device: " + ", ".join(str(o) for o in options) + ".")))
+            # The scale among them, lowest first, where the attribute has one.
+            _add_order(g, schema, [v for v in row.get("value_order") or []
+                                   if v in options])
         # 2. The unit, as a QUDT IRI (only where the table states one).
         if row.get("unit"):
             _add_unit(g, schema, row["unit"])
+        # 3. What the value means, where the table says (a curtain's "degree" is a
+        #    percentage), after any description of its values: one js:description.
+        if row.get("description"):
+            listed = g.value(schema, JS.description)
+            g.remove((schema, JS.description, None))
+            g.add((schema, JS.description, Literal(
+                " ".join(str(s) for s in (listed, row["description"]) if s))))
         return schema
 
     @staticmethod

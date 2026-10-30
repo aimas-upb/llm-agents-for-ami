@@ -34,6 +34,14 @@ value: 40}]}``, and so on. ``load_episode(benchmark_dir, name)`` merges
 Gold semantics are those of ``ami_agents/environment/integration/HomeBench/engine.py``
 (no preconditions, corrected heating range); ``verify_gold`` replays every gold call
 on its home through that engine and reports the violations.
+
+A few golds contradict HomeBench's own home files; ``label_corrections.yaml`` replaces
+them by row id, after naming. A corrected episode is renamed for its new case with a
+``_fixed`` suffix, keeping its seed (``hb1_infeasible_seed_2631`` becomes
+``hb1_feasible_seed_2631_fixed``, which cannot collide with the feasible group's own
+seed 2631), and records the original (``meta.label_correction``).
+``--apply-label-corrections`` applies the table to an already converted directory,
+without the HomeBench checkout.
 """
 
 from __future__ import annotations
@@ -46,6 +54,8 @@ import random
 import re
 import sys
 from collections import Counter
+
+import yaml
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -66,6 +76,10 @@ LOGGER = logging.getLogger(__name__)
 HERE = Path(__file__).resolve().parent
 DEFAULT_HOMEBENCH = HERE.parents[1].parent / "HomeBench"
 DEFAULT_OUT = HERE / "data"
+#: Ground-truth corrections by HomeBench row id (see the module docstring).
+LABEL_CORRECTIONS = HERE / "label_corrections.yaml"
+#: Appended to the name of an episode whose gold was corrected.
+FIXED_SUFFIX = "_fixed"
 TEST_DATA = "dataset/test_data.jsonl"
 HOME_DATA = "dataset/home_status_method.jsonl"
 
@@ -259,11 +273,7 @@ def _value_type(value: Any) -> str:
 
 
 def _feasible_goal(call: GoldCall, devices: Dict[str, Any]) -> Dict[str, Any]:
-    """Goal for a gold call: asserts only the attribute the call sets.
-
-    A vacuum command the home does not offer has no modelled effect: the goal is
-    marked ``unreachable`` with no asserts, to be reported separately.
-    """
+    """Goal for a gold call: asserts only the attribute the call sets."""
     device = devices.get(call.device_id)
     if device is None:
         raise ConversionError(f"gold device {call.device_id} not in its home")
@@ -271,11 +281,8 @@ def _feasible_goal(call: GoldCall, devices: Dict[str, Any]) -> Dict[str, Any]:
         "room_id": call.room or HOUSEHOLD_ROOM, "device_id": call.device_id,
         "device_type": call.device, "asserts": [],
     }
-    # 1. A command no engine models (start/stop/pause/charge) cannot be asserted.
-    if call.command in engine.UNREACHABLE_COMMANDS.get(call.device, ()):
-        goal["unreachable"] = True
-        return goal
-    # 2. Otherwise one assert: the attribute the call writes, with the call's value.
+    # One assert: the attribute the call writes, with the call's value (the vacuum's
+    # start / stop / pause / charge write its `state`, as every state command does).
     attribute, value = engine.command_effect(call.command, call.arg)
     arg_text = "" if call.arg is None else str(call.arg)
     goal["asserts"].append({
@@ -374,7 +381,7 @@ def build_episode(
 
     ``home`` is the row's ``initial_home_config``. ``stats`` accumulates the
     diagnostics that end up in the manifest (alignment method, unresolved parts,
-    superseded asserts, unreachable parts).
+    superseded asserts).
     """
     homebench_type = row["type"]
     expected = multi_parts(homebench_type)
@@ -400,8 +407,6 @@ def build_episode(
         for i, part in enumerate(parts)
     ]
     stats["asserts_superseded"] += _mark_superseded(goals)
-    unreachable = [i for i, g in enumerate(goals) if g.get("unreachable")]
-    stats["parts_unreachable"] += len(unreachable)
     # 4. Rooms the request names: one get_room_devices each, first-seen order.
     rooms = list(dict.fromkeys(
         g["room_id"] for g in goals
@@ -413,8 +418,6 @@ def build_episode(
         "devices_count": len({g["device_id"] for g in goals if g["device_id"]}),
         "id": row["id"], "homebench_type": homebench_type, "gold": row["output"],
     }
-    if unreachable:
-        meta["unreachable_parts"] = unreachable
     episode = {
         "meta": meta, "query": row["input"], "user_location": None,
         "eval": {"required_actions": [
@@ -485,9 +488,154 @@ def convert_dataset(
             if name in episodes:
                 raise ConversionError(f"duplicate episode name {name}")
             episodes[name] = item.episode
-    # 3. Manifest: provenance and counts.
+    # 3. The golds HomeBench's own homes contradict, corrected and renamed.
+    corrected = apply_label_corrections(episodes, homes)
+    # 4. Manifest: provenance and counts.
     manifest = _manifest(root, rng_seed, rows, episodes, stats)
+    manifest["label_corrections"] = corrected
     return Conversion(rng_seed, homes, episodes, manifest)
+
+
+# -- ground-truth corrections ------------------------------------------------------------------
+
+
+def load_label_corrections(path: Any = LABEL_CORRECTIONS) -> Dict[str, Dict[str, Any]]:
+    """``{row id: {"gold", "reason", "attribute", "part_reason"}}`` from the corrections
+    table (empty without one); for a part corrected to ``error_input``, ``attribute``
+    names what it lacks and ``part_reason`` why it cannot be done (default
+    ``unexist_attribute``)."""
+    table_path = Path(path)
+    if not table_path.is_file():
+        return {}
+    table = yaml.safe_load(table_path.read_text(encoding="utf-8")) or {}
+    reason = table.get("reason")
+    return {row["id"]: {"gold": row["gold"], "reason": row.get("reason", reason),
+                        "attribute": row.get("attribute"),
+                        "part_reason": row.get("part_reason")}
+            for row in table.get("rows") or []}
+
+
+def _corrected_type(homebench_type: str, case: str) -> str:
+    """HomeBench's label for a corrected answer: a single row is ``normal`` (the only
+    corrections are calls); a multi row keeps its part count and takes the suffix of
+    its new case (``multi3_normal`` with one part made impossible is ``multi3_mix``)."""
+    parts = multi_parts(homebench_type)
+    if parts is None:
+        return "normal"
+    suffix = {"feasible": "normal", "mixed": "mix"}.get(case)
+    return f"multi{parts}_{suffix}" if suffix else homebench_type
+
+
+def correct_episode(episode: Dict[str, Any], home: Dict[str, Any],
+                    correction: Dict[str, Any]) -> None:
+    """Replace one episode's gold with the corrected one, part by part, in place.
+
+    A part whose call is unchanged keeps its goal; a part corrected to a call gets the
+    goal the converter builds for any call (`_feasible_goal`); a part corrected to
+    ``error_input`` becomes an infeasible part on the device the old call named, the
+    attribute it lacks taken from the correction (``unexist_attribute``). The case and
+    the label follow the new gold; the seed and home stay (the name is the caller's,
+    `fixed_name`). ``meta.label_correction`` keeps what was there.
+    """
+    meta = episode["meta"]
+    # 1. Both golds, parsed the way the row's type says, part for part.
+    multi = multi_parts(meta["homebench_type"]) is not None
+    old_calls = parse_gold(meta["gold"], multi)
+    calls = parse_gold(correction["gold"], multi)
+    if len(calls) != len(old_calls):
+        raise ConversionError(f"{meta['id']}: the correction has {len(calls)} parts, "
+                              f"the gold {len(old_calls)}")
+    devices = {d["device_id"]: d for r in home["rooms"].values() for d in r["devices"]}
+    # 2. One goal per part: kept, rebuilt for a new call, or made infeasible.
+    goals = []
+    for old_goal, old, new in zip(episode["eval"]["goals"], old_calls, calls):
+        if new == old:
+            goals.append(old_goal)
+        elif new is not None:
+            goals.append(_feasible_goal(new, devices))
+        else:
+            goals.append({"room_id": old.room or HOUSEHOLD_ROOM, "device_id": old.device_id,
+                          "device_type": old.device, "feasibility": False,
+                          "reason": correction.get("part_reason") or "unexist_attribute",
+                          "resolved": True, "attribute": correction.get("attribute")})
+    _mark_superseded(goals)
+    # 3. What was there, then the new gold, case, label and goals.
+    meta["label_correction"] = {"original_gold": meta["gold"],
+                                "original_type": meta["homebench_type"],
+                                "reason": correction.get("reason")}
+    case = case_of(calls)
+    meta.update(gold=correction["gold"], case=case,
+                homebench_type=_corrected_type(meta["homebench_type"], case))
+    episode["eval"]["goals"] = goals
+
+
+def fixed_name(name: str, case: str) -> str:
+    """The name of a corrected episode: its new case, its seed, and ``_fixed``
+    (``hb1_infeasible_seed_2631`` -> ``hb1_feasible_seed_2631_fixed``)."""
+    qtype, _, rest = name.partition("_")
+    seed = rest.rsplit("_seed_", 1)[1].removesuffix(FIXED_SUFFIX)
+    return f"{qtype}_{case}_seed_{seed}{FIXED_SUFFIX}"
+
+
+def apply_label_corrections(episodes: Dict[str, Dict[str, Any]],
+                            homes: Dict[Any, Dict[str, Any]],
+                            corrections: Optional[Dict[str, Dict[str, Any]]] = None
+                            ) -> Dict[str, str]:
+    """Correct every episode the table names (by ``meta.id``) and rename it in
+    ``episodes`` (`fixed_name`); ``{old name: new name}`` of the episodes renamed. An
+    episode already corrected to the table's gold is left as it is; one corrected to
+    an earlier gold is corrected again, keeping the dataset's original as the
+    original."""
+    corrections = load_label_corrections() if corrections is None else corrections
+    renamed: Dict[str, str] = {}
+    for name in sorted(episodes):
+        episode = episodes[name]
+        correction = corrections.get(episode["meta"].get("id"))
+        if correction is None:
+            continue
+        # 1. The gold, corrected to the table's; a second correction keeps the
+        #    dataset's original as the original.
+        meta = episode["meta"]
+        if meta["gold"] != correction["gold"]:
+            earlier = meta.get("label_correction")
+            correct_episode(episode, homes[episode["home_id"]], correction)
+            if earlier:
+                meta["label_correction"].update(original_gold=earlier["original_gold"],
+                                                original_type=earlier["original_type"])
+        # 2. The name, for its (possibly new) case.
+        new = fixed_name(name, meta["case"])
+        if new != name:
+            renamed[name] = new
+    # The new names, once every correction is made.
+    for old, new in renamed.items():
+        if new in episodes:
+            raise ConversionError(f"corrected episode {new} already exists")
+        episodes[new] = episodes.pop(old)
+    return renamed
+
+
+def correct_converted(benchmark_dir: Any) -> Dict[str, str]:
+    """Apply the corrections table to an already converted directory, in place: the
+    episodes it names are written under their new names and the old files removed,
+    the rest untouched; ``{old name: new name}``."""
+    root = Path(benchmark_dir)
+    corrections = load_label_corrections()
+    ids = set(corrections)
+    # 1. Only the episodes the table names are read and rewritten.
+    episodes, homes = {}, {}
+    for path in sorted((root / "episodes").glob("*.json")):
+        episode = json.loads(path.read_text(encoding="utf-8"))
+        if episode["meta"].get("id") in ids:
+            episodes[path.stem] = episode
+            homes.setdefault(episode["home_id"], load_home(root, episode["home_id"]))
+    # 2. Every episode the table names is written (a re-correction keeps its name);
+    #    a renamed one's old file goes.
+    renamed = apply_label_corrections(episodes, homes, corrections)
+    for name, episode in episodes.items():
+        _dump(root / "episodes" / f"{name}.json", episode)
+    for old in renamed:
+        (root / "episodes" / f"{old}.json").unlink()
+    return renamed
 
 
 def _manifest(
@@ -568,14 +716,14 @@ def load_episode(benchmark_dir: Any, name: str) -> Dict[str, Any]:
 def verify_gold(conversion: Conversion, homebench_dir: Any) -> Dict[str, Any]:
     """Replay every gold call on its home through the engine; report violations.
 
-    Returns ``{"rows", "calls", "applied", "unreachable", "errors"}``; ``errors``
+    Returns ``{"rows", "calls", "applied", "errors"}``; ``errors``
     lists ``(row id, call, message)`` for every call the engine refused (an
     unknown device, a missing command, or an enum/range violation).
     """
     rows = read_jsonl(Path(homebench_dir) / TEST_DATA)
     machines: Dict[int, HomeBenchEngine] = {}
     report: Dict[str, Any] = {"rows": len(rows), "calls": 0, "applied": 0,
-                              "unreachable": 0, "errors": []}
+                              "errors": []}
     for row in rows:
         # 1. One engine per home, reset to the home file before every row.
         machine = machines.setdefault(
@@ -586,13 +734,11 @@ def verify_gold(conversion: Conversion, homebench_dir: Any) -> Dict[str, Any]:
         for call in filter(None, parts):
             report["calls"] += 1
             try:
-                result = machine.apply(call.device_id, call.command, call.arg)
+                machine.apply(call.device_id, call.command, call.arg)
             except engine.EngineError as exc:
                 report["errors"].append((row["id"], call, str(exc)))
                 continue
-            key = "unreachable" if result.status == engine.STATUS_UNREACHABLE \
-                else "applied"
-            report[key] += 1
+            report["applied"] += 1
     return report
 
 
@@ -634,8 +780,17 @@ def main(argv: List[str]) -> int:
     parser.add_argument("--mappings-only", action="store_true",
                         help="write only the mapping tables (reads the homes file "
                              "alone, a few seconds), then stop")
+    parser.add_argument("--apply-label-corrections", action="store_true",
+                        help="apply label_corrections.yaml to the converted --out "
+                             "directory in place (no HomeBench checkout needed), then stop")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    # 0. Corrections only, on what is already converted.
+    if args.apply_label_corrections:
+        renamed = correct_converted(args.out)
+        LOGGER.info("corrected %d episodes: %s", len(renamed),
+                    ", ".join(f"{old} -> {new}" for old, new in renamed.items()) or "none")
+        return 0
     # 0. The mapping tables need only the homes; --mappings-only stops after them.
     if args.mappings_only:
         write_mappings(args.homebench, args.mappings_out)
@@ -644,9 +799,8 @@ def main(argv: List[str]) -> int:
     conversion = convert_dataset(args.homebench, args.seed)
     if not args.no_verify:
         report = verify_gold(conversion, args.homebench)
-        LOGGER.info("gold replay: %d calls, %d applied, %d unreachable, %d errors",
-                    report["calls"], report["applied"], report["unreachable"],
-                    len(report["errors"]))
+        LOGGER.info("gold replay: %d calls, %d applied, %d errors",
+                    report["calls"], report["applied"], len(report["errors"]))
         conversion.manifest["gold_replay"] = {k: v for k, v in report.items()
                                               if k != "errors"} | {
             "errors": len(report["errors"])}

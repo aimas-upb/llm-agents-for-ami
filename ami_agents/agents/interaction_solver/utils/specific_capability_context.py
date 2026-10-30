@@ -45,6 +45,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from rdflib import Graph, Literal, URIRef
+from rdflib.collection import Collection
 from rdflib.namespace import RDF, RDFS
 
 from ....shared.models.goal_structure import GoalSpec
@@ -209,7 +210,9 @@ _JSON_TYPES = {
 
 def json_schema(graph: Graph, schema: Any) -> Dict[str, Any]:
     """A TD data schema as a JSON-schema dict: type, enum, bounds, unit,
-    description; an object schema with its named properties."""
+    description, and `order` -- the enum values that form a scale, lowest first
+    (`homeont:orderedValues`, an `rdf:List`); an object schema with its named
+    properties."""
     types = [shorten(t) for t in graph.objects(schema, RDF.type)]
     kind = next((_JSON_TYPES[t] for t in types if t in _JSON_TYPES), None)
     out: Dict[str, Any] = {"type": kind} if kind else {}
@@ -230,6 +233,10 @@ def json_schema(graph: Graph, schema: Any) -> Dict[str, Any]:
                   key=lambda v: (str(type(v)), v))
     if enum:
         out["enum"] = enum
+    # The scale, in the list's own order (unlike `enum`, which RDF leaves unordered).
+    order = graph.value(schema, HOMEONT.orderedValues)
+    if order is not None:
+        out["order"] = [v.toPython() for v in Collection(graph, order)]
     for key, predicate in (("minimum", JS.minimum), ("maximum", JS.maximum)):
         value = graph.value(schema, predicate)
         if value is not None:
