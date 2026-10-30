@@ -18,6 +18,9 @@ Which API a call goes over is decided by the client's endpoint (`api_for`):
 - Any other OpenAI-compatible endpoint (for example Ollama, vLLM or LM Studio)
   gets Chat Completions, which they all serve.
 
+An explicit transport selected by the benchmark overrides this default through
+the client's `_ami_tool_api` setting. Normal agent clients have no override.
+
 Example: planning "turn on the light" with gpt-6-luna on api.openai.com sends
 `responses.create(instructions=<system>, input=[<user>], tools=[{type: function,
 name: generate_behavior_tree, ...}], tool_choice={type: function, name: ...},
@@ -49,12 +52,17 @@ OPENAI_HOST = "api.openai.com"
 # -- choosing the API ---------------------------------------------------------
 
 def api_for(client: Any) -> str:
-    """RESPONSES for a client on OpenAI's own endpoint, CHAT for any other.
+    """An explicit client policy, else RESPONSES on OpenAI's endpoint and CHAT elsewhere.
 
     Local and third-party servers implement Chat Completions, while their
     Responses support is partial or missing, so only OpenAI's endpoint moves.
     A client with no `base_url` (a test double) is treated as a local one.
     """
+    # A benchmark can explicitly select a transport for every phase. Ordinary
+    # agent clients have no override and retain the endpoint-based default.
+    override = getattr(client, "_ami_tool_api", None)
+    if override in (RESPONSES, CHAT):
+        return override
     base_url = str(getattr(client, "base_url", "") or "")
     return RESPONSES if OPENAI_HOST in base_url.lower() else CHAT
 

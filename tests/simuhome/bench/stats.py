@@ -537,11 +537,8 @@ def official_table(buckets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def write(directory: Path, rows: List[Dict[str, Any]],
           summary: List[Dict[str, Any]], title: str,
-          environment: Optional[str] = None) -> Path:
-    """episodes.csv, summary.csv, summary.json and summary.md in ``directory``/stats (and
-    buckets.csv for HomeBench records: the official metrics per bucket); returns that
-    directory. ``environment`` (``on`` | ``off``), when the run recorded it, heads the
-    report."""
+          environment: Optional[str] = None, *, legend: str = LEGEND) -> Path:
+    """Write suite-aware statistics, preserving a caller's legend and model table."""
     out = directory / "stats"
     out.mkdir(parents=True, exist_ok=True)
 
@@ -555,7 +552,7 @@ def write(directory: Path, rows: List[Dict[str, Any]],
     # 2. The readable report: legend, then the tables (HomeBench: the official metrics per
     #    bucket and the caveats after the score table).
     shown = tables(summary)
-    legend = LEGEND + (HOMEBENCH_NOTE if any(r["type"].startswith("hb") for r in rows) else "")
+    legend = legend + (HOMEBENCH_NOTE if any(r["type"].startswith("hb") for r in rows) else "")
     official = ""
     if buckets:
         notes = "".join(f"- {note}\n" for note in homebench_notes(rows))
@@ -570,7 +567,7 @@ def write(directory: Path, rows: List[Dict[str, Any]],
     return out
 
 
-def compute(directory: Path, title: Optional[str] = None) -> Optional[Path]:
+def compute(directory: Path, title: Optional[str] = None, *, legend: str = LEGEND) -> Optional[Path]:
     """Load, measure, group and write the statistics of the records in
     ``directory``; prints the score table. Returns the stats directory, or
     None when there are no records."""
@@ -585,7 +582,7 @@ def compute(directory: Path, title: Optional[str] = None) -> Optional[Path]:
     summary = aggregate(rows)
     environment = run_environment(directory)
     out = write(directory, rows, summary, title or f"Bench statistics: {directory.name}",
-                environment)
+                environment, legend=legend)
     if environment:
         print(f"environment: {environment}")
     print(_table(tables(summary)["score"]))

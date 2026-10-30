@@ -1,0 +1,267 @@
+{
+  "states": {
+    "light.ambient_lights_308e": {
+      "state": "off",
+      "attributes": {
+        "friendly_name": "ambient_lights_308e",
+        "brightness": 96
+      }
+    },
+    "light.task_lights_308e": {
+      "state": "off",
+      "attributes": {
+        "friendly_name": "task_lights_308e",
+        "brightness": 128
+      }
+    },
+    "light.desk_lamp_308e": {
+      "state": "off",
+      "attributes": {
+        "friendly_name": "desk_lamp_308e",
+        "brightness": 140
+      }
+    },
+    "cover.blinds_308e_cover": {
+      "state": "closed",
+      "attributes": {
+        "friendly_name": "blinds_308e cover",
+        "current_position": 0,
+        "supported_features": 15
+      }
+    },
+    "cover.blackout_blinds_308e_cover": {
+      "state": "open",
+      "attributes": {
+        "friendly_name": "blackout_blinds_308e cover",
+        "current_position": 100,
+        "supported_features": 15
+      }
+    },
+    "cover.window_308e_cover": {
+      "state": "closed",
+      "attributes": {
+        "friendly_name": "window_308e cover",
+        "current_position": 0,
+        "supported_features": 15
+      }
+    },
+    "media_player.projector_308e": {
+      "state": "off",
+      "attributes": {
+        "friendly_name": "projector_308e",
+        "volume_level": 0.15
+      }
+    },
+    "media_player.display_wall_308e": {
+      "state": "on",
+      "attributes": {
+        "friendly_name": "display_wall_308e",
+        "volume_level": 0.0
+      }
+    },
+    "switch.ceiling_fan_308e": {
+      "state": "off",
+      "attributes": {
+        "friendly_name": "ceiling_fan_308e"
+      }
+    },
+    "climate.air_conditioner_308e": {
+      "state": "cool",
+      "attributes": {
+        "friendly_name": "air_conditioner_308e",
+        "hvac_mode": "cool",
+        "temperature": 24,
+        "current_temperature": 26,
+        "min_temp": 18,
+        "max_temp": 30,
+        "target_temp_step": 0.5
+      }
+    },
+    "climate.heater_308e": {
+      "state": "off",
+      "attributes": {
+        "friendly_name": "heater_308e",
+        "hvac_mode": "off",
+        "temperature": 20,
+        "current_temperature": 26,
+        "min_temp": 16,
+        "max_temp": 28,
+        "target_temp_step": 0.5
+      }
+    },
+    "sensor.person_counter_308e": {
+      "state": 3,
+      "attributes": {
+        "friendly_name": "person_counter_308e",
+        "unit_of_measurement": "persons"
+      }
+    },
+    "binary_sensor.presence_sensing_308e": {
+      "state": "on",
+      "attributes": {
+        "friendly_name": "presence_sensing_308e",
+        "device_class": "occupancy"
+      }
+    },
+    "sensor.internal_light_sensing_308e": {
+      "state": 180,
+      "attributes": {
+        "friendly_name": "internal_light_sensing_308e",
+        "unit_of_measurement": "lx"
+      }
+    },
+    "sensor.desk_light_sensing_308e": {
+      "state": 120,
+      "attributes": {
+        "friendly_name": "desk_light_sensing_308e",
+        "unit_of_measurement": "lx"
+      }
+    },
+    "sensor.glare_sensing_308e": {
+      "state": 75,
+      "attributes": {
+        "friendly_name": "glare_sensing_308e",
+        "unit_of_measurement": "%"
+      }
+    },
+    "sensor.external_light_sensing_308e": {
+      "state": 5200,
+      "attributes": {
+        "friendly_name": "external_light_sensing_308e",
+        "unit_of_measurement": "lx"
+      }
+    },
+    "sensor.temperature_sensing_308e": {
+      "state": 26,
+      "attributes": {
+        "friendly_name": "temperature_sensing_308e",
+        "unit_of_measurement": "C"
+      }
+    },
+    "sensor.humidity_sensing_308e": {
+      "state": 62,
+      "attributes": {
+        "friendly_name": "humidity_sensing_308e",
+        "unit_of_measurement": "%"
+      }
+    },
+    "sensor.co2_sensing_308e": {
+      "state": 980,
+      "attributes": {
+        "friendly_name": "co2_sensing_308e",
+        "unit_of_measurement": "ppm"
+      }
+    }
+  },
+  "services": {
+    "light.ambient_lights_308e": [
+      {
+        "domain": "light",
+        "service": "turn_off",
+        "data": {
+          "entity_id": "light.ambient_lights_308e"
+        }
+      }
+    ],
+    "light.task_lights_308e": [
+      {
+        "domain": "light",
+        "service": "turn_off",
+        "data": {
+          "entity_id": "light.task_lights_308e"
+        }
+      }
+    ],
+    "light.desk_lamp_308e": [
+      {
+        "domain": "light",
+        "service": "turn_off",
+        "data": {
+          "entity_id": "light.desk_lamp_308e"
+        }
+      }
+    ],
+    "cover.blinds_308e_cover": [
+      {
+        "domain": "cover",
+        "service": "close_cover",
+        "data": {
+          "entity_id": "cover.blinds_308e_cover"
+        }
+      }
+    ],
+    "cover.blackout_blinds_308e_cover": [
+      {
+        "domain": "cover",
+        "service": "open_cover",
+        "data": {
+          "entity_id": "cover.blackout_blinds_308e_cover"
+        }
+      }
+    ],
+    "cover.window_308e_cover": [
+      {
+        "domain": "cover",
+        "service": "close_cover",
+        "data": {
+          "entity_id": "cover.window_308e_cover"
+        }
+      }
+    ],
+    "media_player.projector_308e": [
+      {
+        "domain": "media_player",
+        "service": "turn_off",
+        "data": {
+          "entity_id": "media_player.projector_308e"
+        }
+      }
+    ],
+    "media_player.display_wall_308e": [
+      {
+        "domain": "media_player",
+        "service": "turn_on",
+        "data": {
+          "entity_id": "media_player.display_wall_308e"
+        }
+      }
+    ],
+    "switch.ceiling_fan_308e": [
+      {
+        "domain": "switch",
+        "service": "turn_off",
+        "data": {
+          "entity_id": "switch.ceiling_fan_308e"
+        }
+      }
+    ],
+    "climate.air_conditioner_308e": [
+      {
+        "domain": "climate",
+        "service": "set_hvac_mode",
+        "data": {
+          "entity_id": "climate.air_conditioner_308e",
+          "hvac_mode": "cool"
+        }
+      },
+      {
+        "domain": "climate",
+        "service": "set_temperature",
+        "data": {
+          "entity_id": "climate.air_conditioner_308e",
+          "temperature": 24
+        }
+      }
+    ],
+    "climate.heater_308e": [
+      {
+        "domain": "climate",
+        "service": "set_hvac_mode",
+        "data": {
+          "entity_id": "climate.heater_308e",
+          "hvac_mode": "off"
+        }
+      }
+    ]
+  }
+}

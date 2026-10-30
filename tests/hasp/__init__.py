@@ -1,0 +1,1 @@
+"""HASP benchmark adapters."""

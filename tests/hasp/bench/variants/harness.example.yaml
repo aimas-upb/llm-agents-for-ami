@@ -1,0 +1,20 @@
+# Same model-per-phase format as tests/simuhome/bench/variants/harness.example.yaml.
+name: hasp-lab308e-openai-nano
+providers:
+  openai: {api_key_env: OPENAI_API_KEY}
+models:
+  segmentation: {provider: openai, model: gpt-6-luna, reasoning_effort: low}
+  structuring: {provider: openai, model: gpt-6-luna, reasoning_effort: low}
+  planning:
+    explicit: {provider: openai, model: gpt-6-luna, reasoning_effort: low}
+    general: {provider: openai, model: gpt-6-luna, reasoning_effort: medium}
+  profiling: {provider: openai, model: gpt-6-luna, reasoning_effort: low}
+  guarding: {provider: openai, model: gpt-6-luna, reasoning_effort: low}
+  response: {provider: openai, model: gpt-6-luna, reasoning_effort: low}
+run:
+  episodes: "*"
+  runs: 1
+  workers: 1
+  context: none
+  memory: "off"
+  exec_timeout: 60

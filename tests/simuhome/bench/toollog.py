@@ -27,12 +27,17 @@ from typing import Any, Dict, List, Optional
 _URL = re.compile(r"/workspaces/(?P<home>[^/]+)/(?P<room>[^/]+)"
                   r"(?:/artifacts/(?P<device>[^/]+))?/(?P<kind>properties|actions)/"
                   r"(?P<name>[^/?#]+)")
+_HASP_URL = re.compile(r"/workspaces/(?P<room>[^/]+)/artifacts/(?P<device>[^/]+)"
+                       r"/(?P<kind>properties|actions)/(?P<name>[^/?#]+)")
 
 
 def parse_url(url: str) -> Optional[Dict[str, str]]:
     """{room, device?, kind, name} of an SHTD property or action URL."""
     match = _URL.search(str(url or ""))
-    return match.groupdict() if match else None
+    if match:
+        return match.groupdict()
+    match = _HASP_URL.search(str(url or ""))
+    return {"home": "", **match.groupdict()} if match else None
 
 
 class ToolLog:

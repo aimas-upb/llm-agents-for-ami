@@ -115,6 +115,12 @@ class ModelSpec:
     temperature: float = 0.0
     reasoning_effort: Optional[str] = None
     max_tokens: Optional[int] = None
+    api: str = "auto"
+
+    def __post_init__(self):
+        """Reject misspelled API names instead of silently using a different endpoint."""
+        if self.api not in ("auto", "chat-completions", "responses"):
+            raise ValueError(f"unknown LLM API {self.api!r}; use auto, chat-completions or responses")
 
     @property
     def reasoning(self) -> bool:
@@ -125,18 +131,26 @@ class ModelSpec:
         return bool(self.base_url) and "openai.com" not in self.base_url
 
     def client(self) -> AsyncOpenAI:
-        """A client for this spec, registered for `close_clients`. A local
-        endpoint never inherits the environment's proxies or OpenAI key."""
-        # 1. The client: a local endpoint without proxies, or OpenAI.
+        """A client for this spec. A local endpoint never inherits the
+        environment's proxies or OpenAI key."""
+        # 1. Preserve each provider's credentials, proxy and retry policy.
         if self.local:
             client = AsyncOpenAI(api_key=os.getenv(self.api_key_env or "", "") or "ollama",
-                                 base_url=self.base_url, timeout=REQUEST_TIMEOUT,
-                                 max_retries=0, http_client=httpx.AsyncClient(trust_env=False))
+                               base_url=self.base_url, timeout=REQUEST_TIMEOUT,
+                               max_retries=0, http_client=httpx.AsyncClient(trust_env=False))
         else:
             client = AsyncOpenAI(api_key=os.getenv(self.api_key_env or "OPENAI_API_KEY"),
-                                 base_url=self.base_url or OPENAI_URL, timeout=REQUEST_TIMEOUT)
-        # 2. Registered, so the episode closes it in its own loop (`close_clients`).
+                           base_url=self.base_url or OPENAI_URL, timeout=REQUEST_TIMEOUT)
+        # 2. Close both native and adapted clients in the episode's own loop.
         _OPEN_CLIENTS.append(client)
+        # Native forced-tool calls also respect an explicit harness API choice.
+        # Auto leaves the agent's endpoint-based policy intact.
+        if self.api != "auto":
+            client._ami_tool_api = "responses" if self.api == "responses" else "chat"
+        # 3. Adapt only clients explicitly configured for the Responses transport.
+        if self.api == "responses":
+            from .responses import use_responses
+            return use_responses(client)
         return client
 
     def call_kwargs(self) -> Dict[str, Any]:
@@ -153,11 +167,13 @@ class ModelSpec:
         return kwargs
 
     def ua_config(self) -> UAClientConfig:
+        """Pass the phase's output budget through both UA model-family paths."""
         return UAClientConfig(client=self.client(), model=self.model,
                               base_url=self.base_url or OPENAI_URL,
                               temperature=self.temperature,
                               reasoning_effort=self.reasoning_effort if self.reasoning else None,
-                              max_completion_tokens=self.max_tokens if self.reasoning else None)
+                              max_completion_tokens=self.max_tokens if self.reasoning else None,
+                              max_tokens=None if self.reasoning else self.max_tokens)
 
     def isa_config(self) -> ISAClientConfig:
         return ISAClientConfig(client=self.client(), model=self.model,
@@ -268,12 +284,16 @@ def variant_from_dict(raw: Dict[str, Any], name: Optional[str] = None) -> Varian
     return Variant(name=str(name or raw.get("name") or "default"), specs=specs)
 
 
-def load_variant(path: Optional[str]) -> Variant:
-    """The variant in ``path``, or the agents' defaults when none is given."""
-    if not path:
-        return variant_from_dict({}, "default")
-    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
-    return variant_from_dict(raw, raw.get("name") or Path(path).stem)
+def load_variant(path: Optional[str], *, api: Optional[str] = None) -> Variant:
+    """Load a variant; an explicit API override replaces every phase's transport."""
+    # 1. Keep legacy files and unnamed variants on their existing model defaults.
+    raw = (yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}) if path else {}
+    variant = variant_from_dict(raw, raw.get("name") or (Path(path).stem if path else "default"))
+    # 2. Apply the CLI override to the resolved specs, including inherited phases.
+    if api is not None:
+        variant = replace(variant, specs={step: replace(spec, api=api)
+                                          for step, spec in variant.specs.items()})
+    return variant
 
 
 def with_step(variant: Variant, step: str, spec: ModelSpec, name: str) -> Variant:

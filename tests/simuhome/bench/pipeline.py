@@ -73,6 +73,7 @@ from ami_agents.agents.user_assistant.signifiers import (
     capture_execution_context,
 )
 from ami_agents.agents.user_assistant.utils.goal_resolution import structure_clarification
+from ami_agents.agents.user_assistant.utils.processing import run_structuring
 from ami_agents.shared.models.goal_structure import GoalStructure
 from ami_agents.agents.user_assistant.utils.plan import (
     canonicalize_plan_for_hash,
@@ -119,6 +120,7 @@ class Target:
     sim: Any                              # SimuHomeClient
     shtd_base: str
     home_id: str
+    backend: Any = None                   # optional non-SimuHome home/execution adapter
 
 
 def _say(options: Options, title: str, body: Any = None) -> None:
@@ -184,7 +186,7 @@ async def run_episode(name: str, episode: Dict[str, Any], variant: Variant,
     # 1. The record, filled as the steps run.
     suite = suite or get_suite(DEFAULT_SUITE)
     record: Dict[str, Any] = {
-        "suite": suite.name,
+        "suite": "hasp" if target.backend is not None else suite.name,
         "episode": name, "query_type": episode["meta"]["query_type"],
         "case": episode["meta"]["case"], "meta": episode["meta"],
         "query": episode["query"], "variant": variant.as_dict(),
@@ -230,12 +232,15 @@ async def _run(name, episode, variant, config, target, options, logger, record, 
     # 0. Load and discover (not timed as a step: offline in a deployment).
     current["step"] = "load"
     started = time.perf_counter()
-    sim.reset(home_config)
-    # The suite's TD builder, with its environment mode when the suite has one.
-    builder_kwargs = ({"environment": options.environment == "on"}
-                      if options.environment else None)
-    home = Home(target.shtd_base, target.home_id, sim.home_state(), config, logger,
-                builder_cls=suite.td_cls, builder_kwargs=builder_kwargs)
+    if target.backend is None:
+        sim.reset(home_config)
+        # Preserve the suite's TD/environment switch for SimuHome and HomeBench.
+        builder_kwargs = ({"environment": options.environment == "on"}
+                          if options.environment else None)
+        home = Home(target.shtd_base, target.home_id, sim.home_state(), config, logger,
+                    builder_cls=suite.td_cls, builder_kwargs=builder_kwargs)
+    else:
+        home = await target.backend.load(config, logger)
     record["discovery_seconds"] = time.perf_counter() - started
     record["ambient_sensors"] = home.sensors
     tools.sensors = home.sensors
@@ -245,8 +250,9 @@ async def _run(name, episode, variant, config, target, options, logger, record, 
     # The ISA reads the clock to check stated times: the simulator's, through
     # SHTD (production takes it from environment.yaml).
     isa.config["environment"] = {**(isa.config.get("environment") or {}),
-                                 "clock": {"source": "http", "http": {
-                                     "url": f"{target.shtd_base}/_shtd/time"}}}
+                                 "clock": ({"source": "http", "http": {
+                                     "url": f"{target.shtd_base}/_shtd/time"}}
+                                           if target.backend is None else target.backend.clock)}
     text = _input_text(episode, options)
     record["input"] = text
     _say(options, f"{name} [{record['query_type']} {record['case']}]", text)
@@ -376,19 +382,24 @@ async def _run(name, episode, variant, config, target, options, logger, record, 
         runnable = [e for e in ordered if isinstance(e.get("tree"), dict) and e["tree"]]
         # Timed episodes are always run in lockstep, plans or not: their goals
         # are checked at set times, so the home is followed through them.
-        timed = suite.timed(record["query_type"])
+        timed = target.backend is None and suite.timed(record["query_type"])
         contexts = []
         if runnable or timed:
-            sim.reset(home_config)
+            if target.backend is None:
+                sim.reset(home_config)
             if options.memory is not None:
                 for index, entry in enumerate(runnable):
                     contexts.append(await capture_execution_context(
                         None, f"{name}-{index}", entry["tree"], entry=entry,
                         intent=entry.get("intent"), logger=logger))
             async with meter.step("execution") as step:
-                result = await asyncio.to_thread(
-                    _execute, runnable, tools, sim, config, options,
-                    home_config, episode, timed, home.turtle)
+                if target.backend is None:
+                    result = await asyncio.to_thread(
+                        _execute, runnable, tools, sim, config, options,
+                        home_config, episode, timed, home.turtle)
+                else:
+                    result = await asyncio.to_thread(
+                        target.backend.execute, runnable, tools, config, options)
                 step.update(mode=result.mode, virtual_seconds=result.virtual_seconds,
                             lockstep_steps=result.steps)
             record["execution"] = result.as_dict()
@@ -443,8 +454,8 @@ async def _run(name, episode, variant, config, target, options, logger, record, 
 
 
 async def _understand(text, ua, logger, meter, options, current) -> Dict[str, Any]:
-    """Segmentation, then every intent structured concurrently (as the UA
-    spawns them). Plain data, so it can be cached."""
+    """Segment and structure within the live UA's concurrency limit; return cacheable data."""
+    # 1. Only validated segmentation output may create structuring behaviours.
     current["step"] = "segmentation"
     async with meter.step("segmentation"):
         intents = await ua_pipeline.segment_into_atomic_intents(ua, logger, text)
@@ -462,23 +473,25 @@ async def _understand(text, ua, logger, meter, options, current) -> Dict[str, An
     capabilities = [i for i in intents if i.type == "ENV_CAPABILITIES_REQUEST"]
 
     async def structure(behaviour, label):
+        """Meter actual structuring work after it acquires capacity, excluding queue time."""
         behaviour.agent = ua
         async with meter.step("structuring.intent", kind=label, text=behaviour.intent_text):
             await behaviour.run()
         return behaviour
 
+    # 2. Match the live agent's limit without changing result ordering or phase accounting.
+    jobs = ([(GoalStructuringBehaviour(i.text, i.qualifiers, logger=logger), "goal") for i in goals]
+            + [(EnvStateStructuringBehaviour(i.text, logger=logger), "state") for i in states]
+            + [(EnvCapabilityStructuringBehaviour(i.text, logger=logger), "capabilities")
+               for i in capabilities])
+
+    async def run_job(job):
+        """Unpack one labelled behaviour for the shared scheduling helper."""
+        return await structure(*job)
+
     async with meter.step("structuring"):
-        done = await asyncio.gather(
-            *[structure(GoalStructuringBehaviour(i.text, i.qualifiers, logger=logger), "goal")
-              for i in goals],
-            *[structure(EnvStateStructuringBehaviour(i.text, logger=logger), "state")
-              for i in states],
-            *[structure(EnvCapabilityStructuringBehaviour(i.text, logger=logger),
-                        "capabilities") for i in capabilities])
-    # The UA's question is asked of the structure it built, as UserRequestBehaviour
-    # does: the wire dict leaves out what stays in the UA (a question set by
-    # resolution, how the request picks out its device), so a structure rebuilt
-    # from it would never be held back for them.
+        done = await run_structuring(ua, jobs, run_job)
+    # 3. Save every result in the same goal/query layout used by the planner.
     for behaviour in done[:len(goals)]:
         result = behaviour.result
         front["goals"].append({
