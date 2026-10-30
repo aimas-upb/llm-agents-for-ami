@@ -1,0 +1,55 @@
+# GPT-5 nano handles understanding; the remaining phases use the ollama5 models.
+name: hasp-lab308e-gpt5-nano-ollama
+
+providers:
+  openai:
+    api_key_env: OPENAI_API_KEY
+    api: responses
+  local:
+    base_url: http://10.205.0.124:11434/v1
+    api: chat-completions
+
+models:
+  segmentation:
+    provider: openai
+    model: gpt-5-nano
+    reasoning_effort: low
+  structuring:
+    provider: openai
+    model: gpt-5-nano
+    reasoning_effort: low
+  planning:
+    explicit:
+      provider: local
+      model: qwen3:4b
+      temperature: 0
+      max_tokens: 4096
+    general:
+      provider: local
+      model: qwen3:4b
+      temperature: 0
+      max_tokens: 4096
+  profiling:
+    provider: local
+    model: qwen3:8b
+    temperature: 0
+    max_tokens: 2048
+  guarding:
+    provider: local
+    model: gemma3:1b
+    temperature: 0
+    max_tokens: 1024
+  response:
+    provider: local
+    model: fufufuyangyang/Qwen2.5-Coder-7B-Instruct
+    temperature: 0
+    max_tokens: 1024
+
+run:
+  episodes: "*"
+  runs: 1
+  workers: 1
+  structuring_concurrency: 1
+  context: none
+  memory: "off"
+  exec_timeout: 60
