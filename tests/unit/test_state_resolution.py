@@ -105,7 +105,10 @@ class TestRetrievalTuple:
         assert affordance.artifact_name == "living_room_tv_1"
         assert affordance.workspace_name == "Living Room"
         assert affordance.affordance_name == "currentChannel"
-        assert affordance.affordance_type == "homeont:ChannelCurrentChannel"
+        # Asked by the generic class, answered with the TV's own leaf: the
+        # channel is actuatable now (ChangeChannel), typed like the TV's other
+        # knobs (homeont:TvBrightness under LevelControlBrightness).
+        assert affordance.affordance_type == "homeont:TvCurrentChannel"
 
     def test_artifact_type_is_the_device_class(self, graph):
         """Never null: the field exists to say what kind of device answered."""
@@ -362,3 +365,50 @@ class TestQueryComposition:
         assert "hasPropertyAffordance" not in query
         assert "hasForm" not in query
         assert "a/rdfs:subClassOf* homeont:Freezer" in query
+
+
+# -- a device called by name, and the air quality --------------------------------
+
+class TestNamedDevice:
+    def test_a_name_narrows_to_that_device(self, graph):
+        result = resolve_state_request(
+            graph, location_class="homeont:Kitchen", device_class="homeont:Freezer",
+            device_property={"class": "homeont:CompartmentTemperature"},
+            artifact_name="kitchen_freezer_1")
+        assert result.outcome is StateOutcome.RESOLVED
+        assert [a.artifact_name for a in result.affordances] == ["kitchen_freezer_1"]
+
+    def test_a_name_no_device_has_is_no_answer(self, graph):
+        """Freezer 2 is not answered by freezer 1."""
+        result = resolve_state_request(
+            graph, location_class="homeont:Kitchen", device_class="homeont:Freezer",
+            device_property={"class": "homeont:CompartmentTemperature"},
+            artifact_name="kitchen_freezer_2")
+        assert result.outcome is StateOutcome.NONE and not result.affordances
+
+
+@pytest.fixture(scope="module")
+def graph_with_sensors() -> Graph:
+    """The same home with SHTD's virtual room sensors, which read the room's
+    PM10 among its variables."""
+    from ami_agents.environment.integration.SimuHome.td_builder import SimuHomeTD
+    config = json.loads(EPISODE.read_text())["initial_home_config"]
+    builder = SimuHomeTD("http://localhost:8097", "test", config)
+    g = Graph()
+    for room in config["rooms"]:
+        g += builder.room_workspace(room)
+        for device in config["rooms"][room].get("devices", []):
+            g += builder.artifact(room, device["device_id"])
+        for _token, sensor_id, _row in builder.ambient_sensors(room):
+            g += builder.artifact(room, sensor_id)
+    return load_vocabulary(g)
+
+
+def test_the_air_quality_is_what_the_room_measures(graph_with_sensors):
+    """"How is the air quality in the kitchen?" asks for AirQuality, which the
+    kitchen measures as PM10."""
+    result = resolve_state_request(
+        graph_with_sensors, location_class="homeont:Kitchen",
+        environment_variable={"class": "homeont:AirQuality"})
+    assert result.outcome is StateOutcome.RESOLVED
+    assert [a.affordance_type for a in result.affordances] == ["homeont:Pm10MassConcentration"]

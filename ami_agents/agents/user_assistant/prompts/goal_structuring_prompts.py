@@ -33,25 +33,42 @@ What this home offers, by workspace. It may be narrowed to the rooms and devices
 - `Property` — something the device reports. `name` is the **property_name**; `property class` is the **property_class**; `kind` is its branch (actuatable, state, capability, ...). Its `output` is a direct value or an object whose fields are listed beneath it. (Present only when needed.)
 """
 
-GOAL_SPEC_RULES = """\
+# -- Goal rules: one string per section, concatenated into GOAL_SPEC_RULES --------
+
+# The task, the procedure, and when a goal is explicit or incomplete.
+GOAL_SPEC_INTRO = """\
 ## Structuring a goal
 
 A goal is ONE change to ONE device affordance (or, for an ambiguous goal, a desired change to the environment). Fill the fields according to its specificity.
 
-`goal_specificity` starts from the segmenter's label, given with the request. The segmenter sees only the words; you see the home. Change "explicit" to "incomplete" when the home context does not single out one device and one action:
-- several devices fit the request ("the living room lights" with two lights in the living room) — even when the request names their room and kind;
-- no device in the home context fits it ("the bathroom blinds" in a bathroom without blinds);
-- the device fits, but none of its actions can make the change ("make the hallway light blue" on an on/off light);
-- several of its actions fit, and the request does not say which ("set the AC to 22 degrees" with a cooling and a heating setpoint).
-Never pick one of several fitting devices or actions to keep a goal explicit: leave artifact_name (or affordance_name) null and let the quantifier say how many the request means.
+`goal_specificity` starts from the segmenter's label, given with the request. The segmenter sees only the words; you see the home.
 
+"""
+
+# The fields of an explicit or incomplete goal.
+EXPLICIT_GOAL_RULES = """\
 ### explicit and incomplete goals
-- **goal_specificity**: "explicit" or "incomplete".
+
+Proceed as follows in the general case:
+1. Find the device: the room the request names, then the device of the kind or name it mentions.
+2. Find the action that enables the change: by its name, its command class and its input; when it lists an `acts upon` property, that is the setting it changes.
+3. Find the value: read the action's input (type, range, unit, description) and express the request's value or change in it.
+4. Only then decide how to fill the fields listed below.
+
+- **goal_specificity**: "explicit" or "incomplete". Values start out from that in the segmenter's label, but may change when you see the home context:
+    - Change "explicit" to "incomplete" when the home context does not single out one device and one action:
+      - several devices fit the request ("the living room lights" with two lights in the living room) — even when the request names their room and kind;
+      - no device in the home context fits it ("the bathroom blinds" in a bathroom without blinds). A device called by name fits only if it has that name: "the Hue Go" in a home whose only lamp is a Hue Iris fits no device;
+      - the device fits, but none of its actions can make the change ("make the hallway light blue" on an on/off light);
+      - several of its actions fit, and the request does not say which ("set the AC to 22 degrees" with a cooling and a heating setpoint).
+      - Never pick one of several fitting devices or actions to keep a goal explicit: leave artifact_name (or affordance_name) null and let the quantifier say how many the request means.
+
 - **goal_kind**: "achievement" when the goal is done once its action is performed or it has a time-bounded objective; "maintenance" when it asks for a state to be kept or held ("keep the room at 22 degrees").
 - **intent_text**: the part of the request this goal comes from, verbatim.
 - **location_class**: the room class of the device's workspace.
 - **artifact_class**: the device's homeont class.
 - **artifact_name**: the `name` of the device's `Artifact`.
+- **device_reference**: how the request picks out the device: "name" when it calls the device by its own name, for example "the Hue Go" or "kitchen light 2"; "description" when it describes the device by its kind, its room or another property, for example "the fan" or "the lights in the kitchen"; null when the request refers to no device.
 - **affordance_class**: the command class of the action that performs the change, copied from its action's `command class`. Its `acts upon` property tells you what the action changes — use it to choose the right action, never as the affordance_class.
 - **parent_class**: the class `affordance_class` sits under (e.g. saref:Command); null if unknown.
 - **affordance_name**: the `name` of the `Action`.
@@ -70,13 +87,43 @@ Never pick one of several fitting devices or actions to keep a goal explicit: le
 
 For an **incomplete** goal fill everything the request and the home context support, and leave the rest null. Do not guess a device or a room the request does not point to.
 
-### "Start" on an appliance with a cycle
+- **unmatched_device**: the request's words for the device it names, when no device of that kind is in the home context, for example "the air conditioner"; null otherwise. Then leave artifact_name and artifact_class null.
+- **unmatched_action**: the request's words for a setting its device does not have, for example "brightness" on an on/off light; null otherwise.
+
+"""
+
+# How certain kinds of devices are operated, beyond what their actions say: one
+# string per convention, listed in DEVICE_CONVENTIONS.
+DEVICE_CONVENTIONS_INTRO = """\
+#### Device conventions
+How certain kinds of devices are operated, beyond what their actions say.
+
+"""
+
+CYCLE_START_CONVENTION = """\
+##### "Start" on an appliance with a cycle
 This applies to every device that runs cycles, that is, every device with an operational-state action (`homeont:SetOperationalStateCommand`), e.g. washers, dryers. On such a device, words like "start", "run", "begin" or "get it going" mean starting its cycle: the operational-state action, with the value for Running. They never mean the on/off action alone. Starting a cycle may also imply switching the device on first, and choosing the settings the request names with it, for example "on Heavy mode", "at Max dryness" or "with 1200 rpm spin".
 - When the request may hold several goals (a request with conditions, timing or several instructions): make one goal per instruction, in this order: switch on, then each setting the request names, then the start of the cycle (Running). Each later goal starts "after_goal" the one before it. Settings come before the start, because a running cycle may refuse them.
 - When the request holds exactly one goal: that goal is the start of the cycle (the operational-state action, Running), not switching the device on.
 
+"""
+
+DEVICE_CONVENTIONS = "".join([
+    DEVICE_CONVENTIONS_INTRO,
+    CYCLE_START_CONVENTION,
+])
+
+# The fields of an ambiguous goal.
+AMBIGUOUS_GOAL_RULES = """\
 ### ambiguous goals
 The request expresses a desired change of the environment — a complaint, sensation or wish — without naming what to actuate or how.
+
+How to proceed in the general case:
+1. Find the room the request names, if it names one.
+2. Find the variables: the `Variable`s of the room's `Environment` the request is about ("so damp" is relative humidity).
+3. Find the direction each variable should go.
+4. Name no device and no action: choosing them is the planner's job.
+
 - **goal_specificity**: "ambiguous"; **goal_kind**; **intent_text** as above.
 - **implied_environment_vars**: the environment variables the goal implicitly refers to, each taken from an `Environment`'s `Variable`s:
   - **property_name**: the variable's `name`;
@@ -87,6 +134,13 @@ The request expresses a desired change of the environment — a complaint, sensa
   - **property_change_direction**: "increase" or "decrease" — the way the user wants this variable to go ("so damp" → relative humidity "decrease"; "too dark" → illuminance "increase"; "freezing in here" → air temperature "increase").
   List one entry per variable and room the request implies.
 """
+
+GOAL_SPEC_RULES = "".join([
+    GOAL_SPEC_INTRO,
+    EXPLICIT_GOAL_RULES,
+    DEVICE_CONVENTIONS,
+    AMBIGUOUS_GOAL_RULES,
+])
 
 PREDICATE_SPEC_RULES = """\
 ## Structuring a predicate
@@ -132,7 +186,7 @@ Give every goal an id G1, G2, … and every predicate an id P1, P2, … in the o
   - "filter" — "any / all … that are X": selects which candidates of the goal's device pool the goal applies to.
 - **applies_to**: the ids of the goals it conditions.
 - **connective**: "and" (default) or "or" — how it combines with the other predicates of the same role on the same goals ("while A and B" → both "and").
-- for a **trigger** only: **offset_text** (the words, e.g. "23 minutes"; null if none) and **offset_direction** ("after" | "before").
+- for a **trigger** only: **offset_text** (the span, e.g. "23 minutes"; null if none) and **offset_direction** ("after" | "before").
 
 State a trigger or termination as the condition that BECOMES TRUE: "after I close it" is a trigger on "the light is off".
 
@@ -149,12 +203,13 @@ A trigger predicate is used only by a goal that starts "on_trigger", or that nam
   - optional **completes_with**: the id of a goal or trigger predicate this goal's run must finish together with — "so A and B finish at the same time", "time it so it's done when the dishwasher is". It is about a run that ends by itself (a wash or drying cycle): nothing is stopped. Record **starts** only for a start the user actually gave ("now", "at 10:30", after another goal). When the start is left to the system ("at the right time", "soon", or no start said), leave **starts** out: the system chooses the start so both finish together.
   - optional **ends**: {"kind": "duration" | "at_time", "text": …} — "for the next 5 hours", "until 6 PM".
   - optional **stated_start_time_text** / **stated_end_time_text** — see "Absolute and relative timing together" below.
+- Times are written in digits, however the user said them: a clock time (time_text, an "at_time" ends text, stated_*) as a 24-hour "HH:MM", for example "1 59 PM" or "one fifty-nine PM" is "13:59", keeping a day word the user gave ("tomorrow 07:00"); a span (offset_text, a "duration" ends text) as a number and a unit, for example "fourteen minutes" is "14 minutes". The user's own words stay in intent_text.
 - **rationale** (optional): the words giving a purpose or occasion ("so the laundry area is lit", "I'm clearing the table").
 
 ### Absolute and relative timing together
 When the user describes the start of a goal with a concrete clock time AND ALSO relative to an anchor — another moment in time ("20 minutes from now"), another goal ("5 minutes after the lights go off") or another event ("23 minutes before washer 1 finishes", "when the dryer stops") — record BOTH:
 - **starts** (with its fields, and any trigger predicate) records the RELATIVE description;
-- **stated_start_time_text** records the ABSOLUTE clock time, exactly as the user wrote it.
+- **stated_start_time_text** records the ABSOLUTE clock time, in digits as above.
 
 The same holds for the end of a goal: when the user gives a clock time for the end AND describes the end relative to an anchor ("for 2 hours, until 8 PM"; "until 6 PM, when the dryer finishes"), **ends** (or the termination predicate, or **completes_with** when the end is the moment another device's run finishes: "so both finish together by 11:39") records the RELATIVE description and **stated_end_time_text** records the ABSOLUTE clock time.
 
@@ -183,12 +238,12 @@ DEPENDENCY_EXAMPLES = """\
 - no predicates.
 
 "At 7:40 PM, that is 25 minutes from now, switch on the bedroom heater, and keep it on for an hour, until 8:40 PM."
-- G1 heater on: timing {"starts": "after_delay", "offset_text": "25 minutes", "stated_start_time_text": "7:40 PM", "ends": {"kind": "duration", "text": "an hour"}, "stated_end_time_text": "8:40 PM"}
+- G1 heater on: timing {"starts": "after_delay", "offset_text": "25 minutes", "stated_start_time_text": "19:40", "ends": {"kind": "duration", "text": "1 hour"}, "stated_end_time_text": "20:40"}
 - no predicates.
 
 "At 9:10 PM, which is 5 minutes after the dryer 1 in the laundry room finishes, turn on hallway light 2."
 - P1 dryer 1 finished: role "trigger", applies_to ["G1"], offset_text "5 minutes", offset_direction "after".
-- G1 hallway light on: timing {"starts": "on_trigger", "stated_start_time_text": "9:10 PM"}
+- G1 hallway light on: timing {"starts": "on_trigger", "stated_start_time_text": "21:10"}
 
 "Set dimmer light 1 in the living room to power on at level 30 at 13 minutes from now, and 8 minutes after the previous action drop it to level 20 while keeping it powered on."
 - G1 power on: timing {"starts": "after_delay", "offset_text": "13 minutes"}
@@ -218,7 +273,7 @@ For example, "Dishwasher 1 in the kitchen is running; start dryer 1 in the bathr
 - P1 dishwasher 1 finished: role "trigger", applies_to ["G3"].
 - G1 switch on dryer 1: timing {"starts": "now"}
 - G2 Normal dryness: timing {"starts": "after_goal", "ref_goal": "G1", "offset_text": null}
-- G3 start the cycle (operational state Running): timing {"starts": "after_goal", "ref_goal": "G2", "offset_text": null, "completes_with": "P1", "stated_end_time_text": "11:39 AM"}
+- G3 start the cycle (operational state Running): timing {"starts": "after_goal", "ref_goal": "G2", "offset_text": null, "completes_with": "P1", "stated_end_time_text": "11:39"}
 
 "Keep the living room at 22 degrees Celsius while the light is on, then 2 minutes after that set the heating pump level to 20 degrees."
 - P1 a living room light is on: predicate_subject "device_property", predicate_specificity "incomplete", quantifier "any", role "scope", applies_to ["G1"].
@@ -239,11 +294,13 @@ Return ONLY one JSON object — no prose, no markdown fences. For an explicit or
 
 {"goal_specificity": "explicit" | "incomplete", "goal_kind": "achievement", "intent_text": string,
  "location_class": string | null, "artifact_class": string | null, "artifact_name": string | null,
+ "device_reference": "name" | "description" | null,
  "affordance_class": string | null, "parent_class": string | null, "affordance_name": string | null,
  "parameter_name": string | "NA" | null, "goal_effect": "set" | "modify" | null,
  "target_value_text": string | null, "target_value_determined": string | null,
  "target_value_is_percentage": true | false,
- "quantifier": "all" | "one" | null}
+ "quantifier": "all" | "one" | null,
+ "unmatched_device": string | null, "unmatched_action": string | null}
 
 For an ambiguous goal:
 

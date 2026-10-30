@@ -24,6 +24,11 @@ from ami_agents.shared.models.environment import (
     ArtifactCategory,
     WorkspaceCategory,
 )
+from ami_agents.shared.utils.namespaces import (  # noqa: E402
+    HOMEONT,
+    JS,
+    TD,
+)
 
 
 @pytest.fixture
@@ -46,7 +51,7 @@ def agent_with_minimal_env(mock_agent):
         workspace_category=WorkspaceCategory.AREA,
         name="Lab 308",
         parent_workspace_id=None,
-        rdf='@prefix td: <https://www.w3.org/2019/wot/td#> .\n<http://example.org/ws/lab308> a td:Thing .',
+        rdf=f'@prefix td: <{TD}> .\n<http://example.org/ws/lab308> a td:Thing .',
         artifacts=["light308"],
         sub_workspaces=[],
         metadata={},
@@ -57,7 +62,7 @@ def agent_with_minimal_env(mock_agent):
         id="light308",
         title="Lab 308 Light",
         description="Overhead light",
-        rdf='@prefix td: <https://www.w3.org/2019/wot/td#> .\n<http://example.org/light308> a td:Thing .',
+        rdf=f'@prefix td: <{TD}> .\n<http://example.org/light308> a td:Thing .',
         properties=[],
         actions=[],
         events=[],
@@ -85,10 +90,10 @@ def agent_with_minimal_env(mock_agent):
         name="turn_on",
         description="Turn on the light",
         artifact_id="light308",
-        rdf="@prefix td: <https://www.w3.org/2019/wot/td#> .",
+        rdf=f"@prefix td: <{TD}> .",
         form=AffordanceForm(href="http://example.org/light308/turn_on", method="POST"),
         semantic_types=[],
-        input_schema={"type": "https://www.w3.org/2019/wot/json-schema#ObjectSchema", "properties": {}},
+        input_schema={"type": f"{JS}ObjectSchema", "properties": {}},
         output_schema=None,
         metadata={},
     )
@@ -99,12 +104,12 @@ def agent_with_minimal_env(mock_agent):
         name="brightness",
         description="Light brightness level",
         artifact_id="light308",
-        rdf="@prefix td: <https://www.w3.org/2019/wot/td#> .",
+        rdf=f"@prefix td: <{TD}> .",
         form=AffordanceForm(href="http://example.org/light308/brightness", method="GET"),
         semantic_types=[],
         input_schema=None,
         output_schema={
-            "type": "https://www.w3.org/2019/wot/json-schema#ObjectSchema",
+            "type": f"{JS}ObjectSchema",
             "properties": {"level": {"type": "integer"}, "unit": {"type": "string"}},
         },
         metadata={},
@@ -263,7 +268,7 @@ class TestCapabilitiesDetailedRDF:
                 for r in config["rooms"] for d in config["rooms"][r].get("devices", [])})
 
         graph = Graph().parse(data=format_capabilities_detailed_rdf(agent), format="turtle")
-        homeont = "http://example.org/homeont/"
+        homeont = f"{HOMEONT}"
         assert (None, None, URIRef(homeont + "AirConditioner")) in graph
         assert (None, None, URIRef(homeont + "Bathroom")) in graph
 

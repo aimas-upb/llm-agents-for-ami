@@ -31,6 +31,20 @@ defines the vocabulary but leaves its own namespace as the unprefixed default,
 rdflib at all (owlready2 loads it). The other declarations below duplicate what
 `homeont.ttl` already gives and are kept so the set the agents rely on is
 readable in one place, and so an unparseable ontology cannot silently remove one.
+
+The single source of every IRI
+------------------------------
+This module is the only place in the agents' code that spells out a vocabulary's
+IRI. Everything else imports the `Namespace` objects below, and SPARQL queries
+and Turtle snippets take their prefix lines from `sparql_prefixes` /
+`turtle_prefixes`. Changing a namespace -- for example when homeont and TD-SOSA
+move from their `example.org` placeholders to published IRIs -- is then one edit
+here plus the ontology files themselves.
+
+The two adapters (HASP and the SimuHome TD server) are deployed on their own and
+cannot import this package; each keeps one local copy of the namespaces it
+serves (`HomeAssistant/hasp_namespaces.py`, `SimuHome/shtd_namespaces.py`), and
+`tests/unit/test_namespaces.py` fails if a copy drifts from this module.
 """
 
 from __future__ import annotations
@@ -38,12 +52,18 @@ from __future__ import annotations
 from typing import Iterable, List, Optional, Union
 
 from rdflib import Graph, Namespace, URIRef
-from rdflib.namespace import NamespaceManager
-
-from .vocabulary import ONTOLOGY_DIR, homeont  # noqa: F401  (ONTOLOGY_DIR re-exported)
+from rdflib.namespace import OWL, RDF, RDFS, SH, SKOS, XSD, NamespaceManager
 
 # Anything that can name a term: a URIRef, a full IRI, or an already-short CURIE.
 TermLike = Union[URIRef, str, None]
+
+# --------------------------------------------------------------------------
+# The vocabularies
+# --------------------------------------------------------------------------
+#
+# Declared BEFORE the import of `vocabulary` below: `vocabulary` imports these
+# constants for its class roots, so they must exist whichever module Python
+# happens to load first.
 
 # The vocabularies the environment serves, as namespace objects rather than
 # strings so callers can build terms (`HOMEONT.Kitchen`) and compare membership
@@ -52,16 +72,23 @@ HOMEONT = Namespace("http://example.org/homeont/")
 TD = Namespace("https://www.w3.org/2019/wot/td#")
 JS = Namespace("https://www.w3.org/2019/wot/json-schema#")
 HCTL = Namespace("https://www.w3.org/2019/wot/hypermedia#")
+WOTSEC = Namespace("https://www.w3.org/2019/wot/security#")
+HTV = Namespace("http://www.w3.org/2011/http#")
 HMAS = Namespace("https://purl.org/hmas/")
 WEBSUB = Namespace("https://purl.org/hmas/websub/")
+JACAMO = Namespace("https://purl.org/hmas/jacamo/")
 SOSA = Namespace("http://www.w3.org/ns/sosa/")
 SSN = Namespace("http://www.w3.org/ns/ssn/")
+SSN_SYSTEM = Namespace("http://www.w3.org/ns/ssn/systems/")
 TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
 SAREF = Namespace("https://saref.etsi.org/core/")
 S4BLDG = Namespace("https://saref.etsi.org/saref4bldg/")
 QUDT = Namespace("http://qudt.org/schema/qudt/")
 UNIT = Namespace("http://qudt.org/vocab/unit/")
 QUANTITYKIND = Namespace("http://qudt.org/vocab/quantitykind/")
+SCHEMA = Namespace("https://schema.org/")
+# The generic example namespace, still bound by the legacy discovery formatter.
+EX = Namespace("http://example.org/")
 
 # The vocabulary that describes the home itself: rooms, device families, and the
 # properties of a room's environment. Matching rules that ask "what kind of room
@@ -73,17 +100,28 @@ _DECLARED = {
     "td": TD,
     "js": JS,
     "hctl": HCTL,
+    "wotsec": WOTSEC,
+    "htv": HTV,
     "hmas": HMAS,
     "websub": WEBSUB,
+    "jacamo": JACAMO,
     "sosa": SOSA,
     "ssn": SSN,
+    "ssn-system": SSN_SYSTEM,
     "tdsosa": TDSOSA,
     "saref": SAREF,
     "s4bldg": S4BLDG,
     "qudt": QUDT,
     "unit": UNIT,
     "quantitykind": QUANTITYKIND,
+    "schema": SCHEMA,
 }
+
+# W3C core vocabularies, for prefix lines only: rdflib binds them on every graph
+# itself, so they are not re-bound on the manager below.
+_CORE = {"rdf": RDF, "rdfs": RDFS, "owl": OWL, "xsd": XSD, "skos": SKOS, "sh": SH}
+
+from .vocabulary import ONTOLOGY_DIR, homeont  # noqa: E402,F401  (ONTOLOGY_DIR re-exported)
 
 
 def _build_manager() -> NamespaceManager:
@@ -111,6 +149,38 @@ NAMESPACE_MANAGER = _build_manager()
 # Namespace -> prefix, for deciding whether a term is in a vocabulary we know.
 # Built once; `namespaces()` yields (prefix, URIRef) pairs.
 _KNOWN = {str(ns): prefix for prefix, ns in NAMESPACE_MANAGER.namespaces()}
+
+
+# --------------------------------------------------------------------------
+# Prefix lines for SPARQL and Turtle
+# --------------------------------------------------------------------------
+
+def namespace_for(prefix: str) -> Namespace:
+    """The namespace bound to `prefix`; KeyError for a prefix we do not know.
+
+    Raises instead of guessing, so a typo in a query's prefix list fails at
+    import rather than producing a query that silently matches nothing.
+    """
+    if prefix in _DECLARED:
+        return _DECLARED[prefix]
+    if prefix in _CORE:
+        return Namespace(str(_CORE[prefix]))
+    raise KeyError(f"unknown namespace prefix: {prefix!r}")
+
+
+def sparql_prefixes(*prefixes: str) -> str:
+    """`PREFIX p: <iri>` lines for a SPARQL query, one per prefix, in order.
+
+    Queries build their header from this instead of spelling IRIs out:
+
+        QUERY = sparql_prefixes("td", "homeont") + "SELECT ?a WHERE { ... }"
+    """
+    return "".join(f"PREFIX {p}: <{namespace_for(p)}>\n" for p in prefixes)
+
+
+def turtle_prefixes(*prefixes: str) -> str:
+    """`@prefix p: <iri> .` lines for a Turtle document, one per prefix."""
+    return "".join(f"@prefix {p}: <{namespace_for(p)}> .\n" for p in prefixes)
 
 
 def as_term(value: TermLike) -> Optional[URIRef]:

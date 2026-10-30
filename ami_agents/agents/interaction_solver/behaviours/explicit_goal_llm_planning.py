@@ -15,10 +15,14 @@ Per goal:
                                               workflow's, with the small client
                                               and only that context
        modify: one call with MODIFY_RECIPE_PROMPT    the model names the action,
-                                              property, mode and range; the
+                                              property, amount and range; the
                                               recipe is checked against the TDs
+                                              (add or scale decided from the
+                                              unit, a scale's order from the TD)
                                               and built into the read -> compute
-                                              -> set tree (`modify_goal_plan`)
+                                              -> set tree (`modify_goal_plan`); a
+                                              value off its ordered scale is a
+                                              question instead
     3. a plan entry: a tree, impossible, or an error. An entry the model made
        carries `llm: True` -- the UserAssistant remembers it once it has run.
 """
@@ -38,6 +42,7 @@ from ....shared.utils.llm_models import is_reasoning_model
 from ....shared.utils.logger import LoggerFactory
 from ..prompts import MODIFY_RECIPE_PROMPT
 from ..utils.modify_goal_plan import describe, modify_tree, recipe_from_answer
+from ..utils.property_read import off_scale_check
 from ..utils.signifier_memory import recall, replay_entry
 from ..utils.specific_capability_context import SpecificCapabilityContext, build_specific_context
 
@@ -160,6 +165,12 @@ class ExplicitGoalLLMPlanningBehaviour(OneShotBehaviour):
             self.logger.warning(f"Explicit goal {where}: unusable recipe: {recipe}")
             return {"tree": None, "error": "explicit_planning_failed", "source": SOURCE,
                     "explanation": f"The model's recipe cannot be used: {recipe}."}
+        # An ordered value not on its scale: ask the user rather than plan.
+        asked = await off_scale_check(recipe, SOURCE)
+        if asked is not None:
+            self.logger.info(demo(f"Explicit goal {where}: asking the user -- "
+                                  f"{asked['explanation']}"))
+            return asked
         self.logger.info(demo(f"Explicit goal {where}: recipe from {cfg.model}"))
         return {"tree": modify_tree(recipe), "explanation": describe(recipe),
                 "source": SOURCE, "llm": True}

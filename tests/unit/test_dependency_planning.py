@@ -158,6 +158,18 @@ class TestBehaviour:
         assert entry["profile_call"]["model"] == "qwen3:8b"
 
     @pytest.mark.asyncio
+    async def test_profiling_asks_for_json_mode(self, graph):
+        """The profiling call requests JSON mode, so a slip inside the free-text
+        evidence cannot make the whole reply unreadable and put every question
+        on its fallback."""
+        # 1. One profiling call, recorded.
+        agent, seen = _agent({"answers": [], "unresolved": []})
+        await _plan(graph, _structure(
+            {"G1": _goal(goal_kind="maintenance", timing={"starts": "now"}, **NAMED)}), agent)
+        # 2. It asked for a JSON object.
+        assert seen["response_format"] == {"type": "json_object"}
+
+    @pytest.mark.asyncio
     async def test_a_failed_profiling_call_falls_back(self, graph):
         """A failed call does not stop the plan: every question on its
         fallback, noted in the explanation."""
@@ -306,3 +318,19 @@ class TestFinishTogether:
             timing={"starts": "after_delay", "offset_text": "soon"}, **NAMED)}), agent)
         assert entry["tree"] is None and entry["requires_clarification"]
         assert entry["error"] == "vague_time" and '"soon"' in entry["explanation"]
+
+
+# -- what a timing question rests on -----------------------------------------------
+
+def test_a_timing_question_says_what_it_read():
+    """The user hears which property gave the time, and an empty one too:
+    a stopped cycle's countdown is why its run length is unknown."""
+    from ami_agents.agents.interaction_solver.behaviours.dependency_goal_planning import (
+        _with_reads)
+    text = _with_reads(["Should I leave it out?"], [
+        {"artifact": "washer_2", "property": "countdownTime", "value": 3540},
+        {"artifact": "dryer_1", "property": "countdownTime", "value": None}])
+    assert text == ("Should I leave it out? (I read washer_2's countdownTime: 3540; "
+                    "dryer_1's countdownTime: no value.)")
+    # Nothing read: the question alone.
+    assert _with_reads(["Q?"], []) == "Q?"

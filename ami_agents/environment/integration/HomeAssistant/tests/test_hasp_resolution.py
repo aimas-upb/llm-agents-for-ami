@@ -12,10 +12,11 @@ import json
 import sys
 from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
-from rdflib import Graph
+from rdflib import Graph, Literal, Namespace, URIRef
 
 import hasp as appmod
 
@@ -27,10 +28,21 @@ from ami_agents.agents.env_explorer.utils.capability_resolution import (  # noqa
     CapabilityOutcome,
     resolve_capability_request,
 )
+from ami_agents.agents.interaction_solver.utils.specific_capability_context import (  # noqa: E402
+    artifact_affordances,
+)
+from ami_agents.bt_planning.planning.affordance_refs import AffordanceCatalog  # noqa: E402
+from ami_agents.bt_planning.planning.bt_planner import AsyncBTPlanner  # noqa: E402
 from ami_agents.agents.env_explorer.utils.state_resolution import (  # noqa: E402
     StateOutcome,
     load_vocabulary,
     resolve_state_request,
+)
+from ami_agents.shared.utils.namespaces import (  # noqa: E402
+    HMAS,
+    SAREF,
+    SCHEMA,
+    TD,
 )
 
 FIXTURE = Path(__file__).parent / "fixtures" / "lab308e_ha.json"
@@ -73,9 +85,8 @@ def _hasp_on_fixture():
     patch = pytest.MonkeyPatch()
     patch.setattr(appmod, "AREAS", set())
     patch.setattr(appmod, "BASE_WS_URI", "http://localhost:8080")
-    patch.setattr(appmod, "TD_SOSA_ENV_VAR_OVERRIDES", {})
-    patch.setattr(appmod, "TD_SOSA_PROPERTY_RANGES", {})
-    patch.setattr(appmod, "TD_SOSA_SETTLING_TIMES", {})
+    # A cache left by another test would serve that test's home.
+    patch.setattr(appmod.app.state, "graph_cache", None, raising=False)
     patch.setattr(appmod, "ha_client", FixtureHAWS())
     patch.setattr(appmod, "ha_rest", FixtureHAREST())
     patch.setenv("SEMANTIC_CONFIG", str(HOME_CONFIG))
@@ -238,9 +249,9 @@ class TestCapabilities:
 class TestPropertyNames:
     def test_no_artifact_advertises_a_bare_state_property(self, graph):
         """Every entity's state has its own name (decided: always rename)."""
-        rows = graph.query("""
-            PREFIX td: <https://www.w3.org/2019/wot/td#>
-            SELECT ?name WHERE { ?a td:hasPropertyAffordance ?p . ?p td:name ?name }
+        rows = graph.query(f"""
+            PREFIX td: <{TD}>
+            SELECT ?name WHERE {{ ?a td:hasPropertyAffordance ?p . ?p td:name ?name }}
         """)
         names = {str(r.name) for r in rows}
         assert "state" not in names
@@ -260,12 +271,12 @@ class TestArtifactNames:
     device, schema:model the product."""
 
     def _labels(self, graph, title):
-        rows = graph.query("""
-            PREFIX td: <https://www.w3.org/2019/wot/td#>
-            PREFIX hmas: <https://purl.org/hmas/>
+        rows = graph.query(f"""
+            PREFIX td: <{TD}>
+            PREFIX hmas: <{HMAS}>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            SELECT ?label WHERE { ?a a hmas:Artifact ; td:title ?t ; rdfs:label ?label .
-                                  FILTER(STR(?t) = "%s") }""" % title)
+            SELECT ?label WHERE {{ ?a a hmas:Artifact ; td:title ?t ; rdfs:label ?label .
+                                  FILTER(STR(?t) = "%s") }}""" % title)
         return sorted(str(r.label) for r in rows)
 
     def test_the_label_is_the_kind_of_device(self, graph):
@@ -278,30 +289,30 @@ class TestArtifactNames:
 
 def test_no_action_carries_the_legacy_status_command(graph):
     """Actions are typed with their homeont / SAREF command, nothing else."""
-    rows = graph.query("""
-        PREFIX td: <https://www.w3.org/2019/wot/td#>
-        ASK { ?a td:hasActionAffordance ?x . ?x a <http://example.org/StatusCommand> }""")
+    rows = graph.query(f"""
+        PREFIX td: <{TD}>
+        ASK {{ ?a td:hasActionAffordance ?x . ?x a <http://example.org/StatusCommand> }}""")
     assert not rows.askAnswer
 
 
 def test_the_thermostat_read_is_a_get_command(graph):
-    rows = graph.query("""
-        PREFIX td: <https://www.w3.org/2019/wot/td#>
-        PREFIX saref: <https://saref.etsi.org/core/>
-        SELECT ?name WHERE { ?a td:hasActionAffordance ?x . ?x td:name ?name ; a saref:GetCommand }""")
+    rows = graph.query(f"""
+        PREFIX td: <{TD}>
+        PREFIX saref: <{SAREF}>
+        SELECT ?name WHERE {{ ?a td:hasActionAffordance ?x . ?x td:name ?name ; a saref:GetCommand }}""")
     assert {str(r.name) for r in rows} == {"getThermostatState"}
 
 
 
 class TestActsUpon:
     def test_light_turn_on_changes_state_and_brightness(self, graph):
-        rows = graph.query("""
-            PREFIX td: <https://www.w3.org/2019/wot/td#>
-            PREFIX saref: <https://saref.etsi.org/core/>
-            SELECT ?pn WHERE { ?a td:title "ambient_lights_308e" ;
+        rows = graph.query(f"""
+            PREFIX td: <{TD}>
+            PREFIX saref: <{SAREF}>
+            SELECT ?pn WHERE {{ ?a td:title "ambient_lights_308e" ;
                                   td:hasActionAffordance ?x .
                                ?x td:name "LightTurnOn" ; saref:actsUpon ?p .
-                               ?p td:name ?pn }""")
+                               ?p td:name ?pn }}""")
         assert {str(r.pn) for r in rows} >= {"lightState", "brightness"}
 
     def test_play_answers_through_the_playback_state_it_changes(self, graph):
@@ -322,3 +333,51 @@ class TestActsUpon:
             device_property={"class": "homeont:MediaPlaybackState"},
             command={"class": "saref:SetAbsoluteLevelCommand"})
         assert result.outcome is CapabilityOutcome.DEVICE_LACKS
+
+
+# -- artifact names (icordos, 3813728) ------------------------------------------------
+
+def test_entity_only_covers_publish_canonical_names_for_the_unmodified_planner(monkeypatch):
+    """HA can report several entity-only covers all named 'Cover': each TD's
+    `td:title` is its stable slug, HA's display name its `schema:name`, and
+    the planner resolves an action by the slug."""
+    # 1. Three device-less covers HA names alike.
+    names = ["blinds_308e_cover", "blackout_blinds_308e_cover", "window_308e_cover"]
+    entities = [{"entity_id": f"cover.{name}", "device_id": None, "area_id": AREA,
+                 "name": None, "original_name": "Cover"} for name in names]
+    states = [{"entity_id": ent["entity_id"], "state": "open",
+               "attributes": {"current_position": 100, "supported_features": 15}}
+              for ent in entities]
+    monkeypatch.setattr(FixtureHAWS, "get_devices", AsyncMock(return_value=[]))
+    monkeypatch.setattr(FixtureHAWS, "get_entities", AsyncMock(return_value=entities))
+    monkeypatch.setattr(FixtureHAREST, "get_states", AsyncMock(return_value=states))
+    td = Namespace(f"{TD}")
+    schema = Namespace(f"{SCHEMA}")
+
+    # 2. Every document names each cover the same way.
+    graph = Graph()
+    with _hasp_on_fixture() as client:
+        responses = [client.get(f"/workspaces/{AREA}"), client.get(f"/workspaces/{AREA}/artifacts")]
+        responses += [client.get(f"/workspaces/{AREA}/artifacts/{name}") for name in names]
+        for response in responses:
+            assert response.status_code == 200
+            document = Graph().parse(data=response.text, format="turtle")
+            for name in names:
+                artifact = URIRef(f"http://testserver/workspaces/{AREA}/artifacts/{name}#artifact")
+                if (artifact, None, None) in document:
+                    assert set(document.objects(artifact, td.title)) == {Literal(name)}
+                    assert document.value(artifact, schema.name) == Literal(f"Cover ({name})")
+            graph += document
+        # HA display-name lookup still reaches the same canonical TD.
+        named = client.get(f"/workspaces/{AREA}/artifacts/Cover ({names[0]})")
+        assert named.status_code == 200
+        assert (URIRef(f"http://testserver/workspaces/{AREA}/artifacts/{names[0]}#artifact"),
+                td.title, Literal(names[0])) in Graph().parse(data=named.text, format="turtle")
+
+    # 3. The planner resolves an action by the slug.
+    affordances = artifact_affordances(graph, URIRef(
+        f"http://testserver/workspaces/{AREA}/artifacts/{names[0]}#artifact"))
+    tree = {"type": "action", "artifact": names[0], "affordance": "CoverOpenCover",
+            "affordance_class": "saref:OpenCommand"}
+    assert AsyncBTPlanner()._resolve_affordance_refs(tree, AffordanceCatalog(affordances)) == []
+    assert tree["action_url"].endswith(f"/{names[0]}/ha/cover/open_cover")

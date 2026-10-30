@@ -17,13 +17,21 @@ from ami_agents.agents.interaction_solver.utils.llm_client import build_llm_clie
 from ami_agents.bt_planning.planning.bt_planner import AsyncBTPlanner
 from ami_agents.shared.models.goal_structure import GoalSpec
 from ami_agents.shared.utils.vocabulary import close_types
+from ami_agents.shared.utils.namespaces import (  # noqa: E402
+    HCTL,
+    HMAS,
+    HOMEONT,
+    JS,
+    SAREF,
+    TD,
+)
 
-HOME = """
-@prefix hmas: <https://purl.org/hmas/> .
-@prefix homeont: <http://example.org/homeont/> .
-@prefix td: <https://www.w3.org/2019/wot/td#> .
-@prefix hctl: <https://www.w3.org/2019/wot/hypermedia#> .
-@prefix js: <https://www.w3.org/2019/wot/json-schema#> .
+HOME = f"""
+@prefix hmas: <{HMAS}> .
+@prefix homeont: <{HOMEONT}> .
+@prefix td: <{TD}> .
+@prefix hctl: <{HCTL}> .
+@prefix js: <{JS}> .
 
 <http://h/ac#artifact> a hmas:Artifact, homeont:AirConditioner ; td:title "ac" ;
     td:hasActionAffordance [ a td:ActionAffordance, homeont:SetModeCommand ;
@@ -201,13 +209,13 @@ class TestPlannerAndConfig:
 
 # A light whose action states no saref:actsUpon -- the deterministic path
 # cannot tell which property to read, the model has to.
-LIGHT = """
-@prefix hmas: <https://purl.org/hmas/> .
-@prefix homeont: <http://example.org/homeont/> .
-@prefix saref: <https://saref.etsi.org/core/> .
-@prefix td: <https://www.w3.org/2019/wot/td#> .
-@prefix hctl: <https://www.w3.org/2019/wot/hypermedia#> .
-@prefix js: <https://www.w3.org/2019/wot/json-schema#> .
+LIGHT = f"""
+@prefix hmas: <{HMAS}> .
+@prefix homeont: <{HOMEONT}> .
+@prefix saref: <{SAREF}> .
+@prefix td: <{TD}> .
+@prefix hctl: <{HCTL}> .
+@prefix js: <{JS}> .
 
 <http://h/light#artifact> a hmas:Artifact, homeont:DimmableLight ; td:title "light" ;
     td:hasActionAffordance [ a td:ActionAffordance, saref:SetAbsoluteLevelCommand ;

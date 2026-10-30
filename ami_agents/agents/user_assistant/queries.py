@@ -21,6 +21,7 @@ from .behaviours.capability_answer import CapabilityAnswerBehaviour
 from .behaviours.state_answer import StateAnswerBehaviour
 from .models import ConversationPhase
 from .utils import capability_answers, state_answers
+from .utils.device_names import missing_device_answer, named_device_missing, state_lookup
 
 
 async def answer_capabilities_query(behaviour, msg, thread: str, conv,
@@ -58,7 +59,7 @@ async def answer_capabilities_query(behaviour, msg, thread: str, conv,
         response = json.loads(result.body or "{}")
         text_intent = extraction.get("text_intent") or conv.user_message
         await behaviour.reply(
-            await _phrase_capabilities(behaviour, response, text_intent))
+            await capabilities_reply(behaviour, response, extraction, text_intent))
     except RpcTimeoutError:
         await behaviour.reply("Timeout querying environment capabilities. Please try again.")
     except Exception as exc:
@@ -66,6 +67,17 @@ async def answer_capabilities_query(behaviour, msg, thread: str, conv,
         await behaviour.reply(f"Error querying capabilities: {exc}")
 
     conv.phase = ConversationPhase.IDLE
+
+
+async def capabilities_reply(behaviour, response: dict, extraction: dict,
+                             text_intent: str) -> str:
+    """The reply to one capability question. A device called by name that the
+    home does not have is not answered for: the devices of its kind found
+    there are listed instead (`utils/device_names.py`)."""
+    if named_device_missing(extraction):
+        return missing_device_answer(
+            extraction, [e.get("artifact_name") for e in response.get("entries") or []])
+    return await _phrase_capabilities(behaviour, response, text_intent)
 
 
 async def _phrase_capabilities(behaviour, response: dict, text_intent: str) -> str:
@@ -107,7 +119,7 @@ async def answer_state_query(behaviour, msg, thread: str, conv,
             behaviour.agent,
             to_jid=str(explorer_jid),
             request_type=MessageType.ENV_STATE_REQUEST.value,
-            body=extraction,
+            body=state_lookup(extraction),
             expect_type=MessageType.ENV_STATE_RESPONSE.value,
             timeout=behaviour.agent.rpc_call_timeout,
         )
@@ -115,7 +127,8 @@ async def answer_state_query(behaviour, msg, thread: str, conv,
 
         response = json.loads(result.body or "{}")
         text_intent = extraction.get("text_intent") or conv.user_message
-        await behaviour.reply(await _phrase(behaviour, response, text_intent))
+        await behaviour.reply(
+            await state_reply(behaviour, response, extraction, text_intent))
     except RpcTimeoutError:
         await behaviour.reply("Timeout querying environment state. Please try again.")
     except Exception as exc:
@@ -123,6 +136,17 @@ async def answer_state_query(behaviour, msg, thread: str, conv,
         await behaviour.reply(f"Error querying state: {exc}")
 
     conv.phase = ConversationPhase.IDLE
+
+
+async def state_reply(behaviour, response: dict, extraction: dict,
+                      text_intent: str) -> str:
+    """The reply to one state question. A device called by name that the home
+    does not have is not read in its place: the devices of its kind found
+    there are listed instead (`utils/device_names.py`)."""
+    if named_device_missing(extraction):
+        return missing_device_answer(
+            extraction, [a.get("artifact_name") for a in response.get("affordances") or []])
+    return await _phrase(behaviour, response, text_intent)
 
 
 async def _phrase(behaviour, response: dict, text_intent: str) -> str:

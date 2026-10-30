@@ -8,7 +8,15 @@ import urllib.parse
 from typing import Any, Dict, List, Optional
 
 import websockets
-from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
+from rdflib import BNode, Graph, Literal, RDF, URIRef
+from rdflib.namespace import RDFS
+
+# Every vocabulary IRI comes from the adapter's one namespace module; the names
+# stay importable from here (`from hasp_utils import JS`).
+try:
+    from .hasp_namespaces import EX, HCTL, HMAS, HTV, JACAMO, JS, TD, WEBSUB, WOTSEC
+except ImportError:  # pragma: no cover - run from this directory
+    from hasp_namespaces import EX, HCTL, HMAS, HTV, JACAMO, JS, TD, WEBSUB, WOTSEC
 
 # Safe import for LoggerFactory - works both as standalone and as package module
 try:
@@ -22,15 +30,6 @@ except ImportError:
 
 # Namespaces
 BASE_FALLBACK = "http://localhost:8080/"
-WEBSUB = Namespace("https://purl.org/hmas/websub/")
-HCTL   = Namespace("https://www.w3.org/2019/wot/hypermedia#")
-JS     = Namespace("https://www.w3.org/2019/wot/json-schema#")
-HMAS   = Namespace("https://purl.org/hmas/")
-EX     = Namespace("http://example.org/")
-WOTSEC = Namespace("https://www.w3.org/2019/wot/security#")
-HTV    = Namespace("http://www.w3.org/2011/http#")
-JACAMO = Namespace("https://purl.org/hmas/jacamo/")
-TD     = Namespace("https://www.w3.org/2019/wot/td#")
 
 # ---------------- WebSocket client -----------------
 class HomeAssistantWS:
@@ -154,6 +153,12 @@ class HomeAssistantRDF:
                     input_schema: Optional[BNode] = None,
                     output_schema: Optional[BNode] = None,
                     description: Optional[str] = None):
+        """Add an ActionAffordance with one form to a Thing, and return its node.
+
+        `type_uri` is the action's own type (a JaCaMo or WebSub operation); None
+        when the caller adds the command class itself.
+        """
+        # 1. The affordance: its types, name and description.
         act = BNode()
         self.g.add((subj, TD.hasActionAffordance, act))
         self.g.add((act, RDF.type, TD.ActionAffordance))
@@ -164,10 +169,9 @@ class HomeAssistantRDF:
         self.g.add((act, TD.name, Literal(name)))
         self.g.add((act, TD.title, Literal(name)))
         if description:
-            # Add RDFS namespace if not already bound
-            RDFS = Namespace("http://www.w3.org/2000/01/rdf-schema#")
             self.g.bind("rdfs", RDFS)
             self.g.add((act, RDFS.comment, Literal(description)))
+        # 2. The form that invokes it over HTTP.
         form = BNode()
         self.g.add((act, TD.hasForm, form))
         self.g.add((form, HTV.methodName, Literal(method)))
@@ -176,6 +180,7 @@ class HomeAssistantRDF:
         self.g.add((form, HCTL.hasOperationType, TD.invokeAction))
         if subproto:
             self.g.add((form, HCTL.forSubProtocol, Literal(subproto)))
+        # 3. Its data schemas, when it takes or returns data.
         if input_schema:
             self.g.add((act, TD.hasInputSchema, input_schema))
         if output_schema:
@@ -238,7 +243,8 @@ class HomeAssistantRDF:
 
     # ---- Dynamic schema builders for HA services ----
     def _build_input_schema_from_fields(self, fields: Dict[str, Any],
-                                        entity_options: Optional[Dict[str, List[str]]] = None
+                                        entity_options: Optional[Dict[str, List[str]]] = None,
+                                        domain: Optional[str] = None,
                                         ) -> Optional[BNode]:
         """Build JSON Schema from HA service field definitions.
 
@@ -247,7 +253,10 @@ class HomeAssistantRDF:
         a service definition is shared by every entity of its domain, so it
         cannot say which modes this one has. Such a field -- and a select
         field with static options -- gets them as `js:enum` and as its
-        description, the way an enum is described."""
+        description, the way an enum is described.
+
+        ``domain`` is the service's domain, for the fields whose scale
+        direction `SCALE_MEANINGS` states (a cover's `position`)."""
         if not fields:
             return None
         entity_options = entity_options or {}
@@ -322,6 +331,10 @@ class HomeAssistantRDF:
                 if field_def.get("description") else []
             if allowed:
                 sentences.append("Values on this device: " + ", ".join(allowed) + ".")
+            # Which way the number runs, where the domain fixes it.
+            meaning = SCALE_MEANINGS.get((domain or "", field_name))
+            if meaning:
+                sentences.append(meaning)
             if sentences:
                 self.g.add((prop, JS.description, Literal(" ".join(sentences))))
 
@@ -386,7 +399,9 @@ class HomeAssistantRDF:
                       output_schema: Optional[BNode] = None,
                       description: Optional[str] = None,
                       observable: bool = True):
-        """Add a PropertyAffordance to a Thing."""
+        """Add a readable PropertyAffordance with one GET form to a Thing, and
+        return its node."""
+        # 1. The affordance: its type, name and description.
         prop = BNode()
         self.g.add((subj, TD.hasPropertyAffordance, prop))
         self.g.add((prop, RDF.type, TD.PropertyAffordance))
@@ -394,7 +409,6 @@ class HomeAssistantRDF:
         self.g.add((prop, TD.title, Literal(name)))
 
         if description:
-            RDFS = Namespace("http://www.w3.org/2000/01/rdf-schema#")
             self.g.bind("rdfs", RDFS)
             self.g.add((prop, RDFS.comment, Literal(description)))
 
@@ -454,7 +468,8 @@ class HomeAssistantRDF:
             attr_name: The attribute name (e.g., "state", "brightness")
             attr_value: The current value of the attribute
             entity_attributes: All entity attributes for context
-            entity_domain: Optional entity domain (e.g., "sensor", "light") for domain-specific logic
+            entity_domain: Optional entity domain (e.g., "sensor", "light") for domain-specific
+                logic: a state's values, and a scale's direction (SCALE_MEANINGS)
         """
         schema = BNode()
 
@@ -574,6 +589,13 @@ class HomeAssistantRDF:
             # For other types, default to string
             self.g.add((schema, RDF.type, JS.StringSchema))
 
+        # Which way the number runs, where the domain fixes it (a cover's
+        # current_position). Only attributes, never a state, are in the table,
+        # so no other description is overwritten.
+        meaning = SCALE_MEANINGS.get((entity_domain or "", attr_name))
+        if meaning:
+            self.g.add((schema, JS.description, Literal(meaning)))
+
         return schema
 
     def platform_to_rdf(self, areas: List[Dict[str, Any]]) -> None:
@@ -655,6 +677,21 @@ STATE_VALUES = {
     "binary_sensor": ["on", "off"],
     "cover": ["open", "closed", "opening", "closing"],
     "media_player": ["off", "on", "idle", "playing", "paused", "standby"],
+}
+
+# Which way a scale runs, for the (domain, field or attribute) pairs whose
+# number alone does not say it. Home Assistant's cover position counts how
+# far the cover is OPEN, the reverse of Matter's lift percentage (percent
+# closed), so each TD states its own device's direction in the value schema
+# (`js:description`), not on the homeont class both deployments share. The
+# service field (`position`) and the attribute it sets (`current_position`)
+# say the same.
+SCALE_MEANINGS = {
+    ("cover", "position"): "Percent open: 0 is fully closed, 100 is fully open.",
+    ("cover", "current_position"): "Percent open: 0 is fully closed, 100 is fully open.",
+    ("cover", "tilt_position"): "Percent tilted open: 0 is fully closed, 100 is fully open.",
+    ("cover", "current_tilt_position"):
+        "Percent tilted open: 0 is fully closed, 100 is fully open.",
 }
 
 

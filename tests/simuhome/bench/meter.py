@@ -1,8 +1,9 @@
 """Timing and LLM use per reasoning step.
 
-Every chat-completion call any client makes goes through
-`AsyncCompletions.create`, so wrapping that one method sees them all, including
-clients a behaviour builds for itself. A context variable says which step is
+Every LLM call any client makes goes through `AsyncCompletions.create` (Chat
+Completions) or `AsyncResponses.create` (the Responses API, which the BT
+planner uses on OpenAI's endpoint), so wrapping those two methods sees them
+all, including clients a behaviour builds for itself. A context variable says which step is
 running; a call is booked to the innermost step open when it was made. Tasks
 created inside a step inherit it, so concurrent structuring calls are booked
 correctly.
@@ -42,6 +43,7 @@ from contextlib import asynccontextmanager, contextmanager
 from typing import Any, Dict, Iterator, List, Optional
 
 from openai.resources.chat.completions import AsyncCompletions
+from openai.resources.responses import AsyncResponses
 
 _STEP: contextvars.ContextVar[Optional["Meter"]] = contextvars.ContextVar("bench_meter",
                                                                           default=None)
@@ -50,6 +52,10 @@ _NAME: contextvars.ContextVar[str] = contextvars.ContextVar("bench_step", defaul
 
 # The processing stages, in pipeline order; anything else is "other".
 STAGES = ("segmentation", "structuring", "planning", "profiling", "guarding", "execution")
+
+# The methods wrapped, and the names each API gives its token counts in `usage`.
+WRAPPED = ((AsyncCompletions, "prompt_tokens", "completion_tokens"),
+           (AsyncResponses, "input_tokens", "output_tokens"))
 
 
 def _stage(name: str) -> str:
@@ -67,7 +73,7 @@ class Meter:
     """Wall time per step and every LLM call, for one episode."""
 
     _installed = 0
-    _original = None
+    _originals: Dict[type, Any] = {}
 
     def __init__(self) -> None:
         self.steps: List[Dict[str, Any]] = []      # {step, seconds, ...extra}
@@ -75,37 +81,46 @@ class Meter:
 
     # -- the wrapper -----------------------------------------------------------
 
+    @staticmethod
+    def _wrap(original, tokens_in: str, tokens_out: str):
+        """``original`` (a `create` method), booking each call to the meter and
+        step open when it was made; the token counts read from ``usage`` under
+        the API's own names."""
+        async def create(self, *args, **kwargs):
+            meter, step = _STEP.get(), _NAME.get()
+            started = time.perf_counter()
+            ok = False
+            try:
+                response = await original(self, *args, **kwargs)
+                ok = True
+                return response
+            finally:
+                if meter is not None:
+                    usage = getattr(response, "usage", None) if ok else None
+                    meter.calls.append({
+                        "step": step, "model": kwargs.get("model"), "ok": ok,
+                        "seconds": time.perf_counter() - started,
+                        "tokens_in": getattr(usage, tokens_in, None),
+                        "tokens_out": getattr(usage, tokens_out, None)})
+        return create
+
     @classmethod
     def _install(cls) -> None:
+        """Wrap both APIs' `create` on the first install; later ones only count."""
         if cls._installed == 0:
-            original = AsyncCompletions.create
-            cls._original = original
-
-            async def create(self, *args, **kwargs):
-                meter, step = _STEP.get(), _NAME.get()
-                started = time.perf_counter()
-                ok = False
-                try:
-                    response = await original(self, *args, **kwargs)
-                    ok = True
-                    return response
-                finally:
-                    if meter is not None:
-                        usage = getattr(response, "usage", None) if ok else None
-                        meter.calls.append({
-                            "step": step, "model": kwargs.get("model"), "ok": ok,
-                            "seconds": time.perf_counter() - started,
-                            "tokens_in": getattr(usage, "prompt_tokens", None),
-                            "tokens_out": getattr(usage, "completion_tokens", None)})
-
-            AsyncCompletions.create = create
+            for api, tokens_in, tokens_out in WRAPPED:
+                cls._originals[api] = api.create
+                api.create = cls._wrap(api.create, tokens_in, tokens_out)
         cls._installed += 1
 
     @classmethod
     def _uninstall(cls) -> None:
+        """Restore the original methods when the last install ends."""
         cls._installed -= 1
-        if cls._installed == 0 and cls._original is not None:
-            AsyncCompletions.create = cls._original
+        if cls._installed == 0:
+            for api, original in cls._originals.items():
+                api.create = original
+            cls._originals.clear()
 
     @contextmanager
     def installed(self) -> Iterator["Meter"]:

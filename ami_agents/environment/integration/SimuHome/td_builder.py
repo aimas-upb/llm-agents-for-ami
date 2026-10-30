@@ -29,8 +29,9 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
-from rdflib.namespace import RDFS, XSD
+from rdflib import BNode, Graph, Literal, RDF, URIRef
+from rdflib.collection import Collection
+from rdflib.namespace import OWL, RDFS, XSD
 
 try:
     from .classify import classify_device
@@ -44,28 +45,16 @@ except ImportError:  # pragma: no cover - direct script use
 # here. Every Matter fact comes from it, never from model memory.
 from matter_model.registry import load_registry  # noqa: E402
 
-HCTL = Namespace("https://www.w3.org/2019/wot/hypermedia#")
-JS = Namespace("https://www.w3.org/2019/wot/json-schema#")
-HMAS = Namespace("https://purl.org/hmas/")
-# All SHTD vocabulary -- spaces, device families, environmental properties
-# and Matter provenance -- lives in one ontology:
-# ami_agents/shared/ontologies/homeont.ttl
-HOME = Namespace("http://example.org/homeont/")
-WOTSEC = Namespace("https://www.w3.org/2019/wot/security#")
-HTV = Namespace("http://www.w3.org/2011/http#")
-JACAMO = Namespace("https://purl.org/hmas/jacamo/")
-WEBSUB = Namespace("https://purl.org/hmas/websub/")
-TD = Namespace("https://www.w3.org/2019/wot/td#")
-SOSA = Namespace("http://www.w3.org/ns/sosa/")
-SSN = Namespace("http://www.w3.org/ns/ssn/")
-QUDT = Namespace("http://qudt.org/schema/qudt/")
-UNIT = Namespace("http://qudt.org/vocab/unit/")
-QK = Namespace("http://qudt.org/vocab/quantitykind/")
-TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
-SAREF = Namespace("https://saref.etsi.org/core/")
-# Thing-level device metadata (manufacturer, product name). The TD spec mints no
-# vendor vocabulary of its own and points at schema.org for it.
-SCHEMA = Namespace("https://schema.org/")
+# Every vocabulary IRI comes from the adapter's one namespace module.
+try:
+    from .shtd_namespaces import (HCTL, HMAS, HOMEONT, HTV, JACAMO, JS, QUANTITYKIND, QUDT, SAREF, SCHEMA,
+                                  SOSA, SSN, TD, TDSOSA, UNIT, WEBSUB, WOTSEC)
+except ImportError:  # pragma: no cover - direct script use
+    from shtd_namespaces import (HCTL, HMAS, HOMEONT, HTV, JACAMO, JS, QUANTITYKIND, QUDT, SAREF, SCHEMA,
+                                  SOSA, SSN, TD, TDSOSA, UNIT, WEBSUB, WOTSEC)  # type: ignore
+# The scripts' short name for homeont.
+HOME = HOMEONT
+QK = QUANTITYKIND
 
 # Ambient sensors are an addition SHTD makes to what SimuHome models. Off, and
 # the graph is exactly what it was before them -- which is how the "no sensor,
@@ -97,6 +86,8 @@ _NS_BY_PREFIX = {
 # Building-space classes homeont defines. Read from the ontology itself rather
 # than hardcoded, so adding a space type there is enough to make it usable here.
 def _load_home_space_classes() -> set:
+    """The local names of every OWL class homeont defines; empty when the
+    ontology cannot be read, since the set only ever widens what is accepted."""
     path = (Path(__file__).resolve().parents[3]
             / "shared" / "ontologies" / "homeont.ttl")
     try:
@@ -107,7 +98,7 @@ def _load_home_space_classes() -> set:
     return {
         str(subject).rsplit("/", 1)[-1]
         for subject in onto.subjects(RDF.type,
-                                     URIRef("http://www.w3.org/2002/07/owl#Class"))
+                                     OWL.Class)
         if str(subject).startswith(str(HOME))
     }
 
@@ -200,6 +191,52 @@ def _add_unit(g: Graph, schema: BNode, unit: Any) -> None:
 # `temperature` covers Thermostat.LocalTemperature and the setpoints;
 # `percent100ths` covers window-covering positions.
 SCALED_TYPES = {"temperature": 100.0, "percent100ths": 100.0}
+
+# Which way a scale runs, for the attributes whose number alone does not say
+# it. The Matter registry has enums but no attribute descriptions, and these
+# are plain numbers, so the spec's meaning is stated here. It goes into the
+# device's own schema (`js:description`) rather than onto the class: another
+# deployment may run the same kind of device the other way round (Home
+# Assistant's cover position is percent *open*), and each TD says how its own
+# device counts. Matter's lift and tilt percentages count closure.
+SCALE_MEANINGS = {
+    ("WindowCovering", "CurrentPositionLiftPercent100ths"):
+        "Percent closed: 0 is fully open, 100 is fully closed.",
+    ("WindowCovering", "TargetPositionLiftPercent100ths"):
+        "Percent closed: 0 is fully open, 100 is fully closed.",
+    ("WindowCovering", "CurrentPositionTiltPercent100ths"):
+        "Percent tilted closed: 0 is fully open, 100 is fully closed.",
+    ("WindowCovering", "TargetPositionTiltPercent100ths"):
+        "Percent tilted closed: 0 is fully open, 100 is fully closed.",
+}
+
+# The enum values that form a scale, lowest first, for the attributes a request may
+# change "by one level". Matter's FanModeEnum: Off < Low < Medium < High; On, Auto and
+# Smart are modes, not positions on the scale. Each device's schema states the scale
+# restricted to the values it supports (`_device_enum_items`), so a fan whose
+# FanModeSequence is OffLowHigh steps Off -> Low -> High.
+ORDERED_VALUES = {
+    ("FanControl", "FanMode"): [0, 1, 2, 3],
+}
+
+
+def ordered_values(cluster: str, attribute: str,
+                   items: List[Dict[str, Any]]) -> List[Any]:
+    """The scale of an attribute (`ORDERED_VALUES`) restricted to the enum items a
+    device supports, lowest first; empty when the attribute has no scale."""
+    supported = {item["value"] for item in items}
+    return [v for v in ORDERED_VALUES.get((cluster, attribute), []) if v in supported]
+
+
+def _add_order(g: Graph, schema: BNode, values: List[Any]) -> None:
+    """State the scale of an enum on its schema: `homeont:orderedValues`, an rdf:List
+    of the values, lowest first. Fewer than two values make no scale, so nothing is
+    written. Shared with the HomeBench builder."""
+    if len(values) < 2:
+        return
+    head = BNode()
+    Collection(g, head, [_literal(v) for v in values])
+    g.add((schema, HOME.orderedValues, head))
 
 
 def report_value(matter_type: Optional[str], value: Any) -> Any:
@@ -698,11 +735,14 @@ class SimuHomeTD:
             siblings.setdefault(key, {})[str(record.get("attribute"))] = record.get("value")
 
         for attr_path, record in sorted(classified.items()):
-            if record["role"] in ("drop", "bound"):
-                # `bound` records were consumed into the sibling map above and
-                # surface as js:minimum/js:maximum on the attribute they bound,
-                # never as readable properties of their own.
+            if record["role"] == "drop":
                 continue
+            # A `bound` record (MaxLevel, MaxTemperature, MinMeasuredValue) is
+            # both: js:minimum/js:maximum on the attribute it bounds (from the
+            # sibling map above) and a read-only property of its own, as Matter
+            # reports it -- "what is the most the dimmer goes to?" asks for it
+            # by its class (homeont:LevelControlMaxLevel), and only a property
+            # typed with that class can answer.
             if record["role"] == "thing_metadata":
                 # BasicInformation is a fact about the Thing, not an interaction
                 # with it -- nothing to read at runtime, nothing to actuate --
@@ -958,14 +998,31 @@ class SimuHomeTD:
             claims.setdefault(
                 str(row["affectsObservableProperty"]), set()).add(row.get("direction"))
 
+        self._write_effects(g, action, room_id, {
+            sosa_property: directions.pop() if len(directions) == 1 else None
+            for sosa_property, directions in claims.items()})
+
+    def _write_effects(self, g: Graph, action: BNode, room_id: str,
+                       claims: Dict[str, Optional[str]]) -> None:
+        """Write one `tdsosa:hasEffectActuation` node per claimed room variable.
+
+        `claims` maps a `sosa_property` name (`air_temperature`) to the direction the
+        action moves it: `"increase"`, `"decrease"`, or `None` for a directionless
+        action (the outcome depends on the value carried). The node acts on the room's
+        variable (`room_property_uri`), the same IRI the environment's `ssn:hasProperty`
+        names, so an agent can walk from the action to the variable. Split out of
+        `_action_effects` so HomeBench, which has no Matter cluster to match rows by,
+        writes the same shape from its own tables.
+        """
+        # One effect per variable, in a stable order, so a re-render is identical.
         for sosa_property in sorted(claims):
-            directions = claims[sosa_property]
-            direction = directions.pop() if len(directions) == 1 else None
+            direction = claims[sosa_property]
             observed = self.room_property_uri(room_id, sosa_property)
             actuation = BNode()
             g.add((action, TDSOSA.hasEffectActuation, actuation))
             g.add((actuation, RDF.type, SOSA.Actuation))
             g.add((actuation, SOSA.actsOnProperty, observed))
+            # The typed direction, when the claim has one; else the plain "affects".
             if direction == "increase":
                 g.add((actuation, RDF.type, TDSOSA.IncreasingActuation))
                 g.add((actuation, TDSOSA.increasesObservableProperty, observed))
@@ -1083,6 +1140,30 @@ class SimuHomeTD:
         return sorted(items, key=lambda item: item["value"])
 
     @staticmethod
+    def _channel_description(cluster: str, attribute: str,
+                             siblings: Dict[str, Any]) -> str:
+        """The channels a TV lists, for its CurrentChannel: "Channels on this
+        device: KBS1 = 1.0, MBC = 3.0. Give MajorNumber and MinorNumber, or
+        the channel's Name." Empty for any other attribute, or when the device
+        lists no channels.
+
+        The value is a ChannelInfoStruct whose numbers are mandatory; a request
+        names the channel ("MBC"), so the pairing is stated here, from the
+        device's own ChannelList."""
+        # 1. Only a TV's current channel, with its list at hand.
+        if (cluster, attribute) != ("Channel", "CurrentChannel"):
+            return ""
+        channels = [c for c in siblings.get("ChannelList") or [] if isinstance(c, dict)]
+        # 2. Each channel as "name = major.minor", in the device's order.
+        parts = [f"{c.get('Name') or c.get('CallSign')} = "
+                 f"{c.get('MajorNumber')}.{c.get('MinorNumber', 0)}"
+                 for c in channels if c.get("MajorNumber") is not None]
+        if not parts:
+            return ""
+        return ("Channels on this device: " + ", ".join(parts)
+                + ". Give MajorNumber and MinorNumber, or the channel's Name.")
+
+    @staticmethod
     def _mode_description(items: List[Dict[str, Any]]) -> str:
         """The device's modes in one sentence, as `_enum_description` spells
         out an enum: "2 = Heavy (mode tags: Heavy)."."""
@@ -1196,8 +1277,9 @@ class SimuHomeTD:
             _add_unit(g, schema, unit)
 
         # What the value MEANS, for an LLM planner that has to choose one.
-        # Three sources, all machine-derived: the spec's enum items, a Mode
-        # cluster's own declared modes, and the device's own declared limits.
+        # Four sources: the spec's enum items, a Mode cluster's own declared
+        # modes and the device's own declared limits (all machine-derived),
+        # and, for a plain number, which way its scale runs (SCALE_MEANINGS).
         # A struct's keys, so "object" is not all the planner is told. Field
         # types come from the registry; nested structs/enums are named by their
         # Matter type rather than expanded, which keeps the graph finite.
@@ -1231,6 +1313,8 @@ class SimuHomeTD:
             enum_items = self._device_enum_items(cluster_name, attribute_name, siblings or {})
             for item in enum_items:
                 g.add((schema, JS.enum, _literal(item["value"])))
+            # The scale among those values, where the attribute has one.
+            _add_order(g, schema, ordered_values(cluster_name, attribute_name, enum_items))
             sentences.append(self._enum_description(cluster_name, attribute_name,
                                                     enum_items) or "")
         else:
@@ -1241,6 +1325,13 @@ class SimuHomeTD:
                 g.add((schema, JS.enum, _literal(item["value"])))
             if mode_items:
                 sentences.append(self._mode_description(mode_items))
+        # A plain number whose direction the spec fixes (a covering's percent
+        # closed), stated so a planner does not guess which end is "closed".
+        sentences.append(SCALE_MEANINGS.get((cluster_name, attribute_name), ""))
+        # A TV's channel: the channels THIS device lists, by name and number,
+        # so "tune to MBC" can be planned without reading ChannelList first.
+        sentences.append(self._channel_description(cluster_name, attribute_name,
+                                                   siblings or {}))
 
         self._add_limits(g, schema, cluster_name, attribute_name, siblings or {})
 
@@ -1250,11 +1341,17 @@ class SimuHomeTD:
         return schema
 
     def _room_state_properties(self, g: Graph, room_id: str,
-                               state: Dict[str, Any], foi: URIRef) -> None:
-        """The four environmental variables, as properties of the room.
+                               state: Dict[str, Any], foi: URIRef,
+                               readable: bool = True) -> None:
+        """The environmental variables of `state`, as properties of the room.
 
         Only their shape is described here; the values are read through each
-        property's form, since they change on every simulator tick.
+        property's form, since they change on every simulator tick. Only the keys of
+        `state` are read, never its values.
+
+        `readable=False` declares the variables without making them observable:
+        `td:isObservable false` and no read form, as HASP does for a variable no device
+        observes. HomeBench uses it, as it has no room values to serve.
         """
         for token in sorted(state):
             row = self.m.room_state_property(token) or {}
@@ -1273,7 +1370,7 @@ class SimuHomeTD:
                 g.add((prop, RDF.type, prop_class))
             g.add((prop, TD.name, Literal(name)))
             g.add((prop, TD.title, Literal(name)))
-            g.add((prop, TD.isObservable, Literal(True, datatype=XSD.boolean)))
+            g.add((prop, TD.isObservable, Literal(readable, datatype=XSD.boolean)))
             # `ssn:isPropertyOf` is the correct link: this property belongs to
             # the environment. (`sosa:isObservedBy` would name the SENSOR that
             # observes it, not the feature of interest -- pointing it back at
@@ -1295,6 +1392,9 @@ class SimuHomeTD:
             # divided, and `qudt:unit` names the unit the value is in.
             g.add((prop, TD.hasOutputSchema, schema))
 
+            # A declared-only variable has nothing to read, so it gets no form.
+            if not readable:
+                continue
             form = BNode()
             g.add((prop, TD.hasForm, form))
             g.add((form, HTV.methodName, Literal("GET")))

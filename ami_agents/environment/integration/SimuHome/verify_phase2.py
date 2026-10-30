@@ -22,7 +22,8 @@ import argparse
 import sys
 from typing import Dict, List, Set
 
-from rdflib import Graph, Namespace, RDF, URIRef
+from rdflib import Graph, RDF, URIRef
+from rdflib.namespace import OWL
 
 try:
     from .classify import classify_device
@@ -31,14 +32,13 @@ except ImportError:  # pragma: no cover
     from classify import classify_device  # type: ignore
     from sim_client import SimuHomeClient  # type: ignore
 
-HMAS = Namespace("https://purl.org/hmas/")
-TD = Namespace("https://www.w3.org/2019/wot/td#")
-HCTL = Namespace("https://www.w3.org/2019/wot/hypermedia#")
-SOSA = Namespace("http://www.w3.org/ns/sosa/")
-SSN = Namespace("http://www.w3.org/ns/ssn/")
-# All SHTD vocabulary lives in one ontology (homeont.ttl).
-HOME = Namespace("http://example.org/homeont/")
-JS = Namespace("https://www.w3.org/2019/wot/json-schema#")
+# Every vocabulary IRI comes from the adapter's one namespace module.
+try:
+    from .shtd_namespaces import (HCTL, HMAS, HOMEONT, JS, SOSA, SSN, TD)
+except ImportError:  # pragma: no cover - direct script use
+    from shtd_namespaces import (HCTL, HMAS, HOMEONT, JS, SOSA, SSN, TD)  # type: ignore
+# The scripts' short name for homeont.
+HOME = HOMEONT
 
 PASS, FAIL = "PASS", "FAIL"
 _results: List[tuple] = []
@@ -89,6 +89,8 @@ def crawl(base: str) -> Dict[str, object]:
 
 
 def main() -> int:
+    """Crawl a live SHTD and check it against the simulator; 0 when every
+    check passes, 1 otherwise."""
     parser = argparse.ArgumentParser(description="Verify SHTD phase 2.")
     parser.add_argument("--shtd", default="http://127.0.0.1:8097")
     parser.add_argument("--sim", default="http://127.0.0.1:44275/api")
@@ -381,7 +383,6 @@ def main() -> int:
     else:
         onto = Graph()
         onto.parse(str(onto_path), format="turtle")
-        OWL = Namespace("http://www.w3.org/2002/07/owl#")
         defined = {
             str(s) for kind in (OWL.Class, OWL.DatatypeProperty, OWL.ObjectProperty)
             for s in onto.subjects(RDF.type, kind)

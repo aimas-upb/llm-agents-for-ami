@@ -51,6 +51,33 @@ class TestChangeClamped:
             self.op(["on"], {"amount": 1, "mode": "add"})
 
 
+class TestStepInOrder:
+    """`step_in_order`: a value moved along an ordered scale, stopping at its ends."""
+
+    op = staticmethod(COMPUTE_OPS["step_in_order"])
+    ORDER = ["low", "medium", "high"]
+
+    def test_up_and_down_by_steps(self):
+        """One step up from low is medium; two down from high is low."""
+        assert self.op(["low"], {"order": self.ORDER, "steps": 1}) == "medium"
+        assert self.op(["high"], {"order": self.ORDER, "steps": -2}) == "low"
+
+    def test_the_ends_stop_the_change(self):
+        """Up from high stays high; three down from medium is low."""
+        assert self.op(["high"], {"order": self.ORDER, "steps": 1}) == "high"
+        assert self.op(["medium"], {"order": self.ORDER, "steps": -3}) == "low"
+
+    def test_a_read_value_is_unwrapped(self):
+        """The `PropertyValue` a read node stores, and an integer scale (Matter)."""
+        assert self.op([PropertyValue(success=True, value=1)],
+                       {"order": [0, 1, 2, 3], "steps": 2}) == 3
+
+    def test_a_value_off_the_scale_raises(self):
+        """`auto` has no position: the node fails instead of guessing one."""
+        with pytest.raises(ValueError, match="not on the scale"):
+            self.op(["auto"], {"order": self.ORDER, "steps": 1})
+
+
 class TestIR:
     def test_the_tree_validates(self):
         tree = {"type": "sequence", "name": "all", "children": [
@@ -109,3 +136,25 @@ class TestExecution:
         result = IRExecutor(max_ticks=50).execute_from_spec(tree)
         assert result.success is True
         assert posted == {"http://h/b/actions/level": {"value": 15}}
+
+    def test_a_level_step_is_read_stepped_and_set(self, client_cls):
+        """The tree `modify_tree` builds for "fan speed down by 2 levels": high is read,
+        low is set; an `auto` reading fails the tree and sets nothing."""
+        from ami_agents.agents.interaction_solver.utils.modify_goal_plan import (
+            ModifyRecipe, modify_tree,
+        )
+        recipe = ModifyRecipe(device="fan", action="speed",
+                              action_url="http://h/fan/actions/speed", parameter="value",
+                              property_url="http://h/fan/properties/speed", amount=-2,
+                              mode="add", order=["low", "medium", "high"])
+        # 1. On the scale: stepped and set.
+        client, posted = _fake_device({"http://h/fan/properties/speed": "high"})
+        client_cls.return_value = client
+        result = IRExecutor(max_ticks=50).execute_from_spec(modify_tree(recipe))
+        assert result.success is True
+        assert posted == {"http://h/fan/actions/speed": {"value": "low"}}
+        # 2. Off the scale (changed since planning): the tree fails, nothing is sent.
+        client, posted = _fake_device({"http://h/fan/properties/speed": "auto"})
+        client_cls.return_value = client
+        result = IRExecutor(max_ticks=50).execute_from_spec(modify_tree(recipe))
+        assert result.success is False and posted == {}

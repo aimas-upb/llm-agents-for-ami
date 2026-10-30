@@ -1,12 +1,14 @@
-"""A goal's stated clock times against its relative timing, and "finish
-together" goals (`completes_with`) against their run lengths."""
+"""A goal's stated clock times against its relative timing, "finish
+together" goals (`completes_with`) against their run lengths, and a trigger
+against the clock-timed start of its own device."""
 
 from datetime import datetime
 
 import pytest
 
 from ami_agents.agents.interaction_solver.utils.goal_profile import build_checklist
-from ami_agents.agents.interaction_solver.utils.time_consistency import check, check_completion
+from ami_agents.agents.interaction_solver.utils.time_consistency import (
+    check, check_completion, check_triggers, triggered_after_timed)
 from ami_agents.shared.models.goal_structure import GoalStructure, GoalTiming
 
 NOW = datetime(2025, 8, 23, 16, 55, 35)
@@ -162,11 +164,16 @@ class TestCompletesWith:
         (question,) = result.conflicts
         assert "11:39" in question and "11:54" in question
 
-    def test_the_run_length_unknown_is_a_question(self):
-        """A cycle's countdown is empty while the device is stopped."""
+    def test_the_run_length_unknown_is_refused_with_the_events_time(self):
+        """A cycle's countdown is empty while the device is stopped: not
+        started on a guess, and the event's time left is said."""
         result = check_completion(_dryer(), SEED_46_NOW, {"P1": 3600.0}, {"G1": None})
         (question,) = result.conflicts
+        # 1. Why it can't be done, about which device.
         assert "bathroom_laundry_dryer_1 doesn't report how long" in question
+        assert "won't start it on a guess" in question
+        # 2. When the event is, as read (10:25 + 60 minutes).
+        assert "in about 60 minutes, at 11:25 AM" in question
 
     def test_the_events_time_left_unknown_is_a_question(self):
         result = check_completion(_dryer(), SEED_46_NOW, {"P1": None}, {"G1": 3000.0})
@@ -200,3 +207,70 @@ class TestCompletesWith:
                                 "G2": {**DRYER, "timing": {"completes_with": "G1"}}})
         assert check_completion(structure, NOW, {}, {"G2": 600.0}).conflicts == []
         assert check_completion(structure, NOW, {}, {"G2": None}).conflicts
+
+
+# -- a trigger against its device's start ----------------------------------------
+
+DRYER_1 = "utility_room_laundry_dryer_1"
+WASHER_DONE = {"P1": {"predicate_subject": "device_property", "role": "trigger",
+                      "predicate_text": "washer 1 finishes", "applies_to": ["G3"]}}
+
+
+def _start_then_pause(at="6:14 PM", **pause_timing):
+    """qt4-3 seed 11's shape: switch dryer 1 on at a time, start its cycle
+    after that, pause it when washer 1 finishes (P1)."""
+    goal = {"goal_specificity": "explicit", "goal_kind": "achievement",
+            "artifact_name": DRYER_1}
+    return _structure({
+        "G1": {**goal, "intent_text": "switch dryer 1 on",
+               "timing": {"starts": "at_time", "time_text": at}},
+        "G2": {**goal, "intent_text": "start dryer 1",
+               "timing": {"starts": "after_goal", "ref_goal": "G1"}},
+        "G3": {**goal, "intent_text": "pause dryer 1",
+               "timing": {"starts": "on_trigger", **pause_timing}},
+    }, WASHER_DONE)
+
+
+class TestTriggerBeforeStart:
+    def test_the_pause_is_checked_against_the_clock_timed_goals_on_its_device(self):
+        """G1 is timed by the clock, G2 through it; P1 is the pause's trigger."""
+        assert triggered_after_timed(_start_then_pause()) == {"G3": ("P1", ["G1", "G2"])}
+
+    def test_a_goal_timed_from_the_trigger_is_not_clock_timed(self):
+        """"resume it 10 minutes later" follows the pause, so it is no start
+        the trigger could come before; with no clock-timed goal, no check."""
+        structure = _start_then_pause()
+        # 1. Every goal but the pause now follows the pause.
+        for gid in ("G1", "G2"):
+            structure.goals[gid].timing = GoalTiming.from_dict(
+                {"starts": "after_goal", "ref_goal": "G3", "offset_text": "10 minutes"})
+        # 2. Nothing left to check.
+        assert triggered_after_timed(structure) == {}
+
+    def test_the_washer_finishing_before_the_dryer_starts_is_a_question(self):
+        """16:55 with 30 minutes left: the washer finishes at 17:25, before the
+        dryer's 18:14 start, so the pause would come first."""
+        result = check_triggers(_start_then_pause(), NOW, {"P1": 30 * 60.0})
+        (question,) = result.conflicts
+        assert "pause dryer 1" in question and "5:25 PM" in question
+        assert "6:14 PM" in question and "leave" in question
+
+    def test_the_washer_finishing_after_the_start_is_noted(self):
+        result = check_triggers(_start_then_pause(), NOW, {"P1": 120 * 60.0})
+        assert not result.conflicts and "after" in result.notes[0]
+
+    def test_the_washers_time_left_unknown_is_only_noted(self):
+        result = check_triggers(_start_then_pause(), NOW, {"P1": None})
+        assert not result.conflicts and "could not check" in result.notes[0]
+
+    def test_the_profile_asks_for_the_washers_time_left(self):
+        """Without a stated time or an offset before, only this check needs it."""
+        checklist = build_checklist(_start_then_pause())
+        assert ("time_to_event", "P1") in [(c["question"], c["target"]) for c in checklist]
+
+    def test_an_event_said_with_when_is_not_doubled(self):
+        """The structurer may keep "when" in the event's words."""
+        structure = _start_then_pause()
+        structure.predicates["P1"].predicate_text = "when washer 1 finishes"
+        (question,) = check_triggers(structure, NOW, {"P1": 30 * 60.0}).conflicts
+        assert "due when washer 1 finishes" in question and "when when" not in question

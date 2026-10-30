@@ -4,7 +4,7 @@ Hardcoded simulator loop for the lab308e virtual workspace.
 
 What it does:
 - updates the clock sensor
-- computes outdoor light from real time of day
+- computes outdoor light from real time of day, or noon with --daylight
 - reads current actuator/device states from Home Assistant
 - updates the derived light sensors based on lights, blinds, blackout blinds,
   and projector/display usage
@@ -27,11 +27,14 @@ Notes:
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import datetime as dt
 import json
 import math
 import os
+from pathlib import Path
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
@@ -143,10 +146,28 @@ class Lab308eState:
 
 
 class Lab308eSimulator:
-    def __init__(self, client: httpx.AsyncClient, tick_seconds: float):
+    def __init__(self, client: httpx.AsyncClient, tick_seconds: float, *, daylight: bool = False):
+        """Create dynamics with an optional noon start, advancing at real-time speed."""
+        # Keep wall-clock mode unchanged; daylight starts anew for each process.
         self.client = client
         self.state = Lab308eState()
         self.tick_seconds = tick_seconds
+        self.daylight = daylight
+        self._daylight_start = None
+        self._daylight_monotonic = None
+
+    def now(self) -> dt.datetime:
+        """Return local wall time, or local noon plus elapsed time since the first tick."""
+        # Monotonic elapsed time keeps the simulated clock moving across midnight
+        # or host-clock adjustments without resetting it to noon on every tick.
+        if not self.daylight:
+            return dt.datetime.now().astimezone().replace(microsecond=0)
+        if self._daylight_start is None:
+            self._daylight_start = dt.datetime.now().astimezone().replace(
+                hour=12, minute=0, second=0, microsecond=0)
+            self._daylight_monotonic = time.monotonic()
+        elapsed = time.monotonic() - self._daylight_monotonic
+        return (self._daylight_start + dt.timedelta(seconds=elapsed)).replace(microsecond=0)
 
     async def _get_state(self, entity_id: str) -> Dict[str, Any]:
         response = await self.client.get(f"/api/states/{entity_id}")
@@ -302,10 +323,13 @@ class Lab308eSimulator:
         }
 
     async def tick_once(self) -> Dict[str, Any]:
+        """Update all derived HA sensors from one consistent simulated timestamp."""
+        # Read actuator state before calculating the light and climate responses.
         world = await self._read_world()
-        now = dt.datetime.now().astimezone().replace(microsecond=0)
+        now = self.now()
         targets = self._compute_targets(world, now)
 
+        # Publish the clock and every derived value before declaring startup ready.
         await self._set_entity(ENTITY["clock"], targets["clock"])
         await self._set_entity(ENTITY["external_lux"], targets["external_lux"])
         await self._set_entity(ENTITY["internal_lux"], targets["internal_lux"])
@@ -371,15 +395,24 @@ async def _periodic_trigger(queue: asyncio.Queue[str], tick_seconds: float) -> N
         await queue.put("tick")
 
 
-async def main() -> None:
+async def main(argv=None) -> None:
+    """Run event-driven dynamics, optionally starting at noon for benchmark trials."""
+    # Parse clock settings before contacting HA so --help stays entirely offline.
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--daylight", action="store_true",
+                        help="start at simulated local noon and advance at real-time speed")
+    parser.add_argument("--ready-file", type=Path,
+                        help="write the simulated timestamp after the first full sensor update")
+    args = parser.parse_args(argv)
     ha_url = _env("HA_URL")
     ha_token = _env("HA_TOKEN")
     base_url = _base_url(ha_url)
     tick_seconds = float(os.getenv("LAB308E_TICK_SECONDS", "5"))
 
+    # The harness waits for the first full update before querying the environment.
     headers = {"Authorization": f"Bearer {ha_token}", "Content-Type": "application/json"}
     async with httpx.AsyncClient(base_url=base_url, headers=headers, timeout=10.0) as client:
-        sim = Lab308eSimulator(client, tick_seconds=tick_seconds)
+        sim = Lab308eSimulator(client, tick_seconds=tick_seconds, daylight=args.daylight)
         queue: asyncio.Queue[str] = asyncio.Queue()
         listener_task = asyncio.create_task(_event_listener(ha_url, ha_token, queue))
         periodic_task = asyncio.create_task(_periodic_trigger(queue, tick_seconds))
@@ -391,6 +424,9 @@ async def main() -> None:
                 while not queue.empty():
                     reason = await queue.get()
                 targets = await sim.tick_once()
+                if args.ready_file is not None:
+                    args.ready_file.write_text(targets["clock"], encoding="utf-8")
+                    args.ready_file = None
                 print(
                     "lab308e "
                     f"reason={reason} "
@@ -405,6 +441,7 @@ async def main() -> None:
         except KeyboardInterrupt:
             print("\nStopped.")
         finally:
+            # Stop event producers even if sensor updates or readiness writes fail.
             listener_task.cancel()
             periodic_task.cancel()
             await asyncio.gather(listener_task, periodic_task, return_exceptions=True)

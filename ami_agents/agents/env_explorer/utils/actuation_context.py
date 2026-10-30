@@ -46,14 +46,17 @@ from ....shared.utils.namespaces import (
     JS,
     QUDT,
     SAREF,
+    SCHEMA,
     SSN,
     SOSA,
     TD,
     TDSOSA,
     action_types,
+    expand,
     in_namespace,
     shorten,
 )
+from ....shared.utils.vocabulary import vocabulary
 from .capability_resolution import property_branch
 
 # Fallbacks for the thresholds in `agents.yaml > env_explorer > actuation_context`.
@@ -71,8 +74,22 @@ def _title(graph: Graph, node: Any) -> Optional[str]:
 
 
 def _types_in(graph: Graph, node: Any, namespace) -> List[str]:
-    return sorted(shorten(t) for t in graph.objects(node, RDF.type)
-                  if in_namespace(t, namespace))
+    """The node's classes in `namespace`, the most specific first: in a graph
+    closed under subclass inference a CO2 reading is also typed with its
+    superclass AirQuality, and a caller taking the first class means the CO2."""
+    types = {t for t in graph.objects(node, RDF.type) if in_namespace(t, namespace)}
+    # A class is less specific when another of the node's classes is below it.
+    # The ontology says which is below which, whether or not the graph carries
+    # its axioms (a graph closed under it holds the types, not the axioms).
+    vocab = vocabulary()
+
+    def above(cls: Any) -> Set[Any]:
+        return (set(graph.transitive_objects(cls, RDFS.subClassOf))
+                | set(vocab.transitive_objects(cls, RDFS.subClassOf)))
+
+    general = {t for t in types for other in types if other != t and t in above(other)}
+    return ([shorten(t) for t in sorted(types - general, key=str)]
+            + [shorten(t) for t in sorted(general, key=str)])
 
 
 def _label(graph: Graph, cls: Any) -> Optional[str]:
@@ -219,14 +236,12 @@ def _property(graph: Graph, affordance: Any,
     without its values: they are the action's input, already listed, so the
     entry names that action (`written_by`) instead of repeating them.
     """
-    classes = [t for t in graph.objects(affordance, RDF.type)
-               if in_namespace(t, HOMEONT)]
-    cls = sorted(classes, key=str)[0] if classes else None
+    classes = _types_in(graph, affordance, HOMEONT)
     entry: Dict[str, Any] = {"title": _title(graph, affordance),
-                             "class": shorten(cls) if cls is not None else None}
+                             "class": classes[0] if classes else None}
     # Which tree the class sits in: actuatable / state / capability /
     # observable -- whether reading it is about the device or its surroundings.
-    branch = property_branch(graph, cls) if cls is not None else None
+    branch = property_branch(graph, expand(classes[0])) if classes else None
     if branch:
         entry["branch"] = branch
     if written_by:
@@ -249,6 +264,13 @@ def _property(graph: Graph, affordance: Any,
 
 def _artifact(graph: Graph, artifact: Any,
               with_properties: bool = False) -> Dict[str, Any]:
+    """One artifact as the goal context lists it: title, types, label, vendor,
+    actions and, on request, its properties with the action that writes each.
+
+    The structuring model copies classes and names from this entry, so it holds
+    only what the TD graph states about the artifact.
+    """
+    # 1. Identity: title and the types from each vocabulary.
     homeont = _types_in(graph, artifact, HOMEONT)
     entry: Dict[str, Any] = {
         "title": _title(graph, artifact),
@@ -256,15 +278,18 @@ def _artifact(graph: Graph, artifact: Any,
         "saref_types": _types_in(graph, artifact, SAREF),
         "homeont_types": homeont,
     }
+    # 2. The family's human label, from the ontology.
     if homeont:
         label = _label(graph, URIRef(HOMEONT[homeont[0].split(":", 1)[1]]))
         if label:
             entry["label"] = label
-    for key, predicate in (("manufacturer", URIRef("https://schema.org/manufacturer")),
-                           ("model", URIRef("https://schema.org/model"))):
+    # 3. Vendor metadata (schema.org, as the TD specification recommends).
+    for key, predicate in (("manufacturer", SCHEMA.manufacturer),
+                           ("model", SCHEMA.model)):
         value = graph.value(artifact, predicate)
         if value is not None:
             entry[key] = str(value)
+    # 4. The domain actions and, optionally, the properties they write.
     actions = _domain_actions(graph, artifact)
     entry["actions"] = [_action(graph, a) for a in actions]
     if with_properties:
@@ -308,12 +333,11 @@ def _environment(graph: Graph, workspace: Any) -> Optional[Dict[str, Any]]:
             # The observer's reading may be typed with a device-specific
             # subclass of the variable's class, hence `rdfs:subClassOf*`.
             for var in graph.objects(env, SSN.hasProperty):
-                classes = [t for t in graph.objects(var, RDF.type)
-                           if in_namespace(t, HOMEONT)]
+                classes = _types_in(graph, var, HOMEONT)
                 if not classes:
                     continue
-                var_class = sorted(classes, key=str)[0]
-                entry = variable(shorten(var_class), var, _title(graph, var))
+                var_class = URIRef(expand(classes[0]))
+                entry = variable(classes[0], var, _title(graph, var))
                 for artifact in graph.subjects(SOSA.observes, var):
                     for aff in _domain_properties(graph, artifact):
                         if any(var_class in set(graph.transitive_objects(t, RDFS.subClassOf))

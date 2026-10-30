@@ -25,20 +25,22 @@ from typing import Any, Dict, List, Optional
 from rdflib import Graph, URIRef
 from rdflib.namespace import RDF
 
-from ....shared.utils.namespaces import domain_types
+from ....shared.utils.namespaces import HOMEONT, SAREF, SOSA, domain_types, sparql_prefixes
 from ....shared.utils.vocabulary import vocabulary
 
 # Rendering IRIs back as CURIEs keeps the response speaking the same vocabulary
 # the request arrived in -- a caller that sent `homeont:AirTemperature` should
 # not have to recognise the expanded IRI in the reply.
 _CURIE_PREFIXES = (
-    ("homeont:", "http://example.org/homeont/"),
-    ("sosa:", "http://www.w3.org/ns/sosa/"),
-    ("saref:", "https://saref.etsi.org/core/"),
+    ("homeont:", str(HOMEONT)),
+    ("sosa:", str(SOSA)),
+    ("saref:", str(SAREF)),
 )
 
 
 def curie(uri: Any) -> str:
+    """The IRI as a CURIE when it is a homeont, SOSA or SAREF term; otherwise
+    the IRI unchanged, so an unexpected term stays visibly unexpected."""
     text = str(uri)
     for prefix, namespace in _CURIE_PREFIXES:
         if text.startswith(namespace):
@@ -46,15 +48,9 @@ def curie(uri: Any) -> str:
     return text
 
 
-SPARQL_PREFIXES = """
-PREFIX td:      <https://www.w3.org/2019/wot/td#>
-PREFIX hctl:    <https://www.w3.org/2019/wot/hypermedia#>
-PREFIX hmas:    <https://purl.org/hmas/>
-PREFIX homeont: <http://example.org/homeont/>
-PREFIX saref:   <https://saref.etsi.org/core/>
-PREFIX schema:  <https://schema.org/>
-PREFIX rdfs:    <http://www.w3.org/2000/01/rdf-schema#>
-"""
+# The prefixes every state and capability query starts from.
+SPARQL_PREFIXES = "\n" + sparql_prefixes(
+    "td", "hctl", "hmas", "homeont", "saref", "schema", "rdfs")
 
 
 class StateOutcome(str, Enum):
@@ -341,8 +337,42 @@ def resolve_state_request(
     device_class: Optional[str] = None,
     device_property: Optional[Dict[str, Any]] = None,
     environment_variable: Optional[Dict[str, Any]] = None,
+    artifact_name: Optional[str] = None,
 ) -> StateResolution:
-    """Find what can answer one structured state request.
+    """Find what can answer one structured state request, narrowed to the
+    device titled `artifact_name` when the request calls one by name -- as
+    `capability_resolution.resolve_capability_request` does. A name no match
+    has is no answer: another device of the same kind never stands in."""
+    # 1. The request by its classes.
+    resolution = _resolve_state(graph, location_class, device_class,
+                                device_property, environment_variable)
+    if not artifact_name:
+        return resolution
+    # 2. Only the named device's entries, or nothing.
+    resolution.query = dict(resolution.query or {}, artifact_name=artifact_name)
+    named = [a for a in resolution.affordances if a.artifact_name == artifact_name]
+    if named:
+        resolution.affordances = named
+        resolution.property_classes = sorted(
+            {a.affordance_type for a in named if a.affordance_type})
+        # Several property types over many devices may be one on this device.
+        if resolution.outcome == StateOutcome.MISMATCHED \
+                and len(resolution.property_classes) == 1:
+            resolution.outcome = StateOutcome.RESOLVED
+        return resolution
+    return StateResolution(
+        outcome=StateOutcome.NONE, query=resolution.query,
+        detail=f"no device titled {artifact_name!r} matches: {resolution.detail}")
+
+
+def _resolve_state(
+    graph: Graph,
+    location_class: Optional[str] = None,
+    device_class: Optional[str] = None,
+    device_property: Optional[Dict[str, Any]] = None,
+    environment_variable: Optional[Dict[str, Any]] = None,
+) -> StateResolution:
+    """Find what can answer one structured state request, by its classes.
 
     Usually that is a property affordance. When the request names a device but
     no affordance reports what was asked, the device itself is the answer --

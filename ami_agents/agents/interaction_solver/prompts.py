@@ -13,13 +13,12 @@ You receive the structured goal and the device's affordances (actions with their
 
 Return ONLY one JSON object:
 {"action": "<action name>", "parameter": "value" | "<parameter name>", "property": "<property name>",
- "mode": "add" | "scale", "amount": <number>, "min": <number> | null, "max": <number> | null}
+ "amount": <number>, "min": <number> | null, "max": <number> | null}
 
 - action: the action that sets the value being changed, by its name.
 - parameter: "value" when the action's input is a single value; otherwise the name of the input parameter that takes it.
 - property: the property holding the current value of what the action changes, by its name.
-- amount: the change from the goal, keeping its sign (positive increases, negative decreases).
-- mode: "add" when the amount is added as it is (a plain amount, or a percentage of a property that is itself in percent); "scale" when it is a percentage of the current value.
+- amount: the change from the goal, keeping its sign (positive increases, negative decreases). For a value from an ordered list (its schema has an "order", for example a fan speed low, medium, high), the amount is the number of steps along that list.
 - min, max: the range the new value must stay in, from the property's or the action's schema; null if none is stated.
 
 If the device has no action and property that can make this change, return {"impossible": "<why, in one sentence>"}. Never invent a name.

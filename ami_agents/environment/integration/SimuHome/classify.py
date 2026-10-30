@@ -47,6 +47,16 @@ def _command_targets(cluster: str) -> set:
     return load_mappings().command_targets_for(cluster)
 
 
+# An attribute's value type: the approved `attribute_map` row's, else the
+# registry's. The table carries the spec's scale where the registry's plain
+# integer loses it (relative humidity in hundredths of a percent:
+# `tables.SCALED_ATTRIBUTE_TYPES`), and `report_value` scales by it.
+def _value_type(cluster: str, attribute: str, resolved: Optional[Dict[str, Any]]) -> Any:
+    from mappings import load_mappings
+    row = load_mappings().attribute(cluster, attribute) or {}
+    return (row.get("matter") or {}).get("type") or (resolved or {}).get("type")
+
+
 
 # Writable, but writing them has no present-tense effect on the world.
 NO_IMMEDIATE_EFFECT = {
@@ -154,7 +164,7 @@ def classify(cluster: str, attribute: str) -> Dict[str, Any]:
         "affordance": affordance,
         "mechanism": mechanism,
         "writable": writable,
-        "type": (resolved or {}).get("type"),
+        "type": _value_type(cluster, attribute, resolved),
         "resolved": resolved is not None,
         "cluster": cluster,
         "attribute": attribute,

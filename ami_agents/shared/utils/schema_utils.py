@@ -13,10 +13,10 @@ from rdflib import Graph, URIRef, Literal, Namespace, BNode
 from rdflib.namespace import RDF, RDFS, XSD
 import json
 
-logger = logging.getLogger(__name__)
+# JSON Schema in RDF, the TD data-schema vocabulary.
+from .namespaces import JS as JSONSCHEMA
 
-# JSON Schema namespace (commonly used in RDF representations)
-JSONSCHEMA = Namespace("https://www.w3.org/2019/wot/json-schema#")
+logger = logging.getLogger(__name__)
 
 
 class SchemaParsingError(Exception):

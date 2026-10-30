@@ -4,7 +4,13 @@ Stage 2 of the request pipeline. The segmenter has already decided this is a
 capability question; this turns the natural-language fragment into the classes
 EnvExplorer resolves against the TD graph -- a location, a device kind, a device
 property or an environment variable, a command -- plus the performative that
-says whether a yes/no or a list is wanted.
+says whether a yes/no or a list is wanted -- and, for a device the question
+calls by name, which of the home's devices has that name
+(`utils/device_names.py`).
+
+    1. the home's devices, from EnvExplorer: what a name is matched against
+    2. one LLM call -> the classes, the performative, `device_reference` and
+       `artifact_name`
 
 One behaviour per intent, per CLAUDE.md 3.2: structuring one intent is
 independent of structuring another, so several in a single utterance resolve
@@ -20,8 +26,10 @@ from spade.behaviour import OneShotBehaviour
 
 from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
+from .. import pipeline
 from ..prompts.intent_parsing_prompts import ENV_CAPABILITIES_REQUEST_PARSER_PROMPT
 from ..utils import loose_json_loads
+from ..utils.device_names import NO_DEVICES, device_slots
 from ..utils.intent_slots import BRANCH_ROOTS, clean_class, clean_nested
 from ..utils.llm_client import build_behaviour_llm_client, build_llm_call_kwargs
 from ..utils.ontology_context import get_capability_ontology_context_json
@@ -54,8 +62,14 @@ class EnvCapabilityStructuringBehaviour(OneShotBehaviour):
         self.logger.info(demo(
             f"[LLM CALL] Structuring ENV_CAPABILITIES_REQUEST: {self.intent_text[:80]!r}"
         ))
+        # 1. The home's devices, so a device called by name can be found --
+        #    or found missing. Without them the name slots are cleared.
+        devices = await pipeline.fetch_goal_context(self.agent, self.logger,
+                                                    self.intent_text)
+        # 2. The prompt, and the one call.
         prompt = ENV_CAPABILITIES_REQUEST_PARSER_PROMPT.format(
-            ontology_context=get_capability_ontology_context_json()
+            ontology_context=get_capability_ontology_context_json(),
+            home_devices=devices or NO_DEVICES,
         )
         messages = [
             {"role": "system", "content": prompt},
@@ -75,6 +89,8 @@ class EnvCapabilityStructuringBehaviour(OneShotBehaviour):
                 raise ValueError(f"expected a JSON object, got: {raw[:200]!r}")
             self.result = normalise_capability_slots(
                 parsed, self.intent_text, self.logger)
+            # 3. How the question picks out its device, and the one named.
+            self.result.update(device_slots(parsed, bool(devices)))
             self.logger.info(demo(
                 f"[ENV_CAPABILITIES_REQUEST structured]\n"
                 f"{json.dumps(self.result, indent=2)}"

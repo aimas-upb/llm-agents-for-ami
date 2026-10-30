@@ -86,19 +86,21 @@ def vocabulary() -> Graph:
 # The top of every class tree an agent chooses from. The parsers' class trees
 # (`user_assistant/utils/ontology_context.py`) are cut at these, so no class
 # above them ever reaches a structured goal; the type closure below stops at
-# them for the same reason. Plain IRIs: `namespaces` imports this module.
+# them for the same reason.
+#
+# The namespaces come from `namespaces`, the one place IRIs are spelled out.
+# Imported here, below `homeont()` and `ONTOLOGY_DIR`, because `namespaces`
+# imports those two from this module: placed at the top, the import would be
+# circular whichever module Python loads first.
+from .namespaces import HOMEONT, SAREF, SOSA  # noqa: E402
 
-_HOMEONT = "http://example.org/homeont/"
-_SAREF = "https://saref.etsi.org/core/"
-_SOSA = "http://www.w3.org/ns/sosa/"
-
-BUILDING_SPACE_ROOT = URIRef(_HOMEONT + "BuildingSpace")           # rooms
-DEVICE_ROOT = URIRef(_SAREF + "Device")                            # devices
-COMMAND_ROOT = URIRef(_SAREF + "Command")                          # what an action does
-ACTUATABLE_PROPERTY_ROOT = URIRef(_HOMEONT + "ActuatableDeviceProperty")
-STATE_PROPERTY_ROOT = URIRef(_HOMEONT + "DeviceStateProperty")
-CAPABILITY_PROPERTY_ROOT = URIRef(_HOMEONT + "DeviceCapabilityProperty")
-OBSERVABLE_PROPERTY_ROOT = URIRef(_SOSA + "ObservableProperty")    # measurements, environment
+BUILDING_SPACE_ROOT = HOMEONT.BuildingSpace                       # rooms
+DEVICE_ROOT = SAREF.Device                                        # devices
+COMMAND_ROOT = SAREF.Command                                       # what an action does
+ACTUATABLE_PROPERTY_ROOT = HOMEONT.ActuatableDeviceProperty
+STATE_PROPERTY_ROOT = HOMEONT.DeviceStateProperty
+CAPABILITY_PROPERTY_ROOT = HOMEONT.DeviceCapabilityProperty
+OBSERVABLE_PROPERTY_ROOT = SOSA.ObservableProperty                # measurements, environment
 
 CLASS_ROOTS: FrozenSet[URIRef] = frozenset({
     BUILDING_SPACE_ROOT, DEVICE_ROOT, COMMAND_ROOT,

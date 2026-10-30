@@ -29,17 +29,28 @@ from ami_agents.agents.interaction_solver.utils.specific_capability_context impo
 )
 from ami_agents.shared.models.goal_structure import GoalSpec, GoalStructure
 from ami_agents.shared.utils.vocabulary import close_types
+from ami_agents.shared.utils.namespaces import (  # noqa: E402
+    HCTL,
+    HMAS,
+    HOMEONT,
+    JS,
+    SAREF,
+    SOSA,
+    SSN,
+    TD,
+    TDSOSA,
+)
 
-PREFIXES = """
-@prefix hmas: <https://purl.org/hmas/> .
-@prefix homeont: <http://example.org/homeont/> .
-@prefix saref: <https://saref.etsi.org/core/> .
-@prefix td: <https://www.w3.org/2019/wot/td#> .
-@prefix hctl: <https://www.w3.org/2019/wot/hypermedia#> .
-@prefix js: <https://www.w3.org/2019/wot/json-schema#> .
-@prefix ssn: <http://www.w3.org/ns/ssn/> .
-@prefix sosa: <http://www.w3.org/ns/sosa/> .
-@prefix tdsosa: <https://example.org/hmas/td-sosa-ext#> .
+PREFIXES = f"""
+@prefix hmas: <{HMAS}> .
+@prefix homeont: <{HOMEONT}> .
+@prefix saref: <{SAREF}> .
+@prefix td: <{TD}> .
+@prefix hctl: <{HCTL}> .
+@prefix js: <{JS}> .
+@prefix ssn: <{SSN}> .
+@prefix sosa: <{SOSA}> .
+@prefix tdsosa: <{TDSOSA}> .
 """
 
 
@@ -198,6 +209,8 @@ class TestSelection:
 # --------------------------------------------------------------------------
 
 MODULE = "ami_agents.agents.interaction_solver.behaviours.ambiguous_goal_planning"
+# Where the property reads are made (`read_property_value`), so where HTTP is faked.
+READ_MODULE = "ami_agents.agents.interaction_solver.utils.property_read"
 
 
 def _agent(result=None, error=None):
@@ -210,10 +223,26 @@ def _agent(result=None, error=None):
     return agent
 
 
-async def _plan(graph, goal, agent):
+class _Home:
+    """The property reads, answered from ``values`` (by URL); a URL not in it
+    fails, as an unreachable device would."""
+
+    def __init__(self, values=None):
+        self.values = values or {}
+
+    def client(self, config=None):
+        def get(url):
+            ok = url in self.values
+            return SimpleNamespace(is_success=ok, body=self.values.get(url))
+        return SimpleNamespace(get=get)
+
+
+async def _plan(graph, goal, agent, values=None):
+    """Plan one goal with the TD graph and the property reads faked."""
     behaviour = AmbiguousGoalPlanningBehaviour([goal])
     behaviour.agent = agent
-    with patch(f"{MODULE}.fetch_environment_graph", AsyncMock(return_value=graph)):
+    with patch(f"{MODULE}.fetch_environment_graph", AsyncMock(return_value=graph)), \
+            patch(f"{READ_MODULE}.HTTPClient", _Home(values).client):
         await behaviour.run()
     (entry,) = behaviour.results
     return entry
@@ -251,3 +280,38 @@ class TestBehaviour:
     async def test_a_planner_failure_is_an_error_entry(self, graph):
         entry = await _plan(graph, _goal(DAMP_BATHROOM), _agent(error=RuntimeError("down")))
         assert entry["error"] == "ambiguous_planning_failed" and entry["tree"] is None
+
+
+class TestCurrentState:
+    @pytest.mark.asyncio
+    async def test_the_planner_sees_what_the_devices_are_doing_now(self, graph):
+        """Every property the context reads is read once, and goes to the
+        planner by device: a running dehumidifier is what it can switch off."""
+        agent = _agent({"tree": {"type": "action"}, "explanation": "x"})
+        # 1. The context's properties, read: the dehumidifier on, humidity 70.
+        context = build_specific_context(graph, _goal(DAMP_BATHROOM))
+        urls = {p["property"]: p["url"] for v in context.goal_context["variables"]
+                for p in v["properties"]}
+        values = {url: (True if name == "onOff" else 70) for name, url in urls.items()}
+        entry = await _plan(graph, _goal(DAMP_BATHROOM), agent, values)
+        # 2. The state the planner got, by device and property.
+        state = agent.bt_planner.generate_bt.await_args.kwargs["state"]
+        assert state["bath_dehumidifier"]["onOff"] is True
+        assert any(70 in props.values() for props in state.values())
+        # 3. The entry says what was read.
+        assert {r["url"] for r in entry["reads"]} == set(urls.values())
+
+    @pytest.mark.asyncio
+    async def test_a_failed_read_is_left_out_not_guessed(self, graph):
+        """Nothing read: no state, and every read kept with no value."""
+        agent = _agent({"tree": {"type": "action"}, "explanation": "x"})
+        entry = await _plan(graph, _goal(DAMP_BATHROOM), agent, values={})
+        assert agent.bt_planner.generate_bt.await_args.kwargs["state"] is None
+        assert entry["reads"] and all(r["value"] is None for r in entry["reads"])
+
+    def test_the_brief_asks_for_values_that_differ_from_now(self):
+        """A device already in the state an action sets changes nothing; a
+        running device pushing the other way helps once switched off."""
+        assert "Current State" in DIRECTION_INSTRUCTIONS
+        assert "already in changes nothing" in DIRECTION_INSTRUCTIONS
+        assert "switching off a running dehumidifier" in DIRECTION_INSTRUCTIONS

@@ -8,8 +8,48 @@ generator:
   table: command_targets
   matter_registry: https://github.com/project-chip/connectedhomeip.git@v1.5.1.0 (abcc720b48c5) spec 1.5.1
   episodes_scanned: 600
-  generated_at_utc: '2026-10-14T19:50:08.787995+00:00'
+  generated_at_utc: '2026-10-28T23:24:56.028465+00:00'
 rows:
+- key: '1284.0'
+  cluster: Channel
+  command: ChangeChannel
+  writes_attribute: CurrentChannel
+  attribute_type: ChannelInfoStruct
+  attribute_writable: false
+  evidence: &id001
+    why: 'ChangeChannel(Match: string) tunes to the channel of the ChannelList whose identifier, call
+      sign, name or number matches, and sets CurrentChannel to it (SimuHome channel.py::_change_channel)'
+    note: 'the Matter XML states no command->attribute relation; this link is curated. Added for the qt3/qt4
+      TV goals ("tune it to MBC"): without it CurrentChannel classifies as observable and no TV can be
+      tuned'
+  status: approved
+  _orphaned: true
+  _drift:
+    evidence:
+    - *id001
+    - why: 'ChangeChannel(Match: string) sets CurrentChannel to the ChannelList entry whose identifier,
+        call sign, name or number matches (SimuHome channel.py::_change_channel)'
+      note: the Matter XML states no command->attribute relation; this link is curated and the evidence
+        derived
+- key: '1284.2'
+  cluster: Channel
+  command: ChangeChannelByNumber
+  writes_attribute: CurrentChannel
+  attribute_type: ChannelInfoStruct
+  attribute_writable: false
+  evidence: &id002
+    why: ChangeChannelByNumber(MajorNumber, MinorNumber) sets CurrentChannel to the ChannelList entry
+      with those numbers (SimuHome channel.py::_change_channel_by_number)
+    note: the Matter XML states no command->attribute relation; this link is curated
+  status: approved
+  _orphaned: true
+  _drift:
+    evidence:
+    - *id002
+    - why: ChangeChannelByNumber(MajorNumber, MinorNumber) sets CurrentChannel to the ChannelList entry
+        with those numbers
+      note: the Matter XML states no command->attribute relation; this link is curated and the evidence
+        derived
 - key: '89.0'
   cluster: Dishwasher Mode
   command: ChangeToMode
@@ -55,6 +95,58 @@ rows:
     note: the Matter XML states no command->attribute relation; this link is curated and the evidence
       derived
   status: approved
+- key: '1286.1'
+  cluster: Media Playback
+  command: Pause
+  writes_attribute: CurrentState
+  attribute_type: PlaybackStateEnum
+  attribute_writable: false
+  evidence: &id003
+    why: no input fields; moves a playing CurrentState to Paused (1)
+    note: the Matter XML states no command->attribute relation; this link is curated
+  status: approved
+  _orphaned: true
+  _drift:
+    evidence:
+    - *id003
+    - why: no input fields; moves a playing CurrentState to Paused (1)
+      note: the Matter XML states no command->attribute relation; this link is curated and the evidence
+        derived
+- key: '1286.0'
+  cluster: Media Playback
+  command: Play
+  writes_attribute: CurrentState
+  attribute_type: PlaybackStateEnum
+  attribute_writable: false
+  evidence: &id004
+    why: no input fields; moves CurrentState to Playing (0)
+    note: 'the Matter XML states no command->attribute relation; this link is curated. Added for the TV
+      goals ("start playing"): without it CurrentState classifies as observable'
+  status: approved
+  _orphaned: true
+  _drift:
+    evidence:
+    - *id004
+    - why: no input fields; moves CurrentState to Playing (0)
+      note: the Matter XML states no command->attribute relation; this link is curated and the evidence
+        derived
+- key: '1286.2'
+  cluster: Media Playback
+  command: Stop
+  writes_attribute: CurrentState
+  attribute_type: PlaybackStateEnum
+  attribute_writable: false
+  evidence: &id005
+    why: no input fields; moves CurrentState to NotPlaying (2)
+    note: the Matter XML states no command->attribute relation; this link is curated
+  status: approved
+  _orphaned: true
+  _drift:
+    evidence:
+    - *id005
+    - why: no input fields; moves CurrentState to NotPlaying (2)
+      note: the Matter XML states no command->attribute relation; this link is curated and the evidence
+        derived
 - key: '6.0'
   cluster: On/Off
   command: 'Off'

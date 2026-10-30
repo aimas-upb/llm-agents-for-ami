@@ -3,7 +3,13 @@
 Stage 2 of the request pipeline. The segmenter has already decided this is a
 state request; this turns the natural-language fragment into the classes a
 SPARQL query over the TD graph is built from -- a location, a device kind, and
-either a device property or an environment variable.
+either a device property or an environment variable -- and, for a device the
+request calls by name, which of the home's devices has that name
+(`utils/device_names.py`).
+
+    1. the home's devices, from EnvExplorer (the goal context, unscoped by
+       flags): what a name in the request is matched against
+    2. one LLM call -> the classes, `device_reference` and `artifact_name`
 
 One behaviour per intent, per CLAUDE.md 3.2: structuring one intent is
 independent of structuring another, so several in a single utterance resolve
@@ -19,9 +25,11 @@ from spade.behaviour import OneShotBehaviour
 
 from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
+from .. import pipeline
 from ..prompts.intent_parsing_prompts import ENV_STATE_REQUEST_PARSER_PROMPT
 from ..utils import loose_json_loads
 from ..utils.llm_client import build_behaviour_llm_client, build_llm_call_kwargs
+from ..utils.device_names import NO_DEVICES, device_slots
 from ..utils.intent_slots import BRANCH_ROOTS, clean_class, clean_nested
 from ..utils.ontology_context import get_ontology_context_json
 
@@ -36,13 +44,24 @@ class EnvStateStructuringBehaviour(OneShotBehaviour):
         # Populated by ``run`` -- a structured dict, or {} with ``error`` set.
         self.result: Dict[str, Any] = {}
         self.error: Optional[str] = None
+        # Whether the home's devices were had: without them a device called by
+        # name cannot be found, and the name slots are cleared.
+        self._devices_known = False
 
     async def run(self) -> None:
         self.logger.info(demo(
             f"[LLM CALL] Structuring ENV_STATE_REQUEST: {self.intent_text[:80]!r}"
         ))
+        # 1. The home's devices, so a device called by name can be found --
+        #    or found missing. Without them the request is still parsed; the
+        #    name slots are then cleared (`device_slots`).
+        devices = await pipeline.fetch_goal_context(self.agent, self.logger,
+                                                    self.intent_text)
+        self._devices_known = bool(devices)
+        # 2. The prompt, and the one call.
         prompt = ENV_STATE_REQUEST_PARSER_PROMPT.format(
-            ontology_context=get_ontology_context_json()
+            ontology_context=get_ontology_context_json(),
+            home_devices=devices or NO_DEVICES,
         )
         messages = [
             {"role": "system", "content": prompt},
@@ -83,6 +102,7 @@ class EnvStateStructuringBehaviour(OneShotBehaviour):
             "text_intent": str(parsed.get("text_intent") or self.intent_text),
             "location_class": clean_class(parsed.get("location_class")),
             "device_class": clean_class(parsed.get("device_class")),
+            **device_slots(parsed, getattr(self, "_devices_known", False)),
             "device_property": clean_nested(
                 parsed.get("device_property"), "parent_class"),
             "environment_variable": clean_nested(

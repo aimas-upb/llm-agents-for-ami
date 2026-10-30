@@ -54,7 +54,8 @@ environment variables. Every YAML value can read an environment variable with th
 | Variable | Used by | Description |
 |---|---|---|
 | `HA_URL`, `HA_TOKEN`, `AREAS`, `BASE_WS_URI` | HASP | Home Assistant WebSocket URL and token, areas to map, public base URI |
-| `SEMANTIC_CONFIG`, `TD_SOSA_SETTLING_TIMES` | HASP | Semantic mapping file; per-device settling times (JSON) |
+| `SEMANTIC_CONFIG` | HASP | The home config whose `semantic:` block HASP types its TDs with (room, per-device overrides, effects, comfort ranges) |
+| `TD_SOSA_SETTLING_TIMES` | plan executor (`ir_executor.py`) | Optional per-action settling times (JSON); HASP no longer reads it |
 | `SIMULATOR_API_BASE_URL`, `SHTD_HOME`, `SHTD_BASE_URL` | SHTD | Same as `--sim`, `--home`, and the public base URL |
 | `SHTD_AMBIENT_SENSORS` | SHTD | `0` turns the virtual ambient sensors off |
 

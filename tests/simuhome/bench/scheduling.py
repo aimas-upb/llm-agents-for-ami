@@ -316,7 +316,7 @@ class DryRunHome:
     def write(self, action_url: str, parameters: Dict[str, Any]) -> None:
         """Apply one of our actions: the properties it acts upon take the value
         sent; an operational-state change moves the cycle."""
-        value = (parameters or {}).get("value")
+        value = action_value(parameters)
         cycle = self.cycle_of(action_url)
         for url in self.acted_upon(action_url):
             if cycle is not None and url == cycle.state_url:
@@ -345,6 +345,17 @@ class DryRunHome:
 
 def _number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def action_value(parameters: Optional[Dict[str, Any]]) -> Any:
+    """The value an action carries: its ``value`` parameter, or -- for an
+    action whose input is an object schema (a TV's channel: MajorNumber,
+    MinorNumber) -- the named parameters themselves, as SHTD reads a request
+    body (`shtd._action_value`). None when there are no parameters."""
+    parameters = parameters or {}
+    if "value" in parameters:
+        return parameters["value"]
+    return parameters or None
 
 
 def _int(value: Any) -> Optional[int]:
@@ -442,7 +453,7 @@ class SimSync:
         steps = []
         for action in group:
             action.how = "scheduled"
-            body = {"value": action.parameters.get("value"),
+            body = {"value": action_value(action.parameters),
                     **({"current": {"operational_state": action.current_state}}
                        if action.current_state is not None else {})}
             try:

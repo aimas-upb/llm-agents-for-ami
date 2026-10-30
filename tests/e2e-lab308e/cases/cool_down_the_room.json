@@ -31,7 +31,7 @@
   ],
   "query": "cool down the room",
   "semantic_expectations": {
-    "target_properties": ["thermal_comfort"],
+    "target_properties": ["air_temperature"],
     "preferred_artifacts": ["air_conditioner_308e", "ceiling_fan_308e", "window_308e_cover"],
     "acceptable_artifacts": ["air_conditioner_308e", "ceiling_fan_308e", "window_308e_cover", "heater_308e"],
     "forbidden_artifacts": ["projector_308e", "display_wall_308e"],

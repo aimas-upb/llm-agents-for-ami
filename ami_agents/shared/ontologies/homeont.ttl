@@ -243,6 +243,16 @@ an attribute as type "list" and puts the element type in a child <entry>, so
 	rdfs:domain js:ArraySchema ;
 	rdfs:range xsd:string .
 
+:orderedValues a owl:ObjectProperty ;
+	rdfs:label "ordered values"@en ;
+	rdfs:comment """The values of an enum that form a scale, lowest first, as an
+rdf:List -- a fan speed low, medium, high. A request to change such a value "by one
+level" moves one place along the list. A value of the enum outside the list (an
+automatic mode) has no position on the scale. The js:enum values are a set, so the
+order is stated here and nowhere else."""@en ;
+	rdfs:domain js:DataSchema ;
+	rdfs:range rdf:List .
+
 
 # NOTE -- units are carried by `qudt:unit` alone.
 #
@@ -466,12 +476,20 @@ an attribute as type "list" and puts the element type in a child <entry>, so
 	qudt:hasQuantityKind quantitykind:Illuminance ;
 	qudt:unit unit:LUX .
 
+:AirQuality a owl:Class ;
+	rdfs:label "Air Quality"@en ;
+	skos:altLabel "air quality"@en ;
+	skos:altLabel "how fresh the air is"@en ;
+	rdfs:comment """How clean the air of a space is, as whichever of its measures the space has: particulate matter (PM10), carbon dioxide, for example. A request about "the air quality" means these, not one of them; it is answered with what the room measures."""@en ;
+	rdfs:subClassOf sosa:ObservableProperty ;
+	ssn:isPropertyOf :Environment .
+
 :Pm10MassConcentration a owl:Class ;
 	rdfs:label "PM10 Mass Concentration"@en ;
 	rdfs:comment """Particulate matter up to 10 micrometres, as a mass
 concentration. quantitykind:MassConcentration is the closest QUDT quantity kind;
 it does not encode the particle-size cut-off, which is carried by this class."""@en ;
-	rdfs:subClassOf sosa:ObservableProperty ;
+	rdfs:subClassOf sosa:ObservableProperty , :AirQuality ;
 	ssn:isPropertyOf :Environment ;
 	qudt:hasQuantityKind quantitykind:MassConcentration ;
 	qudt:unit unit:MicroGM-PER-M3 .
@@ -577,6 +595,19 @@ Like SetOnOffCommand, one action stands for several commands: invoked with
 Running it is a StartCommand (or a resume, from Paused), with Paused a
 PauseCommand, with Stopped a StopCommand. It specialises the three SAREF
 lifecycle commands rather than falling back to a bare saref:Command."""@en ;
+    rdfs:subClassOf saref:StartCommand, saref:PauseCommand, saref:StopCommand .
+
+:SetPlaybackStateCommand a owl:Class ;
+    rdfs:label "Set Playback State Command"@en ;
+    rdfs:comment """Plays, pauses or stops what a media device is playing -- a TV,
+a speaker -- by the playback state it is to reach.
+
+Like SetOperationalStateCommand, one action stands for several commands: invoked
+with Playing it is a play (a StartCommand), with Paused a PauseCommand, with Not
+Playing a StopCommand. It is a class of its own, not that one, because an
+appliance's cycle carries rules media playback does not: settings that must not
+change while the cycle runs, and a cycle that cannot be paused before it has
+started."""@en ;
     rdfs:subClassOf saref:StartCommand, saref:PauseCommand, saref:StopCommand .
 
 ################################################################################
@@ -911,6 +942,16 @@ lifecycle commands rather than falling back to a bare saref:Command."""@en ;
     rdfs:comment """The level the device adopts after a power interruption, on a tv."""@en ;
     rdfs:subClassOf :LevelControlStartUpCurrentLevel .
 
+:TvCurrentChannel a owl:Class ;
+    rdfs:label "Tv Current Channel"@en ;
+    rdfs:comment """The channel the tv is tuned to, one of the channels it lists."""@en ;
+    rdfs:subClassOf :ChannelCurrentChannel .
+
+:TvPlaybackState a owl:Class ;
+    rdfs:label "Tv Playback State"@en ;
+    rdfs:comment """Whether the tv is playing, paused or not playing."""@en ;
+    rdfs:subClassOf :MediaPlaybackCurrentState .
+
 :LaundryDryerSelectedDrynessLevel a owl:Class ;
     rdfs:label "Laundry Dryer Selected Dryness Level"@en ;
     rdfs:comment """How dry the dryer should leave the load, on a laundry dryer."""@en ;
@@ -1176,8 +1217,8 @@ lifecycle commands rather than falling back to a bare saref:Command."""@en ;
 
 :ChannelCurrentChannel a owl:Class ;
     rdfs:label "Channel Current Channel"@en ;
-    rdfs:comment """The channel current channel reported by the device."""@en ;
-    rdfs:subClassOf :DeviceStateProperty .
+    rdfs:comment """The channel a TV is tuned to, one of the channels it lists. Changed by tuning to a channel by its name or number (Matter ChangeChannel, ChangeChannelByNumber)."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
 
 :DeviceEnergyManagementESACanGenerate a owl:Class ;
     rdfs:label "Device Energy Management ESA Can Generate"@en ;
@@ -1251,8 +1292,8 @@ lifecycle commands rather than falling back to a bare saref:Command."""@en ;
 
 :MediaPlaybackCurrentState a owl:Class ;
     rdfs:label "Media Playback Current State"@en ;
-    rdfs:comment """The media playback current state reported by the device."""@en ;
-    rdfs:subClassOf :DeviceStateProperty .
+    rdfs:comment """Whether a media device is playing, paused or not playing. Driven by Play, Pause and Stop."""@en ;
+    rdfs:subClassOf :ActuatableDeviceProperty .
 
 :OnOffGlobalSceneControl a owl:Class ;
     rdfs:label "On/Off Global Scene Control"@en ;
@@ -1542,9 +1583,11 @@ lifecycle commands rather than falling back to a bare saref:Command."""@en ;
 
 :CarbonDioxideConcentration a owl:Class ;
 	rdfs:label "CO2 Concentration"@en ;
-	rdfs:comment "How much carbon dioxide the air of a space holds, in parts per million. Rises with the number of people in the room and falls with ventilation; the usual measure of how stuffy a room is."@en ;
-	rdfs:subClassOf sosa:ObservableProperty ;
+	rdfs:comment """How much carbon dioxide the air of a space holds, in parts per million. Rises with the number of people in the room and falls with ventilation; the usual measure of how stuffy a room is.
+Measured as quantitykind:MoleFraction: a ppm reading of a gas in air is the share of the air's molecules that are CO2, and MoleFraction is the most specific of the quantity kinds QUDT gives unit:PPM."""@en ;
+	rdfs:subClassOf sosa:ObservableProperty , :AirQuality ;
 	ssn:isPropertyOf :Environment ;
+	qudt:hasQuantityKind quantitykind:MoleFraction ;
 	qudt:unit unit:PPM .
 
 :Occupancy a owl:Class ;
@@ -1555,16 +1598,20 @@ lifecycle commands rather than falling back to a bare saref:Command."""@en ;
 
 :OccupantCount a owl:Class ;
 	rdfs:label "Occupant Count"@en ;
-	rdfs:comment "How many people are present in a space."@en ;
+	rdfs:comment """How many people are present in a space.
+Measured as quantitykind:Count, the quantity kind QUDT gives unit:NUM for a number of things."""@en ;
 	rdfs:subClassOf sosa:ObservableProperty ;
 	ssn:isPropertyOf :Environment ;
+	qudt:hasQuantityKind quantitykind:Count ;
 	qudt:unit unit:NUM .
 
 :Glare a owl:Class ;
 	rdfs:label "Glare"@en ;
-	rdfs:comment "How much uncomfortably bright light falls on the working surfaces or screens of a space, as a percentage. Direct sunlight raises it; closing blinds lowers it."@en ;
+	rdfs:comment """How much uncomfortably bright light falls on the working surfaces or screens of a space, as a percentage. Direct sunlight raises it; closing blinds lowers it.
+Measured as quantitykind:DimensionlessRatio: QUDT has no glare-specific quantity kind, and a share expressed in unit:PERCENT is a dimensionless ratio."""@en ;
 	rdfs:subClassOf sosa:ObservableProperty ;
 	ssn:isPropertyOf :Environment ;
+	qudt:hasQuantityKind quantitykind:DimensionlessRatio ;
 	qudt:unit unit:PERCENT .
 
 # -- Devices --------------------------------------------------------------------
@@ -1632,3 +1679,138 @@ lifecycle commands rather than falling back to a bare saref:Command."""@en ;
 	rdfs:subClassOf :TemperatureSetpoint ;
 	qudt:hasQuantityKind quantitykind:ThermodynamicTemperature ;
 	qudt:unit unit:DEG_C .
+
+################################################################################
+# 10. HomeBench deployments
+#
+# Classes a HomeBench home needs and neither the SimuHome corpus nor the Home
+# Assistant lab did: six device families, the commands and properties that go
+# with them. Additions only: nothing above is changed, and each class sits under
+# an existing root, so the parsers, the resolvers and every other TD are
+# unaffected. Curtain and Blinds are told apart on purpose: a request about
+# "the curtains" in a room that has only blinds must not resolve to the blinds.
+# They stay discoverable under the generic WindowCoveringController.
+################################################################################
+
+# -- Devices ---------------------------------------------------------------------
+
+:Curtain a owl:Class ;
+	rdfs:label "Curtain"@en ;
+	skos:altLabel "curtains"@en ;
+	skos:altLabel "drapes"@en ;
+	rdfs:comment "A window covering of fabric that is drawn open or closed, and in some homes to a degree."@en ;
+	rdfs:subClassOf :WindowCoveringController .
+
+:Blinds a owl:Class ;
+	rdfs:label "Blinds"@en ;
+	skos:altLabel "blind"@en ;
+	skos:altLabel "venetian blinds"@en ;
+	rdfs:comment "A window covering of slats that is opened or closed as a whole. Not a curtain."@en ;
+	rdfs:subClassOf :WindowCoveringController .
+
+:Aromatherapy a owl:Class ;
+	rdfs:label "Aromatherapy"@en ;
+	skos:altLabel "aroma diffuser"@en ;
+	skos:altLabel "essential oil diffuser"@en ;
+	skos:altLabel "diffuser"@en ;
+	rdfs:comment "A diffuser that releases scent into a space at a set intensity and interval."@en ;
+	rdfs:subClassOf saref:Appliance .
+
+:GarageDoor a owl:Class ;
+	rdfs:label "Garage Door"@en ;
+	skos:altLabel "garage door opener"@en ;
+	rdfs:comment "A motorised door of a garage that is opened or closed."@en ;
+	rdfs:subClassOf saref:Actuator .
+
+:WaterHeater a owl:Class ;
+	rdfs:label "Water Heater"@en ;
+	skos:altLabel "hot water heater"@en ;
+	skos:altLabel "boiler"@en ;
+	rdfs:comment "An appliance that heats water to a target temperature, in a heating or an eco mode."@en ;
+	rdfs:subClassOf saref:Appliance .
+
+:Trash a owl:Class ;
+	rdfs:label "Trash"@en ;
+	skos:altLabel "trash can"@en ;
+	skos:altLabel "trash bin"@en ;
+	skos:altLabel "garbage can"@en ;
+	skos:altLabel "waste bin"@en ;
+	rdfs:comment "A smart bin that reports how full it is and can pack (seal and empty) its bag."@en ;
+	rdfs:subClassOf saref:Appliance .
+
+# -- Commands ---------------------------------------------------------------------
+
+:SetOpenCloseCommand a owl:Class ;
+	rdfs:label "Set Open/Close Command"@en ;
+	rdfs:comment """Opens or closes a covering or a door, by the position it is to reach.
+
+Like SetOnOffCommand, one action stands for two SAREF commands, each of which
+fixes the position it writes: invoked with open it is an OpenCommand, with
+closed a CloseCommand."""@en ;
+	rdfs:subClassOf saref:OpenCommand, saref:CloseCommand .
+
+:PackCommand a owl:Class ;
+	rdfs:label "Pack Command"@en ;
+	rdfs:comment "Packs a trash can: seals its bag and leaves it empty. Takes no input."@en ;
+	rdfs:subClassOf saref:Command .
+
+:SetColorCommand a owl:Class ;
+	rdfs:label "Set Color Command"@en ;
+	rdfs:comment "Sets the colour of the light a lamp emits, to a red, green, blue triple."@en ;
+	rdfs:subClassOf saref:Command .
+
+# -- Actuatable properties --------------------------------------------------------
+
+:OpenCloseState a owl:Class ;
+	rdfs:label "Open/Close State"@en ;
+	rdfs:comment "Whether a covering or a door is open or closed."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty, saref:OpenCloseState .
+
+:TrashFillState a owl:Class ;
+	rdfs:label "Trash Fill State"@en ;
+	rdfs:comment "How full a trash can is: empty, not full or full. Packing it leaves it empty."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty .
+
+:DeviceMode a owl:Class ;
+	rdfs:label "Device Mode"@en ;
+	rdfs:comment "The operating mode of a device, chosen from the named modes it offers (for example auto or sleep on a purifier, eco on a water heater)."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty .
+
+:SwingMode a owl:Class ;
+	rdfs:label "Swing Mode"@en ;
+	rdfs:comment "Where a fan or an air conditioner directs its airflow: auto, up, middle or down."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty .
+
+:OutputIntensity a owl:Class ;
+	rdfs:label "Output Intensity"@en ;
+	rdfs:comment "How strongly a humidifier, dehumidifier or diffuser works, as a level from its minimum to its maximum."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty .
+
+:OperatingInterval a owl:Class ;
+	rdfs:label "Operating Interval"@en ;
+	rdfs:comment "The interval between two emissions of a diffuser."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty .
+
+:CleaningArea a owl:Class ;
+	rdfs:label "Cleaning Area"@en ;
+	rdfs:comment "The room a robot vacuum is told to clean, chosen from the rooms of the home."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty .
+
+# -- Readings of a device ------------------------------------------------------------
+
+:BatteryLevel a owl:Class ;
+	rdfs:label "Battery Level"@en ;
+	rdfs:comment "How much charge a battery-powered device has left, as a percentage."@en ;
+	qudt:unit unit:PERCENT ;
+	rdfs:subClassOf sosa:ObservableProperty .
+
+:WaterTankLevel a owl:Class ;
+	rdfs:label "Water Tank Level"@en ;
+	rdfs:comment "How full the water tank of a humidifier or dehumidifier is, as a percentage."@en ;
+	qudt:unit unit:PERCENT ;
+	rdfs:subClassOf sosa:ObservableProperty .
+
+:VacuumState a owl:Class ;
+	rdfs:label "Vacuum State"@en ;
+	rdfs:comment "The operating state of a robot vacuum, for example cleaning, paused or charging. Its start, pause, stop and charge commands change it."@en ;
+	rdfs:subClassOf :DeviceStateProperty .

@@ -10,20 +10,24 @@ from rdflib import Graph, Literal, Namespace, RDF, URIRef
 try:
     from .hasp_utils import HomeAssistantRDF, state_property_names
     from . import hasp_semantics
+    from .hasp_namespaces import HCTL, HMAS, SCHEMA, SOSA, SSN, TD, TDSOSA
 except ImportError:  # pragma: no cover
     from hasp_utils import HomeAssistantRDF, state_property_names
     import hasp_semantics
+    from hasp_namespaces import HCTL, HMAS, SCHEMA, SOSA, SSN, TD, TDSOSA
 
 
-HMAS = Namespace("https://purl.org/hmas/")
-TD = Namespace("https://www.w3.org/2019/wot/td#")
-HCTL = Namespace("https://www.w3.org/2019/wot/hypermedia#")
-SOSA = Namespace("http://www.w3.org/ns/sosa/")
-TDSOSA = Namespace("https://example.org/hmas/td-sosa-ext#")
-TIME = Namespace("http://www.w3.org/2006/time#")
 
 
 ArtifactBuilder = Callable[[str, str, str, List[Dict[str, Any]], Dict[str, Dict[str, Any]], Dict[str, Any]], str]
+
+
+def _curie(uri: Any) -> str:
+    """A homeont IRI as a CURIE (`HOMEONT.Illuminance` -> `homeont:Illuminance`);
+    any other IRI as it is (matches nothing in the homeont tables)."""
+    text = str(uri)
+    homeont = str(hasp_semantics.HOMEONT)
+    return "homeont:" + text[len(homeont):] if text.startswith(homeont) else text
 
 
 def _canonical_label(label: str) -> str:
@@ -140,6 +144,9 @@ class HASPGraphCache:
         self.workspace_ttls: Dict[str, str] = {}
         self.artifacts_ttls: Dict[str, str] = {}
         self.artifact_ttls: Dict[Tuple[str, str], str] = {}
+        # (workspace, variable name) -> [(artifact, property)] that read it, a
+        # sensor first: where the room-property route takes a variable's value.
+        self.variable_readers: Dict[Tuple[str, str], List[Tuple[str, str]]] = {}
         self.full_graph: Graph = Graph(base=self.base_uri)
         self._documents_dirty = False
         self._last_rebuild_monotonic = 0.0
@@ -245,14 +252,21 @@ class HASPGraphCache:
             self._ensure_documents_unlocked()
             return self.full_graph.serialize(format=fmt)
 
+    def variable_uri(self, workspace_id: str, observable_property: str) -> str:
+        """A variable's IRI from an IRI, a name (`illuminance`) or an older
+        key (`luminosity`, mapped by `variable_aliases`)."""
+        if observable_property.startswith(("http://", "https://")):
+            return observable_property
+        name = hasp_semantics.current().variable_name(observable_property)
+        return str(hasp_semantics.variable_uri(self.base_uri, workspace_id, name))
+
     async def query_actions_affecting_observable_property(
         self, workspace_id: str, observable_property: str
     ) -> Dict[str, Any]:
-        property_uri = (
-            observable_property
-            if observable_property.startswith(("http://", "https://"))
-            else f"{self.base_uri}workspaces/{workspace_id}/environment/{urllib.parse.quote(observable_property, safe='')}"
-        )
+        """The actions of a workspace's artifacts that move one variable, with
+        their direction, and the variable's comfort range."""
+        # 1. The variable, and the two queries over the workspace's graph.
+        property_uri = self.variable_uri(workspace_id, observable_property)
         artifact_prefix = f"{self.base_uri}workspaces/{workspace_id}/artifacts/"
         action_query = f"""
         PREFIX td: <{TD}>
@@ -260,7 +274,7 @@ class HASPGraphCache:
         PREFIX sosa: <{SOSA}>
         PREFIX tdsosa: <{TDSOSA}>
 
-        SELECT DISTINCT ?artifact ?artifactTitle ?actionName ?actionTarget ?actuation ?dirType ?settlingNumeric ?settlingUnit
+        SELECT DISTINCT ?artifact ?artifactTitle ?actionName ?actionTarget ?actuation ?dirType
         WHERE {{
           ?artifact td:hasActionAffordance ?action .
           ?action td:name ?actionName ;
@@ -272,11 +286,6 @@ class HASPGraphCache:
           OPTIONAL {{
             ?actuation a ?dirType .
             FILTER(?dirType IN (tdsosa:IncreasingActuation, tdsosa:DecreasingActuation))
-          }}
-          OPTIONAL {{
-            ?actuation tdsosa:settlingTime ?settlingTime .
-            OPTIONAL {{ ?settlingTime <{TIME.numericDuration}> ?settlingNumeric . }}
-            OPTIONAL {{ ?settlingTime <{TIME.unitType}> ?settlingUnit . }}
           }}
           FILTER(STRSTARTS(STR(?artifact), "{artifact_prefix}"))
         }}
@@ -298,6 +307,7 @@ class HASPGraphCache:
             rows = list(self.full_graph.query(action_query))
             meta_rows = list(self.full_graph.query(property_meta_query))
 
+        # 2. One entry per action, with its direction when the actuation states one.
         results: List[Dict[str, Any]] = []
         for row in rows:
             direction = None
@@ -314,14 +324,9 @@ class HASPGraphCache:
                 "property_uri": property_uri,
                 "direction": direction or "",
             }
-            if row.settlingNumeric is not None:
-                try:
-                    item["settling_time_seconds"] = float(row.settlingNumeric)
-                except (TypeError, ValueError):
-                    pass
-            if row.settlingUnit is not None:
-                item["settling_time_unit"] = str(row.settlingUnit)
             results.append(item)
+
+        # 3. The variable's comfort range, when the home states one.
         target_min: Optional[float] = None
         target_max: Optional[float] = None
         target_unit = ""
@@ -352,6 +357,7 @@ class HASPGraphCache:
         self, workspace_id: str, action_url: str
     ) -> Dict[str, Any]:
         """Query TD-SOSA observable-property effects for one action target/URI."""
+        # 1. The action's effect actuations, matched by its form target or IRI.
         action_url = str(action_url or "").strip()
         artifact_prefix = f"{self.base_uri}workspaces/{workspace_id}/artifacts/"
         action_query = f"""
@@ -360,7 +366,7 @@ class HASPGraphCache:
         PREFIX sosa: <{SOSA}>
         PREFIX tdsosa: <{TDSOSA}>
 
-        SELECT DISTINCT ?artifact ?artifactTitle ?action ?actionName ?actionTarget ?actuation ?property ?dirType ?settlingNumeric ?settlingUnit
+        SELECT DISTINCT ?artifact ?artifactTitle ?action ?actionName ?actionTarget ?actuation ?property ?dirType
         WHERE {{
           ?artifact td:hasActionAffordance ?action .
           ?action td:name ?actionName ;
@@ -373,11 +379,6 @@ class HASPGraphCache:
             ?actuation a ?dirType .
             FILTER(?dirType IN (tdsosa:IncreasingActuation, tdsosa:DecreasingActuation))
           }}
-          OPTIONAL {{
-            ?actuation tdsosa:settlingTime ?settlingTime .
-            OPTIONAL {{ ?settlingTime <{TIME.numericDuration}> ?settlingNumeric . }}
-            OPTIONAL {{ ?settlingTime <{TIME.unitType}> ?settlingUnit . }}
-          }}
           FILTER(STRSTARTS(STR(?artifact), "{artifact_prefix}"))
           FILTER(STR(?actionTarget) = "{action_url}" || STR(?action) = "{action_url}")
         }}
@@ -387,6 +388,7 @@ class HASPGraphCache:
             self._ensure_documents_unlocked()
             rows = list(self.full_graph.query(action_query))
 
+        # 2. One entry per variable the action moves.
         effects: List[Dict[str, Any]] = []
         for row in rows:
             direction = ""
@@ -402,16 +404,9 @@ class HASPGraphCache:
                 "action_target": str(row.actionTarget),
                 "actuation_uri": str(row.actuation),
                 "property_uri": str(row.property),
-                "property_name": str(row.property).rstrip("/").rsplit("/", 1)[-1],
+                "property_name": str(row.property).rsplit("#", 1)[-1],
                 "direction": direction,
             }
-            if row.settlingNumeric is not None:
-                try:
-                    item["settling_time_seconds"] = float(row.settlingNumeric)
-                except (TypeError, ValueError):
-                    pass
-            if row.settlingUnit is not None:
-                item["settling_time_unit"] = str(row.settlingUnit)
             effects.append(item)
 
         return {
@@ -466,54 +461,80 @@ class HASPGraphCache:
             return [dict(ent) for ent in device_entities], state_map
 
     async def read_property(self, workspace_id: str, artifact_name: str, property_name: str) -> Any:
+        """An artifact property's current value (`read_property_unlocked`)."""
         async with self._lock:
-            _, device_entities, _, _, _ = self._resolve_artifact_unlocked(workspace_id, artifact_name)
-            decoded_property_name = urllib.parse.unquote(property_name)
-            # `<domain>State` names one entity's state (see
-            # `state_property_names`); bare `state` is the deprecated alias
-            # that reads the first entity with one.
-            state_names = state_property_names(
-                [e.get("entity_id") for e in device_entities if e.get("entity_id")])
-            named_entity = next((entity_id for entity_id, name in state_names.items()
-                                 if name == decoded_property_name), None)
-            if named_entity is not None:
-                device_entities = [e for e in device_entities
-                                   if e.get("entity_id") == named_entity]
-                decoded_property_name = "state"
-            for entity in device_entities:
-                entity_id = entity.get("entity_id")
-                entity_state = self.states_by_entity_id.get(entity_id, {})
-                entity_attrs = entity_state.get("attributes", {}) if isinstance(entity_state, dict) else {}
+            return self._read_property_unlocked(workspace_id, artifact_name, property_name)
 
-                if decoded_property_name == "metadata":
-                    metadata_attrs = {}
-                    for key, value in entity_attrs.items():
-                        if key in {
-                            "friendly_name", "icon", "entity_picture", "supported_features",
-                            "device_class", "state_class", "unit_of_measurement", "attribution",
-                            "restored", "supported_color_modes", "entity_id",
-                        }:
-                            metadata_attrs[key] = value
-                    for ts_field in ("last_changed", "last_reported", "last_updated"):
-                        if ts_field in entity_state:
-                            metadata_attrs[ts_field] = entity_state[ts_field]
-                    if metadata_attrs:
-                        return metadata_attrs
+    async def read_room_property(self, workspace_id: str, variable_name: str) -> Any:
+        """A room variable's current value: the reading of the first device
+        that observes it (a sensor before, say, a thermostat). KeyError when
+        no device observes it -- the workspace TD gives such a variable no form.
+        """
+        async with self._lock:
+            self._ensure_documents_unlocked()
+            name = hasp_semantics.current().variable_name(urllib.parse.unquote(variable_name))
+            for artifact_name, property_name in self.variable_readers.get((workspace_id, name), []):
+                try:
+                    return self._read_property_unlocked(workspace_id, artifact_name, property_name)
+                except KeyError:
+                    continue        # no value right now; the next observer may have one
+            raise KeyError(name)
 
-                if decoded_property_name == "state":
-                    state_value = entity_state.get("state")
-                    if state_value and state_value not in ("unknown", "unavailable"):
-                        entity_domain = entity_id.split(".")[0] if isinstance(entity_id, str) and "." in entity_id else ""
-                        unit = entity_attrs.get("unit_of_measurement")
-                        if (entity_domain == "sensor" or unit) and isinstance(state_value, str):
-                            try:
-                                return int(state_value) if "." not in state_value else float(state_value)
-                            except ValueError:
-                                return state_value
-                        return state_value
+    def _read_property_unlocked(self, workspace_id: str, artifact_name: str,
+                                property_name: str) -> Any:
+        """The value of one property of an artifact, from the cached HA state.
 
-                if decoded_property_name in entity_attrs and entity_attrs[decoded_property_name] is not None:
-                    return entity_attrs[decoded_property_name]
+        `<domain>State` reads one entity's state, bare `state` the first
+        entity's (deprecated alias), `metadata` the descriptive attributes,
+        anything else the attribute of that name. KeyError when there is none.
+        """
+        _, device_entities, _, _, _ = self._resolve_artifact_unlocked(workspace_id, artifact_name)
+        decoded_property_name = urllib.parse.unquote(property_name)
+        # `<domain>State` names one entity's state (see
+        # `state_property_names`); bare `state` is the deprecated alias
+        # that reads the first entity with one.
+        state_names = state_property_names(
+            [e.get("entity_id") for e in device_entities if e.get("entity_id")])
+        named_entity = next((entity_id for entity_id, name in state_names.items()
+                             if name == decoded_property_name), None)
+        if named_entity is not None:
+            device_entities = [e for e in device_entities
+                               if e.get("entity_id") == named_entity]
+            decoded_property_name = "state"
+        for entity in device_entities:
+            entity_id = entity.get("entity_id")
+            entity_state = self.states_by_entity_id.get(entity_id, {})
+            entity_attrs = entity_state.get("attributes", {}) if isinstance(entity_state, dict) else {}
+
+            if decoded_property_name == "metadata":
+                metadata_attrs = {}
+                for key, value in entity_attrs.items():
+                    if key in {
+                        "friendly_name", "icon", "entity_picture", "supported_features",
+                        "device_class", "state_class", "unit_of_measurement", "attribution",
+                        "restored", "supported_color_modes", "entity_id",
+                    }:
+                        metadata_attrs[key] = value
+                for ts_field in ("last_changed", "last_reported", "last_updated"):
+                    if ts_field in entity_state:
+                        metadata_attrs[ts_field] = entity_state[ts_field]
+                if metadata_attrs:
+                    return metadata_attrs
+
+            if decoded_property_name == "state":
+                state_value = entity_state.get("state")
+                if state_value and state_value not in ("unknown", "unavailable"):
+                    entity_domain = entity_id.split(".")[0] if isinstance(entity_id, str) and "." in entity_id else ""
+                    unit = entity_attrs.get("unit_of_measurement")
+                    if (entity_domain == "sensor" or unit) and isinstance(state_value, str):
+                        try:
+                            return int(state_value) if "." not in state_value else float(state_value)
+                        except ValueError:
+                            return state_value
+                    return state_value
+
+            if decoded_property_name in entity_attrs and entity_attrs[decoded_property_name] is not None:
+                return entity_attrs[decoded_property_name]
         raise KeyError(decoded_property_name)
 
     async def get_artifact_contexts(self, workspace_id: str, artifact_name: str) -> List[Dict[str, str]]:
@@ -613,7 +634,7 @@ class HASPGraphCache:
                     suffix = ent.get("entity_id", "")
                     object_id = suffix.split(".", 1)[1] if isinstance(suffix, str) and "." in suffix else suffix
                     label = f"{base_label} ({object_id})"
-                ent["_artifact_label"] = label
+                ent["_artifact_display_label"] = label
                 base_slug = _artifact_slug_from_entity(ent, label)
                 slug_counts[base_slug] = slug_counts.get(base_slug, 0) + 1
                 if slug_counts[base_slug] > 1:
@@ -623,6 +644,9 @@ class HASPGraphCache:
                     else:
                         base_slug = label
                 ent["_artifact_slug"] = urllib.parse.quote(base_slug, safe="")
+                # One instance name across listings, TDs, and focus contexts.
+                # Keep HA's mutable display name as separate metadata.
+                ent["_artifact_label"] = base_slug
             self.workspace_devices[workspace_id] = filtered_devices
             self.workspace_entities[workspace_id] = workspace_entities
 
@@ -637,6 +661,7 @@ class HASPGraphCache:
             object_id = ent.get("entity_id", "").split(".", 1)[-1]
             candidates = {
                 label, ent.get("_artifact_base_label", ""), ent.get("_artifact_slug", ""),
+                ent.get("_artifact_display_label", ""),
                 _entity_display_name(ent, dev_by_id), ent.get("entity_id", ""), object_id,
             }
             matched = decoded_name in {c for c in candidates if c} or any(_canonical_label(c) == decoded_canon for c in candidates if c)
@@ -654,6 +679,11 @@ class HASPGraphCache:
         return device, device_entities, device, decoded_name, urllib.parse.quote(decoded_name, safe="")
 
     def _rebuild_documents_unlocked(self) -> None:
+        """Every TD HASP serves, rebuilt from the cached HA snapshot: the
+        platform, the workspace list, and per workspace its artifacts, its own
+        document and its artifact directory; `full_graph` is their union, for
+        the graph-query endpoints."""
+        # 1. Start empty.
         self._documents_dirty = False
         self._last_rebuild_monotonic = time.monotonic()
         self.platform_ttl = ""
@@ -663,6 +693,7 @@ class HASPGraphCache:
         self.artifact_ttls = {}
         self.full_graph = Graph(base=self.base_uri)
 
+        # 2. The platform and the list of its workspaces.
         areas = [self.areas_by_id[ws] for ws in sorted(self.areas_by_id)]
         platform_rdf = HomeAssistantRDF(self.base_uri)
         platform_rdf.platform_to_rdf(areas)
@@ -675,45 +706,118 @@ class HASPGraphCache:
         self.workspaces_ttl = workspaces_rdf.serialize()
         self.full_graph.parse(data=self.workspaces_ttl, format="turtle")
 
+        # 3. Per workspace: its artifacts first -- the workspace document describes
+        # the room variables they observe and move -- then the workspace and
+        # its artifact directory.
+        self.variable_readers = {}
         for workspace_id, area in self.areas_by_id.items():
             devices = self.workspace_devices.get(workspace_id, [])
             entities = self.workspace_entities.get(workspace_id, [])
-            self.workspace_ttls[workspace_id] = self._build_workspace_ttl(area, devices, entities)
-            self.artifacts_ttls[workspace_id] = self._build_artifacts_ttl(workspace_id, devices, entities)
-            self.full_graph.parse(data=self.workspace_ttls[workspace_id], format="turtle")
-            self.full_graph.parse(data=self.artifacts_ttls[workspace_id], format="turtle")
+            artifacts_graph = Graph()
             for ent in entities:
                 label = ent.get("_artifact_label") or ent.get("_artifact_base_label") or _entity_display_name(ent, self.devices_by_id)
                 safe_name = ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
                 device = self.devices_by_id.get(ent.get("device_id"), {})
                 ttl = self.artifact_builder(workspace_id, safe_name, label, [ent], self.states_by_entity_id, device)
                 self.artifact_ttls[(workspace_id, safe_name)] = ttl
-                self.full_graph.parse(data=ttl, format="turtle")
+                artifacts_graph.parse(data=ttl, format="turtle")
+            variables = self._variables_unlocked(workspace_id, artifacts_graph)
+            self.workspace_ttls[workspace_id] = self._build_workspace_ttl(
+                area, devices, entities, artifacts_graph, variables)
+            self.artifacts_ttls[workspace_id] = self._build_artifacts_ttl(workspace_id, devices, entities)
+            self.full_graph.parse(data=self.workspace_ttls[workspace_id], format="turtle")
+            self.full_graph.parse(data=self.artifacts_ttls[workspace_id], format="turtle")
+            self.full_graph += artifacts_graph
+
+    def _variables_unlocked(self, workspace_id: str,
+                            artifacts_graph: Graph) -> List[Tuple[Any, bool]]:
+        """The workspace's room variables, read back from its artifacts' TDs:
+        every variable some artifact observes or moves, with whether one
+        observes it (it can be read). Records, per variable, the artifact
+        properties that read it (`variable_readers`), sensors first.
+
+        Read from the TDs rather than recomputed, so the workspace document
+        can list nothing the artifacts do not mention, and miss nothing they do.
+        """
+        semantics = hasp_semantics.current()
+        prefix = f"{self.base_uri}workspaces/{workspace_id}#"
+        out: List[Tuple[Any, bool]] = []
+        for node, environment in sorted(set(artifacts_graph.subject_objects(SSN.isPropertyOf))):
+            # 1. A variable of this workspace: a `#name` node with an environment class.
+            text = str(node)
+            if not text.startswith(prefix) or not isinstance(node, URIRef):
+                continue
+            cls = next((semantics.environment_class(_curie(t))
+                        for t in artifacts_graph.objects(node, RDF.type)
+                        if semantics.environment_class(_curie(t))), None)
+            if cls is None:
+                continue
+            env_fragment = str(environment).rsplit("#", 1)[-1]
+            env_key = (hasp_semantics.ROOM_ENVIRONMENT if env_fragment == "environment"
+                       else env_fragment[:-len("_environment")])
+            variable = hasp_semantics.Variable(cls=cls, name=text[len(prefix):],
+                                               environment=env_key)
+
+            # 2. Who reads it: each observer's property of the variable's class.
+            observers = sorted(artifacts_graph.subjects(SOSA.observes, node),
+                               key=lambda a: ((a, RDF.type, hasp_semantics.SAREF.Sensor)
+                                              not in artifacts_graph, str(a)))
+            readers: List[Tuple[str, str]] = []
+            class_uri = hasp_semantics.expand(cls.curie)
+            for observer in observers:
+                artifact_name = str(observer).split("/artifacts/", 1)[-1].split("#", 1)[0]
+                for prop in artifacts_graph.objects(observer, TD.hasPropertyAffordance):
+                    if (prop, RDF.type, class_uri) in artifacts_graph:
+                        readers.append((artifact_name, str(artifacts_graph.value(prop, TD.name))))
+            self.variable_readers[(workspace_id, variable.name)] = readers
+            out.append((variable, bool(readers)))
+        return out
 
     def _build_workspace_ttl(
         self,
         area: Dict[str, Any],
         devices: List[Dict[str, Any]],
         entities: Optional[List[Dict[str, Any]]] = None,
+        artifacts_graph: Optional[Graph] = None,
+        variables: Optional[List[Tuple[Any, bool]]] = None,
     ) -> str:
+        """The workspace's TD: the room it is, the room's environment and its
+        variables (as SimuHome's room workspace), and the artifacts it contains.
+
+        `variables` are `_variables_unlocked`'s (variable, readable) pairs;
+        `artifacts_graph`, the artifacts' TDs, gives each artifact's homeont
+        class, listed here as SimuHome's room document lists it.
+        """
+        # 1. The workspace, its place and the room's environment.
         rdf = HomeAssistantRDF(self.base_uri)
         rdf.workspace_to_rdf(area, [])
-        # The room the area is, and its environment: what the class-based
-        # resolvers scope by and name the room with.
-        hasp_semantics.add_room(
-            rdf.g, rdf.base, area,
-            URIRef(f"{rdf.base}workspaces/{area['area_id']}#workspace"))
-        if entities:
-            aid = area["area_id"]
-            ws = URIRef(f"{rdf.base}workspaces/{aid}#workspace")
-            art_dir = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/")
-            for ent in entities:
-                label = ent.get("_artifact_label") or ent.get("_artifact_base_label") or _entity_display_name(ent, self.devices_by_id)
-                safe_name = ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
-                art = URIRef(f"{art_dir}{safe_name}#artifact")
-                rdf.g.add((art, RDF.type, HMAS.Artifact))
-                rdf.g.add((ws, HMAS.contains, art))
-                rdf.g.add((art, TD.title, Literal(label)))
+        aid = area["area_id"]
+        ws = URIRef(f"{rdf.base}workspaces/{aid}#workspace")
+        hasp_semantics.add_room(rdf.g, rdf.base, area, ws)
+
+        # 2. Every environment variable an artifact observes or moves, in full;
+        #    other environments the home declares, beside the room's.
+        semantics = hasp_semantics.current()
+        for key, declared in semantics.environments().items():
+            if any(v.environment == key for v, _ in variables or []):
+                hasp_semantics.add_environment(rdf.g, rdf.base, aid, key, declared.get("label"))
+        for variable, readable in variables or []:
+            hasp_semantics.add_variable(rdf.g, rdf.base, aid, variable, readable,
+                                        semantics.target_range(variable.name))
+
+        # 3. The artifacts it contains, each with what kind of device it is.
+        art_dir = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/")
+        for ent in entities or []:
+            label = ent.get("_artifact_label") or ent.get("_artifact_base_label") or _entity_display_name(ent, self.devices_by_id)
+            safe_name = ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
+            art = URIRef(f"{art_dir}{safe_name}#artifact")
+            rdf.g.add((art, RDF.type, HMAS.Artifact))
+            rdf.g.add((ws, HMAS.contains, art))
+            rdf.g.add((art, TD.title, Literal(label)))
+            rdf.g.add((art, SCHEMA.name, Literal(ent.get("_artifact_display_label") or label)))
+            for cls in (artifacts_graph.objects(art, RDF.type) if artifacts_graph is not None else []):
+                if str(cls).startswith(str(hasp_semantics.HOMEONT)):
+                    rdf.g.add((art, RDF.type, cls))
         return rdf.serialize()
 
     def _build_artifacts_ttl(self, workspace_id: str, devices: List[Dict[str, Any]], entities: List[Dict[str, Any]]) -> str:
@@ -729,4 +833,5 @@ class HASPGraphCache:
             rdf.g.add((art, RDF.type, HMAS.Artifact))
             rdf.g.add((ws, HMAS.contains, art))
             rdf.g.add((art, TD.title, Literal(label)))
+            rdf.g.add((art, SCHEMA.name, Literal(ent.get("_artifact_display_label") or label)))
         return rdf.serialize()

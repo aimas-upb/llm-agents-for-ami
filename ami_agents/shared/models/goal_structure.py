@@ -38,6 +38,7 @@ PREDICATE_SUBJECTS = ("device_property", "environment_property")
 COMPARISONS = ("==", "!=", ">", ">=", "<", "<=")
 QUANTIFIERS = ("any", "all")             # predicates: some / every candidate satisfies it
 GOAL_QUANTIFIERS = ("all", "one")        # goals: act on every candidate / on one
+DEVICE_REFERENCES = ("name", "description")  # how a request picks out its device
 DIRECTIONS = ("high", "low")
 CHANGE_DIRECTIONS = ("increase", "decrease")
 ROLES = ("guard", "trigger", "scope", "recurrence", "termination", "filter")
@@ -283,8 +284,25 @@ class GoalSpec:
     timing: Optional[GoalTiming] = None
     rationale: Optional[str] = None
     # UA-local, never on the wire: the question to ask when resolution found
-    # the goal's devices in several rooms and the goal means only one of them.
+    # the goal's devices in several rooms and the goal means only one of them,
+    # or when the device the request names is not in the home.
     clarification: Optional[str] = None
+    # UA-local, never on the wire: how the request picks out its device --
+    # "name" (its own name: "kitchen light 2") or "description" (its kind,
+    # room or another property: "the fan"). A named device the home does not
+    # have is asked about, never completed with another
+    # (`goal_resolution.named_device_missing`).
+    device_reference: Optional[str] = None
+    # UA-local, never on the wire: the request's own words for a device it
+    # mentions (by name or by kind) that the home does not have ("air
+    # conditioner"). Such a goal is asked about, never completed with another
+    # device (`goal_resolution.device_missing`).
+    unmatched_device: Optional[str] = None
+    # UA-local, never on the wire: the request's words for what it asks a
+    # device that IS in the home to change, when none of the device's actions
+    # can ("brightness" on an on/off light). Asked about, never moved to
+    # another device that has such an action.
+    unmatched_action: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Any) -> "GoalSpec":
@@ -296,6 +314,9 @@ class GoalSpec:
             location_class=_text(data.get("location_class")),
             artifact_class=_text(data.get("artifact_class")),
             artifact_name=_text(data.get("artifact_name")),
+            device_reference=_choice(data.get("device_reference"), DEVICE_REFERENCES),
+            unmatched_device=_text(data.get("unmatched_device")),
+            unmatched_action=_text(data.get("unmatched_action")),
             affordance_class=_text(data.get("affordance_class")),
             parent_class=_text(data.get("parent_class")),
             affordance_name=_text(data.get("affordance_name")),

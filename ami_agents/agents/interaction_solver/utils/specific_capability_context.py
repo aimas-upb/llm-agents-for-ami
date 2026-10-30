@@ -45,6 +45,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from rdflib import Graph, Literal, URIRef
+from rdflib.collection import Collection
 from rdflib.namespace import RDF, RDFS
 
 from ....shared.models.goal_structure import GoalSpec
@@ -52,6 +53,7 @@ from ....shared.utils.vocabulary import vocabulary
 from ....shared.utils.namespaces import (
     HCTL,
     HMAS,
+    HTV,
     HOMEONT,
     JS,
     QUDT,
@@ -64,6 +66,7 @@ from ....shared.utils.namespaces import (
     expand,
     in_namespace,
     shorten,
+    sparql_prefixes,
 )
 
 # A direct-value input is sent wrapped: SHTD reads `{"value": ...}` (see
@@ -99,10 +102,7 @@ class SpecificCapabilityContext:
 # Primitives: finding devices
 # --------------------------------------------------------------------------
 
-_ARTIFACT_QUERY = """
-PREFIX td:      <https://www.w3.org/2019/wot/td#>
-PREFIX hmas:    <https://purl.org/hmas/>
-PREFIX homeont: <http://example.org/homeont/>
+_ARTIFACT_QUERY = "\n" + sparql_prefixes("td", "hmas", "homeont") + """\
 SELECT DISTINCT ?artifact WHERE {
   ?artifact a hmas:Artifact .
   %(name_block)s
@@ -195,7 +195,7 @@ def _form(graph: Graph, affordance: Any) -> Tuple[str, Optional[str]]:
     """The affordance's target URL and HTTP method, from its first form."""
     for form in graph.objects(affordance, TD.hasForm):
         target = graph.value(form, HCTL.hasTarget)
-        method = graph.value(form, URIRef("http://www.w3.org/2011/http#methodName"))
+        method = graph.value(form, HTV.methodName)
         if target is not None:
             return str(target), (str(method) if method is not None else None)
     return "", None
@@ -210,7 +210,9 @@ _JSON_TYPES = {
 
 def json_schema(graph: Graph, schema: Any) -> Dict[str, Any]:
     """A TD data schema as a JSON-schema dict: type, enum, bounds, unit,
-    description; an object schema with its named properties."""
+    description, and `order` -- the enum values that form a scale, lowest first
+    (`homeont:orderedValues`, an `rdf:List`); an object schema with its named
+    properties."""
     types = [shorten(t) for t in graph.objects(schema, RDF.type)]
     kind = next((_JSON_TYPES[t] for t in types if t in _JSON_TYPES), None)
     out: Dict[str, Any] = {"type": kind} if kind else {}
@@ -231,6 +233,10 @@ def json_schema(graph: Graph, schema: Any) -> Dict[str, Any]:
                   key=lambda v: (str(type(v)), v))
     if enum:
         out["enum"] = enum
+    # The scale, in the list's own order (unlike `enum`, which RDF leaves unordered).
+    order = graph.value(schema, HOMEONT.orderedValues)
+    if order is not None:
+        out["order"] = [v.toPython() for v in Collection(graph, order)]
     for key, predicate in (("minimum", JS.minimum), ("maximum", JS.maximum)):
         value = graph.value(schema, predicate)
         if value is not None:
@@ -444,9 +450,7 @@ def _incomplete_achievement(graph: Graph, goal: GoalSpec) -> Optional[SpecificCa
 # The variable, starting from the hmas workspace: the workspace's space is of the
 # goal's room class, its environment has the variable, the variable is of the
 # goal's class. (Closed graph: subclasses count, as plain `a`.)
-_VARIABLE_QUERY = """
-PREFIX homeont: <http://example.org/homeont/>
-PREFIX ssn:     <http://www.w3.org/ns/ssn/>
+_VARIABLE_QUERY = "\n" + sparql_prefixes("homeont", "ssn") + """\
 SELECT DISTINCT ?workspace ?var WHERE {
   ?workspace homeont:hasSpace ?space .
   ?space a ?spaceClass ;
@@ -458,11 +462,7 @@ SELECT DISTINCT ?workspace ?var WHERE {
 
 # The actions acting on that variable, of artifacts the workspace contains. Any
 # effect actuation counts: most only say they influence it, not which way.
-_AFFECTING_QUERY = """
-PREFIX hmas:   <https://purl.org/hmas/>
-PREFIX td:     <https://www.w3.org/2019/wot/td#>
-PREFIX sosa:   <http://www.w3.org/ns/sosa/>
-PREFIX tdsosa: <https://example.org/hmas/td-sosa-ext#>
+_AFFECTING_QUERY = "\n" + sparql_prefixes("hmas", "td", "sosa", "tdsosa") + """\
 SELECT DISTINCT ?artifact ?action ?actuation WHERE {
   ?workspace hmas:contains ?artifact .
   ?artifact td:hasActionAffordance ?action .
@@ -473,9 +473,7 @@ SELECT DISTINCT ?artifact ?action ?actuation WHERE {
 
 # The readings of that variable, of artifacts the workspace contains: property
 # affordances of the variable's class (a device-specific subclass counts).
-_READING_QUERY = """
-PREFIX hmas: <https://purl.org/hmas/>
-PREFIX td:   <https://www.w3.org/2019/wot/td#>
+_READING_QUERY = "\n" + sparql_prefixes("hmas", "td") + """\
 SELECT DISTINCT ?artifact ?prop WHERE {
   ?workspace hmas:contains ?artifact .
   ?artifact td:hasPropertyAffordance ?prop .
@@ -491,9 +489,16 @@ DIRECTION_INSTRUCTIONS = (
     "-> humidity decrease; \"too dark\" -> illuminance increase). Then choose actions, "
     "and their values, that move it that way. Most actions only say they influence "
     "the variable: decide from the action and its input which value moves it the "
-    "wanted way (turn a dehumidifier on; lower a cooling setpoint). Read the current "
-    "value first when the value to set depends on it. If nothing can move a variable "
-    "the wanted way, answer impossible. Wrap each step that only helps -- a setpoint, a "
+    "wanted way (turn a dehumidifier on; lower a cooling setpoint). Choose them from "
+    "what the devices are doing now (the Current State): setting a device to the "
+    "state it is already in changes nothing, so a value has to differ from it -- for "
+    "example, raise a fan speed that is at 0, or lower a cooling setpoint that is above "
+    "the room's value. A running device that moves the variable the other way moves it "
+    "the wanted way once switched off: for example, switching off a running "
+    "dehumidifier lets the humidity rise. Read the current value first when the value "
+    "to set depends on it and the Current State does not give it. If nothing can move "
+    "a variable the wanted way -- including when every device that could is already "
+    "doing all it can -- answer impossible, and say why. Wrap each step that only helps -- a setpoint, a "
     "fan speed, a level that strengthens the effect -- in ignore_failure, so a device "
     "rejecting it does not stop the other steps; leave unwrapped the steps without "
     "which nothing moves the variable (switching the device on, setting its mode).")

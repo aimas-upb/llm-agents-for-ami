@@ -44,7 +44,13 @@ export HA_URL="ws://localhost:8123/api/websocket"
 export HA_TOKEN="<your-long-lived-access-token>"  # Profile → Security → Create Token
 export AREAS="lab308"                              # area_id created above
 export BASE_WS_URI="http://localhost:8080"        # public base for adapter URIs
+export SEMANTIC_CONFIG="lab308.yaml"               # the home's `semantic:` block
 ```
+
+`SEMANTIC_CONFIG` is all HASP needs beyond the connection: the room variables,
+the sensors observing them and the actions moving them are derived from the
+deployment (see "Room variables" below). The former `TD_SOSA_ENV_VAR_OVERRIDES`,
+`TD_SOSA_PROPERTY_RANGES` and `TD_SOSA_SETTLING_TIMES` are no longer read.
 
 ## 6) Start HASP
 ```
@@ -156,12 +162,47 @@ Assistant home:
 - each device's class (`homeont:ColorLight`, `homeont:AirConditioner`, ...);
 - each property's class (`homeont:DimmableLightBrightness`, `homeont:Illuminance`, ...);
 - each action's command (`saref:OnCommand`, `homeont:SetModeCommand`, ...);
-- the TD-SOSA effect keys (`thermal_comfort` -> `homeont:AirTemperature`, ...).
+- the room's environment variables, which sensors observe and actions move
+  (below).
 
 Defaults live in `semantic_mappings.yaml`. A home overrides them in the
 `semantic:` block of its config, read from `SEMANTIC_CONFIG`: `location_class`,
-and per device `device_class`, `properties` and `commands` (see `lab308e.yaml`).
-Anything unmapped stays untyped and is logged once.
+`environments`, `ranges`, and per device `device_class`, `properties`,
+`commands`, `zone`, `environment` and `effects` (see `lab308e.yaml`).
+Anything unmapped stays untyped and is logged once. No `ex:` types are emitted.
+
+### Room variables
+The same model SimuHome's TD builder serves, built from the HA deployment:
+
+```
+<ws#place>        homeont:hasEnvironment  <ws#environment>
+<ws#environment>  ssn:hasProperty         <ws#illuminance>, <ws#air_temperature>, ...
+<sensor#artifact> sosa:observes           <ws#illuminance>      (a sosa:Sensor, saref:Sensor)
+<light action>    tdsosa:hasEffectActuation [ sosa:actsOnProperty <ws#illuminance> ]
+<every artifact>  homeont:isLocatedIn     <ws#place>
+```
+
+- **Which variables**: none are listed. homeont says which of its classes are a
+  property of a space's environment (`ssn:isPropertyOf homeont:Environment`);
+  a device property typed with one of them (by the `properties` rules, from HA's
+  `domain` / `device_class` / unit) observes that variable. A sensor with no
+  `device_class` is typed by its unit when exactly one environment class has it
+  (`units` table: `lx` -> `unit:LUX` -> `homeont:Illuminance`).
+- **Names**: the class in snake_case, as SimuHome names its room variables
+  (`homeont:AirTemperature` -> `air_temperature`); a device's `zone` prefixes it
+  (`desk_illuminance`), its `environment` moves it to another environment
+  (`outdoor_illuminance`, of `<ws#outdoor_environment>`, which no place has).
+- **Quantity kind and unit**: from the class in homeont.
+- **Effects**: the `effects` rules (lights and covers move illuminance, climate
+  air temperature, humidifiers humidity); a device's own `effects` replace them.
+  The direction comes from the service name (`turn_on` increases) unless a rule
+  states it; setters are directionless.
+- **Reading a variable**: `GET /workspaces/{ws}/properties/{variable}` returns
+  the reading of a device observing it (a sensor first); a variable no device
+  observes has no form and returns 404.
+- **Graph queries**: `/_graph/query/actions-affecting-observable-property`
+  takes a variable name, its IRI, or one of the older keys (`luminosity`,
+  `thermal_comfort`; `variable_aliases`).
 
 Each entity's state is its own property, `<domain>State` (`lightState`,
 `coverState`, `binarySensorState`; with the entity's object id appended when a

@@ -538,7 +538,21 @@ def _row(key: str, status: str, **fields: Any) -> Dict[str, Any]:
     return row
 
 
+# Attributes the Matter spec defines in hundredths but the registry types as a
+# plain integer. Relative humidity is "100 x the relative humidity in %" (a
+# reading of 5404 is 54.04 %), like temperature's hundredths of a degree; typed
+# here, the TD and the property route report it in % as the room's humidity is.
+SCALED_ATTRIBUTE_TYPES: Dict[Tuple[str, str], str] = {
+    ("RelativeHumidityMeasurement", "MeasuredValue"): "percent100ths",
+    ("RelativeHumidityMeasurement", "MinMeasuredValue"): "percent100ths",
+    ("RelativeHumidityMeasurement", "MaxMeasuredValue"): "percent100ths",
+    ("RelativeHumidityMeasurement", "Tolerance"): "percent100ths",
+}
+
+
 def _matter_ref(cluster_token: str, attribute_token: str) -> Optional[Dict[str, Any]]:
+    """The Matter coordinates of an attribute, with its type -- the spec's
+    scale where the registry's plain integer type would lose it."""
     reg = registry_access.get_registry()
     cluster = reg.cluster_by_name(cluster_token)
     attribute = reg.attribute(cluster_token, attribute_token)
@@ -551,7 +565,8 @@ def _matter_ref(cluster_token: str, attribute_token: str) -> Optional[Dict[str, 
         "attribute_id": attribute["id"],
         "attribute_id_hex": attribute["id_hex"],
         "attribute_name": attribute["name"],
-        "type": attribute.get("type"),
+        "type": SCALED_ATTRIBUTE_TYPES.get((cluster_token, attribute_token),
+                                           attribute.get("type")),
     }
 
 
@@ -669,6 +684,33 @@ COMMAND_TARGETS: Dict[Tuple[str, str], Dict[str, Any]] = {
         "attribute": "OperationalState", "status": APPROVED,
         "evidence": "no input fields; moves OperationalState to Stopped (0)",
     },
+    # A TV's channel and playback. Both attributes are read-only and driven by
+    # their cluster's commands; the benchmark asks to "tune it to MBC" and to
+    # "start playing", and without these links neither can be planned (the
+    # TV's TD offered only power and brightness).
+    ("Channel", "ChangeChannel"): {
+        "attribute": "CurrentChannel", "status": APPROVED,
+        "evidence": "ChangeChannel(Match: string) sets CurrentChannel to the "
+                    "ChannelList entry whose identifier, call sign, name or number "
+                    "matches (SimuHome channel.py::_change_channel)",
+    },
+    ("Channel", "ChangeChannelByNumber"): {
+        "attribute": "CurrentChannel", "status": APPROVED,
+        "evidence": "ChangeChannelByNumber(MajorNumber, MinorNumber) sets "
+                    "CurrentChannel to the ChannelList entry with those numbers",
+    },
+    ("MediaPlayback", "Play"): {
+        "attribute": "CurrentState", "status": APPROVED,
+        "evidence": "no input fields; moves CurrentState to Playing (0)",
+    },
+    ("MediaPlayback", "Pause"): {
+        "attribute": "CurrentState", "status": APPROVED,
+        "evidence": "no input fields; moves a playing CurrentState to Paused (1)",
+    },
+    ("MediaPlayback", "Stop"): {
+        "attribute": "CurrentState", "status": APPROVED,
+        "evidence": "no input fields; moves CurrentState to NotPlaying (2)",
+    },
     # FanControl.Step is deliberately absent. Home Assistant's `fan` domain
     # exposes no step service, so no TD form could invoke it, and no query in the
     # 600-episode benchmark asks for a relative fan change: of 174 fan-mentioning
@@ -737,6 +779,10 @@ def _command_targets(cluster_token: str) -> Set[str]:
         "RTCCMode": {"CurrentMode"},
         # Start / Pause / Resume / Stop write OperationalState.
         "OperationalState": {"OperationalState"},
+        # A TV: ChangeChannel(ByNumber) writes CurrentChannel; Play / Pause /
+        # Stop write CurrentState.
+        "Channel": {"CurrentChannel"},
+        "MediaPlayback": {"CurrentState"},
     }.get(cluster_token, set())
 
 

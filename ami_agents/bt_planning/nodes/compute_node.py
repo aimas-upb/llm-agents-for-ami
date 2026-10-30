@@ -96,6 +96,32 @@ def _change_clamped(values: List[Any], args: Dict[str, Any]) -> Any:
 register_compute_op("change_clamped", _change_clamped)
 
 
+def _step_in_order(values: List[Any], args: Dict[str, Any]) -> Any:
+    """A change by steps along an ordered scale (a fan speed "up by 1 level").
+
+    `values[0]` is the current value -- a `PropertyValue` or a bare value. `args`:
+
+        order   the scale, lowest first (`homeont:orderedValues` of the TD)
+        steps   the signed number of steps; the result stops at either end
+
+    A current value not on the scale (an `auto` mode) raises, so the node fails
+    rather than guessing a position; the planner asks the user before it plans
+    such a change, so this only happens if the value changed in between.
+    """
+    # 1. The current value and its place on the scale.
+    current = values[0] if values else None
+    current = getattr(current, "value", current)          # unwrap a PropertyValue
+    order = list(args["order"])
+    if current not in order:
+        raise ValueError(f"current value {current!r} is not on the scale {order}")
+    # 2. Move along it, stopping at the ends.
+    index = order.index(current) + int(args["steps"])
+    return order[max(0, min(index, len(order) - 1))]
+
+
+register_compute_op("step_in_order", _step_in_order)
+
+
 class BlackboardComputeNode(py_trees.behaviour.Behaviour):
     """
     A custom node that reads inputs from the blackboard, applies a registered

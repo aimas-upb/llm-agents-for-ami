@@ -30,6 +30,15 @@ and both (`score`: both pass).
 
 Scores: 1 pass, 0 fail, -1 infrastructure (LLM transport / simulator errors,
 judge errors), which the report leaves out of the denominator.
+
+The benchmark is the record's own `suite` (SimuHome for a record that names none;
+`--suite` overrides): the suite loads the episode, supplies the evaluators and says
+which errors are infrastructure. A HomeBench episode, whatever its case, is scored by
+`tests/homebench/scoring.py` alone: every gold token met by an accepted action (or by a
+value that already held), every `error_input` by a goal answered impossible or with a
+question, no judge. Its verdict also carries `score_extra` (the score with the one extra
+reading of a label, our criterion) and a `homebench` block (the tokens the official
+metrics read); `score` keeps the benchmark's own reading.
 """
 
 from __future__ import annotations
@@ -53,6 +62,8 @@ from dotenv import load_dotenv  # noqa: E402
 if (PROJECT_ROOT / ".env").exists():
     load_dotenv(PROJECT_ROOT / ".env")
 
+from tests.simuhome.bench.suites import DEFAULT_SUITE, SUITE_NAMES, get_suite  # noqa: E402
+from tests.simuhome.bench.suites.simuhome import INFRA_MARKERS  # noqa: E402
 from tests.simuhome.bench.toollog import parse_url  # noqa: E402
 
 # The SHTD property each SimuHome room-state key is served as.
@@ -63,6 +74,9 @@ ROOM_STATE_NAMES = {"temperature": "air_temperature", "humidity": "relative_humi
 VALUE_TOLERANCE_ABS = 0.5
 VALUE_TOLERANCE_REL = 0.02
 JUDGE_SEEDS = (42, 43, 44)
+# The cases with a part that cannot be done, which the judge panel reads (for a suite
+# that has a judge: HomeBench has none).
+JUDGED_CASES = ("infeasible", "mixed")
 
 
 # --------------------------------------------------------------------------
@@ -220,6 +234,11 @@ def _declared_values(attribute: str, attributes: Dict[str, Any]) -> Optional[set
         return FAN_MODE_SEQUENCES.get(value)
     if name == "SupportedModes" and isinstance(value, list):
         return {m.get("mode", m.get("Mode")) for m in value if isinstance(m, dict)}
+    # Other "Supported..." lists name the values of their setting outright
+    # (a dryer's SupportedDrynessLevels [0, 1, 2, 3] for SelectedDrynessLevel).
+    if name.startswith("Supported") and isinstance(value, list) \
+            and all(isinstance(v, int) and not isinstance(v, bool) for v in value):
+        return set(value)
     return None
 
 
@@ -231,11 +250,39 @@ def _close(read: Any, expected: Any) -> bool:
     return abs(read - expected) <= max(VALUE_TOLERANCE_ABS, VALUE_TOLERANCE_REL * abs(expected))
 
 
-def _room_state_ok(goal: Dict[str, Any], reads: List[Dict[str, Any]]) -> bool:
+def _stated(value: Any, answer: Any) -> bool:
+    """Does the answer give this attribute's value in words? Only for a text
+    value ("LG Electronics"): a bare number in an answer could be any number."""
+    if not isinstance(value, str) or not value.strip() or not isinstance(answer, str):
+        return False
+    return value.strip().lower() in answer.lower()
+
+
+_NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
+
+
+def _reported(value: Any, answer: Any) -> bool:
+    """Does the answer report this read value -- some number in it within the
+    tolerance of it?"""
+    if not isinstance(answer, str):
+        return False
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return False
+    return any(_close(float(number), value) for number in _NUMBER.findall(answer))
+
+
+def _room_state_ok(goal: Dict[str, Any], reads: List[Dict[str, Any]], answer: Any) -> bool:
+    """A room's state, as SimuHome's qt1 judge scores it ("values match tool
+    observations"): the right variable of the right room read, and the value
+    read given in the answer. Not the episode's `current_value`: the simulator
+    runs in real time, so a room with a purifier on has another PM10 by the
+    time any agent reads it -- the episode's value is the state at reset."""
     name = ROOM_STATE_NAMES.get(goal.get("room_state"), goal.get("room_state"))
     return any(r["room"] == goal["room_id"] and (not r["device"] or r["sensor"])
                and r["name"] == name
-               and r["has_value"] and _close(r["value"], goal.get("current_value"))
+               and r["has_value"] and _reported(r["value"], answer)
                for r in reads)
 
 
@@ -255,7 +302,7 @@ def check_qt1(record, episode, payload, feasible: bool) -> Dict[str, Any]:
     for goal in episode["eval"]["goals"]:
         read = None
         if goal.get("variant") == "room_state":
-            ok = _room_state_ok(goal, reads)
+            ok = _room_state_ok(goal, reads, record.get("response"))
             name = ROOM_STATE_NAMES.get(goal.get("room_state"), goal.get("room_state"))
             read = any(r["room"] == goal["room_id"] and (not r["device"] or r["sensor"])
                        and r["name"] == name and r["has_value"] for r in reads)
@@ -269,9 +316,17 @@ def check_qt1(record, episode, payload, feasible: bool) -> Dict[str, Any]:
                 ok = any(c["values"] == declared for c in listed)
                 read = bool(listed) or any(r["device"] == device and r["has_value"]
                                            for r in reads)
+            elif attributes[device].get(goal.get("attribute")) is None:
+                # The device reports nothing for it (a dishwasher's phase while
+                # it is not running): reading it and finding no value is right.
+                read = any(r["device"] == device for r in reads)
+                ok = read
             else:
-                ok = any(r["device"] == device and r["has_value"] for r in reads)
-                read = ok
+                # Read from the device, or -- a fact the TD itself states, such
+                # as who made it -- given in the answer without a read.
+                read = any(r["device"] == device and r["has_value"] for r in reads)
+                ok = read or _stated(attributes[device].get(goal.get("attribute")),
+                                     record.get("response"))
         else:
             # The device does not exist: nothing read from a device of its kind in
             # its room may stand in for it.
@@ -394,9 +449,11 @@ def _timed_check(record, initial, device, attribute, expected, lo, hi,
 
 
 def _ok(reading: Optional[str]) -> Dict[str, Any]:
-    """`ok`, naming the reading when it is ours rather than SimuHome's."""
-    return {"class": "ok"} if reading in (None, "simuhome") else \
-        {"class": "ok", "reading": reading}
+    """`ok`, with the reading that matched in `matched` ("simuhome" -- the benchmark's own
+    value -- or the name of an extra reading), and in `reading` when it is ours rather
+    than the benchmark's. The strict rate is the checks matched by "simuhome"."""
+    return {"class": "ok", "matched": reading or "simuhome",
+            **({} if reading in (None, "simuhome") else {"reading": reading})}
 
 
 def _final_check(record, initial, final, expected, device,
@@ -467,6 +524,13 @@ def breakdown(record, episode, simuhome_result: Optional[Dict[str, Any]] = None
             checks.append({"goal": index, "room": goal.get("room"), "device": goal.get("device"),
                            "expected": goal.get("goal"), **verdict})
 
+    return summarise_checks(checks)
+
+
+def summarise_checks(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """A breakdown from its checks: the checks, how many of each class, and the share
+    that are ok (None for an episode with no check). Shared with HomeBench's scorer,
+    whose checks are one per gold call."""
     counts = {c: sum(1 for check in checks if check["class"] == c) for c in CLASSES}
     return {"checks": checks, "total": len(checks), **counts,
             "success": round(counts["ok"] / len(checks), 3) if checks else None}
@@ -494,6 +558,15 @@ def infeasible_part(episode) -> Dict[str, Any]:
                                  for g in missing})}
 
 
+def answered_impossible(record) -> bool:
+    """True when the agents answered some goal "impossible", or asked the user about it
+    (a plan entry, a clarification at structuring, or the episode's own outcome)."""
+    outcomes = [p.get("outcome") for p in record.get("plans") or []]
+    return (any(o in ("impossible", "clarify") for o in outcomes)
+            or any(s.get("clarification") for s in record.get("structures") or [])
+            or record.get("outcome") in ("impossible", "clarify"))
+
+
 def check_execution(record, episode) -> Dict[str, Any]:
     """Infeasible: nothing executed on the part that cannot be done, and that
     part answered as impossible or with a question."""
@@ -508,10 +581,7 @@ def check_execution(record, episode) -> Dict[str, Any]:
     else:
         offending = [d for d in devices if d.get("device") and
                      any(d["device"].startswith(p) for p in part["stand_ins"])]
-    outcomes = [p.get("outcome") for p in record.get("plans") or []]
-    answered = (any(o in ("impossible", "clarify") for o in outcomes)
-                or any(s.get("clarification") for s in record.get("structures") or [])
-                or record.get("outcome") in ("impossible", "clarify"))
+    answered = answered_impossible(record)
     score = int(not offending and answered)
     return {"score": score, "check": "execution", "infeasible_part": part,
             "offending_actions": offending, "answered_impossible_or_clarify": answered,
@@ -519,12 +589,12 @@ def check_execution(record, episode) -> Dict[str, Any]:
                                               else "Not Reported Infeasible")}
 
 
-def infra_error(record) -> Optional[str]:
+def infra_error(record, markers: Tuple[str, ...] = INFRA_MARKERS) -> Optional[str]:
     """An infrastructure failure, not the model's: a step whose every LLM call
-    failed, or an exception from the simulator / the transport."""
+    failed, or an exception from the simulator / the transport -- an error text
+    holding one of ``markers`` (the suite's; SimuHome's by default)."""
     error = record.get("error") or ""
-    if any(k in error for k in ("SimuHomeError", "APIConnectionError", "APITimeoutError",
-                                "RateLimitError", "InternalServerError", "ConnectError")):
+    if any(k in error for k in markers):
         return error
     calls = (record.get("meter") or {}).get("calls") or []
     by_step: Dict[str, List[bool]] = {}
@@ -538,27 +608,43 @@ def infra_error(record) -> Optional[str]:
 # One record
 # --------------------------------------------------------------------------
 
-def evaluate_record(record, episode, evaluators, judges, sim_client) -> Dict[str, Any]:
+def evaluate_record(record, episode, evaluators, judges, sim_client,
+                    markers: Tuple[str, ...] = INFRA_MARKERS) -> Dict[str, Any]:
+    """The verdict on one record: infrastructure failures (``markers``) and
+    stopped runs first, then the evaluator of its (type, case)."""
     qt, case = record["query_type"], record["case"]
-    infra = infra_error(record)
+    infra = infra_error(record, markers)
     if infra:
         return {"score": -1, "error_type": "Infrastructure", "detail": infra}
     if record.get("outcome") == "stopped":
         return {"score": -1, "error_type": "Not Run", "detail": "stopped early"}
+
+    # 1. HomeBench: its own rule for every case (no judge), its checks as the breakdown,
+    #    and the tokens and counts the official metrics read.
+    if qt.startswith("hb"):
+        from tests.homebench import scoring
+        evaluators[(qt, case)]                  # an unknown type or case is a KeyError
+        result = scoring.evaluate_episode(record, episode)
+        result["breakdown"] = summarise_checks(result.pop("checks"))
+        describe = getattr(evaluators, "describe", None)
+        if describe is not None:
+            result["homebench"] = describe(record, episode, result)
+        return result
 
     payload = {"episode": episode, "tools_invoked": record.get("tools_invoked") or [],
                "steps": record.get("steps") or [], "client": sim_client,
                "final_home_state": record.get("final_home_state") or {}}
     module = evaluators[(qt, case)]
 
+    # 2. Feasible: SimuHome's evaluator, then every expected value classified.
     if case == "feasible":
         result = _feasible(record, episode, payload, module, qt, sim_client)
         if result.get("score", -1) >= 0:
             result["breakdown"] = breakdown(record, episode, result)
-        return result
-
-    # Infeasible: our check, and SimuHome's judge on the reply.
-    return _infeasible(record, episode, payload, module, qt, judges)
+    # 3. Infeasible: our check, and SimuHome's judge on the reply.
+    else:
+        result = _infeasible(record, episode, payload, module, qt, judges)
+    return result
 
 
 def _feasible(record, episode, payload, module, qt, sim_client) -> Dict[str, Any]:
@@ -585,8 +671,10 @@ def _feasible(record, episode, payload, module, qt, sim_client) -> Dict[str, Any
 
 def _infeasible(record, episode, payload, module, qt, judges) -> Dict[str, Any]:
     """Our execution check, and SimuHome's judge on the reply."""
-    check = check_qt1(record, episode, payload, False) if qt == "qt1" else \
-        check_execution(record, episode)
+    if qt == "qt1":
+        check = check_qt1(record, episode, payload, False)
+    else:
+        check = check_execution(record, episode)
     out = {"execution_check": check}
     if judges:
         judged = module.evaluate(payload, judges)
@@ -627,11 +715,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--records", required=True,
                         help="a variant's record directory, or one record file")
-    parser.add_argument("--benchmark", default=str(DEFAULT_BENCHMARK))
+    parser.add_argument("--suite", choices=SUITE_NAMES,
+                        help="the benchmark (default: each record's own, else simuhome)")
+    parser.add_argument("--benchmark", help="the benchmark directory (default: the suite's)")
     parser.add_argument("--no-judge", action="store_true",
                         help="infeasible: the execution check only (no LLM calls)")
     parser.add_argument("--judge-model", help="override the variant's judge model")
     parser.add_argument("--explain", action="store_true", help="print each verdict in full")
+    parser.add_argument("--episodes", help="only the records matching this pattern, "
+                                           "e.g. 'qt1_*' (default: all)")
     parser.add_argument("--skip-scored", action="store_true",
                         help="leave records whose .eval.json is newer than the record "
                              "(a resumed run: no judge calls paid twice)")
@@ -643,6 +735,9 @@ def main() -> int:
     files = [target] if target.is_file() else sorted(
         p for p in target.glob("*.json") if not p.name.endswith(".eval.json")
         and p.name not in ("run.json", "summary.json"))
+    if args.episodes:
+        files = [p for p in files if p.match(args.episodes + ".json")
+                 or p.match(args.episodes)]
     if args.skip_scored:
         files = [p for p in files if not _scored_since(p)]
         if not files:
@@ -652,10 +747,10 @@ def main() -> int:
         print("No records.")
         return 1
 
-    # 2. Shared across records: SimuHome's evaluators, a simulator started
-    #    only if a qt2 feasible record needs one, one judge panel per model.
-    evaluators = simuhome_evaluators()
-    benchmark = Path(args.benchmark)
+    # 2. Shared across records: each suite's evaluators (built once), a
+    #    simulator started only if a qt2 feasible record needs one, one judge
+    #    panel per model.
+    evaluators_by_suite: Dict[str, Any] = {}
     worker = None
     judges_by_spec: Dict[str, List[Judge]] = {}
     totals: Dict[Tuple[str, str], List[int]] = {}
@@ -664,8 +759,12 @@ def main() -> int:
         #    next to it and printed in one line.
         for path in files:
             record = json.loads(path.read_text(encoding="utf-8"))
-            episode = json.loads((benchmark / f"{record['episode']}.json")
-                                 .read_text(encoding="utf-8"))
+            suite = get_suite(args.suite or record.get("suite") or DEFAULT_SUITE)
+            if suite.name not in evaluators_by_suite:
+                evaluators_by_suite[suite.name] = suite.evaluators()
+            evaluators = evaluators_by_suite[suite.name]
+            benchmark = Path(args.benchmark) if args.benchmark else suite.default_benchmark
+            episode = suite.load_episode(benchmark, record["episode"])
             sim_client = None
             if record["query_type"] == "qt2" and record["case"] == "feasible":
                 if worker is None:
@@ -675,7 +774,7 @@ def main() -> int:
                     worker = SimuHomeWorker(benchmark=benchmark).start()
                 sim_client = worker.client
             judges: List[Judge] = []
-            if record["case"] == "infeasible" and not args.no_judge:
+            if record["case"] in JUDGED_CASES and suite.judge and not args.no_judge:
                 spec = dict(((record.get("variant") or {}).get("steps") or {}).get("judge")
                             or {"model": "gpt-4o-mini", "temperature": 0.5})
                 if args.judge_model:
@@ -683,7 +782,8 @@ def main() -> int:
                 key = json.dumps(spec, sort_keys=True)
                 judges = judges_by_spec.setdefault(key, [Judge(spec, s) for s in JUDGE_SEEDS])
             try:
-                verdict = evaluate_record(record, episode, evaluators, judges, sim_client)
+                verdict = evaluate_record(record, episode, evaluators, judges, sim_client,
+                                          suite.infra_markers)
             except Exception as exc:  # noqa: BLE001 - recorded as an evaluation error
                 verdict = {"score": -1, "error_type": "Evaluation Runtime Error",
                            "detail": f"{type(exc).__name__}: {exc}"}

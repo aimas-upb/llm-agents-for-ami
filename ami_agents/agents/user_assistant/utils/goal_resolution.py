@@ -22,6 +22,22 @@ A goal's quantifier ("all" or "one") is the structurer's reading of the
 request and is never changed here, except that a promoted goal -- naming its
 one device -- drops it.
 
+A goal whose request calls its device by name (`device_reference` "name") but
+which the structurer left without a device names a device the home does not
+have: a name fits only the device that has it, so no lookup completes it and
+it never reaches the InteractionSolver. The user is asked, with the devices of
+its kind in its room listed when the lookup found any ("I can't find the fan
+you named in the living room. It has: living_room_fan_2.").
+
+The same holds for a device the request mentions by its kind, and for a change
+the request asks of a device that cannot make it. The structurer copies the
+user's words for what is missing (`unmatched_device`: "air conditioner";
+`unmatched_action`: "brightness" on an on/off light); such a goal is not looked
+up and is asked about, never completed with another device that could do the
+same ("I can't find the air conditioner in the master bedroom. What should I do
+instead?"). A request for an effect alone ("warm up the bedroom") mentions no
+device: it is an ambiguous goal, planned on whichever devices can.
+
 An environment predicate missing its room ("while the humidity is above 60%")
 is looked up by its variable's class: if devices read that variable in one room
 only, that room is filled in; several rooms make it quantify over them. A
@@ -66,13 +82,64 @@ def _words(curie: Optional[str]) -> str:
 # Goals: what only the user can answer
 # --------------------------------------------------------------------------
 
+def named_device_missing(goal: GoalSpec) -> bool:
+    """True when the request calls its device by name and the structurer found
+    no device of that name: the goal is incomplete, refers by name, and has no
+    artifact_name. Such a goal is never completed with another device."""
+    return (goal.goal_specificity == "incomplete" and goal.device_reference == "name"
+            and not goal.artifact_name)
+
+
+def _missing_device_question(goal: GoalSpec, names: List[str]) -> str:
+    """The question for a named device the home does not have: what was looked
+    for, where, and the devices of that kind there, when there are any."""
+    kind = _words(goal.artifact_class) or "device"
+    room = f" in the {_words(goal.location_class)}" if goal.location_class else ""
+    question = f"I can't find the {kind} you named{room}."
+    if names:
+        question += f" It has: {', '.join(names)}. Which do you mean?"
+    return question
+
+
+def unmatched_question(goal: GoalSpec) -> Optional[str]:
+    """The question for a goal whose request mentions a device the home does not
+    have (`unmatched_device`), or asks a device for a change none of its actions
+    can make (`unmatched_action`); None for any other goal. Such a goal is never
+    completed with another device, however capable."""
+    room = f" in the {_words(goal.location_class)}" if goal.location_class else ""
+    # 1. The device itself is not there: the user's words for it.
+    if goal.unmatched_device:
+        device = goal.unmatched_device.strip()
+        device = device[4:] if device.lower().startswith("the ") else device
+        return f"I can't find the {device}{room}. What should I do instead?"
+    # 2. The device is there, but cannot make the change asked for: named by
+    #    its own name when the structurer found it ("the garage light"), else
+    #    by its kind and room.
+    if goal.unmatched_action:
+        device = (goal.artifact_name.replace("_", " ") if goal.artifact_name
+                  else f"{_words(goal.artifact_class) or 'device'}{room}")
+        return (f"The {device} has no {goal.unmatched_action} setting. "
+                f"What should I do instead?")
+    return None
+
+
 def clarification_question(goal: GoalSpec) -> Optional[str]:
     """The question to ask the user about this goal, or None when the goal can
     go on to planning."""
-    # Set by resolution: the devices are in several rooms, and the goal means
-    # one of them.
+    # 1. Set by resolution: the devices are in several rooms and the goal means
+    #    one of them, or the named device is missing (with what there is).
     if goal.clarification:
         return goal.clarification
+    # 2. A named device the home does not have, not looked up (its case has no
+    #    lookup): asked about without a list.
+    if named_device_missing(goal):
+        return _missing_device_question(goal, [])
+    # 3. A device mentioned by kind that is not there, or that cannot make the
+    #    change: asked about before the solver could pick another device.
+    unmatched = unmatched_question(goal)
+    if unmatched:
+        return unmatched
+    # 4. What only the user can say: which device, or what to do with it.
     case = incomplete_case(goal)
     if case == UNNAMED:
         return "Which device do you mean, and in which room?"
@@ -104,8 +171,13 @@ def structure_clarification(structure: GoalStructure) -> Optional[str]:
 def goal_query(goal: GoalSpec) -> Optional[Dict[str, Any]]:
     """The ENV_CAPABILITY_QUERY payload for an incomplete goal, or None when it
     is not to be looked up: only goals whose action is known are, since
-    without one nothing can be promoted."""
+    without one nothing can be promoted -- and never a goal the user is asked
+    about (`unmatched_question`)."""
     if incomplete_case(goal) not in (NO_LOCATION, NO_CLASS, NO_NAME):
+        return None
+    # A goal the user is asked about is never looked up: a lookup by room and
+    # action could promote it onto another device.
+    if unmatched_question(goal):
         return None
     payload: Dict[str, Any] = {
         "text_intent": goal.intent_text,
@@ -148,10 +220,19 @@ def apply_goal_resolution(goal: GoalSpec, response: Dict[str, Any]) -> bool:
     One device (and one action) fills the goal's empty slots from it; with all
     of them filled the goal becomes explicit and drops its quantifier. Several
     devices leave it incomplete -- for a goal missing its room, with the room
-    filled in or a question set (`_locate`)."""
+    filled in or a question set (`_locate`). A goal whose named device is
+    missing is never filled in: the devices found go into its question."""
+    entries = response.get("entries") or []
+    # 0. A named device the home does not have: the devices found are listed
+    #    in the question, never used in its place -- a name fits only the
+    #    device that has it, however alike another is.
+    if named_device_missing(goal):
+        names = sorted({str(e["artifact_name"]) for e in entries if e.get("artifact_name")})
+        goal.clarification = _missing_device_question(
+            goal, names if response.get("outcome") == "found" else [])
+        return False
     if response.get("outcome") != "found":
         return False
-    entries = response.get("entries") or []
     case = incomplete_case(goal)
 
     # 1. One device: fill the gaps from it, and promote when nothing is left.

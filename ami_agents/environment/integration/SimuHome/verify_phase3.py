@@ -35,18 +35,20 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
-from rdflib import Graph, Namespace, RDF, URIRef
+from rdflib import Graph, RDF, URIRef
 
 try:
     from .sim_client import SimuHomeClient
 except ImportError:  # pragma: no cover
     from sim_client import SimuHomeClient  # type: ignore
 
-TD = Namespace("https://www.w3.org/2019/wot/td#")
-HCTL = Namespace("https://www.w3.org/2019/wot/hypermedia#")
-HTV = Namespace("http://www.w3.org/2011/http#")
-JS = Namespace("https://www.w3.org/2019/wot/json-schema#")
-HOME = Namespace("http://example.org/homeont/")
+# Every vocabulary IRI comes from the adapter's one namespace module.
+try:
+    from .shtd_namespaces import (HCTL, HOMEONT, HTV, JS, TD, TDSOSA, WEBSUB)
+except ImportError:  # pragma: no cover - direct script use
+    from shtd_namespaces import (HCTL, HOMEONT, HTV, JS, TD, TDSOSA, WEBSUB)  # type: ignore
+# The scripts' short name for homeont.
+HOME = HOMEONT
 
 PASS, FAIL = "PASS", "FAIL"
 _results: List[tuple] = []
@@ -124,6 +126,8 @@ def wait_for_push(predicate, timeout: float = 12.0) -> Optional[Dict[str, Any]]:
 
 
 def main() -> int:
+    """Invoke, verify and observe one device through a live SHTD; 0 when every
+    check passes, 1 otherwise."""
     parser = argparse.ArgumentParser(description="Verify SHTD phase 3.")
     parser.add_argument("--shtd", default="http://127.0.0.1:8097")
     parser.add_argument("--sim", default="http://127.0.0.1:44275/api")
@@ -159,7 +163,6 @@ def main() -> int:
     # An artifact also carries subscribeToArtifact / unsubscribeFromArtifact,
     # which target /hub/ rather than an /actions/ route. Those are subscription
     # affordances, not actuation; count only the latter here.
-    WEBSUB = Namespace("https://purl.org/hmas/websub/")
     _SUBSCRIPTION_TYPES = {WEBSUB.subscribeToArtifact,
                            WEBSUB.unsubscribeFromArtifact,
                            WEBSUB.subscribeToWorkspace,
@@ -171,7 +174,7 @@ def main() -> int:
     actuatable = [
         p for p in g.objects(art, TD.hasPropertyAffordance)
         if (p, RDF.type,
-            URIRef("https://example.org/hmas/td-sosa-ext#ActuatablePropertyAffordance")) in g
+            TDSOSA.ActuatablePropertyAffordance) in g
     ]
     check("one action per actuatable property",
           len(actions) == len(actuatable),
