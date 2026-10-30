@@ -6,7 +6,7 @@
 # (hb1_infeasible_seed_2631 -> hb1_feasible_seed_2631_fixed), and its meta records the
 # original gold and the reason (`meta.label_correction`).
 #
-# Two kinds, both in the ECAI-400 episodes only:
+# These kinds, all in the ECAI-400 episodes only:
 # * labelled `unexist_attribute` ("the light has no brightness") although HomeBench's own
 #   home file gives that light a brightness (0-100) and its method list a set_brightness:
 #   the request can be done, so the gold is the call it asks for. "minimum" / "lowest

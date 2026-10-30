@@ -10,6 +10,7 @@ The config is a variant file (`models.py`: one model per phase, each on OpenAI
 or a local OpenAI-compatible server through `provider:`), plus how to run it:
 
     suite: simuhome                    # simuhome (default) | homebench
+    benchmark: tests/homebench/ecai400 # optional: the episodes' directory (default: the suite's)
     name: nano-openai                  # records under <out>/<name>/
     providers: {local: {base_url: http://localhost:11434/v1}}
     models:
@@ -192,7 +193,11 @@ def main() -> int:
         print(f"config {config_path.name}: {exc}")
         return 2
     out = Path(args.out).resolve() if args.out else suite.results_root / "harness"
-    benchmark = Path(args.benchmark) if args.benchmark else suite.default_benchmark
+    # The benchmark directory: the command line's, else the config's own (relative to
+    # the project root, e.g. tests/homebench/ecai400), else the suite's default.
+    benchmark = (Path(args.benchmark) if args.benchmark
+                 else PROJECT_ROOT / config["benchmark"] if config.get("benchmark")
+                 else suite.default_benchmark)
     records = out / variant.name
     # A suite without a judge (HomeBench) never has one, whatever the config says.
     judge = bool((config.get("evaluate") or {}).get("judge", True)) and not args.no_judge \

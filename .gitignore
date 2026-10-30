@@ -267,6 +267,8 @@ agent_logs/
 **/HomeAssistant/prepare-adapter-env.sh
 # HomeBench converter output (about 17k generated files; rebuild with tests/homebench/convert.py)
 tests/homebench/data/
+# The ECAI-400 evaluation set, copied out of data/ with corrections applied (shipped as a zip)
+tests/homebench/ecai400/
 # HomeBench bench records and statistics (run.py / harness.py / sweep.py write here)
 tests/homebench/results/
 
