@@ -32,6 +32,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -48,6 +49,13 @@ from sim_client import SimuHomeClient, SimuHomeError  # noqa: E402
 REPO = HERE.parents[3]
 DEFAULT_SIMUHOME = REPO.parent / "SimuHome"
 DEFAULT_BENCHMARK = DEFAULT_SIMUHOME / "data" / "benchmark"
+
+
+class _ServerExited(Exception):
+    """A server subprocess ended before it was ready."""
+    def __init__(self, returncode: Optional[int]):
+        super().__init__(returncode)
+        self.returncode = returncode
 
 
 def free_port() -> int:
@@ -162,6 +170,8 @@ class SimuHomeWorker:
             try:
                 if predicate():
                     return True
+            except _ServerExited:
+                raise
             except Exception:
                 pass
             time.sleep(interval)
