@@ -103,14 +103,17 @@ class SimuHomeWorker:
         benchmark: Path = DEFAULT_BENCHMARK,
         tick_interval: Optional[float] = None,
         poll_interval: float = 1.0,
-        startup_timeout: float = 90.0,
+        startup_timeout: Optional[float] = None,
         worker_id: int = 0,
     ):
         self.simuhome = Path(simuhome)
         self.benchmark = Path(benchmark)
         self.tick_interval = tick_interval
         self.poll_interval = poll_interval
-        self.startup_timeout = startup_timeout
+        # Default 90 s; SIMUHOME_STARTUP_TIMEOUT raises it on a loaded node,
+        # where SHTD's TD build can take longer than that.
+        self.startup_timeout = float(startup_timeout if startup_timeout is not None
+                                     else os.environ.get("SIMUHOME_STARTUP_TIMEOUT", 90.0))
         self.worker_id = worker_id
 
         self.sim_port = free_port()
@@ -156,8 +159,15 @@ class SimuHomeWorker:
         last_error = ""
         for attempt in range(2):
             if attempt:
+                # A fresh simulator and fresh ports: SHTD blocks on a wedged
+                # simulator, and a lingering socket blocks the old port.
+                self.stop()
+                self.sim_port = free_port()
                 self.shtd_port = free_port()
+                self.sim_base = f"http://127.0.0.1:{self.sim_port}/api"
                 self.shtd_base = f"http://127.0.0.1:{self.shtd_port}"
+                self.client = SimuHomeClient(self.sim_base)
+                self.start()
             log_dir = Path(os.environ.get("SHTD_LOG_DIR") or tempfile.gettempdir())
             log_dir.mkdir(parents=True, exist_ok=True)
             log_path = log_dir / f"shtd_w{self.worker_id}_{self.shtd_port}.log"
@@ -167,7 +177,7 @@ class SimuHomeWorker:
                      "--sim", self.sim_base, "--home", home,
                      "--host", "127.0.0.1", "--port", str(self.shtd_port),
                      "--poll-interval", str(self.poll_interval)],
-                    stdout=subprocess.DEVNULL, stderr=log)
+                    stdout=log, stderr=subprocess.STDOUT)
 
             def ready() -> bool:
                 if self._shtd is not None and self._shtd.poll() is not None:

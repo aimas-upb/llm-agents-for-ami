@@ -124,6 +124,7 @@ done
 # --- the harness --------------------------------------------------------------
 cd "$REPO"
 export SHTD_LOG_DIR="$JOB_DIR/shtd"      # each worker's SHTD stderr (worker.py), for post-mortems
+export SIMUHOME_STARTUP_TIMEOUT="${SIMUHOME_STARTUP_TIMEOUT:-300}"   # simulator / SHTD start, seconds (worker.py)
 ARGS=(--config "$VARIANT_RUN" --out "$OUT_DIR")
 [ -n "${EPISODES:-}" ] && ARGS+=(--episodes "$EPISODES")
 [ -n "${SEEDS:-}" ]    && ARGS+=(--seeds "$SEEDS")
