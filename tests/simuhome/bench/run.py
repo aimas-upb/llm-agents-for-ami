@@ -230,6 +230,20 @@ def _logger(debug: bool):
     return logging.getLogger("bench")
 
 
+def _infra_text(text: Optional[str], suite: Suite) -> bool:
+    """Whether an error text names the infrastructure (the simulator, the transport)."""
+    return any(marker in (text or "") for marker in suite.infra_markers)
+
+
+def _infra_record(path: Path, suite: Suite) -> bool:
+    """Whether a record is an infrastructure error (re-run on --skip-existing)."""
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return True
+    return record.get("outcome") == "error" and _infra_text(record.get("error"), suite)
+
+
 def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> List[str]:
     """Run ``names`` on one simulator (SimuHome's, or HomeBench's engine); the
     record paths written."""
@@ -288,13 +302,35 @@ def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> Li
             sim = worker.client
             fixed = None
 
+        def restart_worker():
+            """A fresh worker on fresh ports; None when no simulator can start."""
+            nonlocal worker, sim
+            worker.stop()
+            try:
+                worker = fresh_worker()
+            except Exception as restart_exc:  # noqa: BLE001 - reported, chunk ends
+                print(f"[w{worker_id}] no simulator ({type(restart_exc).__name__}): "
+                      f"{len(names) - count + 1} episode(s) left for a later run", flush=True)
+                print(f"[w{worker_id}] {restart_exc}", file=sys.stderr, flush=True)
+                worker = None
+                return None
+            sim = worker.client
+            return worker
+
         # 3. Each episode: loaded by the suite, served by the worker, run, recorded.
+        #    An environment failure (the simulator or its TD server down: a
+        #    lingering port, a slow start on a loaded node, a simulator that died
+        #    under the previous episode) costs one fresh worker and one retry of
+        #    the episode, not the worker's whole chunk. A second failure leaves
+        #    the episode for the next --skip-existing run, which also re-runs any
+        #    record that is an infrastructure error rather than the model's.
         for count, name in enumerate(names, 1):
             path = out / f"{name}.json"
-            if settings["skip_existing"] and path.exists():
+            if settings["skip_existing"] and path.exists() and not _infra_record(path, suite):
                 continue
             episode = suite.load_episode(benchmark, name)
-            target = None
+            record = None
+            dead = False
             for attempt in range(2):
                 try:
                     if worker is not None:
@@ -304,13 +340,7 @@ def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> Li
                                         getattr(worker, "home_id", None) or name)
                     else:
                         target = Target(sim, *fixed)
-                    break
                 except Exception as exc:  # noqa: BLE001 - a dead environment must not end the run
-                    # The simulator or its TD server did not come up (a lingering
-                    # port, a slow start on a loaded node): one fresh worker and one
-                    # retry of the episode. A second failure leaves the episode
-                    # without a record, for the next --skip-existing run; a worker
-                    # that cannot be restarted at all ends this chunk the same way.
                     print(f"[w{worker_id} {count}/{len(names)}] {name}: environment failed"
                           + (", retrying on a fresh worker" if worker is not None and not attempt
                              else ", skipped"), flush=True)
@@ -318,23 +348,31 @@ def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> Li
                           file=sys.stderr, flush=True)
                     if worker is None or attempt:
                         break
-                    worker.stop()
-                    try:
-                        worker = fresh_worker()
-                    except Exception as restart_exc:  # noqa: BLE001 - reported, chunk ends
-                        print(f"[w{worker_id}] no simulator ({type(restart_exc).__name__}): "
-                              f"{len(names) - count + 1} episode(s) left for a later run",
-                              flush=True)
-                        print(f"[w{worker_id}] {restart_exc}", file=sys.stderr, flush=True)
-                        worker = None
-                        return written
-                    sim = worker.client
-            if target is None:
+                    if restart_worker() is None:
+                        dead = True
+                        break
+                    continue
+                started = time.perf_counter()
+                record = asyncio.run(run_episode(name, episode, variant, config, target,
+                                                 options, logger, suite))
+                record["wall_seconds"] = time.perf_counter() - started
+                if (worker is not None and not attempt and record["outcome"] == "error"
+                        and record.get("error_step") == "load"
+                        and _infra_text(record.get("error"), suite)):
+                    # The simulator stopped answering (seen as a failed reset):
+                    # the record is the infrastructure's, not the model's.
+                    print(f"[w{worker_id} {count}/{len(names)}] {name}: environment failed in load "
+                          f"({record['error']}), retrying on a fresh worker", flush=True)
+                    record = None
+                    if restart_worker() is None:
+                        dead = True
+                        break
+                    continue
+                break
+            if dead:
+                return written
+            if record is None:
                 continue
-            started = time.perf_counter()
-            record = asyncio.run(run_episode(name, episode, variant, config, target,
-                                             options, logger, suite))
-            record["wall_seconds"] = time.perf_counter() - started
             path.write_text(json.dumps(record, default=str), encoding="utf-8")
             written.append(str(path))
             print(f"[w{worker_id} {count}/{len(names)}] {name}: {record['outcome']}"
