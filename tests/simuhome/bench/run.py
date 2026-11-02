@@ -279,8 +279,12 @@ def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> Li
             # The environment mode goes only to a worker whose suite has the option
             # (SimuHomeWorker has no such argument).
             extra = {"environment": settings["environment"]} if suite.environment else {}
-            worker = suite.worker_cls(benchmark=benchmark, worker_id=worker_id,
-                                      **extra).start()
+
+            def fresh_worker():
+                return suite.worker_cls(benchmark=benchmark, worker_id=worker_id,
+                                        **extra).start()
+
+            worker = fresh_worker()
             sim = worker.client
             fixed = None
 
@@ -290,12 +294,43 @@ def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> Li
             if settings["skip_existing"] and path.exists():
                 continue
             episode = suite.load_episode(benchmark, name)
-            if worker is not None:
-                worker.load(name)               # TD server bound to this episode's home id
-                # SimuHome's home id is the episode's name; HomeBench's is home<id>.
-                target = Target(sim, worker.shtd_base, getattr(worker, "home_id", None) or name)
-            else:
-                target = Target(sim, *fixed)
+            target = None
+            for attempt in range(2):
+                try:
+                    if worker is not None:
+                        worker.load(name)       # TD server bound to this episode's home id
+                        # SimuHome's home id is the episode's name; HomeBench's is home<id>.
+                        target = Target(sim, worker.shtd_base,
+                                        getattr(worker, "home_id", None) or name)
+                    else:
+                        target = Target(sim, *fixed)
+                    break
+                except Exception as exc:  # noqa: BLE001 - a dead environment must not end the run
+                    # The simulator or its TD server did not come up (a lingering
+                    # port, a slow start on a loaded node): one fresh worker and one
+                    # retry of the episode. A second failure leaves the episode
+                    # without a record, for the next --skip-existing run; a worker
+                    # that cannot be restarted at all ends this chunk the same way.
+                    print(f"[w{worker_id} {count}/{len(names)}] {name}: environment failed"
+                          + (", retrying on a fresh worker" if worker is not None and not attempt
+                             else ", skipped"), flush=True)
+                    print(f"[w{worker_id}] {name}: {type(exc).__name__}: {exc}",
+                          file=sys.stderr, flush=True)
+                    if worker is None or attempt:
+                        break
+                    worker.stop()
+                    try:
+                        worker = fresh_worker()
+                    except Exception as restart_exc:  # noqa: BLE001 - reported, chunk ends
+                        print(f"[w{worker_id}] no simulator ({type(restart_exc).__name__}): "
+                              f"{len(names) - count + 1} episode(s) left for a later run",
+                              flush=True)
+                        print(f"[w{worker_id}] {restart_exc}", file=sys.stderr, flush=True)
+                        worker = None
+                        return written
+                    sim = worker.client
+            if target is None:
+                continue
             started = time.perf_counter()
             record = asyncio.run(run_episode(name, episode, variant, config, target,
                                              options, logger, suite))

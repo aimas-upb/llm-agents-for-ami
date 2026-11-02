@@ -130,23 +130,65 @@ class SimuHomeWorker:
     # -- lifecycle ---------------------------------------------------------
 
     def start(self) -> "SimuHomeWorker":
+        """Start the simulator. One failed start (the process exits, or is not
+        ready in ``startup_timeout``) is retried once on fresh ports. Its output
+        is kept in ``SHTD_LOG_DIR`` (default: the system temp dir), and its tail
+        is part of the error: a start that fails silently cannot be diagnosed."""
         if not (self.simuhome / "src" / "simulator" / "api" / "app.py").is_file():
             raise FileNotFoundError(f"SimuHome not found at {self.simuhome}")
+        last_error = ""
+        for attempt in range(2):
+            if attempt:
+                self.stop()
+                self._reassign_ports()
+            env = os.environ.copy()
+            env["SERVER_PORT"] = str(self.sim_port)
+            log_path = self._log_dir() / f"sim_w{self.worker_id}_{self.sim_port}.log"
+            with open(log_path, "w", encoding="utf-8") as log:
+                self._sim = subprocess.Popen(
+                    [sys.executable, "-m", "src.simulator.api.app"],
+                    cwd=str(self.simuhome), env=env,
+                    stdout=log, stderr=subprocess.STDOUT)
 
-        env = os.environ.copy()
-        env["SERVER_PORT"] = str(self.sim_port)
-        self._sim = subprocess.Popen(
-            [sys.executable, "-m", "src.simulator.api.app"],
-            cwd=str(self.simuhome), env=env,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            def ready() -> bool:
+                if self._sim is not None and self._sim.poll() is not None:
+                    raise _ServerExited(self._sim.returncode)
+                return bool(self.client.health())
 
-        if not self._wait_for(lambda: self.client.health()):
-            self.stop()
-            raise RuntimeError(f"simulator did not start on {self.sim_port}")
+            try:
+                if self._wait_for(ready):
+                    # SHTD's home id is set per episode, so it starts unbound and
+                    # is restarted on the first load. Starting it here would fix
+                    # the wrong id.
+                    return self
+                last_error = f"not ready after {self.startup_timeout:.0f}s"
+            except _ServerExited as exc:
+                last_error = f"exited with code {exc.returncode}"
+            last_error += f" on port {self.sim_port}" + self._log_tail(log_path)
+        self.stop()
+        raise RuntimeError(f"simulator did not start: {last_error}")
 
-        # SHTD's home id is set per episode, so it starts unbound and is
-        # restarted on the first load. Starting it here would fix the wrong id.
-        return self
+    def _reassign_ports(self) -> None:
+        """Fresh ports for both servers: a lingering socket blocks the old one."""
+        self.sim_port = free_port()
+        self.shtd_port = free_port()
+        self.sim_base = f"http://127.0.0.1:{self.sim_port}/api"
+        self.shtd_base = f"http://127.0.0.1:{self.shtd_port}"
+        self.client = SimuHomeClient(self.sim_base)
+
+    @staticmethod
+    def _log_dir() -> Path:
+        log_dir = Path(os.environ.get("SHTD_LOG_DIR") or tempfile.gettempdir())
+        log_dir.mkdir(parents=True, exist_ok=True)
+        return log_dir
+
+    @staticmethod
+    def _log_tail(log_path: Path, lines: int = 8) -> str:
+        try:
+            tail = log_path.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-lines:]
+        except OSError:
+            tail = []
+        return ("; output tail:\n  " + "\n  ".join(tail)) if tail else ""
 
     def _start_shtd(self, home: str) -> None:
         """Start SHTD for ``home``. One failed start (the server exits, or is
@@ -162,15 +204,9 @@ class SimuHomeWorker:
                 # A fresh simulator and fresh ports: SHTD blocks on a wedged
                 # simulator, and a lingering socket blocks the old port.
                 self.stop()
-                self.sim_port = free_port()
-                self.shtd_port = free_port()
-                self.sim_base = f"http://127.0.0.1:{self.sim_port}/api"
-                self.shtd_base = f"http://127.0.0.1:{self.shtd_port}"
-                self.client = SimuHomeClient(self.sim_base)
+                self._reassign_ports()
                 self.start()
-            log_dir = Path(os.environ.get("SHTD_LOG_DIR") or tempfile.gettempdir())
-            log_dir.mkdir(parents=True, exist_ok=True)
-            log_path = log_dir / f"shtd_w{self.worker_id}_{self.shtd_port}.log"
+            log_path = self._log_dir() / f"shtd_w{self.worker_id}_{self.shtd_port}.log"
             with open(log_path, "w", encoding="utf-8") as log:
                 self._shtd = subprocess.Popen(
                     [sys.executable, str(HERE / "shtd.py"),
@@ -194,13 +230,7 @@ class SimuHomeWorker:
             except _ServerExited as exc:
                 last_error = f"exited with code {exc.returncode}"
             self._stop_shtd()
-            try:
-                tail = log_path.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-8:]
-            except OSError:
-                tail = []
-            last_error += f" on port {self.shtd_port} (home {home})"
-            if tail:
-                last_error += "; stderr tail:\n  " + "\n  ".join(tail)
+            last_error += f" on port {self.shtd_port} (home {home})" + self._log_tail(log_path)
         self.stop()
         raise RuntimeError(f"SHTD did not start: {last_error}")
 
