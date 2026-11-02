@@ -58,6 +58,18 @@ echo "host: $(hostname -f)  variant: $VARIANT  attempt: $ATTEMPT  out: $OUT_DIR"
 nvidia-smi -L || true
 
 # --- Ollama on a per-job port -------------------------------------------------
+# The bundle is copied to node-local disk first: Ollama probes the GPU by
+# starting a llama-server with its CUDA libraries, under a 30 s watchdog, and
+# a cold read of those 2 GB over the NFS home misses it -- Ollama then falls
+# back to the CPU without failing. The copy is kept per node and reused.
+OLLAMA_LOCAL="${OLLAMA_LOCAL:-/tmp/ollama-$(basename "$OLLAMA_DIR")-$USER}"
+if [ ! -x "$OLLAMA_LOCAL/bin/ollama" ] || [ "$OLLAMA_DIR/bin/ollama" -nt "$OLLAMA_LOCAL/bin/ollama" ]; then
+  echo "copying ollama bundle to $OLLAMA_LOCAL ..."
+  rm -rf "$OLLAMA_LOCAL"; mkdir -p "$OLLAMA_LOCAL"
+  cp -a "$OLLAMA_DIR/." "$OLLAMA_LOCAL/"
+fi
+OLLAMA_BIN="$OLLAMA_LOCAL/bin/ollama"
+
 OLLAMA_PORT=$(( 11500 + SLURM_JOB_ID % 1000 ))
 export OLLAMA_MODELS="$HOME/ollama_models"
 export OLLAMA_HOST="127.0.0.1:${OLLAMA_PORT}"
@@ -66,18 +78,25 @@ export OLLAMA_MAX_LOADED_MODELS="${OLLAMA_MAX_LOADED_MODELS:-5}"
 export OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-4}"
 export OLLAMA_CONTEXT_LENGTH="${OLLAMA_CTX:-32768}"
 export OLLAMA_FLASH_ATTENTION="${OLLAMA_FLASH_ATTENTION:-1}"
-"$OLLAMA_DIR/bin/ollama" serve > "$JOB_DIR/ollama.log" 2>&1 &
+"$OLLAMA_BIN" serve > "$JOB_DIR/ollama.log" 2>&1 &
 OLLAMA_PID=$!
 cleanup() { kill "$OLLAMA_PID" 2>/dev/null || true; }
 trap cleanup EXIT
-for _ in $(seq 1 30); do
-  curl -s -m 2 "http://127.0.0.1:${OLLAMA_PORT}/api/version" >/dev/null && break
+# Wait for the GPU probe to finish, then insist on the GPU: a CPU-only server
+# would run the whole grid at a crawl and poison every latency number.
+for _ in $(seq 1 150); do
+  grep -q 'msg="inference compute"' "$JOB_DIR/ollama.log" 2>/dev/null && break
   kill -0 "$OLLAMA_PID" 2>/dev/null || break
-  sleep 1
+  sleep 2
 done
-curl -s -m 2 "http://127.0.0.1:${OLLAMA_PORT}/api/version" >/dev/null \
-  || { echo "ERROR: ollama did not start on port ${OLLAMA_PORT}"; tail -5 "$JOB_DIR/ollama.log"; exit 1; }
-echo "ollama up on port ${OLLAMA_PORT} (ctx ${OLLAMA_CONTEXT_LENGTH}, parallel ${OLLAMA_NUM_PARALLEL})"
+if ! grep 'msg="inference compute"' "$JOB_DIR/ollama.log" | grep -q 'library=CUDA'; then
+  echo "ERROR: ollama did not find the GPU (see $JOB_DIR/ollama.log):"
+  grep -E 'inference compute|discovery|watchdog' "$JOB_DIR/ollama.log" | cut -c1-200 | tail -6
+  exit 1
+fi
+curl -s -m 5 "http://127.0.0.1:${OLLAMA_PORT}/api/version" >/dev/null \
+  || { echo "ERROR: ollama not answering on port ${OLLAMA_PORT}"; tail -5 "$JOB_DIR/ollama.log"; exit 1; }
+echo "ollama up on port ${OLLAMA_PORT} on $(grep 'msg="inference compute"' "$JOB_DIR/ollama.log" | grep -oE 'description="[^"]+"' | head -1) (ctx ${OLLAMA_CONTEXT_LENGTH}, parallel ${OLLAMA_NUM_PARALLEL})"
 
 # --- the variant, with the local URL pointed at this job's server ------------
 VARIANT_RUN="$JOB_DIR/$(basename "$VARIANT_PATH")"
@@ -88,13 +107,13 @@ sed "s#http://localhost:11434/v1#http://127.0.0.1:${OLLAMA_PORT}/v1#g; s#http://
 # episodes are not timed with model loading inside them.
 MODELS=$(grep -oE 'model: *"?[A-Za-z0-9_./:-]+"?' "$VARIANT_RUN" | sed -E 's/model: *"?([^"]+)"?/\1/' | sort -u)
 for m in $MODELS; do
-  "$OLLAMA_DIR/bin/ollama" list 2>/dev/null | awk '{print $1}' | grep -qx "$m" || continue   # OpenAI names are skipped
+  "$OLLAMA_BIN" list 2>/dev/null | awk '{print $1}' | grep -qx "$m" || continue   # OpenAI names are skipped
   echo "loading $m ..."
   curl -s -m 600 "http://127.0.0.1:${OLLAMA_PORT}/api/generate" \
     -d "{\"model\": \"$m\", \"keep_alive\": -1}" >/dev/null \
     || { echo "ERROR: could not load $m"; exit 1; }
 done
-"$OLLAMA_DIR/bin/ollama" ps || true
+"$OLLAMA_BIN" ps || true
 
 # --- the harness --------------------------------------------------------------
 cd "$REPO"
