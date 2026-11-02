@@ -3,7 +3,10 @@
 Differs from the UserAssistant's equivalent in two ways:
 
 1. A ``planning.llm_planning`` yaml section can override the shared
-   ``llm.providers.openai`` settings (planning-specific model/temperature).
+   ``llm.providers.openai`` settings (planning-specific model/temperature,
+   and -- for the NLU/planner role split -- ``base_url``, ``api_key`` and
+   ``reasoning_effort``, so the planner can live on a different backend
+   than the UserAssistant's model; see docs/multi_model_choice.md).
 2. ``max_tokens`` is supported for non-reasoning models, since BT-JSON
    plans can be long. Reasoning models (o-series) still only use
    ``max_completion_tokens``.
@@ -66,20 +69,27 @@ def build_llm_client(config: Dict[str, Any]) -> LLMClientConfig:
             except Exception:
                 max_completion_tokens = None
 
-    reasoning_effort = (
-        planning_llm.get("reasoning_effort")
-        or provider_cfg.get("reasoning_effort")
-        or llm_root.get("reasoning_effort")
-        or os.getenv("OPENAI_REASONING_EFFORT")
-    )
+    if "reasoning_effort" in planning_llm:
+        # An explicit planning-side value (even an empty one) is authoritative:
+        # a local planner must not inherit the shared provider's effort setting
+        # when the UserAssistant runs on an OpenAI reasoning model.
+        reasoning_effort = planning_llm.get("reasoning_effort") or None
+    else:
+        reasoning_effort = (
+            provider_cfg.get("reasoning_effort")
+            or llm_root.get("reasoning_effort")
+            or os.getenv("OPENAI_REASONING_EFFORT")
+        )
 
     api_key = (
-        provider_cfg.get("api_key")
+        planning_llm.get("api_key")
+        or provider_cfg.get("api_key")
         or llm_root.get("api_key")
         or os.getenv("OPENAI_API_KEY")
     )
     base_url = str(
-        provider_cfg.get("base_url")
+        planning_llm.get("base_url")
+        or provider_cfg.get("base_url")
         or llm_root.get("base_url")
         or "https://api.openai.com/v1"
     )

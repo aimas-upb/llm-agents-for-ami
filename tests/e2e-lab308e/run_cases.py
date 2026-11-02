@@ -72,6 +72,7 @@ RESULT_COLUMNS = [
     *LLM_PHASE_COLUMNS,
     "generation_mode",
     "generated_code",
+    "planner_model_name",
 ]
 SIGNIFIER_RESULT_COLUMNS = [
     "signifier_matches",
@@ -779,7 +780,18 @@ class Lab308eHarness:
             .split("/api/websocket")[0]
         ).strip().rstrip("/")
         self.response_timeout = float(args.response_timeout)
+        # NLU/planner role split (docs/multi_model_choice.md): OPENAI_MODEL is
+        # the UserAssistant's model (intent extraction, dialogue) and, unless
+        # PLANNER_MODEL is set, also the InteractionSolver's. PLANNER_MODEL
+        # (+ optional PLANNER_BASE_URL / PLANNER_API_KEY /
+        # PLANNER_REASONING_EFFORT) moves only the plan generator to another
+        # model or backend, so the generation mode under test is exercised by
+        # the planner model while the upstream NLU stage is held fixed.
         self.model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+        self.planner_override = _planner_override_from_env()
+        self.planner_model_name = (
+            self.planner_override["model"] if self.planner_override else self.model_name
+        )
 
         self.explorer_jid = f"env_explorer@{self.xmpp_server}"
         self.assistant_jid = f"user_assistant@{self.xmpp_server}"
@@ -1128,12 +1140,15 @@ class Lab308eHarness:
         assistant_reply: str,
         fallback: str,
     ) -> Dict[str, Any]:
-        if not self.solver:
+        # The simulated user is harness machinery, not a condition under test:
+        # it runs on the UserAssistant's (NLU) model so a weak planner model
+        # in a role-split run cannot also break the confirmation turn.
+        if not self.assistant:
             return {
                 "reply": fallback,
                 "source": "dynamic_fallback",
                 "raw_dynamic_reply": None,
-                "dynamic_error": "InteractionSolver agent is not available",
+                "dynamic_error": "UserAssistant agent is not available",
             }
 
         system_prompt = (
@@ -1152,25 +1167,24 @@ class Lab308eHarness:
             "fallback_reply": fallback,
         }
         api_kwargs: Dict[str, Any] = {
-            "model": self.solver.model,
+            "model": self.assistant.llm_model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": json.dumps(user_prompt, ensure_ascii=True)},
             ],
         }
-        if not self.solver.model.lower().startswith(("o", "gpt-5")):
-            api_kwargs["temperature"] = self.solver.temperature
-            if self.solver.max_tokens is not None:
-                api_kwargs["max_tokens"] = min(int(self.solver.max_tokens), 256)
+        if not self.assistant.llm_model.lower().startswith(("o", "gpt-5")):
+            api_kwargs["temperature"] = self.assistant.llm_temperature
+            api_kwargs["max_tokens"] = 256
         else:
-            if self.solver.reasoning_effort:
-                api_kwargs["reasoning_effort"] = self.solver.reasoning_effort
-            if self.solver.max_completion_tokens is not None:
-                api_kwargs["max_completion_tokens"] = min(int(self.solver.max_completion_tokens), 256)
+            if self.assistant.llm_reasoning_effort:
+                api_kwargs["reasoning_effort"] = self.assistant.llm_reasoning_effort
+            if self.assistant.llm_max_completion_tokens is not None:
+                api_kwargs["max_completion_tokens"] = min(int(self.assistant.llm_max_completion_tokens), 256)
 
         content: Optional[str] = None
         try:
-            response = await self.solver.llm_client.chat.completions.create(**api_kwargs)
+            response = await self.assistant.llm_client.chat.completions.create(**api_kwargs)
             content = response.choices[0].message.content or ""
             start = content.find("{")
             end = content.rfind("}")
@@ -1229,11 +1243,15 @@ class Lab308eHarness:
         )
 
         model = self.model_name
-        base_url = os.getenv("OPENAI_BASE_URL")
-        if not base_url:
-            base_url = "https://openrouter.ai/api/v1" if ":" in model or "/" in model else "https://api.openai.com/v1"
+        base_url = os.getenv("OPENAI_BASE_URL") or _default_base_url(model)
         reasoning_effort = os.getenv("OPENAI_REASONING_EFFORT", "").strip() or (
             "high" if model.startswith("o") and "openai.com" in base_url else ""
+        )
+        planner_model = self.planner_model_name
+        planner_base_url = (
+            (self.planner_override.get("base_url") or _default_base_url(planner_model))
+            if self.planner_override
+            else base_url
         )
 
         config["yggdrasil_url"] = self.yggdrasil_url
@@ -1250,10 +1268,25 @@ class Lab308eHarness:
                 "model": model,
             }
         )
-        if self._requires_default_temperature(model, base_url):
+        # Captured before the gpt-5 temperature pin below: in a role split the
+        # planner must keep the yaml planning temperature rather than inherit
+        # the UserAssistant's pinned 1.0 (a confound across planner models).
+        yaml_planning = (
+            ((config.get("interaction_solver") or {}).get("planning") or {}).get("llm_planning") or {}
+        )
+        planner_default_temperature = yaml_planning.get(
+            "temperature", config["llm"]["providers"]["openai"].get("temperature")
+        )
+        nlu_needs_default_temperature = self._requires_default_temperature(model, base_url)
+        planner_needs_default_temperature = self._requires_default_temperature(
+            planner_model, planner_base_url
+        )
+        if nlu_needs_default_temperature:
             config["llm"]["providers"]["openai"]["temperature"] = 1.0
+        if planner_needs_default_temperature:
             config.setdefault("interaction_solver", {}).setdefault("planning", {}).setdefault("llm_planning", {})
             config["interaction_solver"]["planning"]["llm_planning"]["temperature"] = 1.0
+        if nlu_needs_default_temperature or planner_needs_default_temperature:
             llm_timeout = float(os.getenv("AMI_LLM_TIMEOUT", "180"))
             config.setdefault("llm", {}).setdefault("retry", {})
             config["llm"]["retry"]["timeout"] = llm_timeout
@@ -1266,6 +1299,22 @@ class Lab308eHarness:
         if reasoning_effort:
             config["llm"]["providers"]["openai"]["reasoning_effort"] = reasoning_effort
         config.setdefault("planning", {})
+        if self.planner_override:
+            _apply_planner_override(
+                config,
+                model=planner_model,
+                base_url=planner_base_url,
+                api_key=self.planner_override.get("api_key") or os.getenv("OPENAI_API_KEY"),
+                reasoning_effort=self.planner_override.get("reasoning_effort", ""),
+                temperature=1.0 if planner_needs_default_temperature else planner_default_temperature,
+            )
+            self.logger.info(
+                "NLU/planner role split: assistant=%s (%s) planner=%s (%s)",
+                model,
+                base_url,
+                planner_model,
+                planner_base_url,
+            )
         config["planning"]["timeout"] = float(os.getenv("AMI_PLANNING_TIMEOUT", "180"))
         # The InteractionSolver reads the plan-generation mode from the
         # top-level planning dict (it receives this full merged config);
@@ -1431,7 +1480,13 @@ class Lab308eHarness:
 
     async def run_case(self, case_path: Path) -> CaseResult:
         case = json.loads(case_path.read_text())
-        details: Dict[str, Any] = {"case": case, "transcript": [], "assertions": [], "model_name": self.model_name}
+        details: Dict[str, Any] = {
+            "case": case,
+            "transcript": [],
+            "assertions": [],
+            "model_name": self.model_name,
+            "planner_model_name": self.planner_model_name,
+        }
         name = case.get("name") or case_path.stem
         case_response_timeout = float(case.get("response_timeout_seconds", self.response_timeout))
         self.logger.info("Running case: %s", name)
@@ -1928,6 +1983,59 @@ def _extract_signifier_result_fields(plan: Any) -> Dict[str, Any]:
     }
 
 
+def _default_base_url(model: str) -> str:
+    """Backend implied by a bare model tag when no base URL is given."""
+    return "https://openrouter.ai/api/v1" if ":" in model or "/" in model else "https://api.openai.com/v1"
+
+
+def _planner_override_from_env() -> Optional[Dict[str, str]]:
+    """Read the PLANNER_* env vars; ``None`` means single-model protocol."""
+    model = os.getenv("PLANNER_MODEL", "").strip()
+    if not model:
+        return None
+    return {
+        "model": model,
+        "base_url": os.getenv("PLANNER_BASE_URL", "").strip(),
+        "api_key": os.getenv("PLANNER_API_KEY", "").strip(),
+        "reasoning_effort": os.getenv("PLANNER_REASONING_EFFORT", "").strip(),
+    }
+
+
+def _apply_planner_override(
+    config: Dict[str, Any],
+    *,
+    model: str,
+    base_url: str,
+    api_key: Optional[str],
+    reasoning_effort: str = "",
+    temperature: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Point the InteractionSolver's planner at its own model/backend.
+
+    The ISA's client factory reads ``planning.llm_planning`` before the
+    shared ``llm.providers`` block, so writing the planner backend there
+    leaves the UserAssistant on the shared provider. ``reasoning_effort`` is
+    always written (even empty) because the factory treats a present key as
+    authoritative -- a local planner must not inherit an OpenAI effort
+    setting. Mirrored into ``interaction_solver.planning.llm_planning`` for
+    the main.py-style config shape, like ``output_format``.
+    """
+    override: Dict[str, Any] = {
+        "model": model,
+        "base_url": base_url,
+        "api_key": api_key,
+        "reasoning_effort": reasoning_effort or "",
+    }
+    if temperature is not None:
+        override["temperature"] = temperature
+    for section in (
+        config.setdefault("planning", {}),
+        config.setdefault("interaction_solver", {}).setdefault("planning", {}),
+    ):
+        section.setdefault("llm_planning", {}).update(override)
+    return config
+
+
 def _extract_generation_fields(plan: Any, default_mode: str = "") -> Dict[str, Any]:
     """Pull generation mode/code from the plan envelope the ISA emitted.
 
@@ -1952,6 +2060,9 @@ def _normalise_results_row(row: Dict[str, Any]) -> Dict[str, Any]:
     for column in ("generation_mode", "generated_code"):
         if normalised.get(column) in (None, ""):
             normalised[column] = generation[column]
+    if normalised.get("planner_model_name") in (None, ""):
+        # Pre-role-split rows were single-model: the planner was model_name.
+        normalised["planner_model_name"] = normalised.get("model_name") or ""
     return normalised
 
 
@@ -2010,6 +2121,7 @@ def _append_results_csv(
             row.update(
                 _extract_generation_fields(details.get("plan"), default_generation_mode)
             )
+            row["planner_model_name"] = details.get("planner_model_name") or details.get("model_name") or ""
             writer.writerow(row)
     return out_path
 

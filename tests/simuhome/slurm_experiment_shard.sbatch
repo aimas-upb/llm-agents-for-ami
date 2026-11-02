@@ -17,6 +17,11 @@
 #   sbatch --export=ALL,MODELS="qwen2.5-coder:3b",RUNS=10 slurm_experiment_shard.sbatch
 #   sbatch -p dgxh100 --export=ALL,MODELS="codegemma:7b-instruct" ...
 #
+# NLU/planner role split (docs/multi_model_choice.md): add NLU_MODEL to pin
+# the UserAssistant to a fixed model while MODELS entries become planner-only:
+#
+#   OPENAI_API_KEY=sk-... sbatch --export=ALL,NLU_MODEL=gpt-5-mini,MODELS="qwen2.5-coder:3b" ...
+#
 # Prerequisites (once, on fep -- already done):
 #   ~/opt/ollama            Ollama bundle          ~/ollama_models  pulled models
 #   ~/venvs/ami             agents venv            ~/venvs/ha       HA Core venv
@@ -34,8 +39,8 @@
 # silently borrows the first one's services — and the stale-workspace sweep
 # can then delete the other shard's live workspace when seeds coincide.
 # Place concurrent shards on different partitions (or --exclude the busy node). Grid env vars (MODES/MODELS/FLAVORS/QUERY_TYPES/
-# SEEDS/RUNS) pass straight through to run_ablation_modes.sh. Results land in
-# ~/experiments/shard_${SLURM_JOB_ID} on shared home.
+# SEEDS/RUNS/NLU_MODEL) pass straight through to run_ablation_modes.sh. Results
+# land in ~/experiments/shard_${SLURM_JOB_ID} on shared home.
 set -euo pipefail
 
 REPO="${REPO:-$HOME/repos/llm-agents-for-ami}"
@@ -50,8 +55,16 @@ for path in "$REPO" "$BENCHMARK_DIR" "$OLLAMA_DIR/bin/ollama" "$HA_SRC_CONFIG" "
   [ -e "$path" ] || { echo "ERROR: missing prerequisite $path"; exit 1; }
 done
 
+# Fail before spending a GPU allocation: an OpenAI NLU model needs a real key
+# (the runner would otherwise exit at its first model iteration).
+NLU_MODEL="${NLU_MODEL:-}"
+if [ -n "$NLU_MODEL" ] && [[ "$NLU_MODEL" != *:* && "$NLU_MODEL" != */* ]] \
+   && { [ -z "${OPENAI_API_KEY:-}" ] || [ "${OPENAI_API_KEY:-}" = "dummy" ]; }; then
+  echo "ERROR: NLU_MODEL=$NLU_MODEL is an OpenAI model but OPENAI_API_KEY is not set"; exit 1
+fi
+
 mkdir -p "$OUT_DIR"
-echo "host: $(hostname -f)  out: $OUT_DIR"
+echo "host: $(hostname -f)  out: $OUT_DIR${NLU_MODEL:+  nlu_model: $NLU_MODEL}"
 nvidia-smi -L || true
 
 # Node-local repo copy: the signifier storage lives inside the repo tree
@@ -118,6 +131,7 @@ export SPADE_SERVER=localhost
 export SPADE_PASSWORD=password
 export PYTHON_BIN="$HOME/venvs/ami/bin/python"
 export BENCHMARK_DIR
+export NLU_MODEL
 
 cd "$OUT_DIR"
 bash "$REPO_RUN/tests/simuhome/run_ablation_modes.sh"

@@ -31,6 +31,17 @@
 #     (defuses run_cases.py's silent openrouter.ai fallback for ':' tags).
 #   - otherwise                        -> OpenAI; requires a real OPENAI_API_KEY.
 #
+# NLU/planner role split (docs/multi_model_choice.md):
+#   NLU_MODEL    unset (default) -> single-model protocol: each MODELS entry
+#                runs both agents (UserAssistant intent extraction AND the
+#                InteractionSolver planner).
+#                set, e.g. NLU_MODEL=gpt-5-mini -> the UserAssistant always
+#                runs NLU_MODEL (on its own backend, resolved by the rules
+#                above) and each MODELS entry is the *planner* model only, so
+#                the generation mode is exercised even by SLMs that cannot
+#                extract intents. CSV names gain a "_nlu-<model>" tag and every
+#                row records planner_model_name next to model_name.
+#
 # Requires: HA_URL, HA_TOKEN, BENCHMARK_DIR. DRY_RUN=1 prints the composed
 # commands without executing anything.
 set -u
@@ -67,39 +78,83 @@ fi
 EXPLICIT_BASE_URL="${OPENAI_BASE_URL:-}"
 ORIG_OPENAI_API_KEY="${OPENAI_API_KEY:-}"
 ORIG_REASONING_EFFORT="${OPENAI_REASONING_EFFORT:-}"
+NLU_MODEL="${NLU_MODEL:-}"
+
+# resolve_backend <model-tag>: sets BACKEND_BASE_URL (empty = OpenAI default),
+# BACKEND_API_KEY, BACKEND_REASONING_EFFORT and BACKEND_LOCAL (1 = Ollama).
+resolve_backend() {
+  local tag="$1"
+  BACKEND_LOCAL=0
+  BACKEND_API_KEY="${ORIG_OPENAI_API_KEY}"
+  BACKEND_REASONING_EFFORT="${ORIG_REASONING_EFFORT}"
+  if [ -n "${EXPLICIT_BASE_URL}" ]; then
+    BACKEND_BASE_URL="${EXPLICIT_BASE_URL}"
+  elif [[ "${tag}" == *:* || "${tag}" == */* ]]; then
+    BACKEND_BASE_URL="${OLLAMA_BASE_URL:?local model '${tag}' needs OLLAMA_BASE_URL}"
+    BACKEND_API_KEY="dummy"
+    BACKEND_REASONING_EFFORT=""
+    BACKEND_LOCAL=1
+  else
+    BACKEND_BASE_URL=""
+    if [ -z "${BACKEND_API_KEY}" ] || [ "${BACKEND_API_KEY}" = "dummy" ]; then
+      echo "OpenAI model '${tag}' needs a real OPENAI_API_KEY" >&2
+      exit 1
+    fi
+  fi
+}
 
 echo "Writing all outputs to: ${OUT_DIR}"
 echo "Grid: models=(${MODELS[*]}) modes=(${MODES[*]}) flavors=(${FLAVORS[*]}) query_types=(${QUERY_TYPES[*]}) seeds=(${SEEDS[*]}) runs=${RUNS}"
+if [ -n "${NLU_MODEL}" ]; then
+  echo "Role split: UserAssistant (NLU) = ${NLU_MODEL}; MODELS entries are planner models"
+fi
 
 for model in "${MODELS[@]}"; do
   safe_model="${model//[^A-Za-z0-9._-]/_}"
 
   # Per-model backend env (exported for the run_simuhome_e2e.py subprocess).
   # Restore the caller's key/effort first so an Ollama model's dummy export
-  # cannot leak into a later OpenAI model in the same sweep.
+  # cannot leak into a later OpenAI model in the same sweep; likewise drop any
+  # PLANNER_* from a previous iteration.
   export OPENAI_API_KEY="${ORIG_OPENAI_API_KEY}"
   export OPENAI_REASONING_EFFORT="${ORIG_REASONING_EFFORT}"
+  unset PLANNER_MODEL PLANNER_BASE_URL PLANNER_API_KEY PLANNER_REASONING_EFFORT
   extra_runner_args=()
-  if [ -n "${EXPLICIT_BASE_URL}" ]; then
-    export OPENAI_BASE_URL="${EXPLICIT_BASE_URL}"
-  elif [[ "${model}" == *:* || "${model}" == */* ]]; then
-    export OPENAI_BASE_URL="${OLLAMA_BASE_URL:?local model '${model}' needs OLLAMA_BASE_URL}"
-    export OPENAI_API_KEY="dummy"
-    export OPENAI_REASONING_EFFORT=""
-    export LLM_TIMEOUT_DEFAULT="${LLM_TIMEOUT_DEFAULT:-600}"
-    extra_runner_args+=(--discovery-timeout 1800)
+  csv_tag="${safe_model}"
+
+  resolve_backend "${model}"
+  any_local="${BACKEND_LOCAL}"
+  if [ -n "${NLU_MODEL}" ]; then
+    # Role split: this MODELS entry drives only the InteractionSolver planner
+    # (PLANNER_* -> planning.llm_planning in run_cases.py); the shared
+    # OPENAI_* provider below is the UserAssistant's fixed NLU model.
+    export PLANNER_MODEL="${model}"
+    export PLANNER_BASE_URL="${BACKEND_BASE_URL:-https://api.openai.com/v1}"
+    export PLANNER_API_KEY="${BACKEND_API_KEY}"
+    export PLANNER_REASONING_EFFORT="${BACKEND_REASONING_EFFORT}"
+    safe_nlu="${NLU_MODEL//[^A-Za-z0-9._-]/_}"
+    csv_tag="${safe_model}_nlu-${safe_nlu}"
+    resolve_backend "${NLU_MODEL}"
+    [ "${BACKEND_LOCAL}" = "1" ] && any_local=1
+    export OPENAI_MODEL="${NLU_MODEL}"
+  else
+    export OPENAI_MODEL="${model}"
+  fi
+  if [ -n "${BACKEND_BASE_URL}" ]; then
+    export OPENAI_BASE_URL="${BACKEND_BASE_URL}"
   else
     unset OPENAI_BASE_URL
-    if [ -z "${OPENAI_API_KEY}" ] || [ "${OPENAI_API_KEY}" = "dummy" ]; then
-      echo "OpenAI model '${model}' needs a real OPENAI_API_KEY" >&2
-      exit 1
-    fi
   fi
-  export OPENAI_MODEL="${model}"
+  export OPENAI_API_KEY="${BACKEND_API_KEY}"
+  export OPENAI_REASONING_EFFORT="${BACKEND_REASONING_EFFORT}"
+  if [ "${any_local}" = "1" ]; then
+    export LLM_TIMEOUT_DEFAULT="${LLM_TIMEOUT_DEFAULT:-600}"
+    extra_runner_args+=(--discovery-timeout 1800)
+  fi
 
   for mode in "${MODES[@]}"; do
     for flavor in "${FLAVORS[@]}"; do
-      csv="${OUT_DIR}/results_${safe_model}_${mode}_${flavor}.csv"
+      csv="${OUT_DIR}/results_${csv_tag}_${mode}_${flavor}.csv"
       flavor_args=()
       case "${flavor}" in
         notdsosa_*) flavor_args+=(--no-td-sosa) ;;
@@ -121,7 +176,7 @@ for model in "${MODELS[@]}"; do
             esac
 
             timestamp="$(date +%Y%m%d_%H%M%S)"
-            run_tag="${timestamp}_${safe_model}_${mode}_${flavor}_${qt}_seed${seed}_run${i}"
+            run_tag="${timestamp}_${csv_tag}_${mode}_${flavor}_${qt}_seed${seed}_run${i}"
             log="${OUT_DIR}/mode_ablation_${run_tag}.log"
 
             cmd=("${PYTHON_BIN}" "${SCRIPT_DIR}/run_simuhome_e2e.py" "${scenario}"
@@ -135,7 +190,7 @@ for model in "${MODELS[@]}"; do
               ${extra_runner_args[@]+"${extra_runner_args[@]}"}
               ${run_args[@]+"${run_args[@]}"})
 
-            echo "[${run_tag}] model=${model} mode=${mode} flavor=${flavor} ${qt} seed=${seed} run=${i}/${RUNS}"
+            echo "[${run_tag}] model=${model}${NLU_MODEL:+ nlu=${NLU_MODEL}} mode=${mode} flavor=${flavor} ${qt} seed=${seed} run=${i}/${RUNS}"
             if [ "${DRY_RUN}" = "1" ]; then
               printf '  DRY_RUN:'; printf ' %q' "${cmd[@]}"; printf '\n'
               continue

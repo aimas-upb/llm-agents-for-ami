@@ -153,6 +153,7 @@ Full demo guide with all sequences and environment variables: [docs/demo.md](doc
 | [docs/prompts.md](docs/prompts.md) | All LLM prompts: intent, purpose, paper reference, call sites |
 | [docs/project-structure.md](docs/project-structure.md) | Full directory layout and data flow |
 | [docs/testing.md](docs/testing.md) | Yggdrasil integration tests and HMAS ontology notes |
+| [docs/multi_model_choice.md](docs/multi_model_choice.md) | Why and how the UserAssistant (NLU) and InteractionSolver (planner) can run on different models in the generation-mode experiment |
 
 ---
 
