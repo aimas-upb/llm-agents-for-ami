@@ -146,23 +146,53 @@ class SimuHomeWorker:
         return self
 
     def _start_shtd(self, home: str) -> None:
+        """Start SHTD for ``home``. One failed start (the server exits, or is
+        not ready in ``startup_timeout``) is retried once on a fresh port:
+        the port is reused across episodes, so a lingering socket from the
+        previous SHTD, or a slow start on a loaded node, must not end a
+        long run. The server's stderr is kept in ``SHTD_LOG_DIR`` (default:
+        the system temp dir), and its tail is part of the error."""
         self._stop_shtd()
-        self._shtd = subprocess.Popen(
-            [sys.executable, str(HERE / "shtd.py"),
-             "--sim", self.sim_base, "--home", home,
-             "--host", "127.0.0.1", "--port", str(self.shtd_port),
-             "--poll-interval", str(self.poll_interval)],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        last_error = ""
+        for attempt in range(2):
+            if attempt:
+                self.shtd_port = free_port()
+                self.shtd_base = f"http://127.0.0.1:{self.shtd_port}"
+            log_dir = Path(os.environ.get("SHTD_LOG_DIR") or tempfile.gettempdir())
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_path = log_dir / f"shtd_w{self.worker_id}_{self.shtd_port}.log"
+            with open(log_path, "w", encoding="utf-8") as log:
+                self._shtd = subprocess.Popen(
+                    [sys.executable, str(HERE / "shtd.py"),
+                     "--sim", self.sim_base, "--home", home,
+                     "--host", "127.0.0.1", "--port", str(self.shtd_port),
+                     "--poll-interval", str(self.poll_interval)],
+                    stdout=subprocess.DEVNULL, stderr=log)
 
-        def ready() -> bool:
+            def ready() -> bool:
+                if self._shtd is not None and self._shtd.poll() is not None:
+                    raise _ServerExited(self._shtd.returncode)
+                try:
+                    return _get_json(f"{self.shtd_base}/_shtd/status", timeout=3) is not None
+                except Exception:
+                    return False
+
             try:
-                return _get_json(f"{self.shtd_base}/_shtd/status", timeout=3) is not None
-            except Exception:
-                return False
-
-        if not self._wait_for(ready):
-            self.stop()
-            raise RuntimeError(f"SHTD did not start on {self.shtd_port}")
+                if self._wait_for(ready):
+                    return
+                last_error = f"not ready after {self.startup_timeout:.0f}s"
+            except _ServerExited as exc:
+                last_error = f"exited with code {exc.returncode}"
+            self._stop_shtd()
+            try:
+                tail = log_path.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-8:]
+            except OSError:
+                tail = []
+            last_error += f" on port {self.shtd_port} (home {home})"
+            if tail:
+                last_error += "; stderr tail:\n  " + "\n  ".join(tail)
+        self.stop()
+        raise RuntimeError(f"SHTD did not start: {last_error}")
 
     def _wait_for(self, predicate, interval: float = 0.5) -> bool:
         deadline = time.monotonic() + self.startup_timeout
