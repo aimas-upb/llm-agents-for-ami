@@ -11,7 +11,8 @@
 #SBATCH --error=%x_%j.err
 # wn11: cuInit fails after a 30 s kernel wait since the driver upgrade of
 # 2026-10-13 (error 919); wn16: idle but without the home mount (exit 53).
-#SBATCH --exclude=ucsc-precis-h200-wn11,ucsc-precis-h200-wn16
+# dgxa100-ncit-wn01: the same missing home mount.
+#SBATCH --exclude=ucsc-precis-h200-wn11,ucsc-precis-h200-wn16,dgxa100-ncit-wn01
 #
 # One SimuHome harness run (tests/simuhome/bench/harness.py) on a GPU node,
 # with the variant's local models served by an Ollama started on the node.
@@ -25,6 +26,7 @@
 #          tests/simuhome/bench/slurm_harness.sbatch
 #   sbatch --export=ALL,VARIANT=...,ATTEMPT=2,EPISODES="qt2_*,qt4-1_*,qt4-2_*,qt4-3_*" ...
 #   sbatch --export=ALL,VARIANT=...,ATTEMPT=smoke,LIMIT=1,WORKERS=2 ...
+#   sbatch -A prof -p dgxa100 --export=ALL,VARIANT=... ...   # A100 pool (prof account)
 #
 # Variables (all optional except VARIANT):
 #   VARIANT   harness config; its local provider URL (http://localhost:11434/v1)
@@ -127,6 +129,11 @@ ARGS=(--config "$VARIANT_RUN" --out "$OUT_DIR")
 [ -n "${LIMIT:-}" ]    && ARGS+=(--limit "$LIMIT")
 [ -n "${WORKERS:-}" ]  && ARGS+=(--workers "$WORKERS")
 [ -n "${NO_JUDGE:-}" ] && ARGS+=(--no-judge)
+# The GPU behind every latency number of this run, beside the records.
+NAME=$(grep -E '^name:' "$VARIANT_RUN" | head -1 | sed -E 's/^name: *"?([^"#]+)"?.*/\1/' | xargs)
+mkdir -p "$OUT_DIR/$NAME"
+printf 'job %s  node %s  partition %s  gpu %s\n' "$SLURM_JOB_ID" "$(hostname -s)" "${SLURM_JOB_PARTITION:-?}" \
+  "$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)" >> "$OUT_DIR/$NAME/gpu.txt"
 echo "=== harness ${ARGS[*]}  ($(date '+%F %T'))"
 "$PYTHON" -m tests.simuhome.bench.harness "${ARGS[@]}" --dry-run
 "$PYTHON" -m tests.simuhome.bench.harness "${ARGS[@]}"
