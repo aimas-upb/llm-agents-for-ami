@@ -9,6 +9,9 @@
 #SBATCH --time=23:00:00
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
+# wn11: cuInit fails after a 30 s kernel wait since the driver upgrade of
+# 2026-10-13 (error 919); wn16: idle but without the home mount (exit 53).
+#SBATCH --exclude=ucsc-precis-h200-wn11,ucsc-precis-h200-wn16
 #
 # One SimuHome harness run (tests/simuhome/bench/harness.py) on a GPU node,
 # with the variant's local models served by an Ollama started on the node.
@@ -78,6 +81,7 @@ export OLLAMA_MAX_LOADED_MODELS="${OLLAMA_MAX_LOADED_MODELS:-5}"
 export OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-4}"
 export OLLAMA_CONTEXT_LENGTH="${OLLAMA_CTX:-32768}"
 export OLLAMA_FLASH_ATTENTION="${OLLAMA_FLASH_ATTENTION:-1}"
+export OLLAMA_LLM_LIBRARY="${OLLAMA_LLM_LIBRARY:-cuda_v13}"   # skip the cuda_v12 probe (30 s on its own)
 "$OLLAMA_BIN" serve > "$JOB_DIR/ollama.log" 2>&1 &
 OLLAMA_PID=$!
 cleanup() { kill "$OLLAMA_PID" 2>/dev/null || true; }
