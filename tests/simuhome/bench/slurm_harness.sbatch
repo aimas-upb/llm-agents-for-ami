@@ -24,7 +24,9 @@
 #
 #   sbatch --export=ALL,VARIANT=tests/simuhome/bench/variants/fep.M1.yaml \
 #          tests/simuhome/bench/slurm_harness.sbatch
-#   sbatch --export=ALL,VARIANT=...,ATTEMPT=2,EPISODES="qt2_*,qt4-1_*,qt4-2_*,qt4-3_*" ...
+#   EPISODES="qt2_*,qt4-1_*,qt4-2_*,qt4-3_*" ATTEMPT=2 VARIANT=... sbatch --export=ALL ...
+#     (a value with commas cannot go in the --export list, which splits on them;
+#      exported from the submitting shell it travels with --export=ALL)
 #   sbatch --export=ALL,VARIANT=...,ATTEMPT=smoke,LIMIT=1,WORKERS=2 ...
 #   sbatch -A prof -p dgxa100 --export=ALL,VARIANT=... ...   # A100 pool (prof account)
 #
