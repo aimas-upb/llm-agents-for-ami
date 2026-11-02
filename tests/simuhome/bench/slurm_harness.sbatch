@@ -123,6 +123,7 @@ done
 
 # --- the harness --------------------------------------------------------------
 cd "$REPO"
+export SHTD_LOG_DIR="$JOB_DIR/shtd"      # each worker's SHTD stderr (worker.py), for post-mortems
 ARGS=(--config "$VARIANT_RUN" --out "$OUT_DIR")
 [ -n "${EPISODES:-}" ] && ARGS+=(--episodes "$EPISODES")
 [ -n "${SEEDS:-}" ]    && ARGS+=(--seeds "$SEEDS")
