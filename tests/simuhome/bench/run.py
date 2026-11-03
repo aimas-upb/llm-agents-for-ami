@@ -236,12 +236,24 @@ def _infra_text(text: Optional[str], suite: Suite) -> bool:
 
 
 def _infra_record(path: Path, suite: Suite) -> bool:
-    """Whether a record is an infrastructure error (re-run on --skip-existing)."""
+    """Whether a record is an infrastructure failure (re-run on --skip-existing):
+    an error outcome naming the infrastructure, or an episode the evaluator
+    scored as "Infrastructure" (LLM calls that failed inside a step, such as a
+    model server timing out under load, leave the outcome intact but the
+    verdict names them)."""
     try:
         record = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return True
-    return record.get("outcome") == "error" and _infra_text(record.get("error"), suite)
+    if record.get("outcome") == "error" and _infra_text(record.get("error"), suite):
+        return True
+    verdict = path.with_name(path.stem + ".eval.json")
+    if verdict.exists():
+        try:
+            return json.loads(verdict.read_text(encoding="utf-8")).get("error_type") == "Infrastructure"
+        except (OSError, ValueError):
+            return False
+    return False
 
 
 def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> List[str]:
