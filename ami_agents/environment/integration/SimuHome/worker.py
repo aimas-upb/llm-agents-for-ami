@@ -145,8 +145,17 @@ class SimuHomeWorker:
             env["SERVER_PORT"] = str(self.sim_port)
             log_path = self._log_dir() / f"sim_w{self.worker_id}_{self.sim_port}.log"
             with open(log_path, "w", encoding="utf-8") as log:
+                # SimuHome's own entry point (python -m src.simulator.api.app)
+                # binds 0.0.0.0. On shared cluster nodes an externally exposed
+                # listener gets terminated by a node-level policy every few
+                # minutes (seen on the dgxa100 nodes: the simulator shut down
+                # by signal ~100 times in one job, the loopback-bound TD server
+                # never). Nothing but this worker talks to the simulator, so it
+                # is started on the loopback interface, same app, same port.
                 self._sim = subprocess.Popen(
-                    [sys.executable, "-m", "src.simulator.api.app"],
+                    [sys.executable, "-c",
+                     "import uvicorn; uvicorn.run('src.simulator.api.app:app', "
+                     f"host='127.0.0.1', port={self.sim_port}, reload=False)"],
                     cwd=str(self.simuhome), env=env,
                     stdout=log, stderr=subprocess.STDOUT)
 
