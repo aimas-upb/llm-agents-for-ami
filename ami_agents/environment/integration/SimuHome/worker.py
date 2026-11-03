@@ -206,11 +206,26 @@ class SimuHomeWorker:
         last_error = ""
         for attempt in range(2):
             if attempt:
-                # A fresh simulator and fresh ports: SHTD blocks on a wedged
-                # simulator, and a lingering socket blocks the old port.
-                self.stop()
-                self._reassign_ports()
-                self.start()
+                # A fresh port for SHTD (a lingering socket blocks the old one).
+                # The simulator is replaced only when it no longer answers:
+                # killing a healthy one here cost every later episode of the
+                # worker a failed reset on the dgxa100 nodes, where a slow SHTD
+                # start under CPU contention is routine, not a wedged simulator.
+                healthy = False
+                try:
+                    healthy = bool(self.client.health())
+                except Exception:  # noqa: BLE001 - unhealthy
+                    pass
+                print(f"[worker {self.worker_id}] SHTD not up on port {self.shtd_port} for home "
+                      f"{home} ({last_error.splitlines()[0]}); retrying on a fresh port"
+                      + ("" if healthy else " with a fresh simulator"), file=sys.stderr, flush=True)
+                if healthy:
+                    self.shtd_port = free_port()
+                    self.shtd_base = f"http://127.0.0.1:{self.shtd_port}"
+                else:
+                    self.stop()
+                    self._reassign_ports()
+                    self.start()
             log_path = self._log_dir() / f"shtd_w{self.worker_id}_{self.shtd_port}.log"
             with open(log_path, "w", encoding="utf-8") as log:
                 self._shtd = subprocess.Popen(

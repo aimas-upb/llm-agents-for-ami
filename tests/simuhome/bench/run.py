@@ -347,6 +347,10 @@ def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> Li
                 try:
                     if worker is not None:
                         worker.load(name)       # TD server bound to this episode's home id
+                        # The worker may have replaced its simulator while loading
+                        # (a retried start); its client, not the one captured at
+                        # creation, is the one that reaches it.
+                        sim = worker.client
                         # SimuHome's home id is the episode's name; HomeBench's is home<id>.
                         target = Target(sim, worker.shtd_base,
                                         getattr(worker, "home_id", None) or name)
