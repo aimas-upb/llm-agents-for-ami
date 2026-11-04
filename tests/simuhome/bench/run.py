@@ -230,6 +230,32 @@ def _logger(debug: bool):
     return logging.getLogger("bench")
 
 
+def _infra_text(text: Optional[str], suite: Suite) -> bool:
+    """Whether an error text names the infrastructure (the simulator, the transport)."""
+    return any(marker in (text or "") for marker in suite.infra_markers)
+
+
+def _infra_record(path: Path, suite: Suite) -> bool:
+    """Whether a record is an infrastructure failure (re-run on --skip-existing):
+    an error outcome naming the infrastructure, or an episode the evaluator
+    scored as "Infrastructure" (LLM calls that failed inside a step, such as a
+    model server timing out under load, leave the outcome intact but the
+    verdict names them)."""
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return True
+    if record.get("outcome") == "error" and _infra_text(record.get("error"), suite):
+        return True
+    verdict = path.with_name(path.stem + ".eval.json")
+    if verdict.exists():
+        try:
+            return json.loads(verdict.read_text(encoding="utf-8")).get("error_type") == "Infrastructure"
+        except (OSError, ValueError):
+            return False
+    return False
+
+
 def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> List[str]:
     """Run ``names`` on one simulator (SimuHome's, or HomeBench's engine); the
     record paths written."""
@@ -281,27 +307,90 @@ def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> Li
             # The environment mode goes only to a worker whose suite has the option
             # (SimuHomeWorker has no such argument).
             extra = {"environment": settings["environment"]} if suite.environment else {}
-            worker = suite.worker_cls(benchmark=benchmark, worker_id=worker_id,
-                                      **extra).start()
+
+            def fresh_worker():
+                return suite.worker_cls(benchmark=benchmark, worker_id=worker_id,
+                                        **extra).start()
+
+            worker = fresh_worker()
             sim = worker.client
             fixed = None
 
+        def restart_worker():
+            """A fresh worker on fresh ports; None when no simulator can start."""
+            nonlocal worker, sim
+            worker.stop()
+            try:
+                worker = fresh_worker()
+            except Exception as restart_exc:  # noqa: BLE001 - reported, chunk ends
+                print(f"[w{worker_id}] no simulator ({type(restart_exc).__name__}): "
+                      f"{len(names) - count + 1} episode(s) left for a later run", flush=True)
+                print(f"[w{worker_id}] {restart_exc}", file=sys.stderr, flush=True)
+                worker = None
+                return None
+            sim = worker.client
+            return worker
+
         # 3. Each episode: loaded by the suite, served by the worker, run, recorded.
+        #    An environment failure (the simulator or its TD server down: a
+        #    lingering port, a slow start on a loaded node, a simulator that died
+        #    under the previous episode) costs one fresh worker and one retry of
+        #    the episode, not the worker's whole chunk. A second failure leaves
+        #    the episode for the next --skip-existing run, which also re-runs any
+        #    record that is an infrastructure error rather than the model's.
         for count, name in enumerate(names, 1):
             path = out / f"{name}.json"
-            if settings["skip_existing"] and path.exists():
+            if settings["skip_existing"] and path.exists() and not _infra_record(path, suite):
                 continue
             episode = suite.load_episode(benchmark, name)
-            if worker is not None:
-                worker.load(name)               # TD server bound to this episode's home id
-                # SimuHome's home id is the episode's name; HomeBench's is home<id>.
-                target = Target(sim, worker.shtd_base, getattr(worker, "home_id", None) or name)
-            else:
-                target = Target(sim, *fixed)
-            started = time.perf_counter()
-            record = asyncio.run(run_episode(name, episode, variant, config, target,
-                                             options, logger, suite))
-            record["wall_seconds"] = time.perf_counter() - started
+            record = None
+            dead = False
+            for attempt in range(2):
+                try:
+                    if worker is not None:
+                        worker.load(name)       # TD server bound to this episode's home id
+                        # The worker may have replaced its simulator while loading
+                        # (a retried start); its client, not the one captured at
+                        # creation, is the one that reaches it.
+                        sim = worker.client
+                        # SimuHome's home id is the episode's name; HomeBench's is home<id>.
+                        target = Target(sim, worker.shtd_base,
+                                        getattr(worker, "home_id", None) or name)
+                    else:
+                        target = Target(sim, *fixed)
+                except Exception as exc:  # noqa: BLE001 - a dead environment must not end the run
+                    print(f"[w{worker_id} {count}/{len(names)}] {name}: environment failed"
+                          + (", retrying on a fresh worker" if worker is not None and not attempt
+                             else ", skipped"), flush=True)
+                    print(f"[w{worker_id}] {name}: {type(exc).__name__}: {exc}",
+                          file=sys.stderr, flush=True)
+                    if worker is None or attempt:
+                        break
+                    if restart_worker() is None:
+                        dead = True
+                        break
+                    continue
+                started = time.perf_counter()
+                record = asyncio.run(run_episode(name, episode, variant, config, target,
+                                                 options, logger, suite))
+                record["wall_seconds"] = time.perf_counter() - started
+                if (worker is not None and not attempt and record["outcome"] == "error"
+                        and record.get("error_step") == "load"
+                        and _infra_text(record.get("error"), suite)):
+                    # The simulator stopped answering (seen as a failed reset):
+                    # the record is the infrastructure's, not the model's.
+                    print(f"[w{worker_id} {count}/{len(names)}] {name}: environment failed in load "
+                          f"({record['error']}), retrying on a fresh worker", flush=True)
+                    record = None
+                    if restart_worker() is None:
+                        dead = True
+                        break
+                    continue
+                break
+            if dead:
+                return written
+            if record is None:
+                continue
             path.write_text(json.dumps(record, default=str), encoding="utf-8")
             written.append(str(path))
             print(f"[w{worker_id} {count}/{len(names)}] {name}: {record['outcome']}"

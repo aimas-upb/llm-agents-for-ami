@@ -1,0 +1,30 @@
+# Config MIX of the local-model grid: understanding (segmentation, structuring)
+# on gpt-5-nano, every later phase on open-weight models served by Ollama on
+# the GPU node. Mirrors the lab308e mix run (tests/hasp/ollamamix1.yaml) so the
+# two benchmarks share a row. The judge is on OpenAI, as in every other run.
+name: fep-MIX-gpt5nano_local
+
+providers:
+  local:  {base_url: "http://localhost:11434/v1"}
+  openai: {api_key_env: OPENAI_API_KEY}
+
+models:
+  segmentation:  {provider: openai, model: gpt-5-nano, reasoning_effort: low}
+  structuring:   {provider: openai, model: gpt-5-nano, reasoning_effort: low}
+  planning:
+    explicit:    {provider: local, model: "qwen2.5-coder:7b-instruct", temperature: 0, max_tokens: 4096}
+    general:     {provider: local, model: "qwen3:4b", temperature: 0, max_tokens: 8192}
+  profiling:     {provider: local, model: "qwen3:8b", temperature: 0, max_tokens: 4096}
+  guarding:      {provider: local, model: "gemma3:1b", temperature: 0, max_tokens: 1024}
+  response:      {provider: local, model: "qwen2.5-coder:7b-instruct", temperature: 0, max_tokens: 1024}
+  judge:         {provider: openai, model: gpt-4o-mini, temperature: 0.5}
+
+run:
+  episodes: "qt*"
+  limit: null
+  workers: 4
+  context: prepend        # as the gpt-6-luna reference run
+  memory: "off"
+
+evaluate:
+  judge: true
