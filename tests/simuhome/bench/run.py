@@ -259,7 +259,9 @@ def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> Li
         cache = StepCache(settings["cache"])
 
     options = Options(context=settings["context"], step_seconds=settings["step_seconds"],
-                      exec_timeout=settings["exec_timeout"], stop_after=settings["stop_after"],
+                      exec_timeout=settings["exec_timeout"],
+                      lockstep_timeout=settings.get("lockstep_timeout", 600.0),
+                      stop_after=settings["stop_after"],
                       memory=memory, cache=cache, debug=settings["debug"],
                       execution=settings.get("execution", "ticks"),
                       dry_step_seconds=float(settings.get("dry_step_seconds", 1.0)),
@@ -342,6 +344,9 @@ def main(execution: str = "ticks", out: Optional[Path] = None) -> int:
                         help="scheduled: how long a value read from the simulator is reused")
     parser.add_argument("--exec-timeout", type=float, default=60.0,
                         help="immediate plans: real seconds before they count as failed")
+    parser.add_argument("--lockstep-timeout", type=float, default=600.0,
+                        help="lockstep plans: real seconds for the whole execution before "
+                             "the plans still running count as failed")
     parser.add_argument("--stop-after", choices=("segmentation", "structuring", "planning"))
     parser.add_argument("--debug", action="store_true", help="print every step")
     parser.add_argument("--sim", help="an already running simulator API, e.g. "
@@ -392,6 +397,7 @@ def main(execution: str = "ticks", out: Optional[Path] = None) -> int:
                 "variant": args.variant, "out": args.out, "benchmark": str(benchmark),
                 "memory": args.memory, "context": args.context,
                 "step_seconds": args.step_seconds, "exec_timeout": args.exec_timeout,
+                "lockstep_timeout": args.lockstep_timeout,
                 "stop_after": args.stop_after, "debug": args.debug or bool(args.episode),
                 "sim": args.sim, "shtd": args.shtd, "skip_existing": args.skip_existing,
                 "cache": args.cache, "execution": args.execution,

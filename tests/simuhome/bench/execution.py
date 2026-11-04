@@ -315,11 +315,14 @@ def observation_points(goals: Sequence[Dict[str, Any]]) -> List[Tuple[int, int, 
 def run_lockstep(entries, tools: ToolLog, sim, *, step_seconds: float,
                  tick_interval: float, eval_goals: Sequence[Dict[str, Any]],
                  default_horizon_s: float = 1800.0, margin_s: float = 60.0,
-                 settle_timeout: float = 30.0,
+                 settle_timeout: float = 30.0, timeout: Optional[float] = None,
                  on_step: Optional[Callable[[int, Dict[str, Any]], None]] = None) -> Execution:
     """Run the plans with the simulator's clock driven step by step.
 
-    ``sim`` is the simulator client (`fast_forward_to`, `home_state`)."""
+    ``sim`` is the simulator client (`fast_forward_to`, `home_state`).
+    ``timeout`` (real seconds, whole loop): the plans still running then fail. A
+    simulator whose clock does not advance (HomeBench's) never reaches the horizon,
+    so a plan that keeps waiting would otherwise loop, one request per turn, forever."""
     execution = Execution(mode="lockstep")
     clock = StateClock()
     state = sim.home_state()
@@ -352,6 +355,11 @@ def run_lockstep(entries, tools: ToolLog, sim, *, step_seconds: float,
             # once the simulator has applied it, and the next tick consumes the
             # answer -- and may send the sequence's next action, at the same
             # virtual time. Only then may the clock move on.
+            if timeout is not None and time.perf_counter() - started > timeout:
+                for plan in plans:
+                    if plan.status == "RUNNING":
+                        plan.status, plan.error = "FAILURE", f"timeout after {timeout}s"
+                break
             recorder.moment = {"tick": tick, "time": state.get("current_time")}
             for _ in range(MAX_TICKS_PER_MOMENT):
                 _tick(plans)

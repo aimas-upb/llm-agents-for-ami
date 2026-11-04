@@ -126,7 +126,8 @@ def main() -> int:
         if suite.name != DEFAULT_SUITE:
             run += ["--suite", suite.name]
         for key in ("episodes", "seeds", "limit", "workers", "context", "memory",
-                    "step_seconds", "exec_timeout", "guidelines", "environment"):
+                    "step_seconds", "exec_timeout", "lockstep_timeout", "guidelines",
+                    "environment"):
             if run_options.get(key) is not None:
                 run += [f"--{key.replace('_', '-')}", str(run_options[key])]
         evaluate = [sys.executable, "-m", "tests.simuhome.bench.evaluate",

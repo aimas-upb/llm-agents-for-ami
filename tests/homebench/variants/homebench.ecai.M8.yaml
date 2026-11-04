@@ -1,0 +1,42 @@
+# HomeBench harness config, ECAI-400 on local models (Ollama), combination M8:
+#   segmentation                  Qwen3-4B
+#   guarding                      Gemma 3 1B
+#   structuring + profiling       DeepSeek-R1-Distill-Qwen-7B
+#   planning (+ response)         Qwen3-4B
+# The models are the 16k-context copies made by tests/homebench/ollama/setup.ps1.
+#
+#   conda run -n ami-agents python -m tests.simuhome.bench.harness \
+#       --config tests/homebench/variants/homebench.ecai.M8.yaml --dry-run
+#
+# Segmentation is a Qwen model in every M config (M1-M4 Qwen3-8B, M5-M8 Qwen3-4B):
+# the 1B-1.5B segmenters left the type qualifier (achievement | maintenance)
+# empty, which routed structuring to the long dependency prompt (see the timing
+# report). Guarding is not exercised with run.guidelines: homebench. The eight M
+# configs differ only in the model names of the other steps; everything else is as
+# homebench.ecai.gpt-5-nano.yaml. The records directory is named after the file
+# (no `name:` key): <out>/homebench.ecai.M8/.
+
+suite: homebench
+benchmark: tests/homebench/ecai400   # the 400 ECAI episodes, corrections applied
+
+providers:
+  local: {base_url: "http://localhost:11434/v1"}     # Ollama; the planner needs tool calling
+
+models:
+  segmentation:  {provider: local, model: "qwen3-4b-16k", temperature: 0}
+  structuring:   {provider: local, model: "ds-r1-7b-16k", temperature: 0}
+  planning:
+    explicit:    {provider: local, model: "qwen3-4b-16k", temperature: 0}
+    general:     {provider: local, model: "qwen3-4b-16k", temperature: 0}
+  profiling:     {provider: local, model: "ds-r1-7b-16k", temperature: 0}
+  guarding:      {provider: local, model: "gemma3-1b-16k", temperature: 0}
+  response:      {provider: local, model: "qwen3-4b-16k", temperature: 0}
+
+run:
+  episodes: "hb*"          # every episode of the benchmark directory above
+  limit: null
+  workers: 1               # one local model at a time: parallel workers only queue on it
+  context: none
+  memory: "off"
+  guidelines: homebench    # homebench: no device conditions | default: as deployed
+  environment: "on"        # as the ECAI run (env_on): room environments and action effects

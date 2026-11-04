@@ -103,6 +103,7 @@ class Options:
     context: str = "none"                 # none | prepend
     step_seconds: float = 10.0            # lockstep step (virtual seconds)
     exec_timeout: float = 60.0            # immediate plans (real seconds)
+    lockstep_timeout: float = 600.0       # lockstep plans, whole execution (real seconds)
     stop_after: Optional[str] = None      # segmentation | structuring | planning
     memory: Any = None                    # memory.Memory, or None
     cache: Any = None                     # StepCache, or None (sweeps)
@@ -605,7 +606,8 @@ def _execute(runnable, tools, sim, config, options, home_config, episode, timed,
         return bench_execution.run_lockstep(
             runnable, tools, sim, step_seconds=options.step_seconds,
             tick_interval=float(home_config.get("tick_interval", 0.1)),
-            eval_goals=(episode.get("eval") or {}).get("goals") or [])
+            eval_goals=(episode.get("eval") or {}).get("goals") or [],
+            timeout=options.lockstep_timeout)
     return bench_execution.run_immediate(
         runnable, tools, tick_period=float(bt.get("min_tick_yield", 0.01)),
         tick_budget=int((bt.get("max_ticks", {}) or {}).get("user_assistant", 100)),

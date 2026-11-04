@@ -296,6 +296,24 @@ class TestLockstep:
                                                               "tolerance_ticks": 0}}])
         assert result.end_tick >= 600 and result.actions == []
 
+    def test_a_frozen_clock_ends_at_the_timeout_not_never(self):
+        # HomeBench's simulator answers fast_forward_to without moving the tick: the
+        # horizon is never reached, and a plan that keeps waiting never finishes.
+        class FrozenSim(FakeSim):
+            def fast_forward_to(self, to_tick, room_ids=None):
+                self.jumps.append(self.tick)
+                return {"status": {"code": 200}, "data": self.home_state(), "error": None}
+
+        sim = FrozenSim()
+        with patch.object(HTTPClient, "post",
+                          return_value=HTTPResponse(200, {"ok": True}, {}, "u", 0.01)):
+            result = execution.run_lockstep([DELAYED], ToolLog(), sim, step_seconds=10,
+                                            tick_interval=0.1, eval_goals=[],
+                                            timeout=0.5)
+        assert result.plans[0]["status"] == "FAILURE"
+        assert "timeout after 0.5s" in str(result.plans[0])
+        assert 0.5 <= result.real_seconds < 5 and sim.jumps
+
     def test_no_jump_while_an_action_is_in_flight(self):
         sim, order = FakeSim(), []
 

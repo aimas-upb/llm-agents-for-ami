@@ -1,0 +1,4 @@
+# 16k-context copy of qwen3:4b for the HomeBench local runs (setup.ps1).
+# Ollama's /v1 endpoint cannot take num_ctx per request, so it is fixed here.
+FROM qwen3:4b
+PARAMETER num_ctx 16384

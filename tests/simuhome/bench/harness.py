@@ -66,7 +66,8 @@ from .suites import DEFAULT_SUITE, ENVIRONMENT_MODES, SUITE_NAMES, Suite, get_su
 
 # The run.py options a config's `run:` section may set.
 RUN_OPTIONS = ("episodes", "seeds", "limit", "workers", "context", "memory", "step_seconds",
-               "dry_step_seconds", "real_read_seconds", "exec_timeout", "guidelines",
+               "dry_step_seconds", "real_read_seconds", "exec_timeout", "lockstep_timeout",
+               "guidelines",
                "environment")
 
 

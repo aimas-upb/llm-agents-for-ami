@@ -1,0 +1,16 @@
+# Home Assistant for the HASP lab308e harness.
+#   docker compose -f tests/hasp/ha/docker-compose.yml up -d
+# ./ha-config is mounted as /config, so the harness's --virtual-dir is
+# tests/hasp/ha/ha-config/custom_components/virtual. Docker Desktop has no
+# --network=host, hence the published port (loopback only).
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Bucharest
+    volumes:
+      - ./ha-config:/config
+    ports:
+      - "127.0.0.1:8123:8123"

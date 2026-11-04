@@ -1,0 +1,4 @@
+# 16k-context copy of erwan2/DeepSeek-R1-Distill-Qwen-7B for the HomeBench local runs (setup.ps1).
+# Ollama's /v1 endpoint cannot take num_ctx per request, so it is fixed here.
+FROM erwan2/DeepSeek-R1-Distill-Qwen-7B
+PARAMETER num_ctx 16384

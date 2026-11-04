@@ -1,0 +1,34 @@
+# HomeBench harness config, ECAI-400 on a single local model (Ollama): Qwen3-8B
+# on every step (segmentation, structuring, planning, profiling, guarding, response).
+# The model is the 16k-context copy (same one as M1 structuring and profiling).
+#
+#   conda run -n ami-agents python -m tests.simuhome.bench.harness \
+#       --config tests/homebench/variants/homebench.ecai.qwen3-8b.yaml --dry-run
+#
+# Everything but the model names is as the M1-M8 configs. The records directory is named
+# after the file (no `name:` key): <out>/homebench.ecai.qwen3-8b/.
+
+suite: homebench
+benchmark: tests/homebench/ecai400   # the 400 ECAI episodes, corrections applied
+
+providers:
+  local: {base_url: "http://localhost:11434/v1"}     # Ollama; the planner needs tool calling
+
+models:
+  segmentation:  {provider: local, model: "qwen3-8b-16k", temperature: 0}
+  structuring:   {provider: local, model: "qwen3-8b-16k", temperature: 0}
+  planning:
+    explicit:    {provider: local, model: "qwen3-8b-16k", temperature: 0}
+    general:     {provider: local, model: "qwen3-8b-16k", temperature: 0}
+  profiling:     {provider: local, model: "qwen3-8b-16k", temperature: 0}
+  guarding:      {provider: local, model: "qwen3-8b-16k", temperature: 0}
+  response:      {provider: local, model: "qwen3-8b-16k", temperature: 0}
+
+run:
+  episodes: "hb*"          # every episode of the benchmark directory above
+  limit: null
+  workers: 1               # one local model at a time: parallel workers only queue on it
+  context: none
+  memory: "off"
+  guidelines: homebench    # homebench: no device conditions | default: as deployed
+  environment: "on"        # as the ECAI run (env_on): room environments and action effects

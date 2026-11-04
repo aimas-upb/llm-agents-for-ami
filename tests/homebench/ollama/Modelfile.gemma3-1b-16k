@@ -1,0 +1,4 @@
+# 16k-context copy of gemma3:1b for the HomeBench local runs (setup.ps1).
+# Ollama's /v1 endpoint cannot take num_ctx per request, so it is fixed here.
+FROM gemma3:1b
+PARAMETER num_ctx 16384

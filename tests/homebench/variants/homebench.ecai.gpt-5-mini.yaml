@@ -1,0 +1,36 @@
+# HomeBench harness config, ECAI on gpt-5-mini: the 400 episodes of the ECAI evaluation,
+# in their own directory (tests/homebench/ecai400), every phase on the OpenAI API.
+#
+#   400 episodes, about 1,900 LLM calls (4.8 per episode in the ECAI run), no judge calls,
+#   about 20-25 minutes with 4 workers. Nothing is run by --dry-run:
+#
+#   conda run -n ami-agents python -m tests.simuhome.bench.harness \
+#       --config tests/homebench/variants/homebench.ecai.gpt-5-mini.yaml --dry-run
+#
+# The records directory is named after the file (no `name:` key):
+# <out>/homebench.ecai.gpt-5-mini/.
+
+suite: homebench
+benchmark: tests/homebench/ecai400   # the 400 ECAI episodes, corrections applied
+
+providers:
+  openai: {api_key_env: OPENAI_API_KEY}
+
+models:
+  segmentation:  {provider: openai, model: gpt-5-mini, reasoning_effort: low}
+  structuring:   {provider: openai, model: gpt-5-mini, reasoning_effort: low}
+  planning:
+    explicit:    {provider: openai, model: gpt-5-mini, reasoning_effort: low}
+    general:     {provider: openai, model: gpt-5-mini, reasoning_effort: medium}
+  profiling:     {provider: openai, model: gpt-5-mini, reasoning_effort: low}
+  guarding:      {provider: openai, model: gpt-5-mini, reasoning_effort: low}
+  response:      {provider: openai, model: gpt-5-mini, reasoning_effort: low}
+
+run:
+  episodes: "hb*"          # every episode of the benchmark directory above
+  limit: null
+  workers: 4               # remote calls: workers run in parallel
+  context: none
+  memory: "off"
+  guidelines: homebench    # homebench: no device conditions | default: as deployed
+  environment: "on"        # as the ECAI run (env_on): room environments and action effects
