@@ -1,0 +1,91 @@
+{
+ "meta": {
+  "seed": 1,
+  "query_type": "hb4",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 38,
+  "devices_count": 3,
+  "id": "home69_multi_104",
+  "homebench_type": "multi4_normal",
+  "gold": "'''guest_bedroom.air_conditioner.set_temperature(16),living_room.curtain.set_degree(80),study_room.air_purifiers.set_fan_speed(high),guest_bedroom.air_conditioner.set_temperature(23),'''",
+  "label_correction": {
+   "original_gold": "'''guest_bedroom.air_conditioner.set_temperature(29),living_room.curtain.set_degree(80),study_room.air_purifiers.set_fan_speed(high),guest_bedroom.air_conditioner.set_temperature(23),'''",
+   "original_type": "multi4_normal",
+   "reason": "the gold is not the start value changed by N (19 - 6, kept at the lowest, 16)"
+  }
+ },
+ "query": "Lower the air conditioner temperature in the guest bedroom by 6 degrees, increase the curtain openness by 80 percent in the living room, set the fan speed to high on the air purifiers in the study room, and lower the air conditioner temperature in the guest bedroom to 23 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [],
+    "superseded_by": 3
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_degree(80)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_purifiers",
+    "device_type": "air_purifiers",
+    "asserts": [
+     {
+      "attribute": "fan_speed",
+      "value": "high",
+      "value_type": "enum",
+      "description": "set_fan_speed(high)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 23,
+      "value_type": "int",
+      "description": "set_temperature(23)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 69
+}

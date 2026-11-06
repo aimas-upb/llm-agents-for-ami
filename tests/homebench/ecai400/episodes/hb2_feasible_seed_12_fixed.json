@@ -1,0 +1,65 @@
+{
+ "meta": {
+  "seed": 12,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 2,
+  "id": "home19_multi_1",
+  "homebench_type": "multi2_normal",
+  "gold": "'''living_room.aromatherapy.set_intensity(70),foyer.light.set_brightness(0),'''",
+  "label_correction": {
+   "original_gold": "'''living_room.aromatherapy.set_intensity(70),error_input,'''",
+   "original_type": "multi2_mix",
+   "reason": "labelled impossible, but the home gives that light a brightness"
+  }
+ },
+ "query": "Decrease the intensity of the aromatherapy by 16% in the living room and set the brightness of the light to 0 in the foyer.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_intensity(70)"
+     }
+    ]
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_brightness(0)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 19
+}

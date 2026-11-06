@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 5095,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 1,
+  "id": "home19_one_568",
+  "homebench_type": "normal",
+  "gold": "''' foyer.aromatherapy.set_interval(40)'''"
+ },
+ "query": "Increase the interval of the aromatherapy device in the foyer by 15 seconds.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_interval(40)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 19
+}

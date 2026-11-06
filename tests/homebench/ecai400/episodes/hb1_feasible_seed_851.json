@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 851,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 47,
+  "devices_count": 1,
+  "id": "home15_one_80",
+  "homebench_type": "normal",
+  "gold": "''' master_bedroom.curtain.set_degree(40)'''"
+ },
+ "query": "Set the curtain degree to 40 in the master bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_degree(40)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 15
+}

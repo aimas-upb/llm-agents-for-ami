@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 40,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 44,
+  "devices_count": 2,
+  "id": "home81_multi_26",
+  "homebench_type": "multi2_normal",
+  "gold": "'''master_bedroom.curtain.set_degree(50),study_room.air_conditioner.set_mode(cool),'''"
+ },
+ "query": "Increase the curtain degree by 50% in the master bedroom and set the air conditioner mode to cool in the study room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_degree(50)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "cool",
+      "value_type": "enum",
+      "description": "set_mode(cool)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 81
+}

@@ -1,0 +1,56 @@
+{
+ "meta": {
+  "seed": 124,
+  "query_type": "hb3",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 46,
+  "devices_count": 1,
+  "id": "home53_multi_81",
+  "homebench_type": "multi3_mix",
+  "gold": "'''error_input,master_bedroom.humidifier.set_intensity(60),master_bedroom.humidifier.set_intensity(30),'''"
+ },
+ "query": "Set the intensity of the humidifier to 30% in the guest bedroom, 60% in the master bedroom, and 30% again in the master bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": null,
+    "device_id": null,
+    "device_type": null,
+    "feasibility": false,
+    "reason": "unknown",
+    "resolved": false
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [],
+    "superseded_by": 2
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_intensity(30)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 53
+}

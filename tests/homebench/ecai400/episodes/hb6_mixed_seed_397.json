@@ -1,0 +1,115 @@
+{
+ "meta": {
+  "seed": 397,
+  "query_type": "hb6",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 51,
+  "devices_count": 6,
+  "id": "home47_multi_211",
+  "homebench_type": "multi6_mix",
+  "gold": "'''error_input,master_bedroom.media_player.set_volume(100),guest_bedroom.air_conditioner.set_swing(up),error_input,master_bedroom.curtain.set_degree(70),study_room.air_conditioner.set_temperature(20),'''"
+ },
+ "query": "Set the fan speed to high in the kitchen, adjust the media player volume to 100 in the master bedroom, decrease the air conditioner swing by 1 level in the guest bedroom, set the aromatherapy intensity to 10 in the master bedroom, adjust the curtain degree to 70 in the master bedroom, and set the air conditioner temperature to 20 in the study room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_fan",
+    "device_type": "fan",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_volume(100)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "swing",
+      "value": "up",
+      "value_type": "enum",
+      "description": "set_swing(up)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "intensity"
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_degree(70)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_temperature(20)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 47
+}

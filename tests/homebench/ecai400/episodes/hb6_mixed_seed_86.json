@@ -1,0 +1,119 @@
+{
+ "meta": {
+  "seed": 86,
+  "query_type": "hb6",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 46,
+  "devices_count": 6,
+  "id": "home53_multi_214",
+  "homebench_type": "multi6_mix",
+  "gold": "'''store_room.dehumidifiers.set_intensity(40),balcony.aromatherapy.set_intensity(10),master_bedroom.air_conditioner.set_fan_speed(medium),error_input,master_bedroom.aromatherapy.turn_off(),master_bedroom.humidifier.set_intensity(30),'''"
+ },
+ "query": "Increase the intensity of the dehumidifiers by 5% in the store room, increase the intensity of the aromatherapy device by 5% on the balcony, decrease the fan speed of the air conditioner by 1 level in the master bedroom, set the water heater to heating mode in the kitchen, turn off the aromatherapy device in the master bedroom, and decrease the intensity of the humidifier by 4% in the master bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_intensity(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_intensity(10)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "fan_speed",
+      "value": "medium",
+      "value_type": "enum",
+      "description": "set_fan_speed(medium)"
+     }
+    ]
+   },
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_water_heater",
+    "device_type": "water_heater",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "off",
+      "value_type": "enum",
+      "description": "turn_off()"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_intensity(30)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 53
+}

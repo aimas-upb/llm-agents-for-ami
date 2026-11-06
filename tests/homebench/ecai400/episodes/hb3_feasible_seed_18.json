@@ -1,0 +1,79 @@
+{
+ "meta": {
+  "seed": 18,
+  "query_type": "hb3",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 43,
+  "devices_count": 3,
+  "id": "home45_multi_65",
+  "homebench_type": "multi3_normal",
+  "gold": "'''guest_bedroom.light.turn_on(),foyer.aromatherapy.set_interval(50),study_room.light.turn_off(),'''"
+ },
+ "query": "Turn on the light in the guest bedroom, set the aromatherapy interval to 50 in the foyer, and turn off the light in the study room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "on",
+      "value_type": "enum",
+      "description": "turn_on()"
+     }
+    ]
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_interval(50)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "off",
+      "value_type": "enum",
+      "description": "turn_off()"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 45
+}

@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 4480,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 51,
+  "devices_count": 1,
+  "id": "home13_one_62",
+  "homebench_type": "normal",
+  "gold": "''' master_bedroom.humidifier.set_mode(sleep)'''"
+ },
+ "query": "Set the humidifier in the master bedroom to sleep mode.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "sleep",
+      "value_type": "enum",
+      "description": "set_mode(sleep)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 13
+}

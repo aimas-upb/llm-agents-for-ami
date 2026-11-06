@@ -1,0 +1,117 @@
+{
+ "meta": {
+  "seed": 100,
+  "query_type": "hb6",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 5,
+  "id": "home68_multi_206",
+  "homebench_type": "multi6_mix",
+  "gold": "'''error_input,balcony.curtain.set_degree(90),garage.media_player.set_volume(30),corridor.aromatherapy.set_interval(50),error_input,error_input,'''"
+ },
+ "query": "Set the brightness of the light to 20 in the bathroom, adjust the curtain's degree to 90 in the balcony, increase the volume of the media player by 1 percent in the garage, extend the interval of the aromatherapy by 25 seconds in the corridor, set the fan to swing up in the study room, and adjust the brightness of the light to 60 in the bathroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "bathroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_light",
+    "device_type": "light",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "brightness"
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_degree(90)"
+     }
+    ]
+   },
+   {
+    "room_id": "garage",
+    "device_id": "garage_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_volume(30)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_interval(50)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_fan",
+    "device_type": "fan",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_light",
+    "device_type": "light",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "brightness"
+   }
+  ]
+ },
+ "home_id": 68
+}

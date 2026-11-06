@@ -1,0 +1,37 @@
+{
+ "meta": {
+  "seed": 3310,
+  "query_type": "hb1",
+  "case": "infeasible",
+  "num_rooms": 13,
+  "num_devices": 45,
+  "devices_count": 1,
+  "id": "home91_one_914",
+  "homebench_type": "unexist_attribute",
+  "gold": "'''error_input'''"
+ },
+ "query": "Set the brightness of the light to 80 in the store room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_light",
+    "device_type": "light",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "brightness"
+   }
+  ]
+ },
+ "home_id": 91
+}

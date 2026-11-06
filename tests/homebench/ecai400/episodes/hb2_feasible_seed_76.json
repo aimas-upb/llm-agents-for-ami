@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 76,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 51,
+  "devices_count": 2,
+  "id": "home13_multi_49",
+  "homebench_type": "multi2_normal",
+  "gold": "'''bathroom.light.set_brightness(80),corridor.light.set_brightness(50),'''"
+ },
+ "query": "Set the brightness of the light in the bathroom to 80 and increase the brightness of the light in the corridor by 28 percent.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "bathroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_brightness(80)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_brightness(50)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 13
+}

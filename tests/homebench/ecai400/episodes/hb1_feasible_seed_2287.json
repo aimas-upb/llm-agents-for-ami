@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 2287,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 47,
+  "devices_count": 1,
+  "id": "home26_one_168",
+  "homebench_type": "normal",
+  "gold": "''' guest_bedroom.trash.pack()'''"
+ },
+ "query": "Pack the trash in the guest bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_trash",
+    "device_type": "trash",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "empty",
+      "value_type": "enum",
+      "description": "pack()"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 26
+}

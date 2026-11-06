@@ -1,0 +1,92 @@
+{
+ "meta": {
+  "seed": 19,
+  "query_type": "hb4",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 42,
+  "devices_count": 3,
+  "id": "home73_multi_115",
+  "homebench_type": "multi4_normal",
+  "gold": "'''guest_bedroom.aromatherapy.set_intensity(70),guest_bedroom.aromatherapy.turn_on(),master_bedroom.curtain.set_degree(100),balcony.light.set_brightness(90),'''"
+ },
+ "query": "Increase the intensity of the aromatherapy in the guest bedroom by 44%, turn on the aromatherapy device, raise the curtain degree by 100% in the master bedroom, and boost the brightness of the light on the balcony by 64%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_intensity(70)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "on",
+      "value_type": "enum",
+      "description": "turn_on()"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_degree(100)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_brightness(90)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 73
+}

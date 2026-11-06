@@ -1,0 +1,79 @@
+{
+ "meta": {
+  "seed": 31,
+  "query_type": "hb3",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 46,
+  "devices_count": 3,
+  "id": "home53_multi_55",
+  "homebench_type": "multi3_normal",
+  "gold": "'''study_room.curtain.close(),foyer.aromatherapy.set_interval(60),balcony.aromatherapy.turn_on(),'''"
+ },
+ "query": "Close the curtain in the study room, increase the aromatherapy interval by 2 seconds in the foyer, and turn on the aromatherapy in the balcony.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "closed",
+      "value_type": "enum",
+      "description": "close()"
+     }
+    ]
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_interval(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "on",
+      "value_type": "enum",
+      "description": "turn_on()"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 53
+}

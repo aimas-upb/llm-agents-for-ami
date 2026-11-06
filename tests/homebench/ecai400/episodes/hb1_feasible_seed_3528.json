@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 3528,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 45,
+  "devices_count": 1,
+  "id": "home91_one_438",
+  "homebench_type": "normal",
+  "gold": "''' bathroom.light.set_brightness(90)'''"
+ },
+ "query": "Increase the brightness of the light in the bathroom by 7%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "bathroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_brightness(90)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 91
+}

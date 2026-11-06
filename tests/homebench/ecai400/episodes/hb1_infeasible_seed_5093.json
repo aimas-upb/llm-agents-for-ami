@@ -1,0 +1,36 @@
+{
+ "meta": {
+  "seed": 5093,
+  "query_type": "hb1",
+  "case": "infeasible",
+  "num_rooms": 13,
+  "num_devices": 44,
+  "devices_count": 1,
+  "id": "home71_one_1337",
+  "homebench_type": "unexist_device",
+  "gold": "'''error_input'''"
+ },
+ "query": "Set the intensity of the aromatherapy device to 50 on the balcony.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   }
+  ]
+ },
+ "home_id": 71
+}

@@ -1,0 +1,54 @@
+{
+ "meta": {
+  "seed": 118,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 46,
+  "devices_count": 2,
+  "id": "home55_multi_26",
+  "homebench_type": "multi2_normal",
+  "gold": "'''living_room.curtain.set_degree(0),living_room.air_purifiers.set_fan_speed(low),'''"
+ },
+ "query": "Set the curtain to 0 percent open and set the air purifiers fan speed to low in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_degree(0)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_purifiers",
+    "device_type": "air_purifiers",
+    "asserts": [
+     {
+      "attribute": "fan_speed",
+      "value": "low",
+      "value_type": "enum",
+      "description": "set_fan_speed(low)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 55
+}

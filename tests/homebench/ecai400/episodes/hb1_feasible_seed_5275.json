@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 5275,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 42,
+  "devices_count": 1,
+  "id": "home74_one_28",
+  "homebench_type": "normal",
+  "gold": "''' master_bedroom.air_conditioner.set_temperature(17)'''"
+ },
+ "query": "Set the temperature of the air conditioner in the master bedroom to 17 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 17,
+      "value_type": "int",
+      "description": "set_temperature(17)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 74
+}

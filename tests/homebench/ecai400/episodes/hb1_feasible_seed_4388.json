@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 4388,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 45,
+  "devices_count": 1,
+  "id": "home91_one_340",
+  "homebench_type": "normal",
+  "gold": "''' study_room.heating.set_mode(fan_only)'''"
+ },
+ "query": "Set the heating in the study room to fan only mode.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "fan_only",
+      "value_type": "enum",
+      "description": "set_mode(fan_only)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 91
+}

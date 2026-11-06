@@ -1,0 +1,86 @@
+{
+ "meta": {
+  "seed": 25,
+  "query_type": "hb4",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 44,
+  "devices_count": 4,
+  "id": "home35_multi_119",
+  "homebench_type": "multi4_normal",
+  "gold": "'''store_room.dehumidifiers.set_intensity(50),master_bedroom.air_conditioner.set_temperature(24),master_bedroom.dehumidifiers.set_intensity(70),master_bedroom.aromatherapy.set_intensity(40),'''"
+ },
+ "query": "Set the intensity of the dehumidifier in the store room to 50, adjust the air conditioner temperature in the master bedroom to 24 degrees, increase the intensity of the dehumidifier in the master bedroom by 55%, and set the intensity of the aromatherapy device in the master bedroom to 40.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_intensity(50)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 24,
+      "value_type": "int",
+      "description": "set_temperature(24)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_intensity(70)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_intensity(40)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 35
+}

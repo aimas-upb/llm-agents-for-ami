@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 5201,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 45,
+  "devices_count": 1,
+  "id": "home91_one_540",
+  "homebench_type": "normal",
+  "gold": "''' balcony.curtain.set_degree(40)'''"
+ },
+ "query": "Close the curtains on the balcony to a 40-degree angle.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_degree(40)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 91
+}

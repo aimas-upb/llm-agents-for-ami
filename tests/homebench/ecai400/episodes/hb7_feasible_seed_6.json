@@ -1,0 +1,149 @@
+{
+ "meta": {
+  "seed": 6,
+  "query_type": "hb7",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 45,
+  "devices_count": 7,
+  "id": "home62_multi_276",
+  "homebench_type": "multi7_normal",
+  "gold": "'''store_room.dehumidifiers.set_intensity(20),corridor.aromatherapy.set_intensity(0),study_room.curtain.set_degree(60),bathroom.light.set_brightness(40),garage.air_purifiers.set_fan_speed(high),garage.light.set_brightness(100),living_room.air_conditioner.set_temperature(26),'''"
+ },
+ "query": "Decrease the intensity of the dehumidifiers by 10% in the storeroom, reduce the intensity of the aromatherapy in the corridor by 26%, adjust the curtain to 60 degrees in the study room, dim the light in the bathroom by 43%, set the fan speed of the air purifiers to high in the garage, set the brightness of the light to 100% in the garage, and set the temperature of the air conditioner to 26 degrees in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "bathroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_intensity(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_intensity(0)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_degree(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_brightness(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "garage",
+    "device_id": "garage_air_purifiers",
+    "device_type": "air_purifiers",
+    "asserts": [
+     {
+      "attribute": "fan_speed",
+      "value": "high",
+      "value_type": "enum",
+      "description": "set_fan_speed(high)"
+     }
+    ]
+   },
+   {
+    "room_id": "garage",
+    "device_id": "garage_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_brightness(100)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 26,
+      "value_type": "int",
+      "description": "set_temperature(26)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 62
+}

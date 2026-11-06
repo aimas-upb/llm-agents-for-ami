@@ -1,0 +1,112 @@
+{
+ "meta": {
+  "seed": 9,
+  "query_type": "hb5",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 45,
+  "devices_count": 5,
+  "id": "home12_multi_157",
+  "homebench_type": "multi5_mix",
+  "gold": "'''error_input,living_room.dehumidifiers.set_intensity(100),store_room.light.turn_on(),guest_bedroom.air_conditioner.set_temperature(18),corridor.aromatherapy.set_intensity(20),'''"
+ },
+ "query": "Turn on the fan in the study room, set the intensity of the dehumidifier to 100% in the living room, turn on the light in the store room, set the air conditioner temperature to 18 degrees in the guest bedroom, and decrease the intensity of the aromatherapy in the corridor by 6%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_fan",
+    "device_type": "fan",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_intensity(100)"
+     }
+    ]
+   },
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "on",
+      "value_type": "enum",
+      "description": "turn_on()"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 18,
+      "value_type": "int",
+      "description": "set_temperature(18)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_intensity(20)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 12
+}

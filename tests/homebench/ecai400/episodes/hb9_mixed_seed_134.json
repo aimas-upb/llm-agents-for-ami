@@ -1,0 +1,151 @@
+{
+ "meta": {
+  "seed": 134,
+  "query_type": "hb9",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 7,
+  "id": "home68_multi_382",
+  "homebench_type": "multi9_mix",
+  "gold": "'''error_input,error_input,master_bedroom.air_conditioner.set_swing(down),corridor.aromatherapy.set_interval(40),master_bedroom.air_conditioner.set_temperature(27),study_room.air_conditioner.set_temperature(27),error_input,study_room.light.set_brightness(50),error_input,'''"
+ },
+ "query": "Decrease the interval of the aromatherapy in the foyer by 10 seconds, increase the interval of the aromatherapy in the foyer by 30 seconds, set the air conditioner in the master bedroom to swing down, increase the interval of the aromatherapy in the corridor by 15 seconds, increase the temperature of the air conditioner in the master bedroom by 6 degrees, increase the temperature of the air conditioner in the study room by 10 degrees, set the brightness of the light in the master bedroom to 90%, decrease the brightness of the light in the study room by 50%, and set the temperature of the heating in the bathroom to 20 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "bathroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "swing",
+      "value": "down",
+      "value_type": "enum",
+      "description": "set_swing(down)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_interval(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 27,
+      "value_type": "int",
+      "description": "set_temperature(27)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 27,
+      "value_type": "int",
+      "description": "set_temperature(27)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_light",
+    "device_type": "light",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "brightness"
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_brightness(50)"
+     }
+    ]
+   },
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_heating",
+    "device_type": "heating",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "temperature"
+   }
+  ]
+ },
+ "home_id": 68
+}

@@ -1,0 +1,87 @@
+{
+ "meta": {
+  "seed": 303,
+  "query_type": "hb4",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 49,
+  "devices_count": 4,
+  "id": "home9_multi_107",
+  "homebench_type": "multi4_mix",
+  "gold": "'''study_room.air_conditioner.set_swing(middle),living_room.air_conditioner.set_mode(fan_only),error_input,balcony.aromatherapy.turn_off(),'''"
+ },
+ "query": "Set the air conditioner in the study room to swing in the middle position, change the air conditioner in the living room to fan only mode, adjust the humidifier intensity to 90% in the study room, and turn off the aromatherapy device on the balcony.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "swing",
+      "value": "middle",
+      "value_type": "enum",
+      "description": "set_swing(middle)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "fan_only",
+      "value_type": "enum",
+      "description": "set_mode(fan_only)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_humidifier",
+    "device_type": "humidifier",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "off",
+      "value_type": "enum",
+      "description": "turn_off()"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 9
+}

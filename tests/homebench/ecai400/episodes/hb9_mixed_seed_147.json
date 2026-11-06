@@ -1,0 +1,159 @@
+{
+ "meta": {
+  "seed": 147,
+  "query_type": "hb9",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 49,
+  "devices_count": 7,
+  "id": "home9_multi_390",
+  "homebench_type": "multi9_mix",
+  "gold": "'''master_bedroom.heating.set_temperature(28),foyer.light.set_brightness(100),corridor.light.set_brightness(80),balcony.aromatherapy.set_interval(10),living_room.curtain.set_degree(70),error_input,living_room.humidifier.set_intensity(60),master_bedroom.curtain.set_degree(50),error_input,'''"
+ },
+ "query": "Set the temperature to 28 degrees in the master bedroom, adjust the brightness to 100 for the light in the foyer, increase the brightness by 30% for the light in the corridor, set the interval to 10 for the aromatherapy in the balcony, adjust the curtain to 70 degrees in the living room, increase the curtain by 20% in the guest bedroom, decrease the humidifier intensity by 10% in the living room, increase the curtain by 50% in the master bedroom, and set the brightness to 40 for the light in the balcony.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 28,
+      "value_type": "int",
+      "description": "set_temperature(28)"
+     }
+    ]
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_brightness(100)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_brightness(80)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_interval(10)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_degree(70)"
+     }
+    ]
+   },
+   {
+    "room_id": null,
+    "device_id": null,
+    "device_type": null,
+    "feasibility": false,
+    "reason": "unknown",
+    "resolved": false
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_intensity(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_degree(50)"
+     }
+    ]
+   },
+   {
+    "room_id": null,
+    "device_id": null,
+    "device_type": null,
+    "feasibility": false,
+    "reason": "unknown",
+    "resolved": false
+   }
+  ]
+ },
+ "home_id": 9
+}

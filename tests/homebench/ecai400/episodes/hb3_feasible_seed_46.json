@@ -1,0 +1,73 @@
+{
+ "meta": {
+  "seed": 46,
+  "query_type": "hb3",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 3,
+  "id": "home30_multi_54",
+  "homebench_type": "multi3_normal",
+  "gold": "'''living_room.air_purifiers.turn_off(),study_room.curtain.set_degree(50),living_room.media_player.set_volume(100),'''"
+ },
+ "query": "Turn off the air purifiers in the living room, increase the curtain degree by 50 percent in the study room, and set the volume of the media player to 100 in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_purifiers",
+    "device_type": "air_purifiers",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "off",
+      "value_type": "enum",
+      "description": "turn_off()"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_degree(50)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_volume(100)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 30
+}

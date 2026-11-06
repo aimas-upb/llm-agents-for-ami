@@ -1,0 +1,36 @@
+{
+ "meta": {
+  "seed": 2972,
+  "query_type": "hb1",
+  "case": "infeasible",
+  "num_rooms": 13,
+  "num_devices": 45,
+  "devices_count": 1,
+  "id": "home91_one_1117",
+  "homebench_type": "unexist_device",
+  "gold": "'''error_input'''"
+ },
+ "query": "Set the intensity of the aromatherapy device to 70 in the guest bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   }
+  ]
+ },
+ "home_id": 91
+}

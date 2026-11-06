@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 789,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 42,
+  "devices_count": 1,
+  "id": "home74_one_300",
+  "homebench_type": "normal",
+  "gold": "''' living_room.aromatherapy.set_intensity(10)'''"
+ },
+ "query": "Decrease the intensity of the aromatherapy in the living room by 16%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_intensity(10)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 74
+}

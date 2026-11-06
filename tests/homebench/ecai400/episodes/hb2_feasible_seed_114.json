@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 114,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 48,
+  "devices_count": 2,
+  "id": "home72_multi_4",
+  "homebench_type": "multi2_normal",
+  "gold": "'''living_room.air_conditioner.set_temperature(28),garage.media_player.play(),'''"
+ },
+ "query": "Lower the air conditioner temperature in the living room by 2 degrees and play media in the garage.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 28,
+      "value_type": "int",
+      "description": "set_temperature(28)"
+     }
+    ]
+   },
+   {
+    "room_id": "garage",
+    "device_id": "garage_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "playing",
+      "value_type": "enum",
+      "description": "play()"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 72
+}

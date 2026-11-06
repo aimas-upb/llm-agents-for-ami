@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 785,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 45,
+  "devices_count": 1,
+  "id": "home91_one_138",
+  "homebench_type": "normal",
+  "gold": "''' guest_bedroom.light.set_brightness(90)'''"
+ },
+ "query": "Set the brightness of the light to 90% in the guest bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_brightness(90)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 91
+}

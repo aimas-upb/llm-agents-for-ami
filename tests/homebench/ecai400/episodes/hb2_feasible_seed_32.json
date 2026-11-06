@@ -1,0 +1,54 @@
+{
+ "meta": {
+  "seed": 32,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 2,
+  "id": "home30_multi_0",
+  "homebench_type": "multi2_normal",
+  "gold": "'''living_room.media_player.set_volume(50),living_room.light.set_brightness(60),'''"
+ },
+ "query": "Set the volume of the media player to 50 and increase the brightness of the light in the living room by 44 percent.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_volume(50)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_brightness(60)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 30
+}

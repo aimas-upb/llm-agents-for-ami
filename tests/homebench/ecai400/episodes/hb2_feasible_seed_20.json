@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 20,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 46,
+  "devices_count": 2,
+  "id": "home2_multi_13",
+  "homebench_type": "multi2_normal",
+  "gold": "'''ding_room.dehumidifiers.turn_on(),corridor.light.set_brightness(30),'''"
+ },
+ "query": "Turn on the dehumidifier in the dining room and set the brightness of the light in the corridor to 30.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "on",
+      "value_type": "enum",
+      "description": "turn_on()"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_brightness(30)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 2
+}

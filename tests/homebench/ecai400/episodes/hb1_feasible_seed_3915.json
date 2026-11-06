@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 3915,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 44,
+  "devices_count": 1,
+  "id": "home35_one_593",
+  "homebench_type": "normal",
+  "gold": "''' garage.media_player.set_volume(10)'''"
+ },
+ "query": "Decrease the volume of the media player in the garage by 73 percent.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "garage",
+    "device_id": "garage_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_volume(10)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 35
+}

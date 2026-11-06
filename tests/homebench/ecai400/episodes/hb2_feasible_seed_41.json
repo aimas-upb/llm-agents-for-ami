@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 41,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 45,
+  "devices_count": 2,
+  "id": "home62_multi_18",
+  "homebench_type": "multi2_normal",
+  "gold": "'''guest_bedroom.heating.set_temperature(30),balcony.media_player.set_volume(80),'''"
+ },
+ "query": "Increase the heating temperature in the guest bedroom by 2 degrees and set the volume of the media player to 80 in the balcony.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_temperature(30)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_volume(80)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 62
+}

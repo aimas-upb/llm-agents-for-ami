@@ -1,0 +1,144 @@
+{
+ "meta": {
+  "seed": 407,
+  "query_type": "hb8",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 51,
+  "devices_count": 8,
+  "id": "home13_multi_318",
+  "homebench_type": "multi8_mix",
+  "gold": "'''error_input,error_input,living_room.air_conditioner.set_temperature(23),error_input,garage.light.set_brightness(20),error_input,ding_room.dehumidifiers.turn_on(),guest_bedroom.light.set_brightness(70),'''"
+ },
+ "query": "Set the water heater temperature to 85 degrees in the kitchen, turn on the fan in the guest bedroom, adjust the air conditioner temperature to 23 degrees in the living room, increase the volume of the media player by 40% in the living room, decrease the brightness of the light by 63% in the garage, set the heating temperature to 25 degrees in the master bedroom, turn on the dehumidifiers in the dining room, and set the brightness of the light to 70% in the guest bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_water_heater",
+    "device_type": "water_heater",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "temperature"
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_fan",
+    "device_type": "fan",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 23,
+      "value_type": "int",
+      "description": "set_temperature(23)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_media_player",
+    "device_type": "media_player",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "garage",
+    "device_id": "garage_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_brightness(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_heating",
+    "device_type": "heating",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "temperature"
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "on",
+      "value_type": "enum",
+      "description": "turn_on()"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_brightness(70)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 13
+}

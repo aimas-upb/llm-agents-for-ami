@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 5846,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 48,
+  "devices_count": 1,
+  "id": "home59_one_102",
+  "homebench_type": "normal",
+  "gold": "''' master_bedroom.humidifier.set_intensity(50)'''"
+ },
+ "query": "Increase the intensity of the humidifier by 42% in the master bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_intensity(50)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 59
+}

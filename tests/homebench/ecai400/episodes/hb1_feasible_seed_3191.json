@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 3191,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 49,
+  "devices_count": 1,
+  "id": "home9_one_672",
+  "homebench_type": "normal",
+  "gold": "''' balcony.media_player.set_volume(90)'''"
+ },
+ "query": "Increase the volume of the media player by 35% on the balcony.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_volume(90)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 9
+}

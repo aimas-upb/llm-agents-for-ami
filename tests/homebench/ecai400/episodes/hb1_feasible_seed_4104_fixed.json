@@ -1,0 +1,46 @@
+{
+ "meta": {
+  "seed": 4104,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 45,
+  "devices_count": 1,
+  "id": "home88_one_599",
+  "homebench_type": "normal",
+  "gold": "''' ding_room.light.set_brightness(40)'''",
+  "label_correction": {
+   "original_gold": "'''error_input'''",
+   "original_type": "unexist_attribute",
+   "reason": "labelled unexist_attribute, but the home file gives the light a 0-100 brightness"
+  }
+ },
+ "query": "Set the brightness of the light to 40 in the dining room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_brightness(40)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 88
+}

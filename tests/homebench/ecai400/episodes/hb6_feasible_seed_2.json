@@ -1,0 +1,136 @@
+{
+ "meta": {
+  "seed": 2,
+  "query_type": "hb6",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 44,
+  "devices_count": 6,
+  "id": "home81_multi_246",
+  "homebench_type": "multi6_normal",
+  "gold": "'''store_room.dehumidifiers.set_intensity(80),living_room.media_player.set_volume(20),corridor.aromatherapy.set_intensity(40),garage.blinds.close(),master_bedroom.aromatherapy.set_interval(30),study_room.humidifier.set_intensity(30),'''"
+ },
+ "query": "Set the dehumidifier intensity to 80 in the store room, adjust the media player volume to 20 in the living room, decrease the aromatherapy intensity by 11% in the corridor, close the blinds in the garage, set the aromatherapy interval to 30 in the master bedroom, and adjust the humidifier intensity to 30 in the study room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_intensity(80)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_volume(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_intensity(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "garage",
+    "device_id": "garage_blinds",
+    "device_type": "blinds",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "closed",
+      "value_type": "enum",
+      "description": "close()"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_interval(30)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_intensity(30)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 81
+}

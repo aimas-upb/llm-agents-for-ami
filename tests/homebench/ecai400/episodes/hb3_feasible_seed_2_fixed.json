@@ -1,0 +1,66 @@
+{
+ "meta": {
+  "seed": 2,
+  "query_type": "hb3",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 42,
+  "devices_count": 2,
+  "id": "home73_multi_93",
+  "homebench_type": "multi3_normal",
+  "gold": "'''master_bedroom.media_player.set_volume(0),master_bedroom.media_player.set_volume(0),master_bedroom.curtain.set_degree(50),'''",
+  "label_correction": {
+   "original_gold": "'''master_bedroom.media_player.set_volume(0),master_bedroom.media_player.set_volume(70),master_bedroom.curtain.set_degree(50),'''",
+   "original_type": "multi3_normal",
+   "reason": "the change follows the previous one on the same device ('then', 'further'), not the start value (0 - 14%, kept at the lowest, 0)"
+  }
+ },
+ "query": "Decrease the volume of the media player by 84% in the master bedroom, then decrease it by 14%, and finally increase the degree of the curtain by 50% in the master bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_media_player",
+    "device_type": "media_player",
+    "asserts": [],
+    "superseded_by": 1
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_volume(0)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_degree(50)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 73
+}

@@ -1,0 +1,92 @@
+{
+ "meta": {
+  "seed": 21,
+  "query_type": "hb4",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 4,
+  "id": "home30_multi_136",
+  "homebench_type": "multi4_normal",
+  "gold": "'''balcony.aromatherapy.set_interval(60),study_room.air_conditioner.set_temperature(29),study_room.light.set_brightness(40),guest_bedroom.air_conditioner.set_temperature(30),'''"
+ },
+ "query": "Set the aromatherapy interval to 60 minutes on the balcony, increase the air conditioner temperature in the study room by 8 degrees, decrease the brightness of the light in the study room by 43 percent, and set the air conditioner temperature to 30 degrees in the guest bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_interval(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 29,
+      "value_type": "int",
+      "description": "set_temperature(29)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_brightness(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_temperature(30)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 30
+}

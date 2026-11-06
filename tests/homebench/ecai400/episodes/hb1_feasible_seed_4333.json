@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 4333,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 47,
+  "devices_count": 1,
+  "id": "home26_one_321",
+  "homebench_type": "normal",
+  "gold": "''' ding_room.light.set_brightness(60)'''"
+ },
+ "query": "Set the brightness of the light in the dining room to 60.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_brightness(60)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 26
+}

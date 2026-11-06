@@ -1,0 +1,36 @@
+{
+ "meta": {
+  "seed": 3764,
+  "query_type": "hb1",
+  "case": "infeasible",
+  "num_rooms": 13,
+  "num_devices": 48,
+  "devices_count": 1,
+  "id": "home59_one_1094",
+  "homebench_type": "unexist_device",
+  "gold": "'''error_input'''"
+ },
+ "query": "Set the intensity of the dehumidifier to 30 in the guest bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   }
+  ]
+ },
+ "home_id": 59
+}

@@ -1,0 +1,36 @@
+{
+ "meta": {
+  "seed": 4134,
+  "query_type": "hb1",
+  "case": "infeasible",
+  "num_rooms": 13,
+  "num_devices": 44,
+  "devices_count": 1,
+  "id": "home71_one_1217",
+  "homebench_type": "unexist_device",
+  "gold": "'''error_input'''"
+ },
+ "query": "Turn on the dehumidifier in the study room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   }
+  ]
+ },
+ "home_id": 71
+}

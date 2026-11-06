@@ -1,0 +1,74 @@
+{
+ "meta": {
+  "seed": 147,
+  "query_type": "hb3",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 3,
+  "id": "home68_multi_70",
+  "homebench_type": "multi3_mix",
+  "gold": "'''study_room.curtain.set_degree(60),master_bedroom.air_conditioner.set_mode(heat),error_input,'''"
+ },
+ "query": "Set the curtain in the study room to 60 degrees, change the air conditioner in the master bedroom to heat mode, and turn on the aromatherapy in the foyer.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_degree(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "heat",
+      "value_type": "enum",
+      "description": "set_mode(heat)"
+     }
+    ]
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   }
+  ]
+ },
+ "home_id": 68
+}

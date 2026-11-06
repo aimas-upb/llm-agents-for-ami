@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 106,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 49,
+  "devices_count": 2,
+  "id": "home9_multi_33",
+  "homebench_type": "multi2_normal",
+  "gold": "'''foyer.light.set_brightness(60),living_room.air_conditioner.set_temperature(21),'''"
+ },
+ "query": "Decrease the brightness of the light in the foyer by 23 percent and set the temperature of the air conditioner in the living room to 21 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_brightness(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 21,
+      "value_type": "int",
+      "description": "set_temperature(21)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 9
+}

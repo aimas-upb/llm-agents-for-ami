@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 1749,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 42,
+  "devices_count": 1,
+  "id": "home74_one_509",
+  "homebench_type": "normal",
+  "gold": "''' foyer.aromatherapy.set_intensity(60)'''"
+ },
+ "query": "Increase the intensity of the aromatherapy in the foyer by 34%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_intensity(60)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 74
+}

@@ -1,0 +1,92 @@
+{
+ "meta": {
+  "seed": 8,
+  "query_type": "hb4",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 46,
+  "devices_count": 4,
+  "id": "home53_multi_100",
+  "homebench_type": "multi4_normal",
+  "gold": "'''guest_bedroom.dehumidifiers.set_intensity(80),living_room.media_player.set_volume(40),ding_room.light.set_brightness(30),living_room.humidifier.set_intensity(60),'''"
+ },
+ "query": "Increase the intensity of the dehumidifier by 50% in the guest bedroom, decrease the volume of the media player by 58% in the living room, set the brightness of the light to 30 in the dining room, and decrease the intensity of the humidifier by 10% in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_intensity(80)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_volume(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_brightness(30)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_intensity(60)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 53
+}

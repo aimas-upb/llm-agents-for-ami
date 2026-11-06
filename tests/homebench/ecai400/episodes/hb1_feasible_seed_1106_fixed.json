@@ -1,0 +1,46 @@
+{
+ "meta": {
+  "seed": 1106,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 47,
+  "devices_count": 1,
+  "id": "home15_one_433",
+  "homebench_type": "normal",
+  "gold": "''' study_room.air_conditioner.set_temperature(19)'''",
+  "label_correction": {
+   "original_gold": "''' study_room.air_conditioner.set_temperature(27)'''",
+   "original_type": "normal",
+   "reason": "the gold is not the start value changed by N (18 + 1)"
+  }
+ },
+ "query": "Raise the air conditioner temperature in the study room by 1 degree.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 19,
+      "value_type": "int",
+      "description": "set_temperature(19)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 15
+}

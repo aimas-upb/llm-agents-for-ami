@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 471,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 44,
+  "devices_count": 1,
+  "id": "home35_one_59",
+  "homebench_type": "normal",
+  "gold": "''' master_bedroom.curtain.set_degree(40)'''"
+ },
+ "query": "Open the curtains in the master bedroom by increasing the degree by 40 percent.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_degree(40)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 35
+}

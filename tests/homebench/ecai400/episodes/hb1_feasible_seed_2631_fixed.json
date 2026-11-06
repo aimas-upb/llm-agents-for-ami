@@ -1,0 +1,46 @@
+{
+ "meta": {
+  "seed": 2631,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 41,
+  "devices_count": 1,
+  "id": "home85_one_916",
+  "homebench_type": "normal",
+  "gold": "''' garage.light.set_brightness(90)'''",
+  "label_correction": {
+   "original_gold": "'''error_input'''",
+   "original_type": "unexist_attribute",
+   "reason": "labelled unexist_attribute, but the home file gives the light a 0-100 brightness"
+  }
+ },
+ "query": "Set the brightness of the light in the garage to 90.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "garage",
+    "device_id": "garage_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_brightness(90)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 85
+}

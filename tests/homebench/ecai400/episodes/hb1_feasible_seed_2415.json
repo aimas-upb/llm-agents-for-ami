@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 2415,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 51,
+  "devices_count": 1,
+  "id": "home13_one_512",
+  "homebench_type": "normal",
+  "gold": "''' study_room.air_purifiers.turn_on()'''"
+ },
+ "query": "Turn on the air purifiers in the study room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_purifiers",
+    "device_type": "air_purifiers",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "on",
+      "value_type": "enum",
+      "description": "turn_on()"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 13
+}

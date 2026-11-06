@@ -1,0 +1,79 @@
+{
+ "meta": {
+  "seed": 36,
+  "query_type": "hb3",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 44,
+  "devices_count": 3,
+  "id": "home35_multi_77",
+  "homebench_type": "multi3_normal",
+  "gold": "'''guest_bedroom.air_conditioner.set_temperature(20),master_bedroom.air_conditioner.set_temperature(16),living_room.aromatherapy.set_intensity(0),'''"
+ },
+ "query": "Lower the air conditioner temperature in the guest bedroom to 20 degrees, decrease the air conditioner temperature in the master bedroom by 8 degrees, and set the intensity of the aromatherapy device to 0 in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_temperature(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 16,
+      "value_type": "int",
+      "description": "set_temperature(16)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_intensity(0)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 35
+}

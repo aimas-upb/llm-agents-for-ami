@@ -1,0 +1,93 @@
+{
+ "meta": {
+  "seed": 12,
+  "query_type": "hb5",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 45,
+  "devices_count": 4,
+  "id": "home62_multi_183",
+  "homebench_type": "multi5_normal",
+  "gold": "'''guest_bedroom.heating.set_temperature(21),guest_bedroom.curtain.set_degree(20),study_room.dehumidifiers.set_mode(auto),guest_bedroom.heating.set_temperature(26),study_room.air_purifiers.set_fan_speed(medium),'''"
+ },
+ "query": "Lower the heating temperature in the guest bedroom by 7 degrees, increase the curtain degree by 20 percent in the guest bedroom, set the dehumidifiers in the study room to auto mode, decrease the heating temperature in the guest bedroom by 2 degrees, and decrease the air purifiers fan speed level by 1 in the study room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_heating",
+    "device_type": "heating",
+    "asserts": [],
+    "superseded_by": 3
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_degree(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "auto",
+      "value_type": "enum",
+      "description": "set_mode(auto)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 26,
+      "value_type": "int",
+      "description": "set_temperature(26)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_purifiers",
+    "device_type": "air_purifiers",
+    "asserts": [
+     {
+      "attribute": "fan_speed",
+      "value": "medium",
+      "value_type": "enum",
+      "description": "set_fan_speed(medium)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 62
+}

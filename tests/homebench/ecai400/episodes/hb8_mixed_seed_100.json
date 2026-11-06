@@ -1,0 +1,142 @@
+{
+ "meta": {
+  "seed": 100,
+  "query_type": "hb8",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 51,
+  "devices_count": 8,
+  "id": "home47_multi_347",
+  "homebench_type": "multi8_mix",
+  "gold": "'''living_room.media_player.set_volume(10),error_input,master_bedroom.media_player.set_volume(60),study_room.light.set_brightness(50),kitchen.blinds.close(),error_input,living_room.dehumidifiers.set_intensity(70),error_input,'''"
+ },
+ "query": "Decrease the volume of the media player by 36% in the living room, increase the intensity of the dehumidifier by 30% in the dining room, increase the volume of the media player by 16% in the master bedroom, increase the brightness of the light by 44% in the study room, close the blinds in the kitchen, set the fan speed to auto in the dining room, increase the intensity of the dehumidifier by 40% in the living room, and set the intensity of the humidifier to 70% in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_volume(10)"
+     }
+    ]
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_volume(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_brightness(50)"
+     }
+    ]
+   },
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_blinds",
+    "device_type": "blinds",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "closed",
+      "value_type": "enum",
+      "description": "close()"
+     }
+    ]
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_fan",
+    "device_type": "fan",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "fan_speed"
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_intensity(70)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_humidifier",
+    "device_type": "humidifier",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   }
+  ]
+ },
+ "home_id": 47
+}

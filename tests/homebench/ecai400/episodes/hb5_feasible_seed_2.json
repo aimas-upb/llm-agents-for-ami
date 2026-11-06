@@ -1,0 +1,111 @@
+{
+ "meta": {
+  "seed": 2,
+  "query_type": "hb5",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 44,
+  "devices_count": 5,
+  "id": "home35_multi_174",
+  "homebench_type": "multi5_normal",
+  "gold": "'''foyer.aromatherapy.set_intensity(40),master_bedroom.air_purifiers.set_mode(sleep),study_room.heating.set_temperature(19),study_room.dehumidifiers.set_intensity(40),guest_bedroom.air_conditioner.set_temperature(18),'''"
+ },
+ "query": "Increase the intensity of the aromatherapy in the foyer by 14%, set the air purifiers in the master bedroom to sleep mode, decrease the heating temperature in the study room by 8 degrees, increase the intensity of the dehumidifiers in the study room by 10%, and set the air conditioner temperature in the guest bedroom to 18 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_intensity(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_purifiers",
+    "device_type": "air_purifiers",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "sleep",
+      "value_type": "enum",
+      "description": "set_mode(sleep)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 19,
+      "value_type": "int",
+      "description": "set_temperature(19)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_intensity(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 18,
+      "value_type": "int",
+      "description": "set_temperature(18)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 35
+}

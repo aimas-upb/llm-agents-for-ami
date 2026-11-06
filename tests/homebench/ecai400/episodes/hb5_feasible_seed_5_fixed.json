@@ -1,0 +1,110 @@
+{
+ "meta": {
+  "seed": 5,
+  "query_type": "hb5",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 44,
+  "devices_count": 4,
+  "id": "home81_multi_184",
+  "homebench_type": "multi5_normal",
+  "gold": "'''kitchen.fan.set_speed(low),bathroom.heating.set_temperature(27),guest_bedroom.air_conditioner.set_temperature(29),bathroom.heating.set_temperature(30),master_bedroom.humidifier.set_intensity(20),'''",
+  "label_correction": {
+   "original_gold": "'''kitchen.fan.set_speed(low),bathroom.heating.set_temperature(27),guest_bedroom.air_conditioner.set_temperature(29),bathroom.heating.set_temperature(19),master_bedroom.humidifier.set_intensity(20),'''",
+   "original_type": "multi5_normal",
+   "reason": "the change follows the previous one on the same device ('then', 'further'), not the start value (27 + 3)"
+  }
+ },
+ "query": "Decrease the speed of the fan in the kitchen by 2 levels, set the temperature of the heating in the bathroom to 27 degrees, increase the temperature of the air conditioner in the guest bedroom by 1 degree, raise the temperature of the heating in the bathroom by 3 degrees, and lower the intensity of the humidifier in the master bedroom by 35 percent.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "bathroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_fan",
+    "device_type": "fan",
+    "asserts": [
+     {
+      "attribute": "speed",
+      "value": "low",
+      "value_type": "enum",
+      "description": "set_speed(low)"
+     }
+    ]
+   },
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_heating",
+    "device_type": "heating",
+    "asserts": [],
+    "superseded_by": 3
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 29,
+      "value_type": "int",
+      "description": "set_temperature(29)"
+     }
+    ]
+   },
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_temperature(30)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_intensity(20)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 81
+}

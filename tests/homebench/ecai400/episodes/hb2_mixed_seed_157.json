@@ -1,0 +1,56 @@
+{
+ "meta": {
+  "seed": 157,
+  "query_type": "hb2",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 46,
+  "devices_count": 2,
+  "id": "home53_multi_22",
+  "homebench_type": "multi2_mix",
+  "gold": "'''error_input,master_bedroom.light.set_brightness(60),'''"
+ },
+ "query": "Set the brightness of the light in the store room to 80 and increase the brightness of the light in the master bedroom by 29 percent.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_light",
+    "device_type": "light",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "brightness"
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_brightness(60)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 53
+}

@@ -1,0 +1,36 @@
+{
+ "meta": {
+  "seed": 364,
+  "query_type": "hb1",
+  "case": "infeasible",
+  "num_rooms": 13,
+  "num_devices": 43,
+  "devices_count": 1,
+  "id": "home67_one_1093",
+  "homebench_type": "unexist_device",
+  "gold": "'''error_input'''"
+ },
+ "query": "Increase the intensity of the humidifier in the dining room by 40%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_humidifier",
+    "device_type": "humidifier",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   }
+  ]
+ },
+ "home_id": 67
+}

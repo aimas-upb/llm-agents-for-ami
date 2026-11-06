@@ -1,0 +1,54 @@
+{
+ "meta": {
+  "seed": 73,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 2,
+  "id": "home19_multi_23",
+  "homebench_type": "multi2_normal",
+  "gold": "'''guest_bedroom.air_conditioner.set_temperature(22),guest_bedroom.aromatherapy.set_intensity(0),'''"
+ },
+ "query": "Lower the air conditioner temperature in the guest bedroom by 7 degrees and set the intensity of the aromatherapy device to 0 in the guest bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 22,
+      "value_type": "int",
+      "description": "set_temperature(22)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_intensity(0)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 19
+}

@@ -1,0 +1,146 @@
+{
+ "meta": {
+  "seed": 224,
+  "query_type": "hb8",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 44,
+  "devices_count": 5,
+  "id": "home49_multi_325",
+  "homebench_type": "multi8_mix",
+  "gold": "'''guest_bedroom.aromatherapy.set_intensity(46),error_input,error_input,foyer.aromatherapy.set_intensity(60),corridor.aromatherapy.set_interval(20),living_room.curtain.set_degree(30),master_bedroom.curtain.set_degree(70),error_input,'''",
+  "label_correction": {
+   "original_gold": "'''guest_bedroom.aromatherapy.set_intensity(20),error_input,error_input,foyer.aromatherapy.set_intensity(60),corridor.aromatherapy.set_interval(20),living_room.curtain.set_degree(30),master_bedroom.curtain.set_degree(70),error_input,'''",
+   "original_type": "multi8_mix",
+   "reason": "a percent change of a 0-100 percent setting adds points: start + N (26 + 20)"
+  }
+ },
+ "query": "- Increase the intensity of the aromatherapy in the guest bedroom by 20%. \n- Increase the air conditioner temperature in the guest bedroom by 1 degree.\n- Decrease the heating temperature in the study room by 5 degrees.\n- Increase the intensity of the aromatherapy in the foyer by 34%.\n- Decrease the interval of the aromatherapy in the corridor by 19 seconds.\n- Increase the curtain degree in the living room by 30%.\n- Set the curtain degree in the master bedroom to 70%.\n- Decrease the air conditioner temperature in the guest bedroom by 3 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 46,
+      "value_type": "int",
+      "description": "set_intensity(46)"
+     }
+    ]
+   },
+   {
+    "room_id": null,
+    "device_id": null,
+    "device_type": null,
+    "feasibility": false,
+    "reason": "unknown",
+    "resolved": false
+   },
+   {
+    "room_id": null,
+    "device_id": null,
+    "device_type": null,
+    "feasibility": false,
+    "reason": "unknown",
+    "resolved": false
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_intensity(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_interval(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_degree(30)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_degree(70)"
+     }
+    ]
+   },
+   {
+    "room_id": null,
+    "device_id": null,
+    "device_type": null,
+    "feasibility": false,
+    "reason": "unknown",
+    "resolved": false
+   }
+  ]
+ },
+ "home_id": 49
+}

@@ -1,0 +1,36 @@
+{
+ "meta": {
+  "seed": 572,
+  "query_type": "hb1",
+  "case": "infeasible",
+  "num_rooms": 12,
+  "num_devices": 45,
+  "devices_count": 1,
+  "id": "home88_one_1194",
+  "homebench_type": "unexist_device",
+  "gold": "'''error_input'''"
+ },
+ "query": "Close the curtains on the balcony to 90 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_curtain",
+    "device_type": "curtain",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   }
+  ]
+ },
+ "home_id": 88
+}

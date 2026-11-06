@@ -1,0 +1,171 @@
+{
+ "meta": {
+  "seed": 132,
+  "query_type": "hb10",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 44,
+  "devices_count": 8,
+  "id": "home35_multi_445",
+  "homebench_type": "multi10_mix",
+  "gold": "'''guest_bedroom.air_conditioner.set_temperature(24),master_bedroom.aromatherapy.set_intensity(80),study_room.dehumidifiers.set_intensity(50),guest_bedroom.air_purifiers.set_fan_speed(low),living_room.aromatherapy.turn_on(),master_bedroom.air_conditioner.set_temperature(24),error_input,kitchen.light.set_brightness(40),living_room.aromatherapy.set_intensity(100),guest_bedroom.air_conditioner.set_temperature(16),'''"
+ },
+ "query": "Set the temperature to 24 degrees in the guest bedroom for the air conditioner, increase the intensity of the aromatherapy in the master bedroom to 80%, adjust the intensity of the dehumidifiers to 50% in the study room, reduce the fan speed of the air purifiers by 2 levels in the guest bedroom, turn on the aromatherapy in the living room, set the temperature to 24 degrees in the master bedroom for the air conditioner, adjust the curtain degree to 30 in the guest bedroom, reduce the brightness of the kitchen lights by 60%, increase the intensity of the aromatherapy in the living room by 74%, and set the temperature to 16 degrees in the guest bedroom for the air conditioner.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [],
+    "superseded_by": 9
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_intensity(80)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_intensity(50)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_purifiers",
+    "device_type": "air_purifiers",
+    "asserts": [
+     {
+      "attribute": "fan_speed",
+      "value": "low",
+      "value_type": "enum",
+      "description": "set_fan_speed(low)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "on",
+      "value_type": "enum",
+      "description": "turn_on()"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 24,
+      "value_type": "int",
+      "description": "set_temperature(24)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_curtain",
+    "device_type": "curtain",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_brightness(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_intensity(100)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 16,
+      "value_type": "int",
+      "description": "set_temperature(16)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 35
+}

@@ -1,0 +1,55 @@
+{
+ "meta": {
+  "seed": 82,
+  "query_type": "hb2",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 2,
+  "id": "home68_multi_14",
+  "homebench_type": "multi2_mix",
+  "gold": "'''error_input,master_bedroom.media_player.set_volume(30),'''"
+ },
+ "query": "Increase the air conditioner temperature in the guest bedroom by 5 degrees and raise the volume of the media player in the master bedroom by 21%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_volume(30)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 68
+}

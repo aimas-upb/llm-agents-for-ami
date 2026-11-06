@@ -1,0 +1,79 @@
+{
+ "meta": {
+  "seed": 23,
+  "query_type": "hb3",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 36,
+  "devices_count": 3,
+  "id": "home40_multi_90",
+  "homebench_type": "multi3_normal",
+  "gold": "'''guest_bedroom.light.set_brightness(60),master_bedroom.air_conditioner.set_temperature(19),corridor.aromatherapy.set_intensity(60),'''"
+ },
+ "query": "Increase the brightness of the light by 32% in the guest bedroom, decrease the air conditioner temperature in the master bedroom by 8 degrees, and increase the intensity of the aromatherapy in the corridor by 34%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_brightness(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 19,
+      "value_type": "int",
+      "description": "set_temperature(19)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_intensity(60)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 40
+}

@@ -1,0 +1,88 @@
+{
+ "meta": {
+  "seed": 12,
+  "query_type": "hb4",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 46,
+  "devices_count": 4,
+  "id": "home53_multi_110",
+  "homebench_type": "multi4_mix",
+  "gold": "'''master_bedroom.aromatherapy.set_intensity(0),error_input,living_room.humidifier.set_mode(auto),error_input,'''"
+ },
+ "query": "Turn off the aromatherapy in the master bedroom, set the humidifier intensity to the maximum in the store room, put the humidifier in the living room in auto mode, and adjust the water heater temperature to 30 degrees in the kitchen.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_intensity(0)"
+     }
+    ]
+   },
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_humidifier",
+    "device_type": "humidifier",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "auto",
+      "value_type": "enum",
+      "description": "set_mode(auto)"
+     }
+    ]
+   },
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_water_heater",
+    "device_type": "water_heater",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   }
+  ]
+ },
+ "home_id": 53
+}

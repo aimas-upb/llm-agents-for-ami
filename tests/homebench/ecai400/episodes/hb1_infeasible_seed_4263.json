@@ -1,0 +1,37 @@
+{
+ "meta": {
+  "seed": 4263,
+  "query_type": "hb1",
+  "case": "infeasible",
+  "num_rooms": 13,
+  "num_devices": 41,
+  "devices_count": 1,
+  "id": "home4_one_572",
+  "homebench_type": "unexist_attribute",
+  "gold": "'''error_input'''"
+ },
+ "query": "Move the fan swing down in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_fan",
+    "device_type": "fan",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "swing"
+   }
+  ]
+ },
+ "home_id": 4
+}

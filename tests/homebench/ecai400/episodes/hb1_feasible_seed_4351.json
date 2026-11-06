@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 4351,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 42,
+  "devices_count": 1,
+  "id": "home74_one_137",
+  "homebench_type": "normal",
+  "gold": "''' guest_bedroom.air_conditioner.set_temperature(20)'''"
+ },
+ "query": "Set the air conditioner temperature to 20 degrees in the guest bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_temperature(20)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 74
+}

@@ -1,0 +1,76 @@
+{
+ "meta": {
+  "seed": 299,
+  "query_type": "hb4",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 51,
+  "devices_count": 4,
+  "id": "home13_multi_101",
+  "homebench_type": "multi4_mix",
+  "gold": "'''balcony.light.set_brightness(30),balcony.aromatherapy.set_intensity(60),error_input,error_input,'''"
+ },
+ "query": "Decrease the brightness of the light on the balcony by 33%, increase the intensity of the aromatherapy device on the balcony by 9%, raise the curtain degree on the balcony by 10%, and set the volume of the media player in the living room to 0.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_brightness(30)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_intensity(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_curtain",
+    "device_type": "curtain",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_media_player",
+    "device_type": "media_player",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   }
+  ]
+ },
+ "home_id": 13
+}

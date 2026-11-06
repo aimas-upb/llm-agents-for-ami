@@ -1,0 +1,36 @@
+{
+ "meta": {
+  "seed": 3877,
+  "query_type": "hb1",
+  "case": "infeasible",
+  "num_rooms": 13,
+  "num_devices": 50,
+  "devices_count": 1,
+  "id": "home31_one_1274",
+  "homebench_type": "unexist_device",
+  "gold": "'''error_input'''"
+ },
+ "query": "Set the water heater temperature to 100 degrees in the kitchen.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_water_heater",
+    "device_type": "water_heater",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   }
+  ]
+ },
+ "home_id": 31
+}

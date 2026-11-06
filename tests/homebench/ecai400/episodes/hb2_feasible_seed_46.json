@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 46,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 46,
+  "devices_count": 2,
+  "id": "home55_multi_22",
+  "homebench_type": "multi2_normal",
+  "gold": "'''master_bedroom.media_player.set_volume(100),study_room.light.set_brightness(30),'''"
+ },
+ "query": "Set the volume of the media player to 100 in the master bedroom and decrease the brightness of the light in the study room by 15 percent.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_volume(100)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_brightness(30)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 55
+}

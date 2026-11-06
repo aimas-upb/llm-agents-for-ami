@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 5715,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 49,
+  "devices_count": 1,
+  "id": "home9_one_750",
+  "homebench_type": "normal",
+  "gold": "''' store_room.dehumidifiers.set_intensity(80)'''"
+ },
+ "query": "Increase the intensity of the dehumidifier in the store room by 50%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_intensity(80)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 9
+}

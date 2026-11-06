@@ -1,0 +1,98 @@
+{
+ "meta": {
+  "seed": 15,
+  "query_type": "hb4",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 51,
+  "devices_count": 4,
+  "id": "home51_multi_146",
+  "homebench_type": "multi4_normal",
+  "gold": "'''guest_bedroom.aromatherapy.set_intensity(90),balcony.aromatherapy.set_intensity(30),garage.blinds.close(),study_room.fan.set_speed(medium),'''"
+ },
+ "query": "Set the intensity of the aromatherapy in the guest bedroom to 90, increase the intensity of the aromatherapy on the balcony by 4 percent, close the blinds in the garage, and increase the fan speed in the study room by 1 level.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_intensity(90)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_intensity(30)"
+     }
+    ]
+   },
+   {
+    "room_id": "garage",
+    "device_id": "garage_blinds",
+    "device_type": "blinds",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "closed",
+      "value_type": "enum",
+      "description": "close()"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_fan",
+    "device_type": "fan",
+    "asserts": [
+     {
+      "attribute": "speed",
+      "value": "medium",
+      "value_type": "enum",
+      "description": "set_speed(medium)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 51
+}

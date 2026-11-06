@@ -1,0 +1,37 @@
+{
+ "meta": {
+  "seed": 1854,
+  "query_type": "hb1",
+  "case": "infeasible",
+  "num_rooms": 13,
+  "num_devices": 43,
+  "devices_count": 1,
+  "id": "home67_one_685",
+  "homebench_type": "unexist_attribute",
+  "gold": "'''error_input'''"
+ },
+ "query": "Set the brightness of the light in the foyer to 30.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_light",
+    "device_type": "light",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "brightness"
+   }
+  ]
+ },
+ "home_id": 67
+}

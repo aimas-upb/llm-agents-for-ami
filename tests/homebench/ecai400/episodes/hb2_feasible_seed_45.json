@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 45,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 44,
+  "devices_count": 2,
+  "id": "home71_multi_10",
+  "homebench_type": "multi2_normal",
+  "gold": "'''master_bedroom.air_purifiers.set_mode(sleep),kitchen.light.set_brightness(90),'''"
+ },
+ "query": "Set the air purifiers in the master bedroom to sleep mode and increase the brightness of the light in the kitchen by 75%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_purifiers",
+    "device_type": "air_purifiers",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "sleep",
+      "value_type": "enum",
+      "description": "set_mode(sleep)"
+     }
+    ]
+   },
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_brightness(90)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 71
+}

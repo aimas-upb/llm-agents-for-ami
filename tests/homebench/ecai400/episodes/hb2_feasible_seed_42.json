@@ -1,0 +1,48 @@
+{
+ "meta": {
+  "seed": 42,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 48,
+  "devices_count": 1,
+  "id": "home72_multi_49",
+  "homebench_type": "multi2_normal",
+  "gold": "'''living_room.air_conditioner.set_temperature(20),living_room.air_conditioner.set_temperature(21),'''"
+ },
+ "query": "Lower the air conditioner temperature in the living room to 20 degrees and decrease it by 9 degrees more to reach 21 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [],
+    "superseded_by": 1
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 21,
+      "value_type": "int",
+      "description": "set_temperature(21)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 72
+}

@@ -1,0 +1,75 @@
+{
+ "meta": {
+  "seed": 342,
+  "query_type": "hb3",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 49,
+  "devices_count": 3,
+  "id": "home9_multi_51",
+  "homebench_type": "multi3_mix",
+  "gold": "'''error_input,kitchen.light.set_brightness(60),living_room.humidifier.set_intensity(10),'''"
+ },
+ "query": "Set the aromatherapy intensity to 80 in the master bedroom, decrease the brightness of the kitchen lights by 30%, and decrease the humidifier intensity by 60% in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "intensity"
+   },
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_brightness(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_intensity(10)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 9
+}

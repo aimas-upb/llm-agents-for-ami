@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 30,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 45,
+  "devices_count": 2,
+  "id": "home62_multi_29",
+  "homebench_type": "multi2_normal",
+  "gold": "'''corridor.aromatherapy.set_intensity(0),study_room.heating.set_temperature(30),'''"
+ },
+ "query": "Turn off the aromatherapy in the corridor and raise the heating temperature in the study room by 1 degree.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_intensity(0)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_temperature(30)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 62
+}

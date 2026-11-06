@@ -1,0 +1,79 @@
+{
+ "meta": {
+  "seed": 30,
+  "query_type": "hb3",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 45,
+  "devices_count": 3,
+  "id": "home62_multi_86",
+  "homebench_type": "multi3_normal",
+  "gold": "'''master_bedroom.air_conditioner.set_temperature(16),study_room.light.turn_on(),guest_bedroom.heating.set_temperature(26),'''"
+ },
+ "query": "Lower the air conditioner temperature in the master bedroom by 13 degrees, turn on the lights in the study room, and set the heating temperature in the guest bedroom to 26 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 16,
+      "value_type": "int",
+      "description": "set_temperature(16)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "on",
+      "value_type": "enum",
+      "description": "turn_on()"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 26,
+      "value_type": "int",
+      "description": "set_temperature(26)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 62
+}

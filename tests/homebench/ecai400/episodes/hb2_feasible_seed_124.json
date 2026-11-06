@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 124,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 43,
+  "devices_count": 2,
+  "id": "home45_multi_23",
+  "homebench_type": "multi2_normal",
+  "gold": "'''foyer.aromatherapy.set_intensity(10),guest_bedroom.air_conditioner.set_temperature(21),'''"
+ },
+ "query": "Set the intensity of the aromatherapy in the foyer to 10 and adjust the air conditioner temperature in the guest bedroom to 21 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_intensity(10)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 21,
+      "value_type": "int",
+      "description": "set_temperature(21)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 45
+}

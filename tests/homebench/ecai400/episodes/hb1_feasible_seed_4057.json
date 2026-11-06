@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 4057,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 44,
+  "devices_count": 1,
+  "id": "home35_one_347",
+  "homebench_type": "normal",
+  "gold": "''' ding_room.dehumidifiers.set_intensity(60)'''"
+ },
+ "query": "Increase the intensity of the dehumidifier by 42% in the dining room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_intensity(60)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 35
+}

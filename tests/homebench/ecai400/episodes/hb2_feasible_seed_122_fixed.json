@@ -1,0 +1,59 @@
+{
+ "meta": {
+  "seed": 122,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 42,
+  "devices_count": 2,
+  "id": "home37_multi_36",
+  "homebench_type": "multi2_normal",
+  "gold": "'''guest_bedroom.air_conditioner.set_temperature(20),guest_bedroom.light.set_brightness(70),'''",
+  "label_correction": {
+   "original_gold": "'''guest_bedroom.air_conditioner.set_temperature(27),guest_bedroom.light.set_brightness(70),'''",
+   "original_type": "multi2_normal",
+   "reason": "the gold is not the start value changed by N (21 - 1)"
+  }
+ },
+ "query": "Lower the air conditioner temperature in the guest bedroom by 1 degree and set the brightness of the light in the guest bedroom to 70.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_temperature(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_brightness(70)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 37
+}

@@ -1,0 +1,54 @@
+{
+ "meta": {
+  "seed": 13,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 45,
+  "devices_count": 2,
+  "id": "home34_multi_2",
+  "homebench_type": "multi2_normal",
+  "gold": "'''guest_bedroom.heating.set_temperature(23),guest_bedroom.humidifier.set_intensity(60),'''"
+ },
+ "query": "Set the heating temperature in the guest bedroom to 23 degrees and increase the intensity of the humidifier in the guest bedroom to 60%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 23,
+      "value_type": "int",
+      "description": "set_temperature(23)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_intensity(60)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 34
+}

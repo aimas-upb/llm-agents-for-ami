@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 25,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 41,
+  "devices_count": 2,
+  "id": "home85_multi_21",
+  "homebench_type": "multi2_normal",
+  "gold": "'''ding_room.trash.pack(),master_bedroom.air_conditioner.set_temperature(17),'''"
+ },
+ "query": "Pack up the trash in the dining room and set the air conditioner temperature in the master bedroom to 17 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_trash",
+    "device_type": "trash",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "empty",
+      "value_type": "enum",
+      "description": "pack()"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 17,
+      "value_type": "int",
+      "description": "set_temperature(17)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 85
+}

@@ -1,0 +1,130 @@
+{
+ "meta": {
+  "seed": 222,
+  "query_type": "hb6",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 51,
+  "devices_count": 6,
+  "id": "home13_multi_231",
+  "homebench_type": "multi6_mix",
+  "gold": "'''error_input,study_room.fan.set_swing(auto),guest_bedroom.humidifier.set_intensity(88),master_bedroom.fan.set_swing(auto),foyer.aromatherapy.set_interval(10),living_room.light.set_brightness(90),'''",
+  "label_correction": {
+   "original_gold": "'''error_input,study_room.fan.set_swing(auto),guest_bedroom.humidifier.set_intensity(80),master_bedroom.fan.set_swing(auto),foyer.aromatherapy.set_interval(10),living_room.light.set_brightness(90),'''",
+   "original_type": "multi6_mix",
+   "reason": "a percent change of a 0-100 percent setting adds points: start + N (8 + 80)"
+  }
+ },
+ "query": "Set the air conditioner fan speed to auto in the master bedroom, set the fan swing to auto in the study room, increase the intensity of the humidifier by 80% in the guest bedroom, set the fan swing to auto in the master bedroom, decrease the aromatherapy interval by 15 seconds in the foyer, and set the brightness of the light to 90% in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_fan",
+    "device_type": "fan",
+    "asserts": [
+     {
+      "attribute": "swing",
+      "value": "auto",
+      "value_type": "enum",
+      "description": "set_swing(auto)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 88,
+      "value_type": "int",
+      "description": "set_intensity(88)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_fan",
+    "device_type": "fan",
+    "asserts": [
+     {
+      "attribute": "swing",
+      "value": "auto",
+      "value_type": "enum",
+      "description": "set_swing(auto)"
+     }
+    ]
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_interval(10)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_brightness(90)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 13
+}

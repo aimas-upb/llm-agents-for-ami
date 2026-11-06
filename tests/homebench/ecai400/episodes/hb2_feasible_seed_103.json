@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 103,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 42,
+  "devices_count": 2,
+  "id": "home73_multi_1",
+  "homebench_type": "multi2_normal",
+  "gold": "'''guest_bedroom.air_conditioner.set_swing(auto),foyer.light.set_brightness(100),'''"
+ },
+ "query": "Set the air conditioner in the guest bedroom to auto swing and increase the brightness of the light in the foyer by 17%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "swing",
+      "value": "auto",
+      "value_type": "enum",
+      "description": "set_swing(auto)"
+     }
+    ]
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_brightness(100)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 73
+}

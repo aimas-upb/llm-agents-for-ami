@@ -1,0 +1,170 @@
+{
+ "meta": {
+  "seed": 133,
+  "query_type": "hb10",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 42,
+  "devices_count": 10,
+  "id": "home64_multi_425",
+  "homebench_type": "multi10_mix",
+  "gold": "'''master_bedroom.dehumidifiers.turn_on(),error_input,kitchen.light.set_brightness(60),study_room.air_conditioner.set_temperature(17),error_input,error_input,error_input,master_bedroom.media_player.set_volume(20),error_input,living_room.air_conditioner.set_temperature(23),'''"
+ },
+ "query": "Turn on the dehumidifiers in the master bedroom, turn on the humidifier in the dining room, decrease the brightness of the lights in the kitchen by 5 percent, set the curtain degree to 80 in the master bedroom, set the temperature of the air conditioner in the study room to 17 degrees, set the temperature of the heating in the living room to 17 degrees, pack the trash in the guest bedroom, increase the volume of the media player by 5 percent in the master bedroom, set the brightness of the lights on the balcony to 50, and set the temperature of the air conditioner in the living room to 23 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "on",
+      "value_type": "enum",
+      "description": "turn_on()"
+     }
+    ]
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_humidifier",
+    "device_type": "humidifier",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_brightness(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 17,
+      "value_type": "int",
+      "description": "set_temperature(17)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_curtain",
+    "device_type": "curtain",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_heating",
+    "device_type": "heating",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_trash",
+    "device_type": "trash",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_volume(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_light",
+    "device_type": "light",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "brightness"
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 23,
+      "value_type": "int",
+      "description": "set_temperature(23)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 64
+}

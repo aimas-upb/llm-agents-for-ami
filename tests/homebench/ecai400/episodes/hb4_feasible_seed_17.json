@@ -1,0 +1,92 @@
+{
+ "meta": {
+  "seed": 17,
+  "query_type": "hb4",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 44,
+  "devices_count": 4,
+  "id": "home81_multi_111",
+  "homebench_type": "multi4_normal",
+  "gold": "'''living_room.media_player.set_volume(30),corridor.aromatherapy.set_interval(40),living_room.air_conditioner.set_swing(auto),study_room.air_conditioner.set_temperature(29),'''"
+ },
+ "query": "Set the volume of the media player to 30 in the living room, adjust the interval of the aromatherapy to 40 in the corridor, set the swing mode of the air conditioner to auto in the living room, and increase the temperature of the air conditioner in the study room by 13 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_volume(30)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_interval(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "swing",
+      "value": "auto",
+      "value_type": "enum",
+      "description": "set_swing(auto)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 29,
+      "value_type": "int",
+      "description": "set_temperature(29)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 81
+}

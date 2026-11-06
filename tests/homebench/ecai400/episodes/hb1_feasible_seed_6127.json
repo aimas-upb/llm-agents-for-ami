@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 6127,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 45,
+  "devices_count": 1,
+  "id": "home12_one_292",
+  "homebench_type": "normal",
+  "gold": "''' living_room.dehumidifiers.set_intensity(30)'''"
+ },
+ "query": "Decrease the intensity of the dehumidifier by 34% in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_intensity(30)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 12
+}

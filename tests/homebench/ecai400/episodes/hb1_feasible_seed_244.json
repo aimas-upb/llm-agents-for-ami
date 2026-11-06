@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 244,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 1,
+  "id": "home19_one_697",
+  "homebench_type": "normal",
+  "gold": "''' store_room.air_purifiers.set_mode(sleep)'''"
+ },
+ "query": "Set the air purifiers in the store room to sleep mode.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_air_purifiers",
+    "device_type": "air_purifiers",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "sleep",
+      "value_type": "enum",
+      "description": "set_mode(sleep)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 19
+}

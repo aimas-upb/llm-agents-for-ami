@@ -1,0 +1,37 @@
+{
+ "meta": {
+  "seed": 3679,
+  "query_type": "hb1",
+  "case": "infeasible",
+  "num_rooms": 12,
+  "num_devices": 45,
+  "devices_count": 1,
+  "id": "home88_one_510",
+  "homebench_type": "unexist_attribute",
+  "gold": "'''error_input'''"
+ },
+ "query": "Set the heating fan speed to medium in the master bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_heating",
+    "device_type": "heating",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "fan_speed"
+   }
+  ]
+ },
+ "home_id": 88
+}

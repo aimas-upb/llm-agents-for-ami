@@ -1,0 +1,117 @@
+{
+ "meta": {
+  "seed": 13,
+  "query_type": "hb5",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 42,
+  "devices_count": 5,
+  "id": "home32_multi_155",
+  "homebench_type": "multi5_normal",
+  "gold": "'''kitchen.light.set_brightness(70),guest_bedroom.air_conditioner.set_temperature(29),study_room.heating.set_fan_speed(high),master_bedroom.humidifier.set_intensity(70),ding_room.dehumidifiers.set_intensity(0),'''"
+ },
+ "query": "Set the brightness of the light in the kitchen to 70, adjust the air conditioner temperature in the guest bedroom to 29 degrees, set the fan speed of the heating in the study room to high, increase the intensity of the humidifier in the master bedroom to 70, and turn off the dehumidifier in the dining room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_brightness(70)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 29,
+      "value_type": "int",
+      "description": "set_temperature(29)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "fan_speed",
+      "value": "high",
+      "value_type": "enum",
+      "description": "set_fan_speed(high)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_intensity(70)"
+     }
+    ]
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_intensity(0)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 32
+}

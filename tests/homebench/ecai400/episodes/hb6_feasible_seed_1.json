@@ -1,0 +1,130 @@
+{
+ "meta": {
+  "seed": 1,
+  "query_type": "hb6",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 36,
+  "devices_count": 6,
+  "id": "home40_multi_231",
+  "homebench_type": "multi6_normal",
+  "gold": "'''balcony.aromatherapy.set_interval(60),ding_room.light.set_brightness(80),guest_bedroom.air_conditioner.set_swing(middle),study_room.fan.turn_on(),corridor.aromatherapy.set_intensity(100),corridor.light.set_brightness(50),'''"
+ },
+ "query": "Increase the interval of the aromatherapy in the balcony by 7 seconds, set the brightness of the light in the dining room to 80, decrease the swing level of the air conditioner in the guest bedroom by 1, turn on the fan in the study room, set the intensity of the aromatherapy in the corridor to 100, and decrease the brightness of the light in the corridor by 33 percent.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_interval(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_brightness(80)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "swing",
+      "value": "middle",
+      "value_type": "enum",
+      "description": "set_swing(middle)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_fan",
+    "device_type": "fan",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "on",
+      "value_type": "enum",
+      "description": "turn_on()"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_intensity(100)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_brightness(50)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 40
+}

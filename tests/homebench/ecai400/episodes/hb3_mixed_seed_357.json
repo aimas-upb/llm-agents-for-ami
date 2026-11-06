@@ -1,0 +1,74 @@
+{
+ "meta": {
+  "seed": 357,
+  "query_type": "hb3",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 42,
+  "devices_count": 3,
+  "id": "home64_multi_64",
+  "homebench_type": "multi3_mix",
+  "gold": "'''study_room.air_conditioner.set_temperature(29),master_bedroom.heating.set_temperature(18),error_input,'''"
+ },
+ "query": "Increase the air conditioner temperature in the study room by 3 degrees, decrease the heating temperature in the master bedroom by 7 degrees, and set the air purifiers in the dining room to sleep mode.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 29,
+      "value_type": "int",
+      "description": "set_temperature(29)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 18,
+      "value_type": "int",
+      "description": "set_temperature(18)"
+     }
+    ]
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_air_purifiers",
+    "device_type": "air_purifiers",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   }
+  ]
+ },
+ "home_id": 64
+}

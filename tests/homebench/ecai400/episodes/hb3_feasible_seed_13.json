@@ -1,0 +1,79 @@
+{
+ "meta": {
+  "seed": 13,
+  "query_type": "hb3",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 42,
+  "devices_count": 3,
+  "id": "home37_multi_74",
+  "homebench_type": "multi3_normal",
+  "gold": "'''guest_bedroom.light.set_brightness(40),study_room.dehumidifiers.set_mode(sleep),living_room.fan.turn_on(),'''"
+ },
+ "query": "Set the brightness of the light to 40 in the guest bedroom, change the mode of the dehumidifiers to sleep in the study room, and turn on the fan in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_brightness(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "sleep",
+      "value_type": "enum",
+      "description": "set_mode(sleep)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_fan",
+    "device_type": "fan",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "on",
+      "value_type": "enum",
+      "description": "turn_on()"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 37
+}

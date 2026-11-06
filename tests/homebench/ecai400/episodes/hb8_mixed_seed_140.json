@@ -1,0 +1,146 @@
+{
+ "meta": {
+  "seed": 140,
+  "query_type": "hb8",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 44,
+  "devices_count": 7,
+  "id": "home35_multi_309",
+  "homebench_type": "multi8_mix",
+  "gold": "'''guest_bedroom.light.turn_off(),bathroom.heating.set_mode(heat),foyer.aromatherapy.set_intensity(20),error_input,guest_bedroom.air_conditioner.set_swing(middle),corridor.light.turn_off(),guest_bedroom.air_conditioner.set_temperature(23),error_input,'''"
+ },
+ "query": "Turn off the light in the guest bedroom, set the heating mode for the bathroom, adjust the aromatherapy intensity to 20 in the foyer, set the aromatherapy interval to 30 on the balcony, set the air conditioner swing to middle in the guest bedroom, turn off the light in the corridor, decrease the air conditioner temperature by 7 degrees in the guest bedroom, and set the heating temperature to 16 in the guest bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "bathroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "off",
+      "value_type": "enum",
+      "description": "turn_off()"
+     }
+    ]
+   },
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "heat",
+      "value_type": "enum",
+      "description": "set_mode(heat)"
+     }
+    ]
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_intensity(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "swing",
+      "value": "middle",
+      "value_type": "enum",
+      "description": "set_swing(middle)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "off",
+      "value_type": "enum",
+      "description": "turn_off()"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 23,
+      "value_type": "int",
+      "description": "set_temperature(23)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_heating",
+    "device_type": "heating",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   }
+  ]
+ },
+ "home_id": 35
+}

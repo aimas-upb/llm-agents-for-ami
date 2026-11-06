@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 3238,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 1,
+  "id": "home19_one_672",
+  "homebench_type": "normal",
+  "gold": "''' garage.media_player.set_volume(10)'''"
+ },
+ "query": "Set the volume of the media player to 10 in the garage.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "garage",
+    "device_id": "garage_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_volume(10)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 19
+}

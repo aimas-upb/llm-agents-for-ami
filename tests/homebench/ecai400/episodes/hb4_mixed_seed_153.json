@@ -1,0 +1,84 @@
+{
+ "meta": {
+  "seed": 153,
+  "query_type": "hb4",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 49,
+  "devices_count": 4,
+  "id": "home9_multi_131",
+  "homebench_type": "multi4_mix",
+  "gold": "'''master_bedroom.heating.set_fan_speed(medium),error_input,balcony.aromatherapy.set_interval(20),error_input,'''"
+ },
+ "query": "Increase the fan speed of the heating in the master bedroom by 1 level, set the dehumidifiers in the master bedroom to sleep mode, adjust the aromatherapy interval on the balcony to 20, and set the fan speed of the fan in the dining room to low.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "fan_speed",
+      "value": "medium",
+      "value_type": "enum",
+      "description": "set_fan_speed(medium)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "mode"
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_interval(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_fan",
+    "device_type": "fan",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "fan_speed"
+   }
+  ]
+ },
+ "home_id": 9
+}

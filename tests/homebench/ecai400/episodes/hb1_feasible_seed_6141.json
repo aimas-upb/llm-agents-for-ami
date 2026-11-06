@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 6141,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 51,
+  "devices_count": 1,
+  "id": "home13_one_683",
+  "homebench_type": "normal",
+  "gold": "''' balcony.aromatherapy.set_interval(20)'''"
+ },
+ "query": "Set the interval of the aromatherapy device on the balcony to 20.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_interval(20)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 13
+}

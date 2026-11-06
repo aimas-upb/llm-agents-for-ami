@@ -1,0 +1,69 @@
+{
+ "meta": {
+  "seed": 154,
+  "query_type": "hb3",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 3,
+  "id": "home68_multi_56",
+  "homebench_type": "multi3_mix",
+  "gold": "'''ding_room.humidifier.set_intensity(10),error_input,ding_room.air_purifiers.set_fan_speed(medium),'''"
+ },
+ "query": "Set the intensity of the humidifier to 10 in the dining room, set the fan to auto mode in the living room, and adjust the fan speed of the air purifiers to medium in the dining room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_intensity(10)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_fan",
+    "device_type": "fan",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "mode"
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_air_purifiers",
+    "device_type": "air_purifiers",
+    "asserts": [
+     {
+      "attribute": "fan_speed",
+      "value": "medium",
+      "value_type": "enum",
+      "description": "set_fan_speed(medium)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 68
+}

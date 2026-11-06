@@ -1,0 +1,46 @@
+{
+ "meta": {
+  "seed": 937,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 48,
+  "devices_count": 1,
+  "id": "home59_one_849",
+  "homebench_type": "normal",
+  "gold": "''' foyer.light.set_brightness(50)'''",
+  "label_correction": {
+   "original_gold": "'''error_input'''",
+   "original_type": "unexist_attribute",
+   "reason": "labelled unexist_attribute, but the home file gives the light a 0-100 brightness"
+  }
+ },
+ "query": "Set the brightness of the light to 50 in the foyer.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_brightness(50)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 59
+}

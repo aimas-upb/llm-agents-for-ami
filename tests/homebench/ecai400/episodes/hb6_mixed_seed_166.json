@@ -1,0 +1,116 @@
+{
+ "meta": {
+  "seed": 166,
+  "query_type": "hb6",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 51,
+  "devices_count": 5,
+  "id": "home47_multi_240",
+  "homebench_type": "multi6_mix",
+  "gold": "'''kitchen.light.set_brightness(90),error_input,error_input,balcony.aromatherapy.set_interval(50),error_input,foyer.aromatherapy.set_intensity(80),'''"
+ },
+ "query": "Increase the brightness of the light in the kitchen by 7 percent, set the interval of the aromatherapy in the guest bedroom to 60 seconds, increase the intensity of the aromatherapy on the balcony to 90 percent, increase the interval of the aromatherapy on the balcony by 25 seconds, set the heating mode in the bathroom, and increase the intensity of the aromatherapy in the foyer by 54 percent.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "bathroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_brightness(90)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "intensity"
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_interval(50)"
+     }
+    ]
+   },
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_heating",
+    "device_type": "heating",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_intensity(80)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 47
+}

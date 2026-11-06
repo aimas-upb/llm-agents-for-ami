@@ -1,0 +1,104 @@
+{
+ "meta": {
+  "seed": 6,
+  "query_type": "hb5",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 44,
+  "devices_count": 4,
+  "id": "home49_multi_160",
+  "homebench_type": "multi5_normal",
+  "gold": "'''living_room.curtain.set_degree(40),master_bedroom.curtain.set_degree(20),study_room.air_conditioner.set_temperature(18),study_room.air_conditioner.set_temperature(16),master_bedroom.media_player.set_volume(80),'''",
+  "label_correction": {
+   "original_gold": "'''living_room.curtain.set_degree(40),master_bedroom.curtain.set_degree(20),study_room.air_conditioner.set_temperature(18),study_room.air_conditioner.set_temperature(24),master_bedroom.media_player.set_volume(80),'''",
+   "original_type": "multi5_normal",
+   "reason": "the change follows the previous one on the same device ('then', 'further'), not the start value (18 - 2)"
+  }
+ },
+ "query": "Set the curtain degree to 40 in the living room, increase the curtain degree by 20% in the master bedroom, decrease the air conditioner temperature by 8 degrees in the study room, further decrease the air conditioner temperature by 2 degrees in the study room, and increase the media player volume by 67% in the master bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_degree(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_degree(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [],
+    "superseded_by": 3
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 16,
+      "value_type": "int",
+      "description": "set_temperature(16)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_volume(80)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 49
+}

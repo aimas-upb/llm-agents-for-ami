@@ -1,0 +1,98 @@
+{
+ "meta": {
+  "seed": 10,
+  "query_type": "hb4",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 36,
+  "devices_count": 4,
+  "id": "home40_multi_145",
+  "homebench_type": "multi4_normal",
+  "gold": "'''study_room.light.set_brightness(80),balcony.light.set_brightness(20),garage.media_player.set_volume(20),ding_room.light.set_brightness(30),'''"
+ },
+ "query": "Set the brightness of the light in the study room to 80, decrease the brightness of the light in the balcony by 63%, decrease the volume of the media player in the garage by 3%, and decrease the brightness of the light in the dining room by 53%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_brightness(80)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_brightness(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "garage",
+    "device_id": "garage_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_volume(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_brightness(30)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 40
+}

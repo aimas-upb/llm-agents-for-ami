@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 3550,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 48,
+  "devices_count": 1,
+  "id": "home59_one_180",
+  "homebench_type": "normal",
+  "gold": "''' guest_bedroom.air_conditioner.set_fan_speed(medium)'''"
+ },
+ "query": "Lower the air conditioner fan speed by 1 level in the guest bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "fan_speed",
+      "value": "medium",
+      "value_type": "enum",
+      "description": "set_fan_speed(medium)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 59
+}

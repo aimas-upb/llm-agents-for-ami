@@ -1,0 +1,73 @@
+{
+ "meta": {
+  "seed": 24,
+  "query_type": "hb3",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 49,
+  "devices_count": 2,
+  "id": "home9_multi_70",
+  "homebench_type": "multi3_normal",
+  "gold": "'''guest_bedroom.heating.set_fan_speed(low),guest_bedroom.heating.set_temperature(19),master_bedroom.curtain.set_degree(50),'''"
+ },
+ "query": "Set the fan speed to low on the heating system, lower the heating temperature in the guest bedroom by 6 degrees, and increase the curtain degree by 50% in the master bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "fan_speed",
+      "value": "low",
+      "value_type": "enum",
+      "description": "set_fan_speed(low)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 19,
+      "value_type": "int",
+      "description": "set_temperature(19)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_degree(50)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 9
+}

@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 1134,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 51,
+  "devices_count": 1,
+  "id": "home13_one_17",
+  "homebench_type": "normal",
+  "gold": "''' master_bedroom.light.set_brightness(70)'''"
+ },
+ "query": "Decrease the brightness of the light in the master bedroom by 13 percent.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_brightness(70)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 13
+}

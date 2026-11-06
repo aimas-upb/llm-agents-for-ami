@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 3241,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 47,
+  "devices_count": 1,
+  "id": "home15_one_286",
+  "homebench_type": "normal",
+  "gold": "''' living_room.fan.set_speed(medium)'''"
+ },
+ "query": "Increase the speed of the fan in the living room by 1 level.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_fan",
+    "device_type": "fan",
+    "asserts": [
+     {
+      "attribute": "speed",
+      "value": "medium",
+      "value_type": "enum",
+      "description": "set_speed(medium)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 15
+}

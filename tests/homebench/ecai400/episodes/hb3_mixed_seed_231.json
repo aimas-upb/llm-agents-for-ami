@@ -1,0 +1,74 @@
+{
+ "meta": {
+  "seed": 231,
+  "query_type": "hb3",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 46,
+  "devices_count": 3,
+  "id": "home53_multi_75",
+  "homebench_type": "multi3_mix",
+  "gold": "'''store_room.dehumidifiers.set_intensity(30),error_input,guest_bedroom.air_conditioner.set_mode(fan_only),'''"
+ },
+ "query": "Decrease the intensity of the dehumidifiers in the store room by 5%, set the temperature of the air conditioner in the living room to 17 degrees, and set the air conditioner in the guest bedroom to fan only mode.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_intensity(30)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "fan_only",
+      "value_type": "enum",
+      "description": "set_mode(fan_only)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 53
+}

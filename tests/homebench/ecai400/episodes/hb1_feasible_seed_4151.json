@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 4151,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 44,
+  "devices_count": 1,
+  "id": "home35_one_294",
+  "homebench_type": "normal",
+  "gold": "''' living_room.aromatherapy.set_intensity(100)'''"
+ },
+ "query": "Set the intensity of the aromatherapy in the living room to 100%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_intensity(100)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 35
+}

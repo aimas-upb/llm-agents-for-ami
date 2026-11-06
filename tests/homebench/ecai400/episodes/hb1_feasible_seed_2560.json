@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 2560,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 47,
+  "devices_count": 1,
+  "id": "home15_one_441",
+  "homebench_type": "normal",
+  "gold": "''' study_room.air_conditioner.set_mode(cool)'''"
+ },
+ "query": "Set the air conditioner in the study room to cool mode.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "cool",
+      "value_type": "enum",
+      "description": "set_mode(cool)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 15
+}

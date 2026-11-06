@@ -1,0 +1,86 @@
+{
+ "meta": {
+  "seed": 11,
+  "query_type": "hb4",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 4,
+  "id": "home19_multi_101",
+  "homebench_type": "multi4_normal",
+  "gold": "'''living_room.curtain.set_degree(80),living_room.dehumidifiers.set_intensity(0),guest_bedroom.curtain.set_degree(10),living_room.air_purifiers.turn_on(),'''"
+ },
+ "query": "Set the curtains in the living room to 80 degrees, decrease the intensity of the dehumidifiers in the living room by 30 percent, increase the curtains in the guest bedroom by 10 percent, and turn on the air purifiers in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_degree(80)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_intensity(0)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_degree(10)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_purifiers",
+    "device_type": "air_purifiers",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "on",
+      "value_type": "enum",
+      "description": "turn_on()"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 19
+}

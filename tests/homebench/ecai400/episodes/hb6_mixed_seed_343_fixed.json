@@ -1,0 +1,125 @@
+{
+ "meta": {
+  "seed": 343,
+  "query_type": "hb6",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 5,
+  "id": "home19_multi_215",
+  "homebench_type": "multi6_mix",
+  "gold": "'''error_input,study_room.humidifier.set_intensity(100),corridor.aromatherapy.set_intensity(40),guest_bedroom.air_conditioner.set_temperature(19),kitchen.light.set_brightness(100),guest_bedroom.air_conditioner.set_temperature(18),'''",
+  "label_correction": {
+   "original_gold": "'''error_input,study_room.humidifier.set_intensity(100),corridor.aromatherapy.set_intensity(40),guest_bedroom.air_conditioner.set_temperature(19),kitchen.light.set_brightness(100),guest_bedroom.air_conditioner.set_temperature(28),'''",
+   "original_type": "multi6_mix",
+   "reason": "the change follows the previous one on the same device ('then', 'further'), not the start value (19 - 1)"
+  }
+ },
+ "query": "Set the brightness of the light to 80 in the balcony, increase the intensity of the humidifier to 100 in the study room, set the intensity of the aromatherapy to 40 in the corridor, decrease the air conditioner temperature by 10 degrees in the guest bedroom, increase the brightness of the light by 35 percent in the kitchen, and lower the air conditioner temperature by 1 degree in the guest bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_light",
+    "device_type": "light",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "brightness"
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_intensity(100)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_intensity(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [],
+    "superseded_by": 5
+   },
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_brightness(100)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 18,
+      "value_type": "int",
+      "description": "set_temperature(18)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 19
+}

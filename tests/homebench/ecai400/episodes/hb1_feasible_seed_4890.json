@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 4890,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 44,
+  "devices_count": 1,
+  "id": "home35_one_185",
+  "homebench_type": "normal",
+  "gold": "''' guest_bedroom.air_conditioner.set_swing(down)'''"
+ },
+ "query": "Move the air conditioner swing down in the guest bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "swing",
+      "value": "down",
+      "value_type": "enum",
+      "description": "set_swing(down)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 35
+}

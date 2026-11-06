@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 4611,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 49,
+  "devices_count": 1,
+  "id": "home9_one_533",
+  "homebench_type": "normal",
+  "gold": "''' foyer.aromatherapy.set_interval(10)'''"
+ },
+ "query": "Set the aromatherapy device interval to 10 in the foyer.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_interval(10)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 9
+}

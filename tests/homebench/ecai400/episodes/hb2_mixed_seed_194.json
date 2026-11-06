@@ -1,0 +1,49 @@
+{
+ "meta": {
+  "seed": 194,
+  "query_type": "hb2",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 46,
+  "devices_count": 1,
+  "id": "home53_multi_39",
+  "homebench_type": "multi2_mix",
+  "gold": "'''error_input,master_bedroom.humidifier.set_intensity(70),'''"
+ },
+ "query": "Set the temperature to 29 degrees in the study room and increase the intensity of the humidifier to 70 in the master bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": null,
+    "device_id": null,
+    "device_type": null,
+    "feasibility": false,
+    "reason": "unknown",
+    "resolved": false
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_intensity(70)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 53
+}

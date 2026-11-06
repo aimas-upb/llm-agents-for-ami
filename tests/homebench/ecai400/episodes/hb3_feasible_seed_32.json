@@ -1,0 +1,79 @@
+{
+ "meta": {
+  "seed": 32,
+  "query_type": "hb3",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 44,
+  "devices_count": 3,
+  "id": "home81_multi_57",
+  "homebench_type": "multi3_normal",
+  "gold": "'''balcony.aromatherapy.set_intensity(70),study_room.humidifier.set_intensity(50),bathroom.heating.set_temperature(30),'''"
+ },
+ "query": "Set the intensity of the aromatherapy device on the balcony to 70%, adjust the intensity of the humidifier in the study room to 50%, and increase the heating temperature in the bathroom by 14 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "bathroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_intensity(70)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_intensity(50)"
+     }
+    ]
+   },
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_temperature(30)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 81
+}

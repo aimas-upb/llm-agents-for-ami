@@ -1,0 +1,166 @@
+{
+ "meta": {
+  "seed": 188,
+  "query_type": "hb10",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 51,
+  "devices_count": 10,
+  "id": "home13_multi_427",
+  "homebench_type": "multi10_mix",
+  "gold": "'''guest_bedroom.curtain.set_degree(10),foyer.aromatherapy.set_interval(20),guest_bedroom.air_conditioner.set_temperature(19),error_input,error_input,living_room.curtain.close(),error_input,error_input,error_input,living_room.dehumidifiers.turn_off(),'''"
+ },
+ "query": "Set the curtain degree to 10 in the guest bedroom, set the interval of the aromatherapy to 20 in the foyer, increase the air conditioner temperature by 1 degree in the guest bedroom, set the brightness of the light to 20 in the dining room, set the fan speed of the air purifiers to medium in the store room, close the curtain in the living room, set the fan speed of the heating to medium in the study room, set the volume of the media player to 20 in the living room, set the heating temperature to 30 in the guest bedroom, and turn off the dehumidifiers in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_degree(10)"
+     }
+    ]
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_interval(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 19,
+      "value_type": "int",
+      "description": "set_temperature(19)"
+     }
+    ]
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_light",
+    "device_type": "light",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "brightness"
+   },
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_air_purifiers",
+    "device_type": "air_purifiers",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "fan_speed"
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "closed",
+      "value_type": "enum",
+      "description": "close()"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_heating",
+    "device_type": "heating",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "fan_speed"
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_media_player",
+    "device_type": "media_player",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_heating",
+    "device_type": "heating",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "off",
+      "value_type": "enum",
+      "description": "turn_off()"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 13
+}

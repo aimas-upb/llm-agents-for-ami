@@ -1,0 +1,79 @@
+{
+ "meta": {
+  "seed": 22,
+  "query_type": "hb3",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 41,
+  "devices_count": 3,
+  "id": "home85_multi_58",
+  "homebench_type": "multi3_normal",
+  "gold": "'''balcony.light.set_brightness(0),study_room.light.set_brightness(0),living_room.humidifier.set_intensity(0),'''"
+ },
+ "query": "Turn off the lights in the balcony and study room, and decrease the intensity of the humidifier by 8% in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_brightness(0)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_brightness(0)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_intensity(0)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 85
+}

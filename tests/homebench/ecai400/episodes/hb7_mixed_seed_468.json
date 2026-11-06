@@ -1,0 +1,132 @@
+{
+ "meta": {
+  "seed": 468,
+  "query_type": "hb7",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 45,
+  "devices_count": 7,
+  "id": "home12_multi_285",
+  "homebench_type": "multi7_mix",
+  "gold": "'''living_room.air_conditioner.set_temperature(28),master_bedroom.humidifier.set_intensity(10),study_room.air_conditioner.set_mode(heat),balcony.aromatherapy.set_intensity(100),master_bedroom.light.set_brightness(40),error_input,living_room.aromatherapy.set_intensity(60),'''"
+ },
+ "query": "Increase the temperature of the air conditioner in the living room by 6 degrees, set the intensity of the humidifier in the master bedroom to 10, switch the air conditioner in the study room to heat mode, increase the intensity of the aromatherapy device on the balcony by 44%, decrease the brightness of the light in the master bedroom by 43%, set the degree of the curtain on the balcony to 40, and increase the intensity of the aromatherapy device in the living room by 34%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 28,
+      "value_type": "int",
+      "description": "set_temperature(28)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_intensity(10)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "heat",
+      "value_type": "enum",
+      "description": "set_mode(heat)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_intensity(100)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_brightness(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_curtain",
+    "device_type": "curtain",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_intensity(60)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 12
+}

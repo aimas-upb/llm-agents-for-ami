@@ -1,0 +1,77 @@
+{
+ "meta": {
+  "seed": 115,
+  "query_type": "hb4",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 4,
+  "id": "home68_multi_135",
+  "homebench_type": "multi4_mix",
+  "gold": "'''error_input,error_input,master_bedroom.air_conditioner.set_temperature(20),master_bedroom.media_player.set_volume(0),'''"
+ },
+ "query": "Increase the air conditioner temperature in the living room by 2 degrees, set the air purifiers in the living room to auto mode, adjust the air conditioner temperature in the master bedroom to 20 degrees, and set the volume of the media player in the master bedroom to 0.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_purifiers",
+    "device_type": "air_purifiers",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "mode"
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_temperature(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_volume(0)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 68
+}

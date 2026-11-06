@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 4288,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 42,
+  "devices_count": 1,
+  "id": "home74_one_409",
+  "homebench_type": "normal",
+  "gold": "''' kitchen.light.set_brightness(60)'''"
+ },
+ "query": "Decrease the brightness of the light in the kitchen by 12%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_brightness(60)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 74
+}

@@ -1,0 +1,89 @@
+{
+ "meta": {
+  "seed": 383,
+  "query_type": "hb4",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 44,
+  "devices_count": 4,
+  "id": "home49_multi_108",
+  "homebench_type": "multi4_mix",
+  "gold": "'''ding_room.humidifier.set_mode(sleep),garage.air_purifiers.turn_on(),error_input,error_input,'''"
+ },
+ "query": "Set the humidifier in the dining room to sleep mode, turn on the air purifiers in the garage, change the air conditioner in the master bedroom to auto swing mode, and adjust the brightness of the light in the foyer to 50.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "sleep",
+      "value_type": "enum",
+      "description": "set_mode(sleep)"
+     }
+    ]
+   },
+   {
+    "room_id": "garage",
+    "device_id": "garage_air_purifiers",
+    "device_type": "air_purifiers",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "on",
+      "value_type": "enum",
+      "description": "turn_on()"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_light",
+    "device_type": "light",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "brightness"
+   }
+  ]
+ },
+ "home_id": 49
+}

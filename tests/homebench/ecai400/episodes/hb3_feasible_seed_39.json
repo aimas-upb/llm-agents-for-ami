@@ -1,0 +1,73 @@
+{
+ "meta": {
+  "seed": 39,
+  "query_type": "hb3",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 49,
+  "devices_count": 2,
+  "id": "home9_multi_95",
+  "homebench_type": "multi3_normal",
+  "gold": "'''living_room.air_conditioner.set_mode(cool),living_room.air_conditioner.set_temperature(28),balcony.curtain.set_degree(20),'''"
+ },
+ "query": "Set the air conditioner in the living room to cool mode and adjust the temperature to 28 degrees, then increase the curtain in the balcony by 20%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "cool",
+      "value_type": "enum",
+      "description": "set_mode(cool)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 28,
+      "value_type": "int",
+      "description": "set_temperature(28)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_degree(20)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 9
+}

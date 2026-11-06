@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 2941,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 1,
+  "id": "home19_one_156",
+  "homebench_type": "normal",
+  "gold": "''' guest_bedroom.curtain.set_degree(90)'''"
+ },
+ "query": "Adjust the curtain in the guest bedroom to 90 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_degree(90)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 19
+}

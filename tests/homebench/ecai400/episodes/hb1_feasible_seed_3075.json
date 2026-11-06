@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 3075,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 45,
+  "devices_count": 1,
+  "id": "home91_one_100",
+  "homebench_type": "normal",
+  "gold": "''' master_bedroom.dehumidifiers.set_intensity(20)'''"
+ },
+ "query": "Decrease the intensity of the dehumidifier by 15% in the master bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_intensity(20)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 91
+}

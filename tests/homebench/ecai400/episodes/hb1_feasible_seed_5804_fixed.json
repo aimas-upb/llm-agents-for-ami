@@ -1,0 +1,46 @@
+{
+ "meta": {
+  "seed": 5804,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 43,
+  "devices_count": 1,
+  "id": "home67_one_682",
+  "homebench_type": "normal",
+  "gold": "''' foyer.light.turn_off()'''",
+  "label_correction": {
+   "original_gold": "'''error_input'''",
+   "original_type": "unexist_attribute",
+   "reason": "labelled impossible, but the light has an on/off state"
+  }
+ },
+ "query": "Turn off the lights in the foyer.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "off",
+      "value_type": "enum",
+      "description": "turn_off()"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 67
+}

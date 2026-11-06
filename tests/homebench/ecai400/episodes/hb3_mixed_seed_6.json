@@ -1,0 +1,74 @@
+{
+ "meta": {
+  "seed": 6,
+  "query_type": "hb3",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 42,
+  "devices_count": 3,
+  "id": "home64_multi_76",
+  "homebench_type": "multi3_mix",
+  "gold": "'''guest_bedroom.aromatherapy.set_interval(20),error_input,kitchen.light.set_brightness(70),'''"
+ },
+ "query": "Decrease the interval of the aromatherapy in the guest bedroom by 5 seconds, turn off the dehumidifiers in the store room, and increase the brightness of the lights in the kitchen by 5 percent.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_interval(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_brightness(70)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 64
+}

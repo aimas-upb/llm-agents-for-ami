@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 383,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 45,
+  "devices_count": 1,
+  "id": "home12_one_486",
+  "homebench_type": "normal",
+  "gold": "''' study_room.curtain.set_degree(90)'''"
+ },
+ "query": "Adjust the curtain angle to 90 degrees in the study room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_degree(90)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 12
+}

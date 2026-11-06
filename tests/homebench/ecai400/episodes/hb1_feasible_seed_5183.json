@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 5183,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 48,
+  "devices_count": 1,
+  "id": "home59_one_332",
+  "homebench_type": "normal",
+  "gold": "''' ding_room.light.set_brightness(70)'''"
+ },
+ "query": "Decrease the brightness of the light in the dining room by 13 percent.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_brightness(70)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 59
+}

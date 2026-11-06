@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 70,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 46,
+  "devices_count": 2,
+  "id": "home2_multi_36",
+  "homebench_type": "multi2_normal",
+  "gold": "'''guest_bedroom.humidifier.set_intensity(90),master_bedroom.media_player.play(),'''"
+ },
+ "query": "Set the intensity of the humidifier to 90% in the guest bedroom and play media in the master bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_intensity(90)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "playing",
+      "value_type": "enum",
+      "description": "play()"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 2
+}

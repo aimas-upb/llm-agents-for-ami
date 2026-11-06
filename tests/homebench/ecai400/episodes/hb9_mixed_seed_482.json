@@ -1,0 +1,144 @@
+{
+ "meta": {
+  "seed": 482,
+  "query_type": "hb9",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 8,
+  "id": "home19_multi_387",
+  "homebench_type": "multi9_mix",
+  "gold": "'''guest_bedroom.air_conditioner.set_temperature(16),guest_bedroom.aromatherapy.set_intensity(100),master_bedroom.humidifier.set_intensity(0),error_input,error_input,study_room.humidifier.turn_off(),error_input,error_input,study_room.humidifier.set_mode(sleep),'''"
+ },
+ "query": "Set the air conditioner temperature to 16 degrees in the guest bedroom, maximize the intensity of the aromatherapy device in the guest bedroom, turn off the humidifier in the master bedroom, adjust the air conditioner temperature to 22 degrees in the master bedroom, set the humidifier intensity to 60% in the living room, turn off the humidifier in the study room, turn on the heating in the living room, increase the heating temperature to 26 degrees in the master bedroom, and set the humidifier in the study room to sleep mode.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 16,
+      "value_type": "int",
+      "description": "set_temperature(16)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_intensity(100)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_intensity(0)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_humidifier",
+    "device_type": "humidifier",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "off",
+      "value_type": "enum",
+      "description": "turn_off()"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_heating",
+    "device_type": "heating",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_heating",
+    "device_type": "heating",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "temperature"
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "sleep",
+      "value_type": "enum",
+      "description": "set_mode(sleep)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 19
+}

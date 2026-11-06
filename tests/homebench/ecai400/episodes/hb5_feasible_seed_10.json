@@ -1,0 +1,111 @@
+{
+ "meta": {
+  "seed": 10,
+  "query_type": "hb5",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 45,
+  "devices_count": 5,
+  "id": "home34_multi_189",
+  "homebench_type": "multi5_normal",
+  "gold": "'''ding_room.fan.set_swing(middle),ding_room.dehumidifiers.set_intensity(60),master_bedroom.fan.set_swing(middle),living_room.air_conditioner.set_temperature(23),guest_bedroom.aromatherapy.set_interval(20),'''"
+ },
+ "query": "Set the fan to swing in the middle, decrease the dehumidifier intensity by 2% in the dining room, adjust the fan swing to the middle in the master bedroom, lower the air conditioner temperature in the living room by 7 degrees, and decrease the aromatherapy interval by 24 seconds in the guest bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_fan",
+    "device_type": "fan",
+    "asserts": [
+     {
+      "attribute": "swing",
+      "value": "middle",
+      "value_type": "enum",
+      "description": "set_swing(middle)"
+     }
+    ]
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_intensity(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_fan",
+    "device_type": "fan",
+    "asserts": [
+     {
+      "attribute": "swing",
+      "value": "middle",
+      "value_type": "enum",
+      "description": "set_swing(middle)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 23,
+      "value_type": "int",
+      "description": "set_temperature(23)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_interval(20)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 34
+}

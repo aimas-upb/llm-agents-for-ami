@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 28,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 44,
+  "devices_count": 2,
+  "id": "home49_multi_25",
+  "homebench_type": "multi2_normal",
+  "gold": "'''living_room.air_conditioner.set_temperature(20),corridor.aromatherapy.set_interval(60),'''"
+ },
+ "query": "Lower the air conditioner temperature in the living room by 8 degrees and set the interval of the aromatherapy device in the corridor to 60 seconds.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_temperature(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_interval(60)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 49
+}

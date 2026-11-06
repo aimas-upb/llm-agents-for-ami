@@ -1,0 +1,116 @@
+{
+ "meta": {
+  "seed": 439,
+  "query_type": "hb5",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 42,
+  "devices_count": 5,
+  "id": "home64_multi_176",
+  "homebench_type": "multi5_normal",
+  "gold": "'''foyer.aromatherapy.set_intensity(40),master_bedroom.media_player.set_volume(50),ding_room.light.set_brightness(90),master_bedroom.dehumidifiers.set_mode(sleep),guest_bedroom.air_conditioner.set_temperature(16),'''",
+  "label_correction": {
+   "original_gold": "'''foyer.aromatherapy.set_intensity(40),master_bedroom.media_player.set_volume(50),error_input,master_bedroom.dehumidifiers.set_mode(sleep),guest_bedroom.air_conditioner.set_temperature(16),'''",
+   "original_type": "multi5_mix",
+   "reason": "labelled impossible, but the home gives that light a brightness"
+  }
+ },
+ "query": "Set the intensity of the aromatherapy in the foyer to 40, adjust the volume of the media player in the master bedroom to 50, increase the brightness of the light in the dining room to 90, change the mode of the dehumidifier in the master bedroom to sleep, and set the temperature of the air conditioner in the guest bedroom to 16 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_intensity(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_volume(50)"
+     }
+    ]
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_brightness(90)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "sleep",
+      "value_type": "enum",
+      "description": "set_mode(sleep)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 16,
+      "value_type": "int",
+      "description": "set_temperature(16)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 64
+}

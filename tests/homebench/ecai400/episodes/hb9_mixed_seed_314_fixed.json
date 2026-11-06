@@ -1,0 +1,167 @@
+{
+ "meta": {
+  "seed": 314,
+  "query_type": "hb9",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 44,
+  "devices_count": 8,
+  "id": "home49_multi_374",
+  "homebench_type": "multi9_mix",
+  "gold": "'''store_room.humidifier.set_mode(sleep),guest_bedroom.aromatherapy.set_intensity(20),corridor.light.set_brightness(80),error_input,master_bedroom.dehumidifiers.set_intensity(60),error_input,living_room.media_player.set_volume(10),error_input,store_room.humidifier.set_intensity(30),'''",
+  "label_correction": {
+   "original_gold": "'''store_room.humidifier.set_mode(sleep),guest_bedroom.aromatherapy.set_intensity(20),error_input,master_bedroom.curtain.set_degree(60),master_bedroom.dehumidifiers.set_intensity(60),error_input,living_room.media_player.set_volume(10),error_input,store_room.humidifier.set_intensity(30),'''",
+   "original_type": "multi9_mix",
+   "reason": "the request asks the curtain for a temperature, which it does not have; the gold set its degree"
+  }
+ },
+ "query": "Set the humidifier in the storage room to sleep mode, decrease the intensity of the aromatherapy in the guest bedroom by 6%, adjust the brightness of the light in the corridor to 80%, set the curtain temperature in the master bedroom to 60 degrees, increase the intensity of the dehumidifiers in the master bedroom to 60%, increase the intensity of the humidifier in the guest bedroom by 30%, decrease the volume of the media player in the living room by 42%, set the brightness of the light in the bathroom to 60%, and adjust the intensity of the humidifier in the storage room to 30%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "bathroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "sleep",
+      "value_type": "enum",
+      "description": "set_mode(sleep)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_intensity(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_brightness(80)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_curtain",
+    "device_type": "curtain",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "temperature"
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_intensity(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_humidifier",
+    "device_type": "humidifier",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_volume(10)"
+     }
+    ]
+   },
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_light",
+    "device_type": "light",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "brightness"
+   },
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_intensity(30)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 49
+}

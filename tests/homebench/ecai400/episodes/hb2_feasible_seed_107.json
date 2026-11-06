@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 107,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 46,
+  "devices_count": 2,
+  "id": "home2_multi_28",
+  "homebench_type": "multi2_normal",
+  "gold": "'''garage.media_player.set_volume(0),corridor.light.set_brightness(60),'''"
+ },
+ "query": "Decrease the volume of the media player in the garage by 30 percent and set the brightness of the light in the corridor to 60.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "garage",
+    "device_id": "garage_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_volume(0)"
+     }
+    ]
+   },
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_brightness(60)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 2
+}

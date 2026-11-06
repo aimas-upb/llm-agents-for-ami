@@ -1,0 +1,74 @@
+{
+ "meta": {
+  "seed": 289,
+  "query_type": "hb3",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 44,
+  "devices_count": 3,
+  "id": "home49_multi_52",
+  "homebench_type": "multi3_mix",
+  "gold": "'''master_bedroom.media_player.set_volume(40),balcony.curtain.set_degree(40),error_input,'''"
+ },
+ "query": "Set the volume of the media player to 40 in the master bedroom, increase the curtain degree by 40% on the balcony, and decrease the intensity of the aromatherapy by 10% in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_volume(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_degree(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_aromatherapy",
+    "device_type": "aromatherapy",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   }
+  ]
+ },
+ "home_id": 49
+}

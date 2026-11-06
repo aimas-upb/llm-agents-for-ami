@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 2815,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 44,
+  "devices_count": 1,
+  "id": "home35_one_305",
+  "homebench_type": "normal",
+  "gold": "''' living_room.media_player.set_volume(20)'''"
+ },
+ "query": "Increase the volume of the media player by 7% in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_volume(20)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 35
+}

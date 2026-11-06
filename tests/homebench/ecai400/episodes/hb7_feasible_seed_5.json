@@ -1,0 +1,137 @@
+{
+ "meta": {
+  "seed": 5,
+  "query_type": "hb7",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 5,
+  "id": "home19_multi_276",
+  "homebench_type": "multi7_normal",
+  "gold": "'''corridor.aromatherapy.set_intensity(50),guest_bedroom.humidifier.set_intensity(30),living_room.air_conditioner.set_temperature(25),living_room.aromatherapy.set_intensity(30),garage.light.set_brightness(30),living_room.aromatherapy.set_interval(20),guest_bedroom.humidifier.turn_off(),'''"
+ },
+ "query": "Set the intensity of the aromatherapy in the corridor to 50, decrease the intensity of the humidifier in the guest bedroom to 30, adjust the temperature of the air conditioner in the living room to 25 degrees, decrease the intensity of the aromatherapy in the living room by 56 percent, set the brightness of the light in the garage to 30, decrease the interval of the aromatherapy in the living room by 34 seconds, and turn off the humidifier in the guest bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_intensity(50)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_intensity(30)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 25,
+      "value_type": "int",
+      "description": "set_temperature(25)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_intensity(30)"
+     }
+    ]
+   },
+   {
+    "room_id": "garage",
+    "device_id": "garage_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_brightness(30)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_interval(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "off",
+      "value_type": "enum",
+      "description": "turn_off()"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 19
+}

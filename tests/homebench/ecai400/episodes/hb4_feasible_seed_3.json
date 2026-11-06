@@ -1,0 +1,86 @@
+{
+ "meta": {
+  "seed": 3,
+  "query_type": "hb4",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 43,
+  "devices_count": 3,
+  "id": "home45_multi_142",
+  "homebench_type": "multi4_normal",
+  "gold": "'''master_bedroom.light.set_brightness(100),foyer.light.set_brightness(10),foyer.aromatherapy.set_interval(10),foyer.aromatherapy.set_intensity(100),'''"
+ },
+ "query": "Set the brightness of the light to 100 in the master bedroom, set the brightness of the light to 10 in the foyer, decrease the interval of the aromatherapy by 34 seconds in the foyer, and set the intensity of the aromatherapy to 100 in the foyer.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "foyer"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_brightness(100)"
+     }
+    ]
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_brightness(10)"
+     }
+    ]
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "interval",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_interval(10)"
+     }
+    ]
+   },
+   {
+    "room_id": "foyer",
+    "device_id": "foyer_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_intensity(100)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 45
+}

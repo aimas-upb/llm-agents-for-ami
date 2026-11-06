@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 391,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 51,
+  "devices_count": 1,
+  "id": "home13_one_496",
+  "homebench_type": "normal",
+  "gold": "''' study_room.curtain.set_degree(30)'''"
+ },
+ "query": "Adjust the curtain in the study room to 30 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_degree(30)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 13
+}

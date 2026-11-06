@@ -1,0 +1,76 @@
+{
+ "meta": {
+  "seed": 170,
+  "query_type": "hb3",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 44,
+  "devices_count": 3,
+  "id": "home35_multi_95",
+  "homebench_type": "multi3_mix",
+  "gold": "'''error_input,ding_room.dehumidifiers.set_intensity(40),error_input,'''",
+  "label_correction": {
+   "original_gold": "'''error_input,ding_room.dehumidifiers.set_intensity(40),balcony.curtain.set_degree(50),'''",
+   "original_type": "multi3_mix",
+   "reason": "the request gives no value for the curtain ('an unspecified degree')"
+  }
+ },
+ "query": "Set the heating temperature in the bathroom to 24 degrees, increase the intensity of the dehumidifier in the dining room by 22%, and adjust the curtain in the balcony to an unspecified degree.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "bathroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_heating",
+    "device_type": "heating",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "temperature"
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_intensity(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_curtain",
+    "device_type": "curtain",
+    "feasibility": false,
+    "reason": "unspecified_value",
+    "resolved": true,
+    "attribute": "degree"
+   }
+  ]
+ },
+ "home_id": 35
+}

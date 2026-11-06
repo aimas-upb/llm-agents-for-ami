@@ -1,0 +1,151 @@
+{
+ "meta": {
+  "seed": 77,
+  "query_type": "hb8",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 46,
+  "devices_count": 7,
+  "id": "home53_multi_312",
+  "homebench_type": "multi8_mix",
+  "gold": "'''balcony.curtain.set_degree(100),guest_bedroom.dehumidifiers.set_intensity(80),guest_bedroom.air_conditioner.set_swing(up),master_bedroom.light.set_brightness(20),error_input,study_room.fan.set_speed(low),error_input,balcony.media_player.set_volume(90),'''",
+  "label_correction": {
+   "original_gold": "'''balcony.curtain.set_degree(100),guest_bedroom.dehumidifiers.set_intensity(80),guest_bedroom.air_conditioner.set_swing(up),error_input,error_input,study_room.fan.set_speed(low),error_input,balcony.media_player.set_volume(90),'''",
+   "original_type": "multi8_mix",
+   "reason": "labelled impossible, but the home gives that light a brightness"
+  }
+ },
+ "query": "Increase the curtain degree by 100% on the balcony, set the dehumidifier intensity to 80% in the guest bedroom, adjust the air conditioner swing to up in the guest bedroom, set the brightness of the light to 20% in the master bedroom, switch the air conditioner swing mode to auto in the living room, set the fan speed to low in the study room, decrease the air conditioner temperature by 5 degrees in the living room, and adjust the media player volume to 90% on the balcony.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_degree(100)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_intensity(80)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "swing",
+      "value": "up",
+      "value_type": "enum",
+      "description": "set_swing(up)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_brightness(20)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_fan",
+    "device_type": "fan",
+    "asserts": [
+     {
+      "attribute": "speed",
+      "value": "low",
+      "value_type": "enum",
+      "description": "set_speed(low)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_volume(90)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 53
+}

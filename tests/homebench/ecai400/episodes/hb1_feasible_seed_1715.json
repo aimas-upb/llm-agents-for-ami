@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 1715,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 45,
+  "devices_count": 1,
+  "id": "home12_one_275",
+  "homebench_type": "normal",
+  "gold": "''' living_room.air_purifiers.set_fan_speed(auto)'''"
+ },
+ "query": "Set the fan speed of the air purifiers to automatic in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_purifiers",
+    "device_type": "air_purifiers",
+    "asserts": [
+     {
+      "attribute": "fan_speed",
+      "value": "auto",
+      "value_type": "enum",
+      "description": "set_fan_speed(auto)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 12
+}

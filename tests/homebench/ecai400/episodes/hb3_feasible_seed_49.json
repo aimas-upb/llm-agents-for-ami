@@ -1,0 +1,79 @@
+{
+ "meta": {
+  "seed": 49,
+  "query_type": "hb3",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 41,
+  "devices_count": 3,
+  "id": "home85_multi_75",
+  "homebench_type": "multi3_normal",
+  "gold": "'''guest_bedroom.fan.set_speed(low),living_room.curtain.set_degree(70),master_bedroom.light.set_brightness(10),'''"
+ },
+ "query": "Set the fan speed to low in the guest bedroom, adjust the curtain to 70 degrees in the living room, and decrease the brightness of the light in the master bedroom to 10.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_fan",
+    "device_type": "fan",
+    "asserts": [
+     {
+      "attribute": "speed",
+      "value": "low",
+      "value_type": "enum",
+      "description": "set_speed(low)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_degree(70)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_brightness(10)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 85
+}

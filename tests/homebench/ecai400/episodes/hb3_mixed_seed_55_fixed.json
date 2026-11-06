@@ -1,0 +1,79 @@
+{
+ "meta": {
+  "seed": 55,
+  "query_type": "hb3",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 45,
+  "devices_count": 3,
+  "id": "home12_multi_64",
+  "homebench_type": "multi3_mix",
+  "gold": "'''guest_bedroom.air_conditioner.set_temperature(23),error_input,garage.media_player.set_volume(70),'''",
+  "label_correction": {
+   "original_gold": "'''guest_bedroom.air_conditioner.set_temperature(27),error_input,garage.media_player.set_volume(70),'''",
+   "original_type": "multi3_mix",
+   "reason": "the gold is not the start value changed by N (24 - 1)"
+  }
+ },
+ "query": "Lower the air conditioner temperature in the guest bedroom by 1 degree, decrease the volume of the media player in the balcony by 50%, and set the volume of the media player in the garage to 70.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 23,
+      "value_type": "int",
+      "description": "set_temperature(23)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_media_player",
+    "device_type": "media_player",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "garage",
+    "device_id": "garage_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_volume(70)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 12
+}

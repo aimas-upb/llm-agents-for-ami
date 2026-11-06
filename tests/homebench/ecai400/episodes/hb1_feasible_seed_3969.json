@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 3969,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 1,
+  "id": "home19_one_416",
+  "homebench_type": "normal",
+  "gold": "''' study_room.air_conditioner.set_temperature(23)'''"
+ },
+ "query": "Set the temperature of the air conditioner in the study room to 23 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 23,
+      "value_type": "int",
+      "description": "set_temperature(23)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 19
+}

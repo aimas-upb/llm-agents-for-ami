@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 111,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 38,
+  "devices_count": 2,
+  "id": "home69_multi_0",
+  "homebench_type": "multi2_normal",
+  "gold": "'''living_room.air_conditioner.set_temperature(21),study_room.air_conditioner.set_fan_speed(low),'''"
+ },
+ "query": "Lower the air conditioner temperature in the living room by 5 degrees and decrease the fan speed of the air conditioner in the study room by 1 level.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 21,
+      "value_type": "int",
+      "description": "set_temperature(21)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "fan_speed",
+      "value": "low",
+      "value_type": "enum",
+      "description": "set_fan_speed(low)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 69
+}

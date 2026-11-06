@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 59,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 51,
+  "devices_count": 2,
+  "id": "home51_multi_20",
+  "homebench_type": "multi2_normal",
+  "gold": "'''garage.light.set_brightness(80),living_room.light.set_brightness(10),'''"
+ },
+ "query": "Set the brightness of the light in the garage to 80 and in the living room to 10.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "garage",
+    "device_id": "garage_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 80,
+      "value_type": "int",
+      "description": "set_brightness(80)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_brightness(10)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 51
+}

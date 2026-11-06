@@ -1,0 +1,79 @@
+{
+ "meta": {
+  "seed": 9,
+  "query_type": "hb3",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 51,
+  "devices_count": 3,
+  "id": "home51_multi_53",
+  "homebench_type": "multi3_normal",
+  "gold": "'''bathroom.heating.set_fan_speed(low),study_room.fan.set_speed(high),garage.media_player.play(),'''"
+ },
+ "query": "Lower the heating fan speed in the bathroom by 1 level, increase the fan speed to high in the study room by 2 levels, and play media in the garage.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "bathroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "fan_speed",
+      "value": "low",
+      "value_type": "enum",
+      "description": "set_fan_speed(low)"
+     }
+    ]
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_fan",
+    "device_type": "fan",
+    "asserts": [
+     {
+      "attribute": "speed",
+      "value": "high",
+      "value_type": "enum",
+      "description": "set_speed(high)"
+     }
+    ]
+   },
+   {
+    "room_id": "garage",
+    "device_id": "garage_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "playing",
+      "value_type": "enum",
+      "description": "play()"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 51
+}

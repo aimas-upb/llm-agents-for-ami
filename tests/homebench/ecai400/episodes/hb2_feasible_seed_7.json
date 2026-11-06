@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 7,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 42,
+  "devices_count": 2,
+  "id": "home73_multi_36",
+  "homebench_type": "multi2_normal",
+  "gold": "'''study_room.air_conditioner.set_temperature(17),bathroom.light.set_brightness(50),'''"
+ },
+ "query": "Lower the air conditioner temperature in the study room to 17 degrees and set the brightness of the light in the bathroom to 50%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "bathroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 17,
+      "value_type": "int",
+      "description": "set_temperature(17)"
+     }
+    ]
+   },
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_brightness(50)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 73
+}

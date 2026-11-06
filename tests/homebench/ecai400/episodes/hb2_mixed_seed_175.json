@@ -1,0 +1,50 @@
+{
+ "meta": {
+  "seed": 175,
+  "query_type": "hb2",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 42,
+  "devices_count": 2,
+  "id": "home64_multi_22",
+  "homebench_type": "multi2_mix",
+  "gold": "'''master_bedroom.dehumidifiers.set_mode(sleep),error_input,'''"
+ },
+ "query": "Set the dehumidifiers in the master bedroom to sleep mode, and adjust the fan in the master bedroom to middle swing.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "sleep",
+      "value_type": "enum",
+      "description": "set_mode(sleep)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_fan",
+    "device_type": "fan",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "swing"
+   }
+  ]
+ },
+ "home_id": 64
+}

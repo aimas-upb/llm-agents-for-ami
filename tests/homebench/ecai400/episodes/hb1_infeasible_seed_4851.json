@@ -1,0 +1,36 @@
+{
+ "meta": {
+  "seed": 4851,
+  "query_type": "hb1",
+  "case": "infeasible",
+  "num_rooms": 12,
+  "num_devices": 45,
+  "devices_count": 1,
+  "id": "home88_one_843",
+  "homebench_type": "unexist_device",
+  "gold": "'''error_input'''"
+ },
+ "query": "Set the volume of the media player to 70 in the master bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_media_player",
+    "device_type": "media_player",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   }
+  ]
+ },
+ "home_id": 88
+}

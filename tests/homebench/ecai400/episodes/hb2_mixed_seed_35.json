@@ -1,0 +1,55 @@
+{
+ "meta": {
+  "seed": 35,
+  "query_type": "hb2",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 2,
+  "id": "home68_multi_10",
+  "homebench_type": "multi2_mix",
+  "gold": "'''error_input,ding_room.humidifier.set_intensity(100),'''"
+ },
+ "query": "Set the curtain to 100 degrees in the living room and increase the intensity of the humidifier by 92% in the dining room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_curtain",
+    "device_type": "curtain",
+    "feasibility": false,
+    "reason": "unexist_device",
+    "resolved": true
+   },
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_intensity(100)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 68
+}

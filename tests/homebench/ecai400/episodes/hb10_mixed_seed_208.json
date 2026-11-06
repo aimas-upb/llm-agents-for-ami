@@ -1,0 +1,157 @@
+{
+ "meta": {
+  "seed": 208,
+  "query_type": "hb10",
+  "case": "mixed",
+  "num_rooms": 12,
+  "num_devices": 51,
+  "devices_count": 5,
+  "id": "home13_multi_441",
+  "homebench_type": "multi10_mix",
+  "gold": "'''garage.air_purifiers.set_fan_speed(low),error_input,error_input,bathroom.light.turn_off(),error_input,study_room.fan.turn_off(),error_input,master_bedroom.curtain.set_degree(90),error_input,kitchen.light.set_brightness(20),'''"
+ },
+ "query": "Set the fan speed to low for the air purifiers in the garage, turn off the bathroom light, decrease the intensity of the humidifier by 30% in the store room, set the temperature to 21 degrees for the air conditioner in the study room, turn off the fan in the study room, set the fan speed to low for the air conditioner in the study room, increase the curtain degree by 90 percent in the master bedroom, set the intensity to 50 for the dehumidifiers in the guest bedroom, and decrease the brightness by 63 percent for the light in the kitchen.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "bathroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "kitchen"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "garage",
+    "device_id": "garage_air_purifiers",
+    "device_type": "air_purifiers",
+    "asserts": [
+     {
+      "attribute": "fan_speed",
+      "value": "low",
+      "value_type": "enum",
+      "description": "set_fan_speed(low)"
+     }
+    ]
+   },
+   {
+    "room_id": null,
+    "device_id": null,
+    "device_type": null,
+    "feasibility": false,
+    "reason": "unknown",
+    "resolved": false
+   },
+   {
+    "room_id": null,
+    "device_id": null,
+    "device_type": null,
+    "feasibility": false,
+    "reason": "unknown",
+    "resolved": false
+   },
+   {
+    "room_id": "bathroom",
+    "device_id": "bathroom_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "off",
+      "value_type": "enum",
+      "description": "turn_off()"
+     }
+    ]
+   },
+   {
+    "room_id": null,
+    "device_id": null,
+    "device_type": null,
+    "feasibility": false,
+    "reason": "unknown",
+    "resolved": false
+   },
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_fan",
+    "device_type": "fan",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "off",
+      "value_type": "enum",
+      "description": "turn_off()"
+     }
+    ]
+   },
+   {
+    "room_id": null,
+    "device_id": null,
+    "device_type": null,
+    "feasibility": false,
+    "reason": "unknown",
+    "resolved": false
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_curtain",
+    "device_type": "curtain",
+    "asserts": [
+     {
+      "attribute": "degree",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_degree(90)"
+     }
+    ]
+   },
+   {
+    "room_id": null,
+    "device_id": null,
+    "device_type": null,
+    "feasibility": false,
+    "reason": "unknown",
+    "resolved": false
+   },
+   {
+    "room_id": "kitchen",
+    "device_id": "kitchen_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_brightness(20)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 13
+}

@@ -1,0 +1,46 @@
+{
+ "meta": {
+  "seed": 3249,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 38,
+  "devices_count": 1,
+  "id": "home69_one_710",
+  "homebench_type": "normal",
+  "gold": "''' store_room.light.set_brightness(20)'''",
+  "label_correction": {
+   "original_gold": "'''error_input'''",
+   "original_type": "unexist_attribute",
+   "reason": "labelled unexist_attribute, but the home file gives the light a 0-100 brightness"
+  }
+ },
+ "query": "Set the brightness of the light to 20 in the store room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 20,
+      "value_type": "int",
+      "description": "set_brightness(20)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 69
+}

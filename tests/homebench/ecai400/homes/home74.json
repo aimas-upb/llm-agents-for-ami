@@ -1,0 +1,746 @@
+{
+ "tick_interval": 0.1,
+ "base_time": "2025-01-01 08:00:00",
+ "rooms": {
+  "master_bedroom": {
+   "state": {},
+   "devices": [
+    {
+     "device_id": "master_bedroom_light",
+     "device_type": "light",
+     "attributes": {
+      "state": "on",
+      "brightness": 55,
+      "color": [
+       17,
+       131,
+       225
+      ]
+     },
+     "constraints": {
+      "brightness": {
+       "lowest": 0,
+       "highest": 100
+      },
+      "color": {
+       "channels": 3,
+       "lowest": 0,
+       "highest": 255
+      }
+     }
+    },
+    {
+     "device_id": "master_bedroom_air_conditioner",
+     "device_type": "air_conditioner",
+     "attributes": {
+      "state": "on",
+      "temperature": 23,
+      "mode": "heat",
+      "fan_speed": "medium",
+      "swing": "up"
+     },
+     "constraints": {
+      "temperature": {
+       "lowest": 16,
+       "highest": 30
+      },
+      "mode": {
+       "options": [
+        "cool",
+        "heat",
+        "fan_only",
+        "dry"
+       ]
+      },
+      "fan_speed": {
+       "options": [
+        "auto",
+        "low",
+        "medium",
+        "high"
+       ]
+      },
+      "swing": {
+       "options": [
+        "auto",
+        "up",
+        "middle",
+        "down"
+       ]
+      }
+     }
+    },
+    {
+     "device_id": "master_bedroom_humidifier",
+     "device_type": "humidifier",
+     "attributes": {
+      "state": "on",
+      "mode": "sleep"
+     },
+     "constraints": {
+      "mode": {
+       "options": [
+        "auto",
+        "sleep"
+       ]
+      }
+     }
+    },
+    {
+     "device_id": "master_bedroom_aromatherapy",
+     "device_type": "aromatherapy",
+     "attributes": {
+      "state": "off"
+     },
+     "constraints": {}
+    },
+    {
+     "device_id": "master_bedroom_trash",
+     "device_type": "trash",
+     "attributes": {
+      "state": "full"
+     },
+     "constraints": {}
+    },
+    {
+     "device_id": "master_bedroom_media_player",
+     "device_type": "media_player",
+     "attributes": {
+      "state": "stopped",
+      "volume": 9
+     },
+     "constraints": {
+      "volume": {
+       "lowest": 0,
+       "highest": 100
+      }
+     }
+    }
+   ]
+  },
+  "guest_bedroom": {
+   "state": {},
+   "devices": [
+    {
+     "device_id": "guest_bedroom_light",
+     "device_type": "light",
+     "attributes": {
+      "state": "off",
+      "brightness": 83
+     },
+     "constraints": {
+      "brightness": {
+       "lowest": 0,
+       "highest": 100
+      }
+     }
+    },
+    {
+     "device_id": "guest_bedroom_air_conditioner",
+     "device_type": "air_conditioner",
+     "attributes": {
+      "state": "on",
+      "temperature": 23,
+      "mode": "fan_only",
+      "fan_speed": "auto",
+      "swing": "down"
+     },
+     "constraints": {
+      "temperature": {
+       "lowest": 16,
+       "highest": 30
+      },
+      "mode": {
+       "options": [
+        "cool",
+        "heat",
+        "fan_only",
+        "dry"
+       ]
+      },
+      "fan_speed": {
+       "options": [
+        "auto",
+        "low",
+        "medium",
+        "high"
+       ]
+      },
+      "swing": {
+       "options": [
+        "auto",
+        "up",
+        "middle",
+        "down"
+       ]
+      }
+     }
+    },
+    {
+     "device_id": "guest_bedroom_curtain",
+     "device_type": "curtain",
+     "attributes": {
+      "state": "closed",
+      "degree": 0
+     },
+     "constraints": {
+      "degree": {
+       "lowest": 0,
+       "highest": 100
+      }
+     }
+    },
+    {
+     "device_id": "guest_bedroom_humidifier",
+     "device_type": "humidifier",
+     "attributes": {
+      "state": "off",
+      "intensity": 8
+     },
+     "constraints": {
+      "intensity": {
+       "lowest": 0,
+       "highest": 100
+      }
+     }
+    },
+    {
+     "device_id": "guest_bedroom_trash",
+     "device_type": "trash",
+     "attributes": {
+      "state": "full"
+     },
+     "constraints": {}
+    }
+   ]
+  },
+  "living_room": {
+   "state": {},
+   "devices": [
+    {
+     "device_id": "living_room_light",
+     "device_type": "light",
+     "attributes": {
+      "state": "off",
+      "color": [
+       251,
+       8,
+       56
+      ]
+     },
+     "constraints": {
+      "color": {
+       "channels": 3,
+       "lowest": 0,
+       "highest": 255
+      }
+     }
+    },
+    {
+     "device_id": "living_room_air_conditioner",
+     "device_type": "air_conditioner",
+     "attributes": {
+      "state": "off",
+      "temperature": 16,
+      "mode": "cool",
+      "fan_speed": "high",
+      "swing": "up"
+     },
+     "constraints": {
+      "temperature": {
+       "lowest": 16,
+       "highest": 30
+      },
+      "mode": {
+       "options": [
+        "cool",
+        "heat",
+        "fan_only",
+        "dry"
+       ]
+      },
+      "fan_speed": {
+       "options": [
+        "auto",
+        "low",
+        "medium",
+        "high"
+       ]
+      },
+      "swing": {
+       "options": [
+        "auto",
+        "up",
+        "middle",
+        "down"
+       ]
+      }
+     }
+    },
+    {
+     "device_id": "living_room_humidifier",
+     "device_type": "humidifier",
+     "attributes": {
+      "state": "off",
+      "mode": "sleep",
+      "intensity": 22,
+      "tank": 100
+     },
+     "constraints": {
+      "mode": {
+       "options": [
+        "auto",
+        "sleep"
+       ]
+      },
+      "intensity": {
+       "lowest": 0,
+       "highest": 100
+      },
+      "tank": {
+       "lowest": 0,
+       "highest": 100
+      }
+     }
+    },
+    {
+     "device_id": "living_room_aromatherapy",
+     "device_type": "aromatherapy",
+     "attributes": {
+      "state": "off",
+      "intensity": 26
+     },
+     "constraints": {
+      "intensity": {
+       "lowest": 0,
+       "highest": 100
+      }
+     }
+    },
+    {
+     "device_id": "living_room_media_player",
+     "device_type": "media_player",
+     "attributes": {
+      "state": "playing",
+      "volume": 65
+     },
+     "constraints": {
+      "volume": {
+       "lowest": 0,
+       "highest": 100
+      }
+     }
+    }
+   ]
+  },
+  "ding_room": {
+   "state": {},
+   "devices": [
+    {
+     "device_id": "ding_room_light",
+     "device_type": "light",
+     "attributes": {
+      "state": "on",
+      "color": [
+       251,
+       8,
+       56
+      ]
+     },
+     "constraints": {
+      "color": {
+       "channels": 3,
+       "lowest": 0,
+       "highest": 255
+      }
+     }
+    },
+    {
+     "device_id": "ding_room_fan",
+     "device_type": "fan",
+     "attributes": {
+      "state": "off",
+      "speed": "low"
+     },
+     "constraints": {
+      "speed": {
+       "options": [
+        "auto",
+        "low",
+        "medium",
+        "high"
+       ]
+      }
+     }
+    },
+    {
+     "device_id": "ding_room_dehumidifiers",
+     "device_type": "dehumidifiers",
+     "attributes": {
+      "state": "on"
+     },
+     "constraints": {}
+    }
+   ]
+  },
+  "study_room": {
+   "state": {},
+   "devices": [
+    {
+     "device_id": "study_room_light",
+     "device_type": "light",
+     "attributes": {
+      "state": "off",
+      "color": [
+       251,
+       8,
+       56
+      ]
+     },
+     "constraints": {
+      "color": {
+       "channels": 3,
+       "lowest": 0,
+       "highest": 255
+      }
+     }
+    },
+    {
+     "device_id": "study_room_heating",
+     "device_type": "heating",
+     "attributes": {
+      "state": "off",
+      "mode": "fan_only",
+      "fan_speed": "auto"
+     },
+     "constraints": {
+      "mode": {
+       "options": [
+        "heat",
+        "fan_only"
+       ]
+      },
+      "fan_speed": {
+       "options": [
+        "auto",
+        "low",
+        "medium",
+        "high"
+       ]
+      }
+     }
+    },
+    {
+     "device_id": "study_room_fan",
+     "device_type": "fan",
+     "attributes": {
+      "state": "on"
+     },
+     "constraints": {}
+    },
+    {
+     "device_id": "study_room_curtain",
+     "device_type": "curtain",
+     "attributes": {
+      "state": "closed",
+      "degree": 0
+     },
+     "constraints": {
+      "degree": {
+       "lowest": 0,
+       "highest": 100
+      }
+     }
+    },
+    {
+     "device_id": "study_room_dehumidifiers",
+     "device_type": "dehumidifiers",
+     "attributes": {
+      "state": "off"
+     },
+     "constraints": {}
+    },
+    {
+     "device_id": "study_room_trash",
+     "device_type": "trash",
+     "attributes": {
+      "state": "not_full"
+     },
+     "constraints": {}
+    }
+   ]
+  },
+  "kitchen": {
+   "state": {},
+   "devices": [
+    {
+     "device_id": "kitchen_light",
+     "device_type": "light",
+     "attributes": {
+      "state": "off",
+      "brightness": 72,
+      "color": [
+       239,
+       27,
+       102
+      ]
+     },
+     "constraints": {
+      "brightness": {
+       "lowest": 0,
+       "highest": 100
+      },
+      "color": {
+       "channels": 3,
+       "lowest": 0,
+       "highest": 255
+      }
+     }
+    },
+    {
+     "device_id": "kitchen_fan",
+     "device_type": "fan",
+     "attributes": {
+      "state": "on",
+      "swing": "auto"
+     },
+     "constraints": {
+      "swing": {
+       "options": [
+        "auto",
+        "up",
+        "middle",
+        "down"
+       ]
+      }
+     }
+    },
+    {
+     "device_id": "kitchen_trash",
+     "device_type": "trash",
+     "attributes": {
+      "state": "empty"
+     },
+     "constraints": {}
+    },
+    {
+     "device_id": "kitchen_water_heater",
+     "device_type": "water_heater",
+     "attributes": {
+      "state": "on",
+      "temperature": 60,
+      "mode": "eco"
+     },
+     "constraints": {
+      "temperature": {
+       "lowest": 30,
+       "highest": 100
+      },
+      "mode": {
+       "options": [
+        "heating",
+        "eco"
+       ]
+      }
+     }
+    }
+   ]
+  },
+  "bathroom": {
+   "state": {},
+   "devices": [
+    {
+     "device_id": "bathroom_light",
+     "device_type": "light",
+     "attributes": {
+      "state": "off",
+      "brightness": 83
+     },
+     "constraints": {
+      "brightness": {
+       "lowest": 0,
+       "highest": 100
+      }
+     }
+    },
+    {
+     "device_id": "bathroom_blinds",
+     "device_type": "blinds",
+     "attributes": {
+      "state": "closed"
+     },
+     "constraints": {}
+    }
+   ]
+  },
+  "foyer": {
+   "state": {},
+   "devices": [
+    {
+     "device_id": "foyer_light",
+     "device_type": "light",
+     "attributes": {
+      "state": "on",
+      "brightness": 83
+     },
+     "constraints": {
+      "brightness": {
+       "lowest": 0,
+       "highest": 100
+      }
+     }
+    },
+    {
+     "device_id": "foyer_aromatherapy",
+     "device_type": "aromatherapy",
+     "attributes": {
+      "state": "on",
+      "intensity": 26
+     },
+     "constraints": {
+      "intensity": {
+       "lowest": 0,
+       "highest": 100
+      }
+     }
+    }
+   ]
+  },
+  "corridor": {
+   "state": {},
+   "devices": [
+    {
+     "device_id": "corridor_light",
+     "device_type": "light",
+     "attributes": {
+      "state": "on",
+      "brightness": 33,
+      "color": [
+       79,
+       196,
+       177
+      ]
+     },
+     "constraints": {
+      "brightness": {
+       "lowest": 0,
+       "highest": 100
+      },
+      "color": {
+       "channels": 3,
+       "lowest": 0,
+       "highest": 255
+      }
+     }
+    }
+   ]
+  },
+  "balcony": {
+   "state": {},
+   "devices": [
+    {
+     "device_id": "balcony_light",
+     "device_type": "light",
+     "attributes": {
+      "state": "off"
+     },
+     "constraints": {}
+    },
+    {
+     "device_id": "balcony_aromatherapy",
+     "device_type": "aromatherapy",
+     "attributes": {
+      "state": "on",
+      "intensity": 26
+     },
+     "constraints": {
+      "intensity": {
+       "lowest": 0,
+       "highest": 100
+      }
+     }
+    },
+    {
+     "device_id": "balcony_trash",
+     "device_type": "trash",
+     "attributes": {
+      "state": "full"
+     },
+     "constraints": {}
+    }
+   ]
+  },
+  "garage": {
+   "state": {},
+   "devices": [
+    {
+     "device_id": "garage_light",
+     "device_type": "light",
+     "attributes": {
+      "state": "on",
+      "brightness": 80,
+      "color": [
+       126,
+       187,
+       12
+      ]
+     },
+     "constraints": {
+      "brightness": {
+       "lowest": 0,
+       "highest": 100
+      },
+      "color": {
+       "channels": 3,
+       "lowest": 0,
+       "highest": 255
+      }
+     }
+    },
+    {
+     "device_id": "garage_garage_door",
+     "device_type": "garage_door",
+     "attributes": {
+      "state": "open"
+     },
+     "constraints": {}
+    }
+   ]
+  },
+  "store_room": {
+   "state": {},
+   "devices": [
+    {
+     "device_id": "store_room_light",
+     "device_type": "light",
+     "attributes": {
+      "state": "on"
+     },
+     "constraints": {}
+    },
+    {
+     "device_id": "store_room_air_purifiers",
+     "device_type": "air_purifiers",
+     "attributes": {
+      "state": "off"
+     },
+     "constraints": {}
+    },
+    {
+     "device_id": "store_room_dehumidifiers",
+     "device_type": "dehumidifiers",
+     "attributes": {
+      "state": "on",
+      "intensity": 30
+     },
+     "constraints": {
+      "intensity": {
+       "lowest": 0,
+       "highest": 100
+      }
+     }
+    }
+   ]
+  }
+ }
+}

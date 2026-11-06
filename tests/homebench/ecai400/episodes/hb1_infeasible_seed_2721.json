@@ -1,0 +1,37 @@
+{
+ "meta": {
+  "seed": 2721,
+  "query_type": "hb1",
+  "case": "infeasible",
+  "num_rooms": 12,
+  "num_devices": 45,
+  "devices_count": 1,
+  "id": "home88_one_546",
+  "homebench_type": "unexist_attribute",
+  "gold": "'''error_input'''"
+ },
+ "query": "Set the fan speed of the air purifier to medium in the guest bedroom.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_purifiers",
+    "device_type": "air_purifiers",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "fan_speed"
+   }
+  ]
+ },
+ "home_id": 88
+}

@@ -1,0 +1,56 @@
+{
+ "meta": {
+  "seed": 95,
+  "query_type": "hb2",
+  "case": "mixed",
+  "num_rooms": 13,
+  "num_devices": 51,
+  "devices_count": 2,
+  "id": "home47_multi_45",
+  "homebench_type": "multi2_mix",
+  "gold": "'''balcony.light.set_brightness(70),error_input,'''"
+ },
+ "query": "Set the brightness of the light to 70 in the balcony, and set the brightness of the light to 60 in the store room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "store_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_brightness(70)"
+     }
+    ]
+   },
+   {
+    "room_id": "store_room",
+    "device_id": "store_room_light",
+    "device_type": "light",
+    "feasibility": false,
+    "reason": "unexist_attribute",
+    "resolved": true,
+    "attribute": "brightness"
+   }
+  ]
+ },
+ "home_id": 47
+}

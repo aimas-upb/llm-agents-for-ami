@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 6075,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 48,
+  "devices_count": 1,
+  "id": "home19_one_220",
+  "homebench_type": "normal",
+  "gold": "''' living_room.light.set_brightness(40)'''"
+ },
+ "query": "Decrease the brightness of the light in the living room by 43%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_brightness(40)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 19
+}

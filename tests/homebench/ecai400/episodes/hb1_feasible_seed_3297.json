@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 3297,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 49,
+  "devices_count": 1,
+  "id": "home9_one_567",
+  "homebench_type": "normal",
+  "gold": "''' corridor.light.set_brightness(100)'''"
+ },
+ "query": "Increase the brightness of the light in the corridor by 50 percent.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "corridor"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "corridor",
+    "device_id": "corridor_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 100,
+      "value_type": "int",
+      "description": "set_brightness(100)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 9
+}

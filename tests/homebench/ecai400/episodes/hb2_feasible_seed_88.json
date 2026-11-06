@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 88,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 42,
+  "devices_count": 2,
+  "id": "home32_multi_33",
+  "homebench_type": "multi2_normal",
+  "gold": "'''guest_bedroom.humidifier.set_intensity(60),balcony.media_player.set_volume(10),'''"
+ },
+ "query": "Set the intensity of the humidifier to 60% in the guest bedroom and decrease the volume of the media player by 71% in the balcony.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "balcony"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_intensity(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "balcony",
+    "device_id": "balcony_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 10,
+      "value_type": "int",
+      "description": "set_volume(10)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 32
+}

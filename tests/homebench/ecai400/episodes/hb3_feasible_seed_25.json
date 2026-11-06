@@ -1,0 +1,73 @@
+{
+ "meta": {
+  "seed": 25,
+  "query_type": "hb3",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 36,
+  "devices_count": 3,
+  "id": "home40_multi_65",
+  "homebench_type": "multi3_normal",
+  "gold": "'''garage.light.set_brightness(90),living_room.dehumidifiers.set_mode(sleep),garage.media_player.set_volume(40),'''"
+ },
+ "query": "Set the brightness of the light in the garage to 90, change the mode of the dehumidifiers in the living room to sleep, and adjust the volume of the media player in the garage to 40.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "garage",
+    "device_id": "garage_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 90,
+      "value_type": "int",
+      "description": "set_brightness(90)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_dehumidifiers",
+    "device_type": "dehumidifiers",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "sleep",
+      "value_type": "enum",
+      "description": "set_mode(sleep)"
+     }
+    ]
+   },
+   {
+    "room_id": "garage",
+    "device_id": "garage_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_volume(40)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 40
+}

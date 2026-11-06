@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 2113,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 49,
+  "devices_count": 1,
+  "id": "home9_one_301",
+  "homebench_type": "normal",
+  "gold": "''' living_room.humidifier.set_intensity(50)'''"
+ },
+ "query": "Set the intensity of the humidifier to 50% in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_humidifier",
+    "device_type": "humidifier",
+    "asserts": [
+     {
+      "attribute": "intensity",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_intensity(50)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 9
+}

@@ -1,0 +1,34 @@
+{
+ "meta": {
+  "seed": 5341,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 38,
+  "devices_count": 1,
+  "id": "home69_one_519",
+  "homebench_type": "normal",
+  "gold": "''' vacuum_robot.set_cleaning_area(dingroom)'''"
+ },
+ "query": "Set the cleaning area of the vacuum robot to the dining room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [],
+  "goals": [
+   {
+    "room_id": "household",
+    "device_id": "household_vacuum_robot",
+    "device_type": "vacuum_robot",
+    "asserts": [
+     {
+      "attribute": "cleaning_area",
+      "value": "dingroom",
+      "value_type": "enum",
+      "description": "set_cleaning_area(dingroom)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 69
+}

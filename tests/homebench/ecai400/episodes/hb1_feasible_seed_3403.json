@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "seed": 3403,
+  "query_type": "hb1",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 51,
+  "devices_count": 1,
+  "id": "home13_one_323",
+  "homebench_type": "normal",
+  "gold": "''' living_room.air_conditioner.set_mode(dry)'''"
+ },
+ "query": "Set the air conditioner in the living room to dry mode.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "mode",
+      "value": "dry",
+      "value_type": "enum",
+      "description": "set_mode(dry)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 13
+}

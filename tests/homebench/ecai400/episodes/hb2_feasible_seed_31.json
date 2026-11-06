@@ -1,0 +1,54 @@
+{
+ "meta": {
+  "seed": 31,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 51,
+  "devices_count": 2,
+  "id": "home13_multi_43",
+  "homebench_type": "multi2_normal",
+  "gold": "'''garage.media_player.set_volume(0),garage.light.set_brightness(50),'''"
+ },
+ "query": "Set the volume of the media player to 0 and decrease the brightness of the light in the garage by 33%.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "garage"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "garage",
+    "device_id": "garage_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_volume(0)"
+     }
+    ]
+   },
+   {
+    "room_id": "garage",
+    "device_id": "garage_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 50,
+      "value_type": "int",
+      "description": "set_brightness(50)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 13
+}

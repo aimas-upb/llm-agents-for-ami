@@ -1,0 +1,92 @@
+{
+ "meta": {
+  "seed": 9,
+  "query_type": "hb4",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 49,
+  "devices_count": 4,
+  "id": "home9_multi_123",
+  "homebench_type": "multi4_normal",
+  "gold": "'''master_bedroom.media_player.set_volume(0),guest_bedroom.aromatherapy.turn_off(),guest_bedroom.heating.set_temperature(24),living_room.media_player.set_volume(70),'''"
+ },
+ "query": "Set the volume of the media player to 0 in the master bedroom, turn off the aromatherapy in the guest bedroom, adjust the heating temperature to 24 degrees in the guest bedroom, and increase the volume of the media player by 69% in the living room.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "living_room"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 0,
+      "value_type": "int",
+      "description": "set_volume(0)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_aromatherapy",
+    "device_type": "aromatherapy",
+    "asserts": [
+     {
+      "attribute": "state",
+      "value": "off",
+      "value_type": "enum",
+      "description": "turn_off()"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_heating",
+    "device_type": "heating",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 24,
+      "value_type": "int",
+      "description": "set_temperature(24)"
+     }
+    ]
+   },
+   {
+    "room_id": "living_room",
+    "device_id": "living_room_media_player",
+    "device_type": "media_player",
+    "asserts": [
+     {
+      "attribute": "volume",
+      "value": 70,
+      "value_type": "int",
+      "description": "set_volume(70)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 9
+}

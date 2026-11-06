@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "seed": 14,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 12,
+  "num_devices": 36,
+  "devices_count": 2,
+  "id": "home40_multi_6",
+  "homebench_type": "multi2_normal",
+  "gold": "'''study_room.light.set_brightness(40),master_bedroom.air_conditioner.set_temperature(30),'''"
+ },
+ "query": "Decrease the brightness of the light in the study room by 21 percent and increase the temperature of the air conditioner in the master bedroom by 3 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "study_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "master_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "study_room",
+    "device_id": "study_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 40,
+      "value_type": "int",
+      "description": "set_brightness(40)"
+     }
+    ]
+   },
+   {
+    "room_id": "master_bedroom",
+    "device_id": "master_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 30,
+      "value_type": "int",
+      "description": "set_temperature(30)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 40
+}

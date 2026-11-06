@@ -1,0 +1,65 @@
+{
+ "meta": {
+  "seed": 58,
+  "query_type": "hb2",
+  "case": "feasible",
+  "num_rooms": 13,
+  "num_devices": 51,
+  "devices_count": 2,
+  "id": "home47_multi_35",
+  "homebench_type": "multi2_normal",
+  "gold": "'''ding_room.light.set_brightness(60),guest_bedroom.air_conditioner.set_temperature(18),'''",
+  "label_correction": {
+   "original_gold": "'''error_input,guest_bedroom.air_conditioner.set_temperature(18),'''",
+   "original_type": "multi2_mix",
+   "reason": "labelled impossible, but the home gives that light a brightness"
+  }
+ },
+ "query": "Set the brightness of the light in the dining room to 60 and decrease the air conditioner temperature in the guest bedroom by 12 degrees.",
+ "user_location": null,
+ "eval": {
+  "required_actions": [
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "ding_room"
+    }
+   },
+   {
+    "tool": "get_room_devices",
+    "params": {
+     "room_id": "guest_bedroom"
+    }
+   }
+  ],
+  "goals": [
+   {
+    "room_id": "ding_room",
+    "device_id": "ding_room_light",
+    "device_type": "light",
+    "asserts": [
+     {
+      "attribute": "brightness",
+      "value": 60,
+      "value_type": "int",
+      "description": "set_brightness(60)"
+     }
+    ]
+   },
+   {
+    "room_id": "guest_bedroom",
+    "device_id": "guest_bedroom_air_conditioner",
+    "device_type": "air_conditioner",
+    "asserts": [
+     {
+      "attribute": "temperature",
+      "value": 18,
+      "value_type": "int",
+      "description": "set_temperature(18)"
+     }
+    ]
+   }
+  ]
+ },
+ "home_id": 47
+}
