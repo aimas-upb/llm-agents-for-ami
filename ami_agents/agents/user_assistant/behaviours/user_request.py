@@ -61,6 +61,7 @@ from ..models import (
     REJECT_TOKENS,
 )
 from ..utils import canonicalize_plan_for_hash, coerce_plan_dict, count_bt_nodes
+from ..utils.intent_merge import merge_coupled_intents
 from ..utils.goal_resolution import structure_clarification
 
 logger = LoggerFactory.get_logger("UserAssistant")
@@ -115,6 +116,13 @@ class SegmentingState(_RequestState):
         # fetches its own scoped environment view in EXTRACTING.
         atomic_intents = await pipeline.segment_into_atomic_intents(
             request.agent, self.logger, request.user_text)
+        # The pieces of one timed request about one device, back in one intent
+        # (intent_merge): the dependency structurer needs them together.
+        before = len(atomic_intents)
+        atomic_intents = merge_coupled_intents(atomic_intents)
+        if len(atomic_intents) < before:
+            self.logger.info(demo(f"[SEGMENTATION] merged {before - len(atomic_intents)} "
+                                  f"coupled intent(s) about one device"))
 
         if not atomic_intents:
             await self.reply(

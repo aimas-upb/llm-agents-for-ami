@@ -1,6 +1,7 @@
 """structure_repair: the deterministic repairs applied before dependency planning."""
 
 from ami_agents.agents.interaction_solver.utils.structure_repair import (
+    complete_together,
     fill_goal_defaults,
     link_triggers,
     repair_structure,
@@ -199,3 +200,79 @@ class TestGoalDefaults:
         s = _structure({"G1": _goal(goal_effect="set", affordance_name="onOff",
                                     affordance_class="homeont:SetOnOffCommand")}, {})
         assert fill_goal_defaults(s) == []
+
+
+class TestCompleteTogether:
+    TEXT = ("Start dryer 1 in the utility room at the right time and put it into Running state. "
+            "Time it so dishwasher 1 in the kitchen and dryer 1 in the utility room finish at the "
+            "same time")
+
+    def _dryer(self, **timing):
+        return _goal(intent_text="Start dryer 1 in the utility room", artifact_class="homeont:LaundryDryer",
+                     artifact_name="utility_room_laundry_dryer_1", affordance_name="operationalState",
+                     affordance_class="homeont:SetOperationalStateCommand", goal_effect="set",
+                     target_value_text="Running", target_value_determined="1",
+                     **({"timing": timing} if timing else {}))
+
+    def test_the_appliance_only_named_becomes_the_event_to_finish_with(self):
+        s = GoalStructure.from_dict({"goals": {"G1": self._dryer(starts="now")}, "predicates": {}},
+                                    intent_text=self.TEXT, structure="dependency")
+        notes = complete_together(s)
+        (pid, pred), = s.predicates.items()
+        assert (pred.predicate_text, pred.artifact_class, pred.location_class, pred.role,
+                pred.applies_to) == ("dishwasher 1 in the kitchen finishes", "homeont:Dishwasher",
+                                     "homeont:Kitchen", "trigger", ["G1"])
+        assert (s.goals["G1"].timing.completes_with, s.goals["G1"].timing.starts) == (pid, None)
+        assert notes[0].startswith("G1 finish with P1 (dishwasher 1 in the kitchen finishes)")
+
+    def test_the_whole_repair_then_resolves_through_the_lexicon_gate(self):
+        s = GoalStructure.from_dict({"goals": {"G1": self._dryer(starts="now")}, "predicates": {}},
+                                    intent_text=self.TEXT, structure="dependency")
+        repair_structure(s)
+        # the trigger is waited for (completes_with), so link_triggers leaves it alone
+        assert s.goals["G1"].timing.starts is None and s.goals["G1"].timing.completes_with == "P1"
+
+    def test_two_goals_the_later_finishes_with_the_earlier(self):
+        s = GoalStructure.from_dict(
+            {"goals": {"G1": _goal(intent_text="start dishwasher 1", artifact_class="homeont:Dishwasher",
+                                   artifact_name="kitchen_dishwasher_1", timing={"starts": "now"}),
+                       "G2": self._dryer(starts="now")}, "predicates": {}},
+            intent_text=self.TEXT, structure="dependency")
+        complete_together(s)
+        assert s.goals["G2"].timing.completes_with == "G1" and s.goals["G2"].timing.starts is None
+        assert s.goals["G1"].timing.starts == "now" and s.predicates == {}
+
+    def test_the_goal_started_now_is_the_anchor(self):
+        s = GoalStructure.from_dict(
+            {"goals": {"G1": self._dryer(starts="after_delay", offset_text="soon"),
+                       "G2": _goal(intent_text="start dishwasher 1 now", artifact_class="homeont:Dishwasher",
+                                   artifact_name="kitchen_dishwasher_1", timing={"starts": "now"})},
+             "predicates": {}},
+            intent_text="Start dryer 1 in the utility room soon so dryer 1 and dishwasher 1 finish "
+                        "together. Start dishwasher 1 now.", structure="dependency")
+        complete_together(s)
+        assert s.goals["G1"].timing.completes_with == "G2" and s.goals["G1"].timing.offset_text is None
+        assert s.goals["G2"].timing.starts == "now"
+
+    def test_a_cycle_of_two_is_broken(self):
+        s = GoalStructure.from_dict(
+            {"goals": {"G1": _goal(artifact_name="kitchen_dishwasher_1", timing={"completes_with": "G2"}),
+                       "G2": self._dryer(completes_with="G1")}, "predicates": {}},
+            intent_text=self.TEXT, structure="dependency")
+        complete_together(s)
+        assert s.goals["G1"].timing.completes_with is None
+        assert s.goals["G2"].timing.completes_with == "G1"
+
+    def test_an_already_timed_structure_is_untouched(self):
+        s = GoalStructure.from_dict(
+            {"goals": {"G1": self._dryer(completes_with="P1")},
+             "predicates": {"P1": {**DRYER_DONE, "predicate_text": "dishwasher 1 finishes",
+                                   "applies_to": ["G1"]}}},
+            intent_text=self.TEXT, structure="dependency")
+        assert complete_together(s) == []
+
+    def test_no_finish_together_words_no_change(self):
+        s = GoalStructure.from_dict({"goals": {"G1": self._dryer(starts="now")}, "predicates": {}},
+                                    intent_text="Start dryer 1 now and pause it when dishwasher 1 finishes",
+                                    structure="dependency")
+        assert complete_together(s) == [] and s.predicates == {}

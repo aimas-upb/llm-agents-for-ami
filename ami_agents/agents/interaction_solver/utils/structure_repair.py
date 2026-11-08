@@ -37,15 +37,26 @@ a note, so the plan's explanation records what was inferred.
                         given, is "incomplete" (the incomplete planner finds
                         the one candidate by its names)
 
+    complete_together   "time it so A and B finish at the same time": the goal
+                        about one appliance completes with the other's run. When
+                        the request names an appliance no goal is about (it is
+                        already running), a trigger predicate "B finishes" is
+                        added and the goal completes with it, its start left to
+                        the planner; when both appliances have goals, the later
+                        completes with the earlier, and a cycle of two goals
+                        completing with each other is broken the same way
+
 `repair_structure(structure)` applies every repair in place and returns the notes.
 """
 
 from __future__ import annotations
 
-from typing import List, Optional
+import re
+from typing import List, Optional, Tuple
 
-from ....shared.models.goal_structure import GoalSpec, GoalStructure, GoalTiming
-from .event_lexicon import event_clause
+
+from ....shared.models.goal_structure import GoalSpec, GoalStructure, GoalTiming, PredicateSpec
+from .event_lexicon import APPLIANCES, ROOMS, event_clause
 
 # Starts the trigger may take over: none, "now", a delay with no anchor, or a
 # clock time (kept as the stated time to check against the event).
@@ -176,7 +187,103 @@ def fill_goal_defaults(structure: GoalStructure) -> List[str]:
     return notes
 
 
-REPAIRS = (drop_placeholders, name_predicates, fill_goal_defaults, link_triggers)
+_TOGETHER = re.compile(
+    r"\b(?:time (?:it|them|\w+(?: \d+)?(?: in the [a-z ]+?)?) so|at the same time|at once|"
+    r"finish(?:es|ed)?\s+(?:up\s+)?together|(?:both|they|the two)\s+(?:are\s+)?(?:done|ready|"
+    r"finished)\s+(?:together|at the same time)?|wrap up together|end together)\b", re.I)
+_APPLIANCE_MENTION = re.compile(
+    r"(?:the\s+)?(" + "|".join(p for p, _ in APPLIANCES) + r")\s*(\d+)?"
+    r"(?:\s+in\s+the\s+(" + "|".join(sorted((re.escape(w) for w in ROOMS), key=len, reverse=True))
+    + r"))?", re.I)
+_SNAKE = {"homeont:LaundryWasher": "washer", "homeont:LaundryDryer": "dryer",
+          "homeont:Dishwasher": "dishwasher", "homeont:Rvc": "rvc"}
+
+
+def _mentions(text: str) -> List[Tuple[str, str, Optional[str], str]]:
+    """(class, number, room class, words) of each appliance the text names."""
+    out, seen = [], set()
+    for m in _APPLIANCE_MENTION.finditer(text or ""):
+        cls = next(c for p, c in APPLIANCES if re.fullmatch(p, m.group(1), re.I))
+        key = (cls, m.group(2) or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        room = ROOMS.get((m.group(3) or "").lower()) if m.group(3) else None
+        out.append((cls, m.group(2) or "", room, m.group(0).strip()))
+    return out
+
+
+def _goal_about(goal: GoalSpec, cls: str, number: str) -> bool:
+    """Whether the goal acts on the appliance (by class, or by its title's words)."""
+    title = (goal.artifact_name or "").lower()
+    word = _SNAKE.get(cls, "")
+    by_class = goal.artifact_class == cls
+    by_title = bool(word) and word in title and not (
+        word == "washer" and "dishwasher" in title)
+    if not (by_class or by_title):
+        return False
+    return not number or bool(re.search(rf"(?:^|[^0-9]){number}$", title)) or not title
+
+
+def complete_together(structure: GoalStructure) -> List[str]:
+    """Make the goals of a finish-together request complete with each other, or
+    with the run of the appliance the request only names (module docstring)."""
+    text = structure.intent_text or ""
+    if not _TOGETHER.search(text) or not structure.goals:
+        return []
+    if any(g.timing and g.timing.completes_with for g in structure.goals.values()):
+        cyclic = [(gid, g) for gid, g in structure.goals.items()
+                  if g.timing and g.timing.completes_with in structure.goals
+                  and (structure.goals[g.timing.completes_with].timing or GoalTiming()).completes_with == gid]
+        if len(cyclic) < 2:
+            return []
+        first_id = cyclic[0][0]
+        cyclic[0][1].timing.completes_with = None
+        return [f"{first_id} no longer completes with {cyclic[1][0]}, which completes with it: "
+                f"one of the two has to start on its own"]
+    mentions = _mentions(text)
+    if len(mentions) < 2:
+        return []
+    with_goals = [(m, [gid for gid, g in structure.goals.items() if _goal_about(g, m[0], m[1])])
+                  for m in mentions]
+    timed = [gid for gid in structure.goals if any(gid in gids for _, gids in with_goals)]
+    without = [m for m, gids in with_goals if not gids]
+    if not timed:
+        return []
+    notes: List[str] = []
+    if without:
+        cls, number, room, words = without[0]
+        pid = next(f"P{n}" for n in range(1, 100) if f"P{n}" not in structure.predicates)
+        structure.predicates[pid] = PredicateSpec.from_dict({
+            "predicate_specificity": "explicit", "predicate_subject": "device_property",
+            "predicate_text": f"{words} finishes", "artifact_class": cls,
+            "location_class": room, "role": "trigger", "applies_to": list(timed)})
+        for gid in timed:
+            goal = structure.goals[gid]
+            goal.timing = goal.timing or GoalTiming()
+            goal.timing.completes_with = pid
+            goal.timing.starts = None
+            goal.timing.time_text = goal.timing.offset_text = None
+        notes.append(f"{', '.join(timed)} finish with {pid} ({words} finishes): the request times "
+                     f"{'them' if len(timed) > 1 else 'it'} with an appliance it only names")
+    elif len(timed) >= 2:
+        # The anchor runs on its own: the one goal the user starts "now", else
+        # the first listed; the others finish with it.
+        anchors = [gid for gid in timed
+                   if structure.goals[gid].timing and structure.goals[gid].timing.starts == "now"]
+        first = anchors[0] if len(anchors) == 1 else timed[0]
+        later = [gid for gid in timed if gid != first]
+        for gid in later:
+            goal = structure.goals[gid]
+            goal.timing = goal.timing or GoalTiming()
+            goal.timing.completes_with = first
+            goal.timing.starts = None
+            goal.timing.time_text = goal.timing.offset_text = None
+        notes.append(f"{', '.join(later)} finish with {first}: the request wants them done together")
+    return notes
+
+
+REPAIRS = (drop_placeholders, name_predicates, fill_goal_defaults, complete_together, link_triggers)
 
 
 def repair_structure(structure: GoalStructure) -> List[str]:
