@@ -214,6 +214,19 @@ def _locate(goal: GoalSpec, entries: List[Dict[str, Any]]) -> None:
                               + " or ".join(f"the {_words(r)}" for r in rooms) + "?")
 
 
+def _named_entry(goal: GoalSpec, entries: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The one entry whose device title carries the kind and number the goal's
+    words name, or None (none, or several devices do)."""
+    from .device_guard import device_mentions, title_matches
+    mentions = device_mentions(goal.intent_text or "")
+    titles = {str(e["artifact_name"]) for e in entries if e.get("artifact_name")}
+    matching = {t for t in titles if any(title_matches(t, m) for m in mentions)}
+    if len(matching) != 1:
+        return None
+    (title,) = matching
+    return next(e for e in entries if str(e.get("artifact_name")) == title)
+
+
 def apply_goal_resolution(goal: GoalSpec, response: Dict[str, Any]) -> bool:
     """Apply the lookup's answer to the goal. True if promoted to explicit.
 
@@ -223,14 +236,20 @@ def apply_goal_resolution(goal: GoalSpec, response: Dict[str, Any]) -> bool:
     filled in or a question set (`_locate`). A goal whose named device is
     missing is never filled in: the devices found go into its question."""
     entries = response.get("entries") or []
-    # 0. A named device the home does not have: the devices found are listed
-    #    in the question, never used in its place -- a name fits only the
-    #    device that has it, however alike another is.
+    # 0. A named device the parser did not find: the one device found whose
+    #    title carries the kind and number the user wrote ("light 1" ->
+    #    bathroom_on_off_light_1) is that device (device_guard); otherwise the
+    #    devices found are listed in the question, never used in its place --
+    #    a name fits only the device that has it, however alike another is.
     if named_device_missing(goal):
-        names = sorted({str(e["artifact_name"]) for e in entries if e.get("artifact_name")})
-        goal.clarification = _missing_device_question(
-            goal, names if response.get("outcome") == "found" else [])
-        return False
+        named = _named_entry(goal, entries) if response.get("outcome") == "found" else None
+        if named is None:
+            names = sorted({str(e["artifact_name"]) for e in entries if e.get("artifact_name")})
+            goal.clarification = _missing_device_question(
+                goal, names if response.get("outcome") == "found" else [])
+            return False
+        entries = [e for e in entries if e.get("artifact_name") == named.get("artifact_name")]
+        goal.artifact_name = named.get("artifact_name")
     if response.get("outcome") != "found":
         return False
     case = incomplete_case(goal)

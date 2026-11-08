@@ -29,6 +29,7 @@ from ....shared.utils.logger import LoggerFactory
 from .. import pipeline
 from ..prompts.goal_structuring_prompts import render_goal_prompt
 from ..utils import loose_json_loads
+from ..utils.device_guard import guard_goal
 from ..utils.goal_resolution import (
     apply_goal_resolution,
     apply_predicate_resolution,
@@ -87,6 +88,12 @@ class GoalStructuringBehaviour(OneShotBehaviour):
             self.error = "no goal could be structured"
             return
 
+        # A goal on another device than the one its words name is asked
+        # about, never done on that device (device_guard).
+        for gid, goal in structure.goals.items():
+            guarded = guard_goal(goal)
+            if guarded:
+                self.logger.info(demo(f"[GOAL] {gid}: device guard: {guarded}"))
         await self._resolve(structure)
         default_quantifiers(structure.predicates)
         self.result = structure

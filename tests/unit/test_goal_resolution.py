@@ -384,3 +384,32 @@ class TestPredicates:
         default_quantifiers(preds)
         assert preds["P1"].quantifier == "any"
         assert preds["P2"].quantifier is None
+
+
+class TestNamedDeviceByTheUsersWords:
+    """A goal whose parser-chosen device the guard rejected (`device_guard`):
+    the device whose title carries the user's kind and number is taken."""
+
+    def _named(self, text, **fields):
+        return _goal(intent_text=text, device_reference="name", artifact_class="homeont:OnOffLight",
+                     location_class="homeont:Bathroom", affordance_class=ONOFF, **fields)
+
+    def test_the_device_with_the_users_number_is_taken(self):
+        goal = self._named("turn on bathroom light 1")
+        found = _found(_light("bathroom_on_off_light_1", "homeont:Bathroom"),
+                       _light("bathroom_on_off_light_2", "homeont:Bathroom"))
+        assert apply_goal_resolution(goal, found)
+        assert (goal.artifact_name, goal.goal_specificity) == ("bathroom_on_off_light_1", "explicit")
+
+    def test_no_device_with_that_number_is_asked_about(self):
+        goal = self._named("turn on bathroom light 3")
+        assert not apply_goal_resolution(goal, _found(_light("bathroom_on_off_light_1", "homeont:Bathroom")))
+        assert goal.clarification.startswith("I can't find the on off light you named in the bathroom")
+        assert "bathroom_on_off_light_1" in goal.clarification
+
+    def test_another_kind_with_that_number_is_not_taken(self):
+        goal = self._named("turn on bathroom light 1")
+        dimmable = {"artifact_name": "bathroom_dimmable_light_1", "artifact_type": "homeont:DimmableLight",
+                    "workspace_class": "homeont:Bathroom", "affordance_name": "onOff"}
+        assert not apply_goal_resolution(goal, _found(dimmable))
+        assert goal.artifact_name is None and goal.clarification

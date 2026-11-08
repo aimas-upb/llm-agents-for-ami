@@ -28,6 +28,7 @@ from ....shared.utils.logger import LoggerFactory
 from .. import pipeline
 from ..prompts.intent_parsing_prompts import ENV_STATE_REQUEST_PARSER_PROMPT
 from ..utils import loose_json_loads
+from ..utils.device_guard import guard_extraction
 from ..utils.llm_client import build_behaviour_llm_client, build_llm_call_kwargs
 from ..utils.device_names import NO_DEVICES, device_slots
 from ..utils.intent_slots import BRANCH_ROOTS, clean_class, clean_nested
@@ -122,4 +123,9 @@ class EnvStateStructuringBehaviour(OneShotBehaviour):
                 )
                 result[slot] = None
 
+        # The device the question names, by its words, against the parser's
+        # choice (device_guard): another device is never answered about.
+        guarded = guard_extraction(result)
+        if guarded:
+            self.logger.info(demo(f"[STATE] device guard: {guarded}"))
         return result

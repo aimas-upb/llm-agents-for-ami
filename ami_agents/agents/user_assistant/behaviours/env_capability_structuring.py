@@ -29,6 +29,7 @@ from ....shared.utils.logger import LoggerFactory
 from .. import pipeline
 from ..prompts.intent_parsing_prompts import ENV_CAPABILITIES_REQUEST_PARSER_PROMPT
 from ..utils import loose_json_loads
+from ..utils.device_guard import guard_extraction
 from ..utils.device_names import NO_DEVICES, device_slots
 from ..utils.intent_slots import BRANCH_ROOTS, clean_class, clean_nested
 from ..utils.llm_client import build_behaviour_llm_client, build_llm_call_kwargs
@@ -91,6 +92,9 @@ class EnvCapabilityStructuringBehaviour(OneShotBehaviour):
                 parsed, self.intent_text, self.logger)
             # 3. How the question picks out its device, and the one named.
             self.result.update(device_slots(parsed, bool(devices)))
+            guarded = guard_extraction(self.result)
+            if guarded:
+                self.logger.info(demo(f"[CAPABILITY] device guard: {guarded}"))
             self.logger.info(demo(
                 f"[ENV_CAPABILITIES_REQUEST structured]\n"
                 f"{json.dumps(self.result, indent=2)}"
