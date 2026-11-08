@@ -264,34 +264,42 @@ def action_payload(graph: Graph, goal: GoalSpec, schema: Any) -> Dict[str, Any]:
         a direct value         {"value": <typed value>}    (DIRECT_VALUE_KEY)
         an object schema       {<parameter_name>: <typed value>}
 
-    The goal's `parameter_name` must agree with the shape: "NA" (or null) for a
-    direct value, the name of one of the object's properties otherwise. A
-    disagreement means the structurer read the action wrong, and raises
-    SchemaMismatch rather than sending a body the device would reject.
+    The goal's `parameter_name` matters only for an object schema with several
+    properties, where it has to be one of them; for a direct value it is
+    ignored, and for an object with one property that property is used whatever
+    the goal called it. The structurer often echoes the action's title or a
+    prompt phrase into `parameter_name` ("fanSpeed", "parameterized call") while
+    the value itself is right: about 250 recorded plans per Qwen configuration
+    were refused on that alone. SchemaMismatch is raised only when the body
+    could not be built: several parameters and none or a wrong one named.
     """
     if schema is None:
         return {}
     text = goal.target_value_determined
     is_object = (schema, RDF.type, JS.ObjectSchema) in graph
 
-    # A direct value: the schema itself types the value.
+    # A direct value: the schema itself types the value. A parameter name the
+    # goal carries anyway ("fanSpeed", "parameterized call") is the structurer
+    # echoing the action's title or the prompt; the schema decides, not it.
     if not is_object:
-        if goal.parameter_name not in (None, NA):
-            raise SchemaMismatch(f"the action takes a direct value, not parameter "
-                                 f"{goal.parameter_name!r}")
         if goal.target_value_is_percentage:
             text = _from_percentage(graph, schema, text)
         return {DIRECT_VALUE_KEY: _typed(graph, schema, text)}
 
     # A parameterized call: the named property's own schema types the value.
-    if goal.parameter_name in (None, NA):
+    members = {str(graph.value(m, JS.propertyName)): m for m in graph.objects(schema, JS.properties)}
+    name = goal.parameter_name if goal.parameter_name not in (None, NA) else None
+    if name not in members and len(members) == 1:
+        # One property: the goal's name for it (or none) cannot mean another.
+        (name,) = members
+    if name is None:
         raise SchemaMismatch("the action takes named parameters, and the goal names none")
-    for member in graph.objects(schema, JS.properties):
-        if str(graph.value(member, JS.propertyName)) == goal.parameter_name:
-            if goal.target_value_is_percentage:
-                text = _from_percentage(graph, member, text)
-            return {goal.parameter_name: _typed(graph, member, text)}
-    raise SchemaMismatch(f"the action has no parameter {goal.parameter_name!r}")
+    if name not in members:
+        raise SchemaMismatch(f"the action has no parameter {goal.parameter_name!r}")
+    member = members[name]
+    if goal.target_value_is_percentage:
+        text = _from_percentage(graph, member, text)
+    return {name: _typed(graph, member, text)}
 
 
 # --------------------------------------------------------------------------

@@ -170,7 +170,11 @@ ODD_HOME = f"""
         td:hasForm [ hctl:hasTarget <http://h/lamp/power-a> ] ] ,
     [
         a td:ActionAffordance, saref:OnCommand ; td:title "power" ;
-        td:hasForm [ hctl:hasTarget <http://h/lamp/power-b> ] ] .
+        td:hasForm [ hctl:hasTarget <http://h/lamp/power-b> ] ] ,
+    [
+        a td:ActionAffordance, saref:SetLevelCommand ; td:title "speed" ;
+        td:hasForm [ hctl:hasTarget <http://h/lamp/speed> ] ;
+        td:hasInputSchema [ a js:IntegerSchema ; js:minimum 0 ; js:maximum 100 ] ] .
 """
 
 
@@ -198,10 +202,19 @@ class TestParameterizedAndAmbiguous:
             target_value_determined="140"))
         assert result["impossible"] and "range" in result["explanation"]
 
-    def test_a_parameterized_call_without_a_parameter_name_is_impossible(self, odd_graph):
-        result = plan_explicit_goal(odd_graph, _lamp(
-            affordance_name="colour", parameter_name="NA", target_value_determined="40"))
-        assert result["impossible"]
+    def test_an_objects_only_parameter_is_used_whatever_the_goal_called_it(self, odd_graph):
+        for name in ("NA", None, "level", "parameterized call"):
+            result = plan_explicit_goal(odd_graph, _lamp(
+                affordance_name="colour", parameter_name=name, target_value_determined="40"))
+            assert result["tree"]["parameters"] == {"brightness": 40}, name
+
+    def test_a_direct_value_ignores_a_parameter_name(self, odd_graph):
+        # The structurer echoes the action's title (or a prompt phrase) into
+        # parameter_name; the schema says the action takes the value itself.
+        for name in ("NA", "speed", "parameterized call"):
+            result = plan_explicit_goal(odd_graph, _lamp(
+                affordance_name="speed", parameter_name=name, target_value_determined="40"))
+            assert result["tree"]["parameters"] == {"value": 40}, name
 
     def test_two_actions_sharing_names_are_not_guessed_between(self, odd_graph):
         result = plan_explicit_goal(odd_graph, _lamp(
