@@ -1,0 +1,30 @@
+# Qwen3-8B everywhere, as fep.ALL-qwen3-8b, with the model's thinking switched
+# off for the two schema-bound understanding phases (segmentation, structuring:
+# 25-31 s per intent with thinking on the H200). The latency experiment of the
+# local-model grid: the same episodes, the same judge, only the switch differs.
+name: fep-ALL-qwen3-8b-nothink
+
+providers:
+  local:  {base_url: "http://localhost:11434/v1"}
+  openai: {api_key_env: OPENAI_API_KEY}
+
+models:
+  segmentation:  {provider: local, model: "qwen3:8b", temperature: 0, max_tokens: 8192, thinking: false}
+  structuring:   {provider: local, model: "qwen3:8b", temperature: 0, max_tokens: 8192, thinking: false}
+  planning:
+    explicit:    {provider: local, model: "qwen3:8b", temperature: 0, max_tokens: 8192}
+    general:     {provider: local, model: "qwen3:8b", temperature: 0, max_tokens: 8192}
+  profiling:     {provider: local, model: "qwen3:8b", temperature: 0, max_tokens: 4096}
+  guarding:      {provider: local, model: "qwen3:8b", temperature: 0, max_tokens: 2048}
+  response:      {provider: local, model: "qwen3:8b", temperature: 0, max_tokens: 2048}
+  judge:         {provider: openai, model: gpt-4o-mini, temperature: 0.5}
+
+run:
+  episodes: "qt*"
+  limit: null
+  workers: 4
+  context: prepend
+  memory: "off"
+
+evaluate:
+  judge: true

@@ -105,6 +105,33 @@ async def close_clients() -> None:
             pass
 
 
+NO_THINK = "/no_think"
+
+
+def without_thinking(client: AsyncOpenAI) -> AsyncOpenAI:
+    """Make every chat completion of ``client`` carry the "/no_think" soft
+    switch in its system prompt (appended to the first system message, or a
+    new one in front). The switch is what Qwen3 reads; other models see a
+    harmless token. Returns the same client, patched in place."""
+    create = client.chat.completions.create
+
+    async def create_without_thinking(*args, **kwargs):
+        messages = list(kwargs.get("messages") or [])
+        for i, message in enumerate(messages):
+            if isinstance(message, dict) and message.get("role") == "system":
+                content = message.get("content")
+                if isinstance(content, str) and NO_THINK not in content:
+                    messages[i] = {**message, "content": content.rstrip() + "\n" + NO_THINK}
+                break
+        else:
+            messages.insert(0, {"role": "system", "content": NO_THINK})
+        kwargs["messages"] = messages
+        return await create(*args, **kwargs)
+
+    client.chat.completions.create = create_without_thinking  # type: ignore[method-assign]
+    return client
+
+
 @dataclass(frozen=True)
 class ModelSpec:
     """One step's model and how it is called."""
@@ -116,6 +143,11 @@ class ModelSpec:
     reasoning_effort: Optional[str] = None
     max_tokens: Optional[int] = None
     api: str = "auto"
+    # `thinking: false` switches a local hybrid model's reasoning off for the
+    # step (Qwen3's "/no_think" soft switch, appended to the system prompt):
+    # for schema-bound output such as segmentation or structuring the thinking
+    # buys little and costs most of the latency. None leaves the model as is.
+    thinking: Optional[bool] = None
 
     def __post_init__(self):
         """Reject misspelled API names instead of silently using a different endpoint."""
@@ -151,6 +183,8 @@ class ModelSpec:
         if self.api == "responses":
             from .responses import use_responses
             return use_responses(client)
+        if self.thinking is False:
+            without_thinking(client)
         return client
 
     def call_kwargs(self) -> Dict[str, Any]:
@@ -185,7 +219,7 @@ class ModelSpec:
 
     def label(self) -> str:
         return self.model + (f"@{self.reasoning_effort}" if self.reasoning and
-                             self.reasoning_effort else "")
+                             self.reasoning_effort else "") + ("@no-think" if self.thinking is False else "")
 
 
 # The agents' own defaults (`agents.yaml`), so a variant names only what it changes.
