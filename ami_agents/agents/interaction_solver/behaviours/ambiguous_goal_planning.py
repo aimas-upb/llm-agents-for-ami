@@ -44,6 +44,7 @@ from ....shared.models.goal_structure import GoalSpec
 from ....shared.utils.demo_log import demo
 from ....shared.utils.llm_models import is_reasoning_model
 from ....shared.utils.logger import LoggerFactory
+from ..utils.tree_repair import repair_tree
 from ..utils.ambiguous_goal_plan import SOURCE
 from ..utils.environment_graph import fetch_environment_graph
 from ..utils.property_read import read_property_value
@@ -126,7 +127,12 @@ class AmbiguousGoalPlanningBehaviour(OneShotBehaviour):
             return {"tree": None, "error": "ambiguous_planning_failed", "source": SOURCE,
                     "explanation": explanation or "The planner returned no tree.",
                     "reads": reads}
-        return {"tree": result["tree"], "explanation": explanation, "source": SOURCE,
+        # 6. The tree, with the planner's structural slips repaired (tree_repair).
+        tree, repairs = repair_tree(result["tree"], goal)
+        if repairs:
+            self.logger.info(demo(f"Ambiguous goal {goal.intent_text!r}: {'; '.join(repairs)}"))
+            explanation = "; ".join([explanation] * bool(explanation) + repairs)
+        return {"tree": tree, "explanation": explanation, "source": SOURCE,
                 "llm": True, "goal_context": context.goal_context, "reads": reads,
                 **({"signifier_id": hints["signifier_id"]} if hints else {})}
 
