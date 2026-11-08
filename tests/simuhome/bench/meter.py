@@ -65,6 +65,13 @@ def _stage(name: str) -> str:
     return head if head in STAGES else "other"
 
 
+def current_step() -> str:
+    """The step open in this task right now ("segmentation", "planning.achievement",
+    ...; "other" outside any), for a recorder that labels each LLM call with the
+    pipeline step that made it, as `Meter` books the call's time and tokens."""
+    return _NAME.get()
+
+
 def _empty() -> Dict[str, Any]:
     return {"seconds": 0.0, "calls": 0, "llm_seconds": 0.0, "tokens_in": 0, "tokens_out": 0}
 

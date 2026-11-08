@@ -337,6 +337,7 @@ what differs.
 | `python -m tests.simuhome.bench.evaluate --suite homebench --records DIR [--skip-scored] [--explain]` | Scores the records, writing `<episode>.eval.json` beside each. `--suite` defaults to each record's own | none |
 | `python -m tests.simuhome.bench.stats --records DIR` | The statistics for one variant in `DIR/stats/`, with the official table | none |
 | `python -m tests.simuhome.bench.report --root DIR [--variants a,b]` | Compares variants: `rates.csv`, `steps.csv`, `outcomes.csv`, `official.csv`, `report.md` | none |
+| `python -m tests.homebench.error_report DIR [--episodes BENCH] [--out OUT] [--examples N]` | Error analysis of one run folder in `DIR/stats/`: each failing gold part is followed down the pipeline to the stage and code that lost it (`errors.md`, `errors.json`, `errors_episodes.csv`, `errors_parts.csv`). A record with no `.eval.json` is scored from the record and `--episodes` (default `tests/homebench/ecai400`) | none |
 | `python -m tests.simuhome.bench.sweep --grid G [--dry-run]` | A grid of model variants (run + evaluate each), then `report`. The grid says `suite: homebench` | per variant |
 
 A HomeBench sweep grid is SimuHome's with `suite: homebench` and a HomeBench `base:`:

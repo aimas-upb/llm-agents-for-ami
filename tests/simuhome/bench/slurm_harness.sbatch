@@ -134,7 +134,8 @@ ARGS=(--config "$VARIANT_RUN" --out "$OUT_DIR")
 [ -n "${WORKERS:-}" ]  && ARGS+=(--workers "$WORKERS")
 [ -n "${NO_JUDGE:-}" ] && ARGS+=(--no-judge)
 # The GPU behind every latency number of this run, beside the records.
-NAME=$(grep -E '^name:' "$VARIANT_RUN" | head -1 | sed -E 's/^name: *"?([^"#]+)"?.*/\1/' | xargs)
+NAME=$(grep -E '^name:' "$VARIANT_RUN" | head -1 | sed -E 's/^name: *"?([^"#]+)"?.*/\1/' | xargs || true)
+[ -n "$NAME" ] || NAME=$(basename "$VARIANT_RUN" .yaml)   # HomeBench configs have no `name:` key
 mkdir -p "$OUT_DIR/$NAME"
 printf 'job %s  node %s  partition %s  gpu %s\n' "$SLURM_JOB_ID" "$(hostname -s)" "${SLURM_JOB_PARTITION:-?}" \
   "$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)" >> "$OUT_DIR/$NAME/gpu.txt"
