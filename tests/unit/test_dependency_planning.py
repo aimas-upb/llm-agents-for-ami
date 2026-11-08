@@ -203,7 +203,8 @@ class TestBehaviour:
         agent, _ = _agent()
         entry = await _plan(graph, _structure(
             {"G1": _goal(timing={"starts": "on_trigger"}, **NAMED)},
-            {"P1": {**WASHER_DONE, "target_value_determined": None, "role": "trigger",
+            {"P1": {**WASHER_DONE, "predicate_text": "washer 1 is warm",
+                    "target_value_determined": None, "role": "trigger",
                     "applies_to": ["G1"]}}), agent)
         assert entry["error"] == "unresolvable_predicate"
 

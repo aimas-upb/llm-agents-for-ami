@@ -93,6 +93,7 @@ from ..utils.dependency_context import (
     resolve_predicate,
 )
 from ..utils.environment_graph import fetch_environment_graph
+from ..utils.event_lexicon import complete_event_predicate
 from ..utils.explicit_goal_plan import deterministic_goal
 from ..utils.goal_profile import InconsistentStructure, build_checklist
 from ..utils.condition_check import guard_trees
@@ -199,9 +200,13 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
         subtrees, per_device, devices, llm = await self._steps(graph, structure)
         started = self._timed("achievement", started)
 
-        # 2. What each predicate reads.
+        # 2. What each predicate reads; an appliance event the structurer left
+        #    as words alone ("washer 1 finishes") is completed from them first.
         targets: Dict[str, PredicateTarget] = {}
         for pid, pred in structure.predicates.items():
+            completed = complete_event_predicate(graph, pred)
+            if completed:
+                repaired.append(f"{pid}: {completed}")
             target = resolve_predicate(graph, pred)
             if isinstance(target, str):
                 raise _Stop({"tree": None, "error": "unresolvable_predicate",
