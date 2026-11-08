@@ -1,6 +1,7 @@
 """structure_repair: the deterministic repairs applied before dependency planning."""
 
 from ami_agents.agents.interaction_solver.utils.structure_repair import (
+    fill_goal_defaults,
     link_triggers,
     repair_structure,
 )
@@ -115,3 +116,86 @@ def test_repair_structure_runs_every_repair_and_returns_the_notes():
     s = _structure({"G1": _goal()}, {"P1": {**DRYER_DONE, "applies_to": ["G1"]}})
     notes = repair_structure(s)
     assert len(notes) == 1 and s.goals["G1"].timing.starts == "on_trigger"
+
+
+class TestPredicates:
+    def test_an_empty_slot_is_dropped(self):
+        s = _structure({"G1": _goal(timing={"starts": "now"})}, {"P1": {"connective": "and"}})
+        notes = repair_structure(s)
+        assert s.predicates == {} and notes[0].startswith("P1 dropped: empty")
+
+    def test_a_text_less_trigger_takes_the_requests_event_clause(self):
+        s = GoalStructure.from_dict(
+            {"goals": {"G1": _goal(timing={"starts": "on_trigger"})},
+             "predicates": {"P1": {"role": "trigger", "applies_to": ["G1"],
+                                   "offset_text": "30 minutes", "offset_direction": "after"}}},
+            intent_text="At 3:30 PM, which is 30 minutes after the dryer 1 in the utility room "
+                        "finishes, turn on air purifier 1 in the bathroom", structure="dependency")
+        repair_structure(s)
+        p = s.predicates["P1"]
+        assert (p.predicate_text, p.predicate_subject, p.offset_text) == \
+            ("the dryer 1 in the utility room finishes", "device_property", "30 minutes")
+
+    def test_a_text_less_trigger_with_no_event_in_the_request_is_dropped(self):
+        s = GoalStructure.from_dict(
+            {"goals": {"G1": _goal(timing={"starts": "on_trigger"}),
+                       "G2": _goal(timing={"starts": "at_time", "time_text": "12:10"})},
+             "predicates": {"P1": {"role": "trigger", "applies_to": ["G1", "G2"]}}},
+            intent_text="Start dishwasher 1 in the kitchen at 12:10 PM so it is ready for dinner",
+            structure="dependency")
+        notes = repair_structure(s)
+        assert s.predicates == {}
+        assert s.goals["G1"].timing.starts is None and s.goals["G2"].timing.starts == "at_time"
+        assert notes == ["P1 dropped: a trigger with no condition in it; G1 start now instead"]
+
+    def test_a_released_goal_keeps_another_trigger(self):
+        s = GoalStructure.from_dict(
+            {"goals": {"G1": _goal(timing={"starts": "on_trigger"})},
+             "predicates": {"P1": {"role": "trigger", "applies_to": ["G1"]},
+                            "P2": {**DRYER_DONE, "applies_to": ["G1"]}}},
+            intent_text="x", structure="dependency")
+        repair_structure(s)
+        assert list(s.predicates) == ["P2"] and s.goals["G1"].timing.starts == "on_trigger"
+
+
+class TestGoalDefaults:
+    def test_effect_kind_and_specificity_defaults(self):
+        s = _structure({"G1": {"intent_text": "start dishwasher 1", "artifact_class": "homeont:Dishwasher",
+                               "artifact_name": "kitchen_dishwasher_1",
+                               "affordance_class": "homeont:SetOnOffCommand",
+                               "affordance_name": "onOff", "target_value_text": "true",
+                               "target_value_determined": "true"}}, {})
+        notes = fill_goal_defaults(s)
+        g = s.goals["G1"]
+        assert (g.goal_effect, g.goal_kind, g.goal_specificity) == ("set", "achievement", "explicit")
+        assert notes == ["G1 taken as effect set, an achievement, explicit"]
+
+    def test_explicit_without_a_device_title_is_incomplete(self):
+        s = _structure({"G1": _goal(artifact_name=None, artifact_class="homeont:WindowCoveringController",
+                                    affordance_class="saref:SetAbsoluteLevelCommand",
+                                    affordance_name="position", goal_effect="set",
+                                    location_class="homeont:LivingRoom")}, {})
+        fill_goal_defaults(s)
+        assert s.goals["G1"].goal_specificity == "incomplete"
+
+    def test_explicit_without_an_action_title_is_incomplete(self):
+        s = _structure({"G1": _goal(artifact_class="homeont:HeatPump",
+                                    artifact_name="utility_room_heat_pump_1",
+                                    affordance_class="homeont:SetModeCommand", goal_effect="set",
+                                    target_value_text="heating mode", target_value_determined="4")}, {})
+        fill_goal_defaults(s)
+        assert s.goals["G1"].goal_specificity == "incomplete"
+
+    def test_a_class_only_goal_is_incomplete_and_an_empty_goal_is_left(self):
+        s = _structure({"G1": {"intent_text": "turn on utility room fan 1",
+                               "affordance_class": "homeont:SetOnOffCommand",
+                               "affordance_name": "onOff", "target_value_text": "on"},
+                        "G2": {"intent_text": "I need the load ready to fold before dinner"}}, {})
+        fill_goal_defaults(s)
+        assert s.goals["G1"].goal_specificity == "incomplete"
+        assert s.goals["G2"].goal_specificity is None and s.goals["G2"].goal_kind is None
+
+    def test_a_well_formed_goal_is_untouched(self):
+        s = _structure({"G1": _goal(goal_effect="set", affordance_name="onOff",
+                                    affordance_class="homeont:SetOnOffCommand")}, {})
+        assert fill_goal_defaults(s) == []

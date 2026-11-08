@@ -20,6 +20,7 @@ from ..utils.ambiguous_goal_plan import ambiguous_goal
 from ..utils.dependency_context import dependency_structure
 from ..utils.explicit_goal_plan import deterministic_goal
 from ..utils.incomplete_goal_plan import incomplete_goal
+from ..utils.structure_repair import repair_structure
 from ..utils.plan_envelope import (
     envelope_error,
     envelope_plan_entries,
@@ -98,6 +99,10 @@ class GoalRequestBehaviour(CyclicBehaviour):
         # and ambiguous achievement goals from the TD graph or by an LLM against
         # a context cut to the goal; dependency structures (conditions, timing,
         # maintenance) by templates. Only plain-text intents reach the workflow.
+        for item in intent_objects:
+            if isinstance(item, GoalStructure):
+                for note in repair_structure(item):
+                    self.logger.info(demo(f"Structure repaired ({item.intent_text!r}): {note}"))
         routes = route(intent_objects)
         if any(routes.values()):
             envelope = await self._plan_mixed(

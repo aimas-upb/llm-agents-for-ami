@@ -21,6 +21,9 @@ as finished / done / stopped but valued as 1 (running) gets the value 0.
 
 `complete_event_predicate(graph, pred)` edits the predicate in place and
 returns a note of what it inferred, or None when it changed nothing.
+`event_clause(text)` finds the appliance-event clause of a request ("30
+minutes after the dryer 1 in the utility room finishes, turn on ...") for a
+predicate that arrived without any text.
 """
 
 from __future__ import annotations
@@ -155,3 +158,19 @@ def complete_event_predicate(graph: Graph, pred: PredicateSpec) -> Optional[str]
     if not filled:
         return None
     return f"{pred.predicate_text!r} read as {', '.join(filled)} (appliance-event lexicon)"
+
+
+_APPLIANCE_WORDS = "|".join(pattern for pattern, _ in APPLIANCES)
+_ROOM_WORDS = "|".join(sorted((re.escape(w) for w in ROOMS), key=len, reverse=True))
+_CLAUSE = re.compile(
+    rf"(?:the\s+)?(?:{_APPLIANCE_WORDS})(?:\s+\d+)?(?:\s+in\s+the\s+(?:{_ROOM_WORDS}))?"
+    rf"(?:'s)?(?:\s+(?:cycle|run))?\s+"
+    rf"(?:finish(?:es|ed|ing)?|(?:is|are|has|have)\s+(?:been\s+)?(?:finished|done|complete[d]?|"
+    rf"stopped|running)|(?:is\s+)?done|complete[sd]?|stop(?:s|ped)?|ends?|starts?|started|begins?)"
+    rf"(?:\s+(?:drying|washing|cleaning|running|its\s+cycle|the\s+cycle))?", re.I)
+
+
+def event_clause(text: str) -> Optional[str]:
+    """The appliance-event clause in `text`, or None (several clauses: the first)."""
+    m = _CLAUSE.search(text or "")
+    return m.group(0).strip() if m else None

@@ -20,14 +20,32 @@ a note, so the plan's explanation records what was inferred.
                     placed after or with another GOAL are left as they are:
                     they follow their goal.
 
+    drop_placeholders   a predicate with no text, no role and no goals is
+                        the structurer's empty slot, not a condition: dropped
+    name_predicates     a predicate with a role and goals but no text takes
+                        the appliance-event clause of the request ("30
+                        minutes after the dryer 1 finishes, ...") as its
+                        text, for the event lexicon to complete; with no such
+                        clause it is dropped, and a goal that started on it
+                        starts now instead (noted: part of the request is
+                        then lost, which the explanation says)
+    fill_goal_defaults  a goal naming its device and action but missing
+                        goal_effect ("set"), goal_kind ("achievement") or
+                        goal_specificity (explicit / incomplete / ambiguous by
+                        what it names) gets the default; an "explicit" goal
+                        missing its device or action title, with the class
+                        given, is "incomplete" (the incomplete planner finds
+                        the one candidate by its names)
+
 `repair_structure(structure)` applies every repair in place and returns the notes.
 """
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
-from ....shared.models.goal_structure import GoalStructure, GoalTiming
+from ....shared.models.goal_structure import GoalSpec, GoalStructure, GoalTiming
+from .event_lexicon import event_clause
 
 # Starts the trigger may take over: none, "now", a delay with no anchor, or a
 # clock time (kept as the stated time to check against the event).
@@ -78,7 +96,87 @@ def link_triggers(structure: GoalStructure) -> List[str]:
     return notes
 
 
-REPAIRS = (link_triggers,)
+def _empty_predicate(pred) -> bool:
+    return not (pred.predicate_text or pred.artifact_name or pred.artifact_class
+                or pred.property_name or pred.target_value_determined
+                or pred.qualitative_condition or pred.environment_var)
+
+
+def drop_placeholders(structure: GoalStructure) -> List[str]:
+    """Drop predicates that carry nothing: no text, role or goals."""
+    dropped = [pid for pid, pred in structure.predicates.items()
+               if _empty_predicate(pred) and not pred.role and not pred.applies_to]
+    for pid in dropped:
+        del structure.predicates[pid]
+    return [f"{', '.join(dropped)} dropped: empty predicate{'s' if len(dropped) > 1 else ''}"] \
+        if dropped else []
+
+
+def name_predicates(structure: GoalStructure) -> List[str]:
+    """Give a text-less predicate the request's event clause, or drop it."""
+    notes: List[str] = []
+    for pid, pred in list(structure.predicates.items()):
+        if not _empty_predicate(pred) or not (pred.role or pred.applies_to):
+            continue
+        clause = event_clause(structure.intent_text)
+        if clause:
+            pred.predicate_text = clause
+            pred.predicate_subject = pred.predicate_subject or "device_property"
+            notes.append(f"{pid} read as {clause!r}: the structure gave it no condition")
+            continue
+        del structure.predicates[pid]
+        released = []
+        for gid in pred.applies_to or []:
+            goal = structure.goals.get(gid)
+            timing = goal.timing if goal else None
+            if timing and timing.starts == "on_trigger" and not any(
+                    p.role == "trigger" and gid in (p.applies_to or [])
+                    for p in structure.predicates.values()):
+                timing.starts = None
+                released.append(gid)
+        notes.append(f"{pid} dropped: a {pred.role or 'condition'} with no condition in it"
+                     + (f"; {', '.join(released)} start now instead" if released else ""))
+    return notes
+
+
+def _specificity(goal: GoalSpec) -> Optional[str]:
+    if goal.artifact_name and (goal.affordance_name or goal.affordance_class):
+        return "explicit"
+    if goal.artifact_class or goal.location_class or goal.affordance_class:
+        return "incomplete"
+    if goal.implied_environment_vars:
+        return "ambiguous"
+    return None
+
+
+def fill_goal_defaults(structure: GoalStructure) -> List[str]:
+    """Defaults for the slots a well-named goal left empty (module docstring)."""
+    notes: List[str] = []
+    for gid, goal in structure.goals.items():
+        filled = []
+        has_action = bool(goal.affordance_name or goal.affordance_class)
+        if goal.goal_effect is None and has_action:
+            goal.goal_effect = "set"
+            filled.append("effect set")
+        if goal.goal_kind is None and (has_action or goal.target_value_text):
+            goal.goal_kind = "achievement"
+            filled.append("an achievement")
+        if goal.goal_specificity is None:
+            goal.goal_specificity = _specificity(goal)
+            if goal.goal_specificity:
+                filled.append(goal.goal_specificity)
+        elif (goal.goal_specificity == "explicit" and has_action
+              and not (goal.artifact_name and goal.affordance_name)
+              and (goal.artifact_class or goal.location_class or goal.artifact_name)):
+            goal.goal_specificity = "incomplete"
+            filled.append("incomplete: " + ("no device title" if not goal.artifact_name
+                                            else "no action title"))
+        if filled:
+            notes.append(f"{gid} taken as {', '.join(filled)}")
+    return notes
+
+
+REPAIRS = (drop_placeholders, name_predicates, fill_goal_defaults, link_triggers)
 
 
 def repair_structure(structure: GoalStructure) -> List[str]:

@@ -26,8 +26,11 @@ from ami_agents.agents.interaction_solver.utils.goal_profile import (
     InconsistentStructure,
     build_checklist,
 )
+from ami_agents.agents.interaction_solver.utils.ambiguous_goal_plan import ambiguous_goal
+from ami_agents.agents.interaction_solver.utils.explicit_goal_plan import deterministic_goal
+from ami_agents.agents.interaction_solver.utils.incomplete_goal_plan import incomplete_goal
 from ami_agents.agents.interaction_solver.utils.structure_repair import repair_structure
-from ami_agents.shared.models.goal_structure import GoalStructure
+from ami_agents.shared.models.goal_structure import GoalSpec, GoalStructure
 
 HEAD_STARTS = (None, "now", "at_time", "after_delay", "on_trigger")
 
@@ -57,6 +60,26 @@ def structure_gate(structure: GoalStructure) -> Optional[str]:
     return None
 
 
+def goal_gate(goal: GoalSpec) -> bool:
+    """Whether one of the achievement planners takes the goal (mirrors
+    `DependencyGoalPlanningBehaviour._step`; the routing of a simple structure
+    applies the same three selectors)."""
+    simple = GoalStructure(intent_text=goal.intent_text or "g", structure="simple",
+                           goals={"G1": goal})
+    return any(select(simple) is not None
+               for select in (deterministic_goal, incomplete_goal, ambiguous_goal))
+
+
+def unplannable_goals(structure: GoalStructure) -> List[str]:
+    return [gid for gid, goal in structure.goals.items() if not goal_gate(goal)]
+
+
+def empty_predicates(structure: GoalStructure) -> List[str]:
+    return [pid for pid, pred in structure.predicates.items()
+            if pred.target_value_determined is None and pred.role != "filter"
+            and not pred.predicate_text]
+
+
 def records(roots: Iterable[Path]) -> Iterable[Tuple[str, Path, Dict[str, Any]]]:
     for root in roots:
         for path in sorted(root.glob("*/qt*.json")):
@@ -68,25 +91,33 @@ def records(roots: Iterable[Path]) -> Iterable[Tuple[str, Path, Dict[str, Any]]]
                 continue
 
 
-def dependency_structures(record: Dict[str, Any]) -> List[GoalStructure]:
+def structures(record: Dict[str, Any], dependency_only: bool = True) -> List[GoalStructure]:
     out = []
     for item in record.get("structures") or []:
         raw = (item or {}).get("structure") if isinstance(item, dict) else None
-        if isinstance(raw, dict) and raw.get("structure") == "dependency":
+        if isinstance(raw, dict) and (raw.get("structure") == "dependency" or not dependency_only):
             out.append(GoalStructure.from_dict(raw, intent_text=raw.get("text_intent") or ""))
     return out
+
+
+def dependency_structures(record: Dict[str, Any]) -> List[GoalStructure]:
+    return structures(record, dependency_only=True)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--roots", nargs="+", type=Path, required=True,
                     help="attempt directories holding <config>/<episode>.json records")
-    ap.add_argument("--types", default="qt2,qt4-1,qt4-2,qt4-3",
+    ap.add_argument("--types", default="qt2,qt3,qt4-1,qt4-2,qt4-3",
                     help="episode types to look at (comma list)")
     args = ap.parse_args(argv)
     types = tuple(t.strip() for t in args.types.split(","))
 
     # per config: counters
+    goals_bad = collections.Counter()      # goals no planner takes, as recorded
+    goals_fixed = collections.Counter()    # ... taken after the repairs
+    preds_bad = collections.Counter()      # predicates with neither text nor value
+    preds_fixed = collections.Counter()    # ... given a text, or dropped, by the repairs
     seen = collections.Counter()           # dependency structures
     failed_before = collections.Counter()  # failed the gate as recorded
     pass_after = collections.Counter()     # ... and pass it after the repairs
@@ -98,6 +129,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     for config, path, record in records(args.roots):
         if not path.name.startswith(types):
             continue
+        for structure in structures(record, dependency_only=False):
+            bad_goals, bad_preds = unplannable_goals(structure), empty_predicates(structure)
+            if bad_goals or bad_preds:
+                repair_structure(structure)
+                goals_bad[config] += len(bad_goals)
+                goals_fixed[config] += sum(goal_gate(structure.goals[g]) for g in bad_goals)
+                preds_bad[config] += len(bad_preds)
+                preds_fixed[config] += sum(p not in structure.predicates
+                                           or bool(structure.predicates[p].predicate_text)
+                                           for p in bad_preds)
         for structure in dependency_structures(record):
             seen[config] += 1
             before = structure_gate(structure)
@@ -129,6 +170,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                                                        for k, v in residual[config].most_common()))
         for ex in examples[config]:
             print(f"    e.g. {ex}")
+        print(f"    goals no planner takes: {goals_bad[config]}, taken after repair: "
+              f"{goals_fixed[config]}; empty predicates: {preds_bad[config]}, named or dropped: "
+              f"{preds_fixed[config]}")
     return 0
 
 
