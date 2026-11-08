@@ -500,6 +500,9 @@ async def _understand(text, ua, logger, meter, options, current) -> Dict[str, An
             "context_unavailable": behaviour.context_unavailable,
             "structure": result.to_wire_dict() if result else None,
             "question": structure_clarification(result) if result else None,
+            # What the structuring `repair` variant changed in the reply (empty, and so
+            # left out, for the default): how much of a result is the repair's.
+            **({"repairs": behaviour.repairs} if behaviour.repairs else {}),
             "device_references": ({gid: g.device_reference for gid, g in result.goals.items()}
                                   if result else None)})
     for kind, behaviour in [("state", b) for b in done[len(goals):len(goals) + len(states)]] + \

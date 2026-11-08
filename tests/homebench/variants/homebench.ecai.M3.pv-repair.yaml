@@ -1,0 +1,43 @@
+# HomeBench harness config, ECAI-400 on local models: M3 with ONE change to how structuring
+# builds its call (experiment arm E; the control is homebench.ecai.M3.yaml, nothing set):
+#   prompt_variants.structuring   repair: class_names
+#
+# No LLM change. After structuring, each class the reply names is written as the home
+# writes it (`Foyer` -> `homeont:Foyer`, `Master bedroom` -> `homeont:MasterBedroom`),
+# only when exactly one class of the home has that name. Shows how much of the failure
+# is notation rather than choice.
+#
+# Models, run settings and episodes are M3's, so a difference in the results is the
+# variant's. Details: tests/homebench/prompt-variants.md.
+#
+#   conda run -n ami-agents python -m tests.simuhome.bench.harness \
+#       --config tests/homebench/variants/homebench.ecai.M3.pv-repair.yaml --dry-run
+
+suite: homebench
+benchmark: tests/homebench/ecai400   # the 400 ECAI episodes, corrections applied
+
+providers:
+  local: {base_url: "http://localhost:11434/v1"}     # Ollama; the planner needs tool calling
+
+models:
+  segmentation:  {provider: local, model: "qwen3-8b-16k", temperature: 0}
+  structuring:   {provider: local, model: "ds-r1-7b-16k", temperature: 0}
+  planning:
+    explicit:    {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+    general:     {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+  profiling:     {provider: local, model: "ds-r1-7b-16k", temperature: 0}
+  guarding:      {provider: local, model: "ds-r1-1.5b-16k", temperature: 0}
+  response:      {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+
+run:
+  episodes: "hb*"          # every episode of the benchmark directory above
+  limit: null
+  workers: 1               # one local model at a time: parallel workers only queue on it
+  context: none
+  memory: "off"
+  guidelines: homebench    # homebench: no device conditions | default: as deployed
+  environment: "on"        # as the ECAI run (env_on): room environments and action effects
+
+# How structuring builds its prompt (ami_agents/shared/utils/prompt_variants.py):
+prompt_variants:
+  structuring: {repair: class_names}

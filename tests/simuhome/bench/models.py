@@ -32,8 +32,19 @@ steps may sit under a `models:` key, so a harness config (`harness.py`) with its
 
 A step's own `base_url` / `api_key_env` win over its provider's.
 
+How a step builds its prompt is a second kind of choice, named under the top-level
+`prompt_variants:` (one entry per step; the axes and options are declared by the step,
+`ami_agents/shared/utils/prompt_variants.py`). An axis left out is its default:
+
+    prompt_variants:
+      structuring: {context: json, constraint: schema}
+
+The run applies it to the agents' config (`run.apply_prompt_variants`), and it is part
+of the step cache's key, so a changed prompt never reuses a cached result.
+
 Flow:
-    load_variant(path)       YAML -> Variant (every step filled, defaults below)
+    load_variant(path)       YAML -> Variant (every step filled, defaults below; plus
+                             its `prompt_variants:`, below)
     ModelSpec.ua_config()    the UA's LLMClientConfig for that step
     ModelSpec.isa_config()   the ISA's LLMClientConfig for that step
     ModelSpec.call_kwargs()  temperature, or reasoning effort + token budget
@@ -65,6 +76,7 @@ from ami_agents.agents.user_assistant.utils.llm_client import (
     LLMClientConfig as UAClientConfig,
     is_reasoning_model,
 )
+from ami_agents.shared.utils import prompt_variants
 
 OPENAI_URL = "https://api.openai.com/v1"
 # One request may take this long before it counts as failed (seconds).
@@ -203,24 +215,40 @@ DEFAULTS: Dict[str, ModelSpec] = {
 
 @dataclass(frozen=True)
 class Variant:
-    """A name and one model spec per step."""
+    """A name, one model spec per step, and the steps' prompt variants.
+
+    `prompts` maps a step to the axes of its prompt construction that differ from
+    the default (`ami_agents/shared/utils/prompt_variants.py`): `{"structuring":
+    {"constraint": "schema"}}`. Empty for a variant that changes none."""
 
     name: str
     specs: Dict[str, ModelSpec] = field(default_factory=dict)
+    prompts: Dict[str, Dict[str, str]] = field(default_factory=dict)
 
     def __getitem__(self, step: str) -> ModelSpec:
         return self.specs[step]
 
     def as_dict(self) -> Dict[str, Any]:
-        return {"name": self.name,
-                "steps": {step: {k: v for k, v in asdict(spec).items() if v is not None}
-                          for step, spec in self.specs.items()}}
+        out: Dict[str, Any] = {
+            "name": self.name,
+            "steps": {step: {k: v for k, v in asdict(spec).items() if v is not None}
+                      for step, spec in self.specs.items()}}
+        # Only when there is one, so records of a variant without prompt variants
+        # are the records they always were.
+        if self.prompts:
+            out["prompt_variants"] = self.prompts
+        return out
 
     def key(self, *steps: str) -> str:
-        """A short hash of the specs of ``steps`` -- what a cached result of
-        those steps depends on."""
-        blob = json.dumps({s: asdict(self.specs[s]) for s in steps}, sort_keys=True)
-        return hashlib.sha1(blob.encode()).hexdigest()[:12]
+        """A short hash of the specs and prompt variants of ``steps`` -- what a
+        cached result of those steps depends on. A step's prompt variants are in
+        the hash only when it has some, so the keys of runs made before prompt
+        variants existed still match."""
+        blob = {s: asdict(self.specs[s]) for s in steps}
+        prompts = {s: self.prompts[s] for s in steps if s in self.prompts}
+        if prompts:
+            blob["prompt_variants"] = prompts
+        return hashlib.sha1(json.dumps(blob, sort_keys=True).encode()).hexdigest()[:12]
 
 
 # --------------------------------------------------------------------------
@@ -281,7 +309,12 @@ def variant_from_dict(raw: Dict[str, Any], name: Optional[str] = None) -> Varian
     for step in STEPS:
         default = specs["planning.explicit"] if step in INHERIT_EXPLICIT else DEFAULTS[step]
         specs[step] = _spec(given[step], default, providers)
-    return Variant(name=str(name or raw.get("name") or "default"), specs=specs)
+
+    # 3. The prompt variants, checked against what the steps declare (a typo is an
+    #    error here, not a run on the defaults) and cut to what differs from them.
+    prompts = prompt_variants.normalize(raw.get("prompt_variants"))
+    return Variant(name=str(name or raw.get("name") or "default"), specs=specs,
+                   prompts=prompts)
 
 
 def load_variant(path: Optional[str], *, api: Optional[str] = None) -> Variant:

@@ -318,6 +318,7 @@ Approval for one run does not carry over to the next run.
 | Add a new LLM-driven step | Copy the `BTPlanGenerationBehaviour` pattern (`OneShotBehaviour`, takes the LLM client/config from `self.agent`) |
 | Tweak NLU/NLG prompts | `ami_agents/agents/user_assistant/prompts.py` |
 | Tweak BT planner prompts | `ami_agents/bt_planning/planning/prompts.py` |
+| Vary how a step builds its call (context format, prompt, output schema, reply repair) for an experiment | Registry `ami_agents/shared/utils/prompt_variants.py`; the structuring step's options in `ami_agents/agents/user_assistant/utils/goal_structuring_variants.py`. Selected by `prompt_variants:` in `agents.yaml` or in a harness variant file; add an option as one function registered on its axis. See `tests/homebench/prompt-variants.md` |
 | Change a timeout | `ami_agents/config/agents.yaml > timeouts:` |
 | Add a config-driven feature | yaml key + `LLMClientConfig`-style dataclass in `utils/` |
 | Add a new BT node type | Define the `py_trees` node in `ami_agents/bt_planning/nodes/`, then `register_node_type(...)` in `nodes/registry.py` (compile + validate). Custom compute logic goes through a named op in `compute_node.py` — never embed code in the IR (keeps it JSON-serialisable for cross-agent transport, issue #22) |

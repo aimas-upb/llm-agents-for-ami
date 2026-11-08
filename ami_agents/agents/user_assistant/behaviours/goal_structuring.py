@@ -5,7 +5,10 @@ qualifiers decide the rest (see `utils/goal_routing.py`):
 
     1. route       simple or dependency prompt, and which context it needs
     2. context     the goal context from EnvExplorer, scoped to this goal
-    3. structure   one LLM call -> a `GoalStructure`
+    3. structure   one LLM call -> a `GoalStructure`; how the call is built
+                   (context format, prompt, output schema, repair of the reply)
+                   follows `user_assistant.prompt_variants.structuring`, see
+                   `utils/goal_structuring_variants.py` (all defaults: as always)
     4. resolve     incomplete goals and device predicates that the
                    environment allows only one reading of are promoted to
                    explicit (see `utils/goal_resolution.py`)
@@ -26,8 +29,8 @@ from spade.behaviour import OneShotBehaviour
 from ....shared.models.goal_structure import GoalStructure
 from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
+from ....shared.utils.prompt_variants import selection_from_config
 from .. import pipeline
-from ..prompts.goal_structuring_prompts import render_goal_prompt
 from ..utils import loose_json_loads
 from ..utils.goal_resolution import (
     apply_goal_resolution,
@@ -36,7 +39,8 @@ from ..utils.goal_resolution import (
     goal_query,
     predicate_query,
 )
-from ..utils.goal_routing import route_goal
+from ..utils.goal_context import GoalContext
+from ..utils.goal_routing import GoalRoute, route_goal
 from ..utils.llm_client import build_behaviour_llm_client, build_llm_call_kwargs
 
 
@@ -55,6 +59,9 @@ class GoalStructuringBehaviour(OneShotBehaviour):
         # True when the goal context could not be had -- a different failure
         # from a parse that went wrong, and reported differently.
         self.context_unavailable = False
+        # What the `repair` variant changed in the model's reply, one line each
+        # (empty with the default variant).
+        self.repairs: List[str] = []
 
     async def run(self) -> None:
         route = route_goal(self.qualifiers)
@@ -63,17 +70,17 @@ class GoalStructuringBehaviour(OneShotBehaviour):
             f"qualifiers={self.qualifiers} -> {route.structure} "
             f"(properties={route.with_properties}, environment={route.with_environment})"))
 
-        context = await pipeline.fetch_goal_context(
+        context = await pipeline.fetch_goal_context_data(
             self.agent, self.logger, self.intent_text,
             with_properties=route.with_properties,
             with_environment=route.with_environment)
-        if not context:
+        if not context.text:
             self.context_unavailable = True
             self.error = "goal context unavailable"
             return
 
         try:
-            parsed = await self._structure(route.structure, context)
+            parsed = await self._structure(route, context)
         except Exception as exc:
             self.error = str(exc)
             self.logger.warning("Goal structuring failed for %r: %s",
@@ -93,23 +100,44 @@ class GoalStructuringBehaviour(OneShotBehaviour):
         self.logger.info(demo(
             f"[GOAL structured]\n{json.dumps(structure.to_wire_dict(), indent=2)}"))
 
-    async def _structure(self, structure: str, context: str) -> dict:
+    async def _structure(self, route: GoalRoute, context: GoalContext) -> dict:
+        """The one LLM call: the parsed JSON object the model answered with.
+
+        Built as the config's `prompt_variants.structuring` says (all defaults: the
+        full prompt over the text context, a free-text reply, no repair). Raises when
+        the model's reply is not a JSON object, or when a variant cannot work."""
+        variants = selection_from_config(self.agent.config, "structuring")
+
+        # 1. The messages: the context rendered, then the system prompt around it.
+        rendered = variants["context"](context)
         messages = [
-            {"role": "system", "content": render_goal_prompt(structure, context)},
+            {"role": "system", "content": variants["prompt"](
+                route.structure, rendered, self.qualifiers)},
             {"role": "user", "content": (
                 f"Request: {self.intent_text}\n"
                 f"Segmenter qualifiers: {', '.join(self.qualifiers) or 'none'}")},
         ]
+
+        # 2. The call; a constrained reply adds its `response_format`.
         llm_cfg = build_behaviour_llm_client(self.agent.config, "intent_parsing")
+        kwargs = build_llm_call_kwargs(llm_cfg)
+        response_format = variants["constraint"](route.structure, self.qualifiers, context)
+        if response_format:
+            kwargs["response_format"] = response_format
         response = await llm_cfg.client.chat.completions.create(
             model=llm_cfg.model,
             messages=messages,
-            **build_llm_call_kwargs(llm_cfg),
+            **kwargs,
         )
+
+        # 3. The reply: an object, then the variant's repair of it.
         raw = (response.choices[0].message.content or "").strip()
         parsed = loose_json_loads(raw)
         if not isinstance(parsed, dict):
             raise ValueError(f"expected a JSON object, got: {raw[:200]!r}")
+        parsed, self.repairs = variants["repair"](parsed, context)
+        for line in self.repairs:
+            self.logger.info(demo(f"[GOAL] repaired {line}"))
         return parsed
 
     async def _resolve(self, structure: GoalStructure) -> None:

@@ -13,6 +13,7 @@ import pytest
 from ami_agents.agents.user_assistant.behaviours.goal_structuring import (
     GoalStructuringBehaviour,
 )
+from ami_agents.agents.user_assistant.utils.goal_context import GoalContext
 from ami_agents.agents.user_assistant.prompts.goal_structuring_prompts import (
     GOAL_CONTEXT_PLACEHOLDER,
     PROMPTS,
@@ -42,7 +43,7 @@ async def _run(behaviour, llm_payload, context="CTX", candidates=None):
          patch(f"{MODULE}.build_behaviour_llm_client",
                return_value=_llm_returning(llm_payload)) as llm, \
          patch(f"{MODULE}.build_llm_call_kwargs", return_value={}):
-        pl.fetch_goal_context = AsyncMock(return_value=context)
+        pl.fetch_goal_context_data = AsyncMock(return_value=GoalContext(text=context))
         pl.resolve_candidates = AsyncMock(return_value=candidates or {})
         await behaviour.run()
     return pl, llm
@@ -67,7 +68,7 @@ class TestStructuring:
         pl, llm = await _run(b, {"goal_specificity": "explicit",
                                  "goal_kind": "achievement",
                                  "artifact_name": "kitchen_on_off_light_1"})
-        kwargs = pl.fetch_goal_context.await_args.kwargs
+        kwargs = pl.fetch_goal_context_data.await_args.kwargs
         assert (kwargs["with_properties"], kwargs["with_environment"]) == (False, False)
         system = llm.return_value.client.chat.completions.create.await_args.kwargs[
             "messages"][0]["content"]
@@ -85,7 +86,7 @@ class TestStructuring:
             "predicates": {"P1": {"predicate_specificity": "explicit",
                                   "predicate_subject": "device_property",
                                   "role": "trigger", "applies_to": ["G1"]}}})
-        kwargs = pl.fetch_goal_context.await_args.kwargs
+        kwargs = pl.fetch_goal_context_data.await_args.kwargs
         assert kwargs["with_properties"] and kwargs["with_environment"]
         assert b.result.structure == "dependency"
         assert b.result.predicates["P1"].role == "trigger"

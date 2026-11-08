@@ -33,6 +33,25 @@ What this home offers, by workspace. It may be narrowed to the rooms and devices
 - `Property` — something the device reports. `name` is the **property_name**; `property class` is the **property_class**; `kind` is its branch (actuatable, state, capability, ...). Its `output` is a direct value or an object whose fields are listed beneath it. (Present only when needed.)
 """
 
+# The same guide for the context given as JSON (the `json` context variant): the
+# same facts under the keys of EnvExplorer's structured view.
+CONTEXT_GUIDE_JSON = """\
+## Home context
+
+What this home offers, as one JSON object, by workspace. It may be narrowed to the rooms and devices the request names. Copy names and classes from the values EXACTLY, case-sensitive. A class or name that does not appear here matches nothing in this home: never invent one.
+
+- `workspaces` — rooms (a workspace may hold further `workspaces`). `title` is the room's name; `space_class` is a **location_class**.
+- `environment` with its `variables` — the room's environment variables. A variable's `title` is its name, `class` its class; `observed_by` lists the device properties that read it (empty: nothing in this home can). (Present only when needed.)
+- `artifacts` — devices. `title` is the **artifact_name** — this device's own name. `homeont_types` lists its classes, the most specific first: the first is its **artifact_class**. `label` names the *kind* of device, never this device, and is never an artifact_name. `saref_types` and `hmas_types` list its other types.
+- `actions` — what the device can do. `title` is the **affordance_name**; `command_types` holds the **affordance_class**. Its `input` is either `"form": "direct value"` (the action takes the value itself) or `"form": "parameterized call"` (named `parameters`, each with its `parameter_name`); `minimum` and `maximum` give the lowest and highest value the input accepts. `acts_upon` names the device property it changes; `environment_effect` names the room variable it moves.
+- `properties` — what the device reports. `title` is the **property_name**; `class` is the **property_class**; `branch` is its kind (actuatable, state, capability, ...). Its `output` is a direct value or an object whose fields are listed beneath it. (Present only when needed.)
+"""
+
+# Gaps of the focused prompt, besides the home context: which guide describes the
+# context's format, and the device conventions that apply to this home.
+CONTEXT_GUIDE_PLACEHOLDER = "{context_guide}"
+CONVENTIONS_PLACEHOLDER = "{conventions}"
+
 # -- Goal rules: one string per section, concatenated into GOAL_SPEC_RULES --------
 
 # The task, the procedure, and when a goal is explicit or incomplete.
@@ -287,11 +306,16 @@ For example, "Dishwasher 1 in the kitchen is running; start dryer 1 in the bathr
 - G1 brightness 20% on the living room lights: quantifier "all" (every light that passes P3), timing {"starts": "now"}.
 """
 
-SIMPLE_OUTPUT = """\
+# The simple output, in the pieces `SIMPLE_OUTPUT` joins: the focused prompt (below)
+# sends the heading and the explicit / incomplete shape alone.
+SIMPLE_OUTPUT_HEAD = """\
 ## Output
 
 Return ONLY one JSON object — no prose, no markdown fences. For an explicit or incomplete goal:
 
+"""
+
+SIMPLE_OUTPUT_GOAL = """\
 {"goal_specificity": "explicit" | "incomplete", "goal_kind": "achievement", "intent_text": string,
  "location_class": string | null, "artifact_class": string | null, "artifact_name": string | null,
  "device_reference": "name" | "description" | null,
@@ -301,6 +325,9 @@ Return ONLY one JSON object — no prose, no markdown fences. For an explicit or
  "target_value_is_percentage": true | false,
  "quantifier": "all" | "one" | null,
  "unmatched_device": string | null, "unmatched_action": string | null}
+"""
+
+SIMPLE_OUTPUT_AMBIGUOUS = """\
 
 For an ambiguous goal:
 
@@ -311,6 +338,8 @@ For an ambiguous goal:
    "property_sensed_space": {"space_class": string | null, "space_name": string | null},
    "property_change_direction": "increase" | "decrease"}]}
 """
+
+SIMPLE_OUTPUT = SIMPLE_OUTPUT_HEAD + SIMPLE_OUTPUT_GOAL + SIMPLE_OUTPUT_AMBIGUOUS
 
 DEPENDENCY_OUTPUT = """\
 ## Output
@@ -325,10 +354,13 @@ Return ONLY one JSON object — no prose, no markdown fences:
 "predicates" is {} when the request has none. Every goal has a timing; every predicate a role and applies_to.
 """
 
-GOAL_STRUCTURING_SIMPLE_PROMPT = "\n".join([
+SIMPLE_INTRO = (
     "You structure ONE atomic smart home goal: a single change the user wants, "
     "with no conditions, triggers or timing. The request and the segmenter's "
-    "qualifiers are given as the user message.",
+    "qualifiers are given as the user message.")
+
+GOAL_STRUCTURING_SIMPLE_PROMPT = "\n".join([
+    SIMPLE_INTRO,
     "",
     GOAL_SPEC_RULES,
     CONTEXT_GUIDE,
@@ -358,7 +390,47 @@ PROMPTS = {
     "dependency": GOAL_STRUCTURING_DEPENDENCY_PROMPT,
 }
 
+# -- The focused prompt (the `focused` prompt variant) -------------------------------
+# For an explicit or incomplete achievement goal: only the rules that goal needs
+# (no ambiguous-goal rules, no ambiguous output shape; the device conventions only
+# when the home has a device they are about), and two worked answers. Synthetic: the
+# requests and homes are not from any benchmark.
+
+FOCUSED_EXAMPLES = """\
+## Examples
+
+Each answer copies every class and name from the home context exactly as written there, prefix included (`homeont:`, `saref:`). `parameter_name` is "NA" when the action's input is a direct value.
+
+Request: "Set the kitchen light to 40 percent." (the kitchen has one dimmable light, `kitchen_light`, whose action `brightness` takes a direct value from 0 to 100 percent)
+{"goal_specificity": "explicit", "goal_kind": "achievement", "intent_text": "Set the kitchen light to 40 percent", "location_class": "homeont:Kitchen", "artifact_class": "homeont:DimmableLight", "artifact_name": "kitchen_light", "device_reference": "description", "affordance_class": "saref:SetAbsoluteLevelCommand", "parent_class": null, "affordance_name": "brightness", "parameter_name": "NA", "goal_effect": "set", "target_value_text": "40 percent", "target_value_determined": "40", "target_value_is_percentage": true, "quantifier": null, "unmatched_device": null, "unmatched_action": null}
+
+Request: "Make the hallway light blue." (the hallway has one light, `hallway_light`, with an on/off action only)
+{"goal_specificity": "incomplete", "goal_kind": "achievement", "intent_text": "Make the hallway light blue", "location_class": "homeont:Hallway", "artifact_class": "homeont:OnOffLight", "artifact_name": "hallway_light", "device_reference": "description", "affordance_class": null, "parent_class": null, "affordance_name": null, "parameter_name": null, "goal_effect": null, "target_value_text": "blue", "target_value_determined": null, "target_value_is_percentage": false, "quantifier": null, "unmatched_device": null, "unmatched_action": "blue"}
+"""
+
+GOAL_STRUCTURING_FOCUSED_PROMPT = "\n".join([
+    SIMPLE_INTRO,
+    "",
+    GOAL_SPEC_INTRO + EXPLICIT_GOAL_RULES,
+    CONVENTIONS_PLACEHOLDER,
+    CONTEXT_GUIDE_PLACEHOLDER,
+    GOAL_CONTEXT_PLACEHOLDER,
+    "",
+    FOCUSED_EXAMPLES,
+    SIMPLE_OUTPUT_HEAD + SIMPLE_OUTPUT_GOAL,
+])
+
 
 def render_goal_prompt(structure: str, goal_context: str) -> str:
     """The system prompt for one goal: its structure's prompt, with the context."""
     return PROMPTS[structure].replace(GOAL_CONTEXT_PLACEHOLDER, goal_context)
+
+
+def render_focused_prompt(context_guide: str, goal_context: str, conventions: str) -> str:
+    """The focused prompt with its context guide, the home context and the device
+    conventions that apply ("" when none does) filled in. Plain substitution, as
+    `render_goal_prompt`: the prompt quotes JSON."""
+    return (GOAL_STRUCTURING_FOCUSED_PROMPT
+            .replace(CONVENTIONS_PLACEHOLDER, conventions)
+            .replace(CONTEXT_GUIDE_PLACEHOLDER, context_guide)
+            .replace(GOAL_CONTEXT_PLACEHOLDER, goal_context))

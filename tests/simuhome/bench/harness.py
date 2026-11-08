@@ -224,6 +224,9 @@ def main() -> int:
         if step == "judge" and not judge:       # no judge runs (--no-judge, or HomeBench)
             continue
         print(f"  {step:<18} {spec.label():<28} {'local ' + spec.base_url if spec.local else 'OpenAI'}")
+    # The steps' prompt variants, the axes that differ from the default.
+    for step, axes in variant.prompts.items():
+        print(f"  {step + ' prompt':<18} " + ", ".join(f"{k}={v}" for k, v in axes.items()))
     steps = commands(config_path, records, out, options, judge, benchmark, suite)
     for command in steps:
         print("  $ " + " ".join(command[1:]))

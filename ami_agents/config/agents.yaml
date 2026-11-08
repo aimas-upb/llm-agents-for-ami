@@ -42,6 +42,17 @@ user_assistant:
     # Read-only plans auto-confirm and never wait.
     confirmation_timeout: "${UA_CONFIRMATION_TIMEOUT:-5.0}"
 
+  # How the goal-structuring call is built: one option per axis, named in
+  # utils/goal_structuring_variants.py (read by GoalStructuringBehaviour). The
+  # defaults are what structuring always did; the HomeBench harness sets these
+  # per run from its variant file (`prompt_variants:`), not from here.
+  prompt_variants:
+    structuring:
+      context: "${AMI_STRUCTURING_CONTEXT:-text}"          # text | json
+      prompt: "${AMI_STRUCTURING_PROMPT:-full}"            # full | focused
+      constraint: "${AMI_STRUCTURING_CONSTRAINT:-none}"    # none | schema
+      repair: "${AMI_STRUCTURING_REPAIR:-none}"            # none | class_names
+
 # EnvExplorer Agent Configuration
 env_explorer:
   jid: "env_explorer@localhost"

@@ -59,6 +59,7 @@ from ami_agents.agents.user_assistant import pipeline
 from ami_agents.agents.user_assistant.behaviours.goal_structuring import (
     GoalStructuringBehaviour,
 )
+from ami_agents.agents.user_assistant.utils.goal_context import GoalContext
 from ami_agents.agents.user_assistant.utils.goal_resolution import clarification_question
 from ami_agents.agents.user_assistant.utils.goal_routing import route_goal
 from ami_agents.agents.user_assistant.utils.llm_client import (
@@ -135,20 +136,26 @@ def wire_explorer(explorer: SimpleNamespace, show_context: bool) -> None:
     capabilities = EnvironmentCapabilitiesBehaviour()
     capabilities.agent = explorer
 
-    async def fetch_goal_context(agent, logger, goal_text, with_properties=False,
-                                 with_environment=False):
+    async def fetch_goal_context_data(agent, logger, goal_text, with_properties=False,
+                                      with_environment=False):
         payload = capabilities._generate_goal_context_payload(
             goal_text, with_properties=with_properties, with_environment=with_environment)
         if payload.get("error"):
             print(f"  ! goal context failed: {payload.get('detail')}")
-            return ""
+            return GoalContext(text="")
         scope = payload.get("scope") or {}
         text = payload.get("text") or ""
         print(f"  goal context: rule={scope.get('rule')} rooms={scope.get('matched_rooms', [])} "
               f"devices={scope.get('matched_devices', [])} chars={len(text)}")
         if show_context:
             print("  " + text.replace("\n", "\n  "))
-        return text
+        return GoalContext(text=text, data=payload.get("context"))
+
+    async def fetch_goal_context(agent, logger, goal_text, with_properties=False,
+                                 with_environment=False):
+        return (await fetch_goal_context_data(
+            agent, logger, goal_text, with_properties=with_properties,
+            with_environment=with_environment)).text
 
     async def resolve_candidates(agent, logger, payload):
         response = capability_response(resolve_capability_payload(explorer, payload), payload)
@@ -158,6 +165,7 @@ def wire_explorer(explorer: SimpleNamespace, show_context: bool) -> None:
         return response
 
     pipeline.fetch_goal_context = fetch_goal_context
+    pipeline.fetch_goal_context_data = fetch_goal_context_data
     pipeline.resolve_candidates = resolve_candidates
 
 

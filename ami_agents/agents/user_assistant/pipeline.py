@@ -28,6 +28,7 @@ from .prompts.intent_response_prompts import (
 )
 from .prompts.intent_segmentation_prompts import ATOMIC_SEGMENTATION_SYSTEM_PROMPT
 from .utils import loose_json_loads
+from .utils.goal_context import GoalContext
 
 
 async def segment_into_atomic_intents(agent, logger, user_text: str) -> list[AtomicIntent]:
@@ -143,20 +144,24 @@ async def format_query_response(agent, logger, raw_data: str, user_text: str) ->
 # ------------------------------------------------------------------
 
 
-async def fetch_goal_context(agent, logger, goal_text: str,
-                             with_properties: bool = False,
-                             with_environment: bool = False) -> str:
+async def fetch_goal_context_data(agent, logger, goal_text: str,
+                                  with_properties: bool = False,
+                                  with_environment: bool = False) -> GoalContext:
     """Fetch the goal context for one goal from EnvExplorer via RPC.
 
     EnvExplorer scopes it to the rooms or device families `goal_text` names
     once the home is too large to send whole; the flags add what devices
-    report and each room's environment variables. Returns "" when the context
-    cannot be had -- there is no other environment description to fall back on.
+    report and each room's environment variables. Returns the prompt text and
+    the structured view it was rendered from (`GoalContext`, for the step
+    variants that read names out of the structure); the text is "" when the
+    context cannot be had -- there is no other environment description to
+    fall back on.
     """
+    # 1. The request; any failure is an empty context, as there is nothing to fall back on.
     explorer_jid = agent.target_jids.get("explorer")
     if not explorer_jid:
         logger.info(demo("Goal context fetch skipped: no explorer JID configured"))
-        return ""
+        return GoalContext(text="")
     try:
         result = await rpc_call(
             agent,
@@ -171,19 +176,34 @@ async def fetch_goal_context(agent, logger, goal_text: str,
         payload = json.loads(result.body or "{}")
     except Exception as exc:
         logger.warning("Failed to fetch goal context: %s", exc)
-        return ""
+        return GoalContext(text="")
 
+    # 2. An error payload is an empty context too.
     if not isinstance(payload, dict) or payload.get("error"):
         logger.warning("Goal context unavailable: %s",
                        payload.get("detail") if isinstance(payload, dict) else payload)
-        return ""
+        return GoalContext(text="")
+
+    # 3. The text, and the structure it was rendered from (None from a sender without it).
     scope = payload.get("scope") or {}
     text = payload.get("text") or ""
+    data = payload.get("context")
     logger.info(demo(
         f"Goal context fetched (properties={with_properties}, "
         f"environment={with_environment}): rule={scope.get('rule')} "
         f"workspaces={scope.get('workspaces', [])} chars={len(text)}"))
-    return text
+    return GoalContext(text=text, data=data if isinstance(data, dict) else None)
+
+
+async def fetch_goal_context(agent, logger, goal_text: str,
+                             with_properties: bool = False,
+                             with_environment: bool = False) -> str:
+    """The text of the goal context (see `fetch_goal_context_data`), "" when it
+    cannot be had: for the steps that only put the context in a prompt."""
+    context = await fetch_goal_context_data(
+        agent, logger, goal_text, with_properties=with_properties,
+        with_environment=with_environment)
+    return context.text
 
 
 async def resolve_candidates(agent, logger, payload: dict) -> dict:

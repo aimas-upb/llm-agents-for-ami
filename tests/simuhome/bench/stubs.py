@@ -54,6 +54,7 @@ from ami_agents.agents.env_explorer.utils.data_formatting import (
 from ami_agents.agents.interaction_solver.utils.llm_client import (
     LLMClientConfig as ISAClientConfig,
 )
+from ami_agents.agents.user_assistant.utils.goal_context import GoalContext
 from ami_agents.bt_planning.planning.bt_planner import AsyncBTPlanner
 from ami_agents.environment.integration.SimuHome.td_builder import SimuHomeTD
 from ami_agents.shared.models.messages import MessageType
@@ -188,14 +189,16 @@ class Explorer:
 
     # UA: goal structuring -------------------------------------------------
 
-    async def fetch_goal_context(self, agent, logger, goal_text, with_properties=False,
-                                 with_environment=False) -> str:
+    async def fetch_goal_context_data(self, agent, logger, goal_text, with_properties=False,
+                                      with_environment=False) -> GoalContext:
+        """The goal context: its text and the structured view it is rendered from
+        (what `GoalStructuringBehaviour` reads; `pipeline.fetch_goal_context_data`)."""
         payload = self.capabilities._generate_goal_context_payload(
             goal_text, with_properties=with_properties, with_environment=with_environment)
         if payload.get("error"):
             self.observations.append({"query": "goal_context", "text": goal_text,
                                       "error": payload.get("detail")})
-            return ""
+            return GoalContext(text="")
         scope = payload.get("scope") or {}
         rooms = [self.home.room_id(room) for room in scope.get("matched_rooms") or []]
         rooms = [room for found in rooms for room in found]
@@ -205,7 +208,15 @@ class Explorer:
             self.tools.room_devices(room, "goal_context")
         self.observations.append({"query": "goal_context", "text": goal_text,
                                   "scope": scope})
-        return payload.get("text") or ""
+        return GoalContext(text=payload.get("text") or "", data=payload.get("context"))
+
+    async def fetch_goal_context(self, agent, logger, goal_text, with_properties=False,
+                                 with_environment=False) -> str:
+        """The text of the goal context, for the steps that only put it in a prompt."""
+        context = await self.fetch_goal_context_data(
+            agent, logger, goal_text, with_properties=with_properties,
+            with_environment=with_environment)
+        return context.text
 
     async def resolve_candidates(self, agent, logger, payload) -> Dict[str, Any]:
         """A capability / candidate lookup, answered from the discovered home.
@@ -370,10 +381,13 @@ def patched_ua_clients(variant: Variant) -> Iterator[None]:
 def patched_explorer_rpcs(explorer: Explorer) -> Iterator[None]:
     """The UA's two EnvExplorer RPCs, answered by ``explorer``."""
     from ami_agents.agents.user_assistant import pipeline
-    saved = (pipeline.fetch_goal_context, pipeline.resolve_candidates)
+    saved = (pipeline.fetch_goal_context, pipeline.fetch_goal_context_data,
+             pipeline.resolve_candidates)
     pipeline.fetch_goal_context = explorer.fetch_goal_context
+    pipeline.fetch_goal_context_data = explorer.fetch_goal_context_data
     pipeline.resolve_candidates = explorer.resolve_candidates
     try:
         yield
     finally:
-        pipeline.fetch_goal_context, pipeline.resolve_candidates = saved
+        (pipeline.fetch_goal_context, pipeline.fetch_goal_context_data,
+         pipeline.resolve_candidates) = saved

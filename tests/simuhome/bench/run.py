@@ -166,6 +166,14 @@ def apply_guidelines(config: Dict[str, Any], path: Optional[Path]) -> None:
     planning.setdefault("guidelines", {})["path"] = str(path)
 
 
+def apply_prompt_variants(config: Dict[str, Any], variant: Any) -> None:
+    """Write the variant's prompt variants into the agents' config, where each step's
+    agent reads them (`<agent>.prompt_variants.<step>`). A step the variant does not
+    name keeps what agents.yaml says. ``config`` is agents.yaml as the bench loaded it."""
+    from ami_agents.shared.utils import prompt_variants
+    prompt_variants.apply_to_config(config, variant.prompts)
+
+
 # --------------------------------------------------------------------------
 # The stage summary, printed at the end of a run
 # --------------------------------------------------------------------------
@@ -270,6 +278,7 @@ def run_worker(worker_id: int, names: List[str], settings: Dict[str, Any]) -> Li
     config = ConfigLoader.load_with_env_vars(str(AGENTS_YAML))
     apply_guidelines(config, suite.guidelines_path(settings.get("guidelines")))
     variant = load_variant(settings["variant"])
+    apply_prompt_variants(config, variant)
     out = Path(settings["out"]) / variant.name
     out.mkdir(parents=True, exist_ok=True)
     benchmark = Path(settings["benchmark"])

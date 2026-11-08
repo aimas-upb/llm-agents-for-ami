@@ -189,7 +189,9 @@ class DecompositionTests(unittest.TestCase):
         """A constant inside another is shown within it, not as its own entry."""
         catalog = prompt_parts.catalog_markdown()
         self.assertIn("## GOAL_STRUCTURING_SIMPLE_PROMPT", catalog)
-        self.assertNotIn("## CONTEXT_GUIDE", catalog)
+        # The heading itself: CONTEXT_GUIDE_JSON (the guide of the json context variant)
+        # is in no prompt constant, so it is rightly an entry of its own.
+        self.assertNotIn("## CONTEXT_GUIDE\n", catalog)
 
 
 class ReportTests(unittest.TestCase):

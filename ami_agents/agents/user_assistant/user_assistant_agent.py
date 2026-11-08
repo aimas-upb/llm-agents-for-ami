@@ -43,6 +43,7 @@ from .behaviours import (
     UserMessageBehaviour,
 )
 from .utils import build_llm_client, build_llm_call_kwargs, build_behaviour_llm_client, LLMClientConfig
+from ...shared.utils.prompt_variants import selection_from_config
 
 # Global logger will be replaced by per-instance loggers
 # logger = logging.getLogger("UserAssistant")
@@ -106,6 +107,10 @@ class UserAssistantAgent(Agent, IAgent):
         self.llm_temperature: float = self._default_llm_cfg.temperature
         self.llm_reasoning_effort = self._default_llm_cfg.reasoning_effort
         self.llm_max_completion_tokens = self._default_llm_cfg.max_completion_tokens
+
+        # A misspelt prompt variant (`prompt_variants:` in agents.yaml) fails here, at
+        # startup, instead of as an error on every goal structured afterwards.
+        selection_from_config(config, "structuring")
 
         # ── Timeouts / tick limits (pulled from yaml) ───────────────
         timeouts = config.get("timeouts", {}) or {}
