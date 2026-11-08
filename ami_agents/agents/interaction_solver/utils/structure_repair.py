@@ -15,8 +15,10 @@ a note, so the plan's explanation records what was inferred.
                     after the washer finishes") starts on the trigger too, and
                     the clock time moves to `stated_start_time_text`, where
                     the planner checks that the two name the same moment.
-                    Goals placed after or with another goal are left as they
-                    are: they follow their goal.
+                    A goal written as after_goal / with_goal whose ref_goal
+                    is the trigger predicate itself starts on it too. Goals
+                    placed after or with another GOAL are left as they are:
+                    they follow their goal.
 
 `repair_structure(structure)` applies every repair in place and returns the notes.
 """
@@ -52,8 +54,11 @@ def link_triggers(structure: GoalStructure) -> List[str]:
             timing = goal.timing
             if timing is None:
                 goal.timing = GoalTiming(starts="on_trigger")
-            elif timing.starts in _UNANCHORED and timing.completes_with != pid:
-                if timing.starts == "after_delay" and timing.offset_text and not pred.offset_text:
+            elif ((timing.starts in _UNANCHORED
+                   or (timing.starts in ("after_goal", "with_goal") and timing.ref_goal == pid))
+                  and timing.completes_with != pid):
+                if (timing.starts in ("after_delay", "after_goal") and timing.offset_text
+                        and not pred.offset_text):
                     pred.offset_text = timing.offset_text
                     pred.offset_direction = pred.offset_direction or "after"
                 if timing.starts == "at_time" and timing.time_text:
@@ -61,6 +66,7 @@ def link_triggers(structure: GoalStructure) -> List[str]:
                 timing.starts = "on_trigger"
                 timing.offset_text = None
                 timing.time_text = None
+                timing.ref_goal = None
             else:
                 continue
             linked.append(gid)

@@ -73,6 +73,19 @@ class TestLinkTriggers:
         assert (timing.starts, timing.time_text, timing.stated_start_time_text) == \
             ("on_trigger", None, "09:56")
 
+    def test_after_the_predicate_itself_is_on_trigger(self):
+        # gpt-5-nano: "17 minutes after the dishwasher finishes" as after_goal of P1
+        s = _structure({"G1": _goal(timing={"starts": "after_goal", "ref_goal": "P1",
+                                            "offset_text": "17 minutes"}),
+                        "G2": _goal(timing={"starts": "after_goal", "ref_goal": "G1"})},
+                       {"P1": {**DRYER_DONE, "applies_to": ["G1", "G2"]}})
+        link_triggers(s)
+        timing = s.goals["G1"].timing
+        assert (timing.starts, timing.ref_goal, timing.offset_text) == ("on_trigger", None, None)
+        assert (s.predicates["P1"].offset_text, s.predicates["P1"].offset_direction) == \
+            ("17 minutes", "after")
+        assert s.goals["G2"].timing.starts == "after_goal"
+
     def test_goal_anchored_starts_are_kept(self):
         s = _structure({"G1": _goal(timing={"starts": "after_goal", "ref_goal": "G0"}),
                         "G2": _goal(timing={"starts": "with_goal", "ref_goal": "G1"})},
