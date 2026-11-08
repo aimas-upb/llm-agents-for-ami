@@ -101,6 +101,7 @@ from ..utils.cycle_guard import guard_cycles
 from ..utils.planning_conditions import load_conditions
 from ..utils.power_on_guard import guard_tree, guidelines_path, load_applies_to
 from ..utils.profiling import ask_profile
+from ..utils.structure_repair import repair_structure
 from ..utils.incomplete_goal_plan import as_explicit, candidates, incomplete_goal
 from ..utils.time_consistency import DEFAULT_TOLERANCE_SECONDS as DEFAULT_STATED_TIME_TOLERANCE
 from ..utils.time_consistency import check as check_times
@@ -190,8 +191,11 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
         """One structure through the four steps (see the module docstring);
         returns its plan entry. Raises _Stop with a tree-less entry when a step
         decides the structure cannot be planned."""
-        # 1. Each goal's action, planned as a simple achievement goal.
+        # 0. Deterministic repairs of what the structurer wrote in the wrong
+        #    place (structure_repair); noted in the plan's explanation.
         started = time.perf_counter()
+        repaired = repair_structure(structure)
+        # 1. Each goal's action, planned as a simple achievement goal.
         subtrees, per_device, devices, llm = await self._steps(graph, structure)
         started = self._timed("achievement", started)
 
@@ -268,7 +272,7 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
 
         # 5. The entry: the tree, its runtime, and everything needed to explain
         #    it -- the profile, the guards, the calls behind them, the notes.
-        notes = fallbacks + checked + condition_notes + compiled.notes + dropped + guard_notes
+        notes = repaired + fallbacks + checked + condition_notes + compiled.notes + dropped + guard_notes
         self.logger.info(demo(
             f"Dependency plan for {structure.intent_text!r}: {len(structure.goals)} goal(s), "
             f"{len(structure.predicates)} predicate(s), {len(checklist)} question(s), "
