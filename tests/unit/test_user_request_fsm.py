@@ -413,7 +413,9 @@ class TestUnplannedEntries:
         with patch(f"{FSM_MODULE}.pipeline.summarize_plan",
                    AsyncMock(return_value="I will do x.")) as summarize:
             await state.run()
-        assert sent == ['I couldn\'t plan "start the dryer": P2 is unused\n'
+        # The planner's error is told as what is missing, never in its own terms.
+        assert sent == ['I couldn\'t plan "start the dryer": I couldn\'t work out when each step '
+                        'should happen from what was asked\n'
                         'I can\'t do "preheat the oven": no oven here',
                         "I will do x."]
         summarised = json.loads(summarize.await_args[0][2])

@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import os
 from typing import Any, Dict, List, Optional
 
@@ -357,6 +358,44 @@ def split_clarifications(plan_obj: Dict[str, Any]):
     return rest, questions
 
 
+# The planner's error codes, said to the user as what is missing or wrong --
+# never the planner's own vocabulary (goal and predicate ids, compiler terms).
+_REASONS = {
+    "dependency_compile_failed": "I couldn't work out when each step should happen from what "
+                                 "was asked",
+    "unresolvable_predicate": "nothing in this home reports {predicate}, so I can't tell when "
+                              "that happens",
+    "unplannable_goal": "I don't know which device or setting \"{goal}\" refers to",
+    "inconsistent_structure": "the steps asked for can't follow each other as described",
+    "ambiguous_planning_failed": "I couldn't come up with a plan for it",
+    "stated_time_conflict": "the time given doesn't agree with the event it is tied to",
+    "completion_unverifiable": "I can't tell how long that run takes, so I can't time it",
+    "trigger_before_start": "the event it waits for comes before its start time",
+    "vague_time": "I need an actual time or delay for it",
+    "context_unavailable": "I couldn't get the home's description",
+    "unrouted": "I couldn't tell which device it is about",
+}
+_IDS = re.compile(r"^\s*(?:[GP]\d+\s*[:(]\s*)+|\b[GP]\d+\b\s*:?\s*")
+_QUOTED = re.compile(r"'([^']+)'")
+
+
+def plain_reason(entry: Dict[str, Any]) -> str:
+    """The reason an entry was not planned, in the user's terms: the
+    explanation when it was written for them (impossible as asked, the
+    structurer's clarifications), a template for the planner's own error codes."""
+    explanation = str(entry.get("explanation") or "").strip()
+    error = entry.get("error")
+    if entry.get("impossible") or not error or error not in _REASONS:
+        return _IDS.sub("", explanation) or str(error or "no reason was given")
+    quoted = _QUOTED.search(explanation)
+    goals = ((entry.get("intent") or {}).get("goals") or {}) if isinstance(entry.get("intent"), dict) else {}
+    goal_text = quoted.group(1) if quoted else next(
+        (g.get("intent_text") for g in goals.values() if isinstance(g, dict) and g.get("intent_text")),
+        "that")
+    predicate = f"when {quoted.group(1)}" if quoted else "that event"
+    return _REASONS[error].format(predicate=predicate, goal=goal_text)
+
+
 def split_unplanned(plan_obj: Dict[str, Any]):
     """The plan without its tree-less impossible / error entries, and one line
     per such entry saying it was not planned and why. Those entries are not
@@ -376,7 +415,7 @@ def split_unplanned(plan_obj: Dict[str, Any]):
         # 2. Not planned: impossible as asked, or our own failure.
         intent = entry.get("intent") or {}
         text = intent.get("text_intent") if isinstance(intent, dict) else None
-        why = entry.get("explanation") or entry.get("error") or "no reason was given"
+        why = plain_reason(entry)
         about = f" \"{text}\"" if text else " this"
         lines.append(f"I can't do{about}: {why}" if entry.get("impossible")
                      else f"I couldn't plan{about}: {why}")
