@@ -223,6 +223,49 @@ def apply_to_config(config: Dict[str, Any], prompts: Mapping[str, Mapping[str, s
         section[step_name] = dict(changed)
 
 
+def full_selection(prompts: Optional[Mapping[str, Mapping[str, Any]]] = None
+                   ) -> Dict[str, Dict[str, str]]:
+    """The choice on EVERY axis of EVERY declared step, defaults written out.
+
+    ``prompts`` is a `normalize` result (the non-default choices). `normalize` keeps
+    only what differs, which is right for a cache key but leaves a record saying
+    nothing about the axes that ran as the default; this is what a run records, so a
+    report states the whole configuration and a later change of a default cannot
+    change what an old run is read as having used."""
+    return {name: dict(resolve(name, (prompts or {}).get(name)).chosen)
+            for name in STEP_MODULES}
+
+
+def option_summary(step: str, axis: str, option: str) -> str:
+    """One line on what ``option`` of ``step``'s ``axis`` does: the first paragraph of
+    its function's docstring. "" when the code no longer has it (a record made with an
+    option since removed), so a report of an old run still renders."""
+    try:
+        function = get_step(step).axes[axis].options[option]
+    except (ValueError, KeyError):
+        return ""
+    paragraph = (function.__doc__ or "").strip().split("\n\n")[0]
+    return " ".join(paragraph.split())
+
+
+def describe_selection(selection: Mapping[str, Mapping[str, str]]) -> List[Dict[str, Any]]:
+    """One row per step and axis of a `full_selection`: the step, the axis, the option,
+    whether it is the axis's default now, and what the option does. For the reports'
+    configuration section (`tests/simuhome/bench/run_config.py`)."""
+    rows: List[Dict[str, Any]] = []
+    for step_name, axes in selection.items():
+        try:
+            declared = get_step(step_name).axes
+        except ValueError:
+            declared = {}
+        for axis_name, option in axes.items():
+            axis = declared.get(axis_name)
+            rows.append({"step": step_name, "axis": axis_name, "option": option,
+                         "default": bool(axis and axis.default == option),
+                         "summary": option_summary(step_name, axis_name, option)})
+    return rows
+
+
 def catalog() -> Dict[str, Dict[str, Dict[str, Any]]]:
     """Every step's axes, defaults and option names, for docs and `--dry-run`."""
     out: Dict[str, Dict[str, Dict[str, Any]]] = {}

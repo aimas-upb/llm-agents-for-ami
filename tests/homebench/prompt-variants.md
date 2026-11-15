@@ -41,10 +41,36 @@ Properties that matter for experiments:
 
 | axis | default | option | what it does |
 |---|---|---|---|
-| `context` | `text` | `json` | the home context as indented JSON (EnvExplorer's structured view, nulls dropped) with a guide to its keys, instead of the indented text and its guide |
+| `context` | `text` | `json` | version 1 of the JSON prompt: the home context as indented JSON (EnvExplorer's structured view, nulls dropped) with a guide to its keys, instead of the indented text and its guide. The RULES are still the text format's words (`Artifact`, `name`, `command class`). Kept as it ran (arm C) |
+| `context` | `text` | `json_v2` | version 2 of the JSON prompt: the same JSON, a guide that explains every key, and the rules reworded in the JSON's keys (`title`, `command_types`, `acts_upon`, ...) |
 | `prompt` | `full` | `focused` | for an explicit/incomplete achievement goal: no ambiguous-goal rules or output shape, device conventions only if the home has a cycle device, two worked answers. Any other goal (dependency, ambiguous) gets the full prompt |
 | `constraint` | `none` | `schema` | `response_format` = strict `json_schema`; slots naming something of the home are enums of this home's values. Simple structure only (see 5) |
+| `decoding` | `free` | `iri_trie` | GENRE-style constrained decoding (De Cao et al. 2021): each IRI value of the reply is decoded under a trie of the values the home allows in that slot, narrowed by the slots the same object already holds (a device of the written room, an action of the written device); the rest of the reply, thinking included, is free. Needs an endpoint that continues a prefilled assistant message and returns `top_logprobs` (Ollama). Not with `constraint: schema`. See G |
 | `repair` | `none` | `class_names` | after parsing, each class slot is rewritten as the home writes it, only when exactly one class of the home has that name (prefix, case, spacing ignored) |
+
+### Versions of the prompt
+
+The option name of the `context` axis is the version of the prompt. The structuring prompt
+is the rules, the guide to the context's format and the context; the rules name what they
+point at, and were written for the text rendering (`Artifact`, `name`, `command class`,
+`acts upon`). Sent a JSON context, a small model must translate those words into the keys it
+sees (`artifacts`, `title`, `command_types`, `acts_upon`): that is version 1 (`json`). Version
+2 (`json_v2`) has no translation left: its rules say `title`, `command_types`, `acts_upon`.
+
+| `context` | context | guide | rules in |
+|---|---|---|---|
+| `text` (default) | indented text | `CONTEXT_GUIDE` | the text's words |
+| `json` (v1) | JSON | `CONTEXT_GUIDE_JSON` | the text's words |
+| `json_v2` | JSON | `CONTEXT_GUIDE_JSON_V2` | the JSON's keys |
+
+How it is built, so that the versions cannot drift: the JSON rules are not a second copy. They
+are the text rules with a table of phrases swapped (`JSON_REWORDINGS` in
+`goal_structuring_prompts.py`); a phrase the rules no longer hold once makes the import fail, so
+an edit of a rule is made in one place and the table is the only thing to follow. Tests pin
+that the default prompts and the v1 guide are unchanged (by hash), that the v2 rules name
+none of the text format's words, and that every key they name is explained by the v2 guide
+and exists in EnvExplorer's structured view. The version reaches `focused` as well
+(`context: json_v2, prompt: focused` has the focused prompt with the JSON rules).
 
 ### Adding a variant, or a step
 
@@ -92,6 +118,8 @@ that). No paid API call: every model is local.
 | C | `homebench.ecai.M3.pv-json.yaml` | `context: json` | does the format of the context matter, all else equal? |
 | D | `homebench.ecai.M3.pv-focused.yaml` | `prompt: focused` | does a shorter prompt with examples help a 7B model, and at what token cost? |
 | E | `homebench.ecai.M3.pv-repair.yaml` | `repair: class_names` | how much of the 22.8% is notation alone? (no LLM change) |
+| F | `homebench.ecai.M3.pv-json-v2.yaml` | `context: json_v2` | is C's result the format, or the rules left in the text's words? (F against C: the wording; F against A: both) |
+| G | `homebench.ecai.M3.pv-trie.yaml` | `decoding: iri_trie` | if the failure is malformed or invented IRIs, does decoding them under a trie of the home's valid IRIs fix it, and what is left? |
 
 ### B: strict schema with the home's enums
 
@@ -130,6 +158,16 @@ It is an ablation that says whether the indented text format is part of the prob
 it makes the format of the context a configured choice for later steps. Cheapest arm to
 drop if B or D already win.
 
+### F: JSON context, version 2 of the prompt
+
+C sends the JSON under rules that say `Artifact`, `name`, `command class` and `acts upon`,
+none of which the JSON has; a 7B model is left to translate, and a worse C than A could be
+that, not the format. F sends the same JSON and facts with the guide completed (`written_by`,
+`quantity_kind`, `unit`, `type`, `description`, `parameter_schema`, the `observed_by`
+entries) and every rule reworded in the keys. Prior: F at least as good as C; F against A
+says whether JSON is a better format once nothing is left to translate. Size: 15,407 chars sent against 14,920 for C on `hb1_feasible_seed_1085`
+(+0.5k: the larger guide and the longer phrases); 3770 tokens in against 3626.
+
 ### D: focused prompt
 
 For a goal labelled explicit or incomplete: the explicit/incomplete rules, without the
@@ -157,6 +195,41 @@ repair uses the home's own context, which the planner already has, and a deploye
 may want it. What it measures is the ceiling of "notation only": the pass rate of E minus
 A is the part of the 22.8% that the model had right and wrote differently. If E alone
 reaches near B, the cheapest fix is E in production and B is not needed.
+
+### G: constrained decoding with a trie of valid IRIs (GENRE)
+
+The question from the 2026-11-01 discussion: if the structuring errors are wrong URLs
+(malformed, missing, or names the home does not have), constrain the decoding itself, as
+GENRE (facebookresearch/GENRE, "Autoregressive Entity Retrieval") does for entity names:
+at each step only the tokens that keep the written prefix inside a prefix tree of the
+valid names may be chosen. Code: `ami_agents/agents/user_assistant/utils/iri_trie.py`.
+
+- The tries. One per slot that names something of the home (`location_class`,
+  `artifact_class`, `artifact_name`, `affordance_class`, `affordance_name`,
+  `parameter_name`, the `property_*` and `space_*` slots). The values are narrowed by
+  what the same JSON object already holds, from the paths of the home (room -> device
+  -> action -> parameter): after `homeont:LaundryRoom`, only that room's devices; after
+  the device, only its actions. If no path fits, the slot's whole vocabulary (logged
+  `conditioned: false`). This is what B's flat enums cannot do.
+- On Ollama. The API has no logits processor, and a grammar cannot be applied to a
+  continued message (`Failed to initialize samplers`). So: the reply is decoded freely
+  first (the control call); each IRI value in it that is in its trie is kept, because
+  constrained greedy decoding writes the same value (every prefix of it is allowed, so
+  the greedy token was allowed at every step). At the first value outside its trie, the
+  reply is cut at the opening quote and the value decoded again one token per call (the
+  reply so far prefilled as the assistant message, `top_logprobs=20`, the most probable
+  allowed token taken; characters the trie forces are written without a call); the value
+  is closed with the model's own closing token (`",`, not a bare `"`: with a bare quote
+  the model skips the comma it believes written); then the model continues freely, and
+  the check goes on. If none of the 20 tokens is allowed, the model's free continuation
+  of the value is snapped to the nearest value of the trie (`how: nearest`).
+- Recorded: `structures[].decoding` = calls, and per re-decoded value the slot, what the
+  free decoding wrote, what the trie wrote, how, steps, conditioned, candidates.
+- Differences from GENRE: greedy, not beam search; a character trie, so any tokenization
+  of a name is accepted; constrained only inside quoted IRI values, so `null` stays
+  the model's choice (an infeasible request can still name no device).
+- Cost: the meter counts the full prompt on every call (`tokens_in`), most of it served
+  from Ollama's prompt cache; the generated tokens and the wall time are the cost.
 
 ## 4. Protocol
 
@@ -234,6 +307,8 @@ the command. C fills `parameter_name` for a direct-value action, which the plann
 refuses, so it ends "impossible" for another reason (`struct_parameter_name`). One
 episode per arm is an existence check, not a result.
 
+Arm F: new unit tests for the version and for the reports (`test_run_config.py`, `TestJsonPromptVersions`); one episode (`hb1_feasible_seed_1085`, `--stop-after structuring`) through the prompt report: the v2 prompt is built and sent, and its report names `context=json_v2`. The model's reply there leaves `parameter_name` null where the prompt says "NA", so the reading of one episode is: the rules are reworded, nothing is shown yet about the results.
+
 Not checked: any arm over more than one episode; the OpenAI endpoint with a schema; the
 grammar compile time on the 52-device home; production (agents running under SPADE) with
 a variant set in agents.yaml.
@@ -241,3 +316,23 @@ a variant set in agents.yaml.
 Not built: the device-pinned schema, `prompt: terse`, and a script that compares two run
 folders paired by episode (step 4 is done by hand from `errors_episodes.csv` and
 `errors_parts.csv` until it exists).
+
+## 7. Where a run's configuration is stated
+
+A result must say what it ran with, without reading the prompt text. `run.py` writes into
+`<records>/run.json` the model of every step, the non-default prompt choices
+(`prompt_variants`) and the whole selection (`prompt_selection`: every axis, the defaults
+written out, so a later change of a default does not change what an old run is read as having
+used), and the run settings (guidelines, environment, memory, context, ...). Every report
+made from a run opens with that, through one module, `tests/simuhome/bench/run_config.py`:
+
+| file | where |
+|---|---|
+| `stats/summary.md` (`stats.py`) | `## Experiment configuration`, before the legend and tables |
+| `report.md` (`report.py`) | `## Configuration: <variant>` per variant |
+| `errors.md` (`error_report.py`) | `## Configuration of the run`, before section 1 |
+| prompt report `README.md` | `Prompt variants: ...` line, then the section; also `abstract.md`, `index.md` and the head of every call page |
+| `--dry-run` and the run's own output | every axis, the non-default marked |
+
+A run.json from before `prompt_selection` is read with the defaults of the current code and
+says so; a run folder without a run.json says that the configuration is not recorded.

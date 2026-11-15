@@ -17,7 +17,27 @@ part is and how it is ordered; the planner builds the behaviour tree.
 The home context goes in through `render_goal_prompt`, a plain substitution of
 `{goal_context}`: the prompts quote JSON, and `str.format` would need every
 brace doubled.
+
+Two dialects of the rules. The rules above were written for the context as text, and
+name what they point at in the text's words (`Artifact`, `name`, `command class`,
+`acts upon`, ...). The same context can also be sent as JSON, whose keys are others
+(`artifacts`, `title`, `command_types`, `acts_upon`, ...): a small model does not
+translate between the two. So every prompt exists in two versions, picked by the
+`context` option of the structuring step (`utils/goal_structuring_variants.py`):
+
+    "text"   PROMPTS, GOAL_STRUCTURING_FOCUSED_PROMPT: rules in the text's words;
+             what the text context and the first JSON context (`context: json`) send
+    "json"   PROMPTS_JSON, GOAL_STRUCTURING_FOCUSED_PROMPT_JSON: the same rules
+             reworded in the JSON's keys, with the guide CONTEXT_GUIDE_JSON_V2;
+             what `context: json_v2` sends
+
+The "json" version is not written a second time: it is the "text" rules with the
+phrases that name the text format swapped for the JSON keys, in one table
+(`JSON_REWORDINGS`), so a rule changed in one version cannot silently drift from the
+other. Each phrase must occur in the rules exactly once, or the import fails.
 """
+
+from typing import Dict, Sequence, Tuple
 
 GOAL_CONTEXT_PLACEHOLDER = "{goal_context}"
 
@@ -33,8 +53,10 @@ What this home offers, by workspace. It may be narrowed to the rooms and devices
 - `Property` — something the device reports. `name` is the **property_name**; `property class` is the **property_class**; `kind` is its branch (actuatable, state, capability, ...). Its `output` is a direct value or an object whose fields are listed beneath it. (Present only when needed.)
 """
 
-# The same guide for the context given as JSON (the `json` context variant): the
-# same facts under the keys of EnvExplorer's structured view.
+# The same guide for the context given as JSON (the `json` context variant, version 1):
+# the same facts under the keys of EnvExplorer's structured view. Kept as it ran, so the
+# runs made with it stay reproducible; it goes with the rules in the text's words. The
+# JSON context of the `json_v2` variant has CONTEXT_GUIDE_JSON_V2 and the reworded rules.
 CONTEXT_GUIDE_JSON = """\
 ## Home context
 
@@ -45,6 +67,21 @@ What this home offers, as one JSON object, by workspace. It may be narrowed to t
 - `artifacts` — devices. `title` is the **artifact_name** — this device's own name. `homeont_types` lists its classes, the most specific first: the first is its **artifact_class**. `label` names the *kind* of device, never this device, and is never an artifact_name. `saref_types` and `hmas_types` list its other types.
 - `actions` — what the device can do. `title` is the **affordance_name**; `command_types` holds the **affordance_class**. Its `input` is either `"form": "direct value"` (the action takes the value itself) or `"form": "parameterized call"` (named `parameters`, each with its `parameter_name`); `minimum` and `maximum` give the lowest and highest value the input accepts. `acts_upon` names the device property it changes; `environment_effect` names the room variable it moves.
 - `properties` — what the device reports. `title` is the **property_name**; `class` is the **property_class**; `branch` is its kind (actuatable, state, capability, ...). Its `output` is a direct value or an object whose fields are listed beneath it. (Present only when needed.)
+"""
+
+# The guide of the `json_v2` context: every key the v2 rules (JSON_REWORDINGS) name is
+# explained here, including those v1's guide leaves out (`written_by`, `quantity_kind`,
+# `unit`, `parameter_schema`, the `observed_by` entries).
+CONTEXT_GUIDE_JSON_V2 = """\
+## Home context
+
+What this home offers, as one JSON object, by workspace. It may be narrowed to the rooms and devices the request names. Copy names and classes from the values EXACTLY, case-sensitive. A class or name that does not appear here matches nothing in this home: never invent one.
+
+- `workspaces` — rooms (a workspace may hold further `workspaces`). `title` is the room's name; `space_class` is a **location_class**.
+- `environment` with its `variables` — the room's environment variables. A variable's `title` is its name, `class` its class, `quantity_kind` its quantity kind, `unit` its unit; `observed_by` lists the device properties that read it, each as an `artifact` and an `affordance` (empty: nothing in this home can). (Present only when needed.)
+- `artifacts` — devices. `title` is the **artifact_name** — this device's own name. `homeont_types` lists its classes, the most specific first: the first is its **artifact_class**. `label` names the *kind* of device, never this device, and is never an artifact_name. `saref_types` and `hmas_types` list its other types.
+- `actions` — what the device can do. `title` is the **affordance_name**; `command_types` holds the **affordance_class**. Its `input` is either `"form": "direct value"` (the action takes the value itself) or `"form": "parameterized call"` (named `parameters`, each with its `parameter_name` and its own `parameter_schema`); `type`, `unit` and `description` say what the value is; `minimum` and `maximum` give the lowest and highest value the input accepts. `acts_upon` names the device property it changes; `environment_effect` names the room variable it moves.
+- `properties` — what the device reports. `title` is the **property_name**; `class` is the **property_class**; `branch` is its kind (actuatable, state, capability, ...). Its `output` is either `"form": "direct value"` or `"form": "parameterized call"` (an object: its fields are the `parameters`). A property with `written_by` has no `output` of its own: its values are the `input` of the action it names. (Present only when needed.)
 """
 
 # Gaps of the focused prompt, besides the home context: which guide describes the
@@ -369,11 +406,14 @@ GOAL_STRUCTURING_SIMPLE_PROMPT = "\n".join([
     SIMPLE_OUTPUT,
 ])
 
-GOAL_STRUCTURING_DEPENDENCY_PROMPT = "\n".join([
+DEPENDENCY_INTRO = (
     "You structure ONE atomic smart home request that combines goals with "
     "conditions, timing or a state to maintain. Split it into its goals and the "
     "predicates (conditions) they depend on, and annotate how they relate. The "
-    "request and the segmenter's qualifiers are given as the user message.",
+    "request and the segmenter's qualifiers are given as the user message.")
+
+GOAL_STRUCTURING_DEPENDENCY_PROMPT = "\n".join([
+    DEPENDENCY_INTRO,
     "",
     GOAL_SPEC_RULES,
     PREDICATE_SPEC_RULES,
@@ -421,16 +461,166 @@ GOAL_STRUCTURING_FOCUSED_PROMPT = "\n".join([
 ])
 
 
-def render_goal_prompt(structure: str, goal_context: str) -> str:
-    """The system prompt for one goal: its structure's prompt, with the context."""
-    return PROMPTS[structure].replace(GOAL_CONTEXT_PLACEHOLDER, goal_context)
+# -- The "json" dialect: the rules in the JSON context's keys (`context: json_v2`) ------
+# The text rules name what they point at in the words of the text rendering. This table
+# swaps each such phrase for the key the JSON has for it. Every old phrase is copied
+# from a rule above, whole enough to occur once; `_reword` raises when one does not, so
+# a rule edited above makes the import fail here instead of leaving a stale phrase in
+# the JSON prompts. Nothing else of a rule changes: what the model is asked to do is
+# the same, only what it is told to read it from.
+
+# (old phrase, new phrase), per rules text.
+EXPLICIT_REWORDINGS: Tuple[Tuple[str, str], ...] = (
+    ("by its name, its command class and its input; when it lists an `acts upon` property, "
+     "that is the setting it changes.",
+     "by its `title`, its `command_types` and its `input`; when it lists `acts_upon`, "
+     "that property is the setting it changes."),
+    ("read the action's input (type, range, unit, description) and",
+     "read the action's `input` (`type`, `minimum` and `maximum`, `unit`, `description`) and"),
+    ("the room class of the device's workspace.",
+     "the `space_class` of the device's workspace."),
+    ("the device's homeont class.",
+     "the first of the device's `homeont_types`."),
+    ("the `name` of the device's `Artifact`.",
+     "the `title` of the device's entry in `artifacts`."),
+    ("copied from its action's `command class`. Its `acts upon` property tells you",
+     "copied from its action's `command_types`. Its `acts_upon` property tells you"),
+    ("the `name` of the `Action`.",
+     "the `title` of the action in `actions`."),
+    ("only when the action's input is a parameterized call — the parameter the value goes "
+     "into, copied from that input.",
+     "only when the action's `input` has `\"form\": \"parameterized call\"` — the parameter "
+     "the value goes into, copied from that input's `parameter_name`."),
+    ("(a direct value, or no input at all)",
+     "(`\"form\": \"direct value\"`, or no `input` at all)"),
+)
+
+AMBIGUOUS_REWORDINGS: Tuple[Tuple[str, str], ...] = (
+    ("the `Variable`s of the room's `Environment` the request is about",
+     "the entries of `variables` in the room's `environment` that the request is about"),
+    ("each taken from an `Environment`'s `Variable`s:",
+     "each taken from an `environment`'s `variables`:"),
+    ("the variable's `name`;", "the variable's `title`;"),
+    ("its quantity kind;", "its `quantity_kind`;"),
+    ("its unit;", "its `unit`;"),
+    ("{\"space_class\": the room class, \"space_name\": the room's name}",
+     "{\"space_class\": the room's `space_class`, \"space_name\": the room's `title`}"),
+)
+
+PREDICATE_REWORDINGS: Tuple[Tuple[str, str], ...] = (
+    ("the `name` of the `Property`.",
+     "the `title` of the property in `properties`."),
+    ("only when the property's output is an object — the field compared. "
+     "\"NA\" for a direct value;",
+     "only when the property's `output` has `\"form\": \"parameterized call\"` (an object) "
+     "— the `parameter_name` of the field compared. "
+     "\"NA\" for `\"form\": \"direct value\"`;"),
+    ("or, for a property shown \"values as Action …\", from that action's `input`:",
+     "or, for a property with `written_by`, from the `input` of the action it names:"),
+)
+
+JSON_REWORDINGS: Dict[str, Tuple[Tuple[str, str], ...]] = {
+    "EXPLICIT_GOAL_RULES": EXPLICIT_REWORDINGS,
+    "AMBIGUOUS_GOAL_RULES": AMBIGUOUS_REWORDINGS,
+    "PREDICATE_SPEC_RULES": PREDICATE_REWORDINGS,
+}
 
 
-def render_focused_prompt(context_guide: str, goal_context: str, conventions: str) -> str:
-    """The focused prompt with its context guide, the home context and the device
-    conventions that apply ("" when none does) filled in. Plain substitution, as
-    `render_goal_prompt`: the prompt quotes JSON."""
-    return (GOAL_STRUCTURING_FOCUSED_PROMPT
+def _reword(name: str, text: str, pairs: Sequence[Tuple[str, str]]) -> str:
+    """``text`` (the rules constant ``name``) with each old phrase of ``pairs`` swapped
+    for its new one. ValueError when a phrase is not in ``text`` exactly once: the rules
+    were edited and the table must follow, never be skipped over."""
+    for old, new in pairs:
+        if text.count(old) != 1:
+            raise ValueError(f"JSON_REWORDINGS[{name!r}]: {old!r} occurs {text.count(old)} "
+                             f"times in {name}, expected once; update the table")
+        text = text.replace(old, new)
+    return text
+
+
+EXPLICIT_GOAL_RULES_JSON = _reword(
+    "EXPLICIT_GOAL_RULES", EXPLICIT_GOAL_RULES, EXPLICIT_REWORDINGS)
+AMBIGUOUS_GOAL_RULES_JSON = _reword(
+    "AMBIGUOUS_GOAL_RULES", AMBIGUOUS_GOAL_RULES, AMBIGUOUS_REWORDINGS)
+PREDICATE_SPEC_RULES_JSON = _reword(
+    "PREDICATE_SPEC_RULES", PREDICATE_SPEC_RULES, PREDICATE_REWORDINGS)
+
+GOAL_SPEC_RULES_JSON = "".join([
+    GOAL_SPEC_INTRO,
+    EXPLICIT_GOAL_RULES_JSON,
+    DEVICE_CONVENTIONS,
+    AMBIGUOUS_GOAL_RULES_JSON,
+])
+
+# The same two prompts, assembled as above with the JSON rules and the JSON guide.
+GOAL_STRUCTURING_SIMPLE_PROMPT_JSON = "\n".join([
+    SIMPLE_INTRO,
+    "",
+    GOAL_SPEC_RULES_JSON,
+    CONTEXT_GUIDE_JSON_V2,
+    GOAL_CONTEXT_PLACEHOLDER,
+    "",
+    SIMPLE_OUTPUT,
+])
+
+GOAL_STRUCTURING_DEPENDENCY_PROMPT_JSON = "\n".join([
+    DEPENDENCY_INTRO,
+    "",
+    GOAL_SPEC_RULES_JSON,
+    PREDICATE_SPEC_RULES_JSON,
+    BINDING_RULES,
+    DEPENDENCY_EXAMPLES,
+    CONTEXT_GUIDE_JSON_V2,
+    GOAL_CONTEXT_PLACEHOLDER,
+    "",
+    DEPENDENCY_OUTPUT,
+])
+
+PROMPTS_JSON = {
+    "simple": GOAL_STRUCTURING_SIMPLE_PROMPT_JSON,
+    "dependency": GOAL_STRUCTURING_DEPENDENCY_PROMPT_JSON,
+}
+
+GOAL_STRUCTURING_FOCUSED_PROMPT_JSON = "\n".join([
+    SIMPLE_INTRO,
+    "",
+    GOAL_SPEC_INTRO + EXPLICIT_GOAL_RULES_JSON,
+    CONVENTIONS_PLACEHOLDER,
+    CONTEXT_GUIDE_PLACEHOLDER,
+    GOAL_CONTEXT_PLACEHOLDER,
+    "",
+    FOCUSED_EXAMPLES,
+    SIMPLE_OUTPUT_HEAD + SIMPLE_OUTPUT_GOAL,
+])
+
+# -- The two dialects, by name ---------------------------------------------------------
+
+DIALECT_TEXT = "text"
+DIALECT_JSON = "json"
+
+# dialect -> structure -> the system prompt template with `{goal_context}` still a gap.
+PROMPTS_BY_DIALECT: Dict[str, Dict[str, str]] = {
+    DIALECT_TEXT: PROMPTS,
+    DIALECT_JSON: PROMPTS_JSON,
+}
+FOCUSED_PROMPTS_BY_DIALECT: Dict[str, str] = {
+    DIALECT_TEXT: GOAL_STRUCTURING_FOCUSED_PROMPT,
+    DIALECT_JSON: GOAL_STRUCTURING_FOCUSED_PROMPT_JSON,
+}
+
+
+def render_goal_prompt(structure: str, goal_context: str, dialect: str = DIALECT_TEXT) -> str:
+    """The system prompt for one goal: its structure's prompt (in the rules' ``dialect``,
+    the text's by default), with the context."""
+    return PROMPTS_BY_DIALECT[dialect][structure].replace(GOAL_CONTEXT_PLACEHOLDER, goal_context)
+
+
+def render_focused_prompt(context_guide: str, goal_context: str, conventions: str,
+                          dialect: str = DIALECT_TEXT) -> str:
+    """The focused prompt (in the rules' ``dialect``) with its context guide, the home
+    context and the device conventions that apply ("" when none does) filled in. Plain
+    substitution, as `render_goal_prompt`: the prompt quotes JSON."""
+    return (FOCUSED_PROMPTS_BY_DIALECT[dialect]
             .replace(CONVENTIONS_PLACEHOLDER, conventions)
             .replace(CONTEXT_GUIDE_PLACEHOLDER, context_guide)
             .replace(GOAL_CONTEXT_PLACEHOLDER, goal_context))

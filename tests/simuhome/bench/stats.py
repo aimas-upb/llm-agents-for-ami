@@ -58,6 +58,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from . import homebench_metrics as hbm
+from . import run_config
 from .meter import STAGES
 from .report import _csv, _p95, _table, type_key
 
@@ -559,8 +560,11 @@ def write(directory: Path, rows: List[Dict[str, Any]],
         official = (f"\n## Official HomeBench metrics (per bucket)\n\n"
                     f"{_table(official_table(buckets))}\n{notes}")
     mode = f"Environment: **{environment}**\n\n" if environment else ""
+    # The configuration the records were made with, read from the run.json beside them:
+    # the first thing a reader of the tables needs to know.
+    config = run_config.markdown_of(directory)
     (out / "summary.md").write_text(
-        f"# {title}\n\n{mode}{legend}\n## Score and goals\n\n{_table(shown['score'])}{official}"
+        f"# {title}\n\n{mode}{config}\n{legend}\n## Score and goals\n\n{_table(shown['score'])}{official}"
         f"\n## Seconds per phase (mean per episode)\n\n{_table(shown['seconds'])}"
         f"\n## Tokens per phase (mean per episode, input / output)\n\n"
         f"{_table(shown['tokens'])}", encoding="utf-8")

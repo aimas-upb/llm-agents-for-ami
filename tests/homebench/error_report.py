@@ -58,6 +58,7 @@ from tests.homebench.error_taxonomy import (
     bare_class_fields, collect_goals, plan_for,
 )
 from tests.simuhome.bench import evaluate as bench_evaluate
+from tests.simuhome.bench import run_config
 
 LOGGER = logging.getLogger(__name__)
 
@@ -215,7 +216,9 @@ def overview(run: Run, analyses: Sequence[EpisodeAnalysis]) -> Dict[str, Any]:
         "pass_rate": pct(verdicts["pass"], done),
         "strict_or_lenient": pct(sum(1 for a in analyses if a.score_extra == 1), done),
         "models": {step: cfg.get("model") for step, cfg in
-                   (run.variant.get("steps") or {}).items()}}
+                   (run.variant.get("steps") or {}).items()},
+        # Everything the run ran with (models, prompt variants, settings), from run.json.
+        "configuration": run_config.load(run.path)}
 
 
 def blame(analyses: Sequence[EpisodeAnalysis]) -> Dict[str, int]:
@@ -645,6 +648,8 @@ def render(data: Dict[str, Any]) -> str:
         "the first stage that lost it. A failing episode's *primary stage* is the "
         "earliest stage any of its parts failed in. Rates leave out infrastructure "
         "failures (score -1), as `summary.md` does.\n")
+    # The configuration the analysed run ran with, before any number is read.
+    out += [run_config.markdown(ov.get("configuration"), "## Configuration of the run"), ""]
     out += ["## 1. Verdicts and blame", "",
             md_table(["metric", "value"], [
                 ["episodes listed in run.json", ov["listed"]],
@@ -655,7 +660,8 @@ def render(data: Dict[str, Any]) -> str:
                 ["pass rate of scored (%)", ov["pass_rate"]],
                 ["pass rate counting the lenient turn-off reading (%)",
                  ov["strict_or_lenient"]]]), ""]
-    if ov["models"]:
+    if ov["models"] and not ov.get("configuration"):
+        # No run.json to state the configuration from: the models the variant lists.
         out += ["Models: " + ", ".join(f"{s}={m}" for s, m in ov["models"].items()), ""]
     total = sum(data["blame"].values())
     out += ["Whose fault the failing episodes are (primary cause):", "",

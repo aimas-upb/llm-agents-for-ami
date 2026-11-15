@@ -503,6 +503,8 @@ async def _understand(text, ua, logger, meter, options, current) -> Dict[str, An
             # What the structuring `repair` variant changed in the reply (empty, and so
             # left out, for the default): how much of a result is the repair's.
             **({"repairs": behaviour.repairs} if behaviour.repairs else {}),
+            # What the `decoding` variant re-decoded (left out for the default).
+            **({"decoding": behaviour.decoding} if behaviour.decoding else {}),
             "device_references": ({gid: g.device_reference for gid, g in result.goals.items()}
                                   if result else None)})
     for kind, behaviour in [("state", b) for b in done[len(goals):len(goals) + len(states)]] + \

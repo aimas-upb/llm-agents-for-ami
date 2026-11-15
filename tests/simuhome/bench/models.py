@@ -233,10 +233,12 @@ class Variant:
             "name": self.name,
             "steps": {step: {k: v for k, v in asdict(spec).items() if v is not None}
                       for step, spec in self.specs.items()}}
-        # Only when there is one, so records of a variant without prompt variants
-        # are the records they always were.
+        # The non-default choices, only when there are some (what `key` hashes).
         if self.prompts:
             out["prompt_variants"] = self.prompts
+        # The whole selection, every axis, defaults written out: what the run is
+        # recorded (and its reports headed) as having used. Not part of `key`.
+        out["prompt_selection"] = prompt_variants.full_selection(self.prompts)
         return out
 
     def key(self, *steps: str) -> str:

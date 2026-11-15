@@ -43,6 +43,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from . import homebench_metrics as hbm
+from . import run_config
 
 STEPS = ("segmentation", "structuring", "state_read", "planning", "planning.achievement",
          "planning.dependency", "profiling", "guarding", "execution", "response")
@@ -297,7 +298,10 @@ def main() -> int:
     modes = environments(root, data)
     mode_line = ("Environment: " + ", ".join(f"{v} = **{m}**" for v, m in modes.items())
                  + "\n\n") if modes else ""
-    report = ("# Bench report\n\n" + mode_line + "## Success rates\n\n"
+    # What each variant ran with, from the run.json of its records.
+    configs = "".join(run_config.markdown_of(root / name, f"## Configuration: {name}") + "\n"
+                      for name in data)
+    report = ("# Bench report\n\n" + mode_line + configs + "## Success rates\n\n"
               + _table(rate_rows) + hb_section
               + "\n## Time per step (seconds per episode)\n\n" + _table(step_rows)
               + "\n## Outcomes\n\n" + _table(outcome_rows))

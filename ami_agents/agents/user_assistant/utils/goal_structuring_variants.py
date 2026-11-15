@@ -1,13 +1,14 @@
 """The variants of the goal-structuring call (`prompt_variants.structuring`).
 
 Structuring is one LLM call per goal: a system prompt (rules, a guide to the home
-context, the context), the request as the user message, a free-text JSON reply. Four
+context, the context), the request as the user message, a free-text JSON reply. Five
 axes say how that call is built (see `shared/utils/prompt_variants.py` for the
 mechanism, and the `doc` of each axis below for what its options receive and return):
 
-    context      how the home context is rendered         text (default) | json
+    context      how the home context is rendered         text (default) | json | json_v2
     prompt       which system prompt is sent              full (default) | focused
     constraint   whether the reply is schema-constrained  none (default) | schema
+    decoding     how the reply's tokens are chosen        free (default) | iri_trie
     repair       what is fixed in the parsed reply        none (default) | class_names
 
 With every axis at its default the call is the one structuring always made, byte for
@@ -15,9 +16,28 @@ byte. The harness's experiment arms are combinations (`tests/homebench/variants/
 
     A control    (nothing set)
     B            constraint: schema
-    C            context: json
+    C            context: json        (version 1 of the JSON prompt, see below)
     D            prompt: focused
     E            repair: class_names
+    F            context: json_v2     (version 2 of the JSON prompt)
+    G            decoding: iri_trie   (GENRE-style trie of the home's IRIs, `iri_trie.py`)
+
+Versions of the prompt. The structuring prompt is the rules (what to fill, from what),
+the guide to the context's format, and the context. The rules were written for the
+text rendering and name things as it writes them (`Artifact`, `name`, `command class`).
+Each `context` option therefore fixes both the format of the context and the version of
+the prompt that goes with it, and the option name is the version:
+
+    text      the text context, its guide, the rules in its words       (the original)
+    json      JSON context + guide v1, but still the rules in the text's words: a model
+              is left to translate `name` of an `Artifact` into `title` of `artifacts`
+              (kept as it ran: arm C of the finished runs)
+    json_v2   JSON context + guide v2 + the rules reworded in the JSON's keys
+              (`goal_structuring_prompts.JSON_REWORDINGS`); nothing to translate
+
+The option is in the variant file, the run's `run.json`, and the header of every report
+(`tests/simuhome/bench/run_config.py`), so what a result ran with is never inferred
+from the prompt text.
 
 Flow, on "Set the brightness of the light to 10 in the master bedroom" with `B`:
 
@@ -49,12 +69,16 @@ from ....shared.utils.prompt_variants import declare_step
 from ..prompts.goal_structuring_prompts import (
     CONTEXT_GUIDE,
     CONTEXT_GUIDE_JSON,
+    CONTEXT_GUIDE_JSON_V2,
     DEVICE_CONVENTIONS,
+    DIALECT_JSON,
+    DIALECT_TEXT,
     GOAL_CONTEXT_PLACEHOLDER,
-    PROMPTS,
+    PROMPTS_BY_DIALECT,
     render_focused_prompt,
 )
 from .goal_context import GoalContext, Vocabulary, vocabulary
+from .iri_trie import decode_with_iri_trie
 
 # A home with a device that runs cycles needs the "start" convention in the prompt;
 # this class name in the context is how the focused prompt knows.
@@ -68,10 +92,13 @@ STEP = declare_step("structuring", agent="user_assistant")
 
 @dataclass(frozen=True)
 class RenderedContext:
-    """The home context as sent: the guide that explains its format, and the body."""
+    """The home context as sent: the guide that explains its format, the body, and the
+    dialect of the rules that go with it (`DIALECT_TEXT`: the rules in the words of the
+    text rendering; `DIALECT_JSON`: reworded in the JSON's keys)."""
 
     guide: str
     body: str
+    dialect: str = DIALECT_TEXT
 
 
 def _labels(qualifiers: Sequence[str]) -> set:
@@ -84,8 +111,9 @@ def _labels(qualifiers: Sequence[str]) -> set:
 CONTEXT = STEP.axis(
     "context", "text",
     "How the home context is rendered. An option takes the `GoalContext` and returns "
-    "a `RenderedContext` (guide, body): the guide describes the body's format, so the "
-    "two always travel together.")
+    "a `RenderedContext` (guide, body, dialect): the guide describes the body's format "
+    "and the dialect says which version of the rules goes with it, so the three always "
+    "travel together. The option's name is the prompt's version (module docstring).")
 
 
 @CONTEXT.option("text")
@@ -105,15 +133,32 @@ def _without_none(value: Any) -> Any:
     return value
 
 
+def _json_body(data: Dict[str, Any]) -> str:
+    """The structured view as indented JSON, nulls dropped: the body of both JSON
+    contexts, so the two versions differ in the prompt's words only."""
+    return json.dumps(_without_none(data), indent=1, ensure_ascii=False)
+
+
 @CONTEXT.option("json")
 def json_context(context: GoalContext) -> RenderedContext:
-    """EnvExplorer's structured view as indented JSON, with a guide to its keys.
+    """Version 1 of the JSON prompt: the structured view as indented JSON, with a guide
+    to its keys, under the rules still written in the text's words.
 
-    The same facts as the text, under the keys the structured view has; only the
-    format differs, so a difference in results is the format's."""
+    The same facts as the text, under the keys the structured view has; the rules keep
+    saying `Artifact`, `name`, `command class`, which the JSON does not have. Kept as
+    it ran (arm C); `json_v2` is the version whose rules speak the JSON's keys."""
     data = context.require_data("context=json")
-    return RenderedContext(CONTEXT_GUIDE_JSON,
-                           json.dumps(_without_none(data), indent=1, ensure_ascii=False))
+    return RenderedContext(CONTEXT_GUIDE_JSON, _json_body(data))
+
+
+@CONTEXT.option("json_v2")
+def json_v2_context(context: GoalContext) -> RenderedContext:
+    """Version 2 of the JSON prompt: the same JSON, its guide v2 and the rules reworded
+    in the JSON's keys (`title`, `command_types`, `acts_upon`, ...), so a model has no
+    text-format word to translate. Same facts as `json`; a difference in results is the
+    wording of the prompt's."""
+    data = context.require_data("context=json_v2")
+    return RenderedContext(CONTEXT_GUIDE_JSON_V2, _json_body(data), DIALECT_JSON)
 
 
 # -- axis: prompt ------------------------------------------------------------
@@ -128,9 +173,11 @@ PROMPT = STEP.axis(
 @PROMPT.option("full")
 def full_prompt(structure: str, rendered: RenderedContext,
                 qualifiers: Sequence[str]) -> str:
-    """The structure's own prompt, the context filled in; its guide swapped for the
-    rendered one (a no-op for the text context, whose guide it already holds)."""
-    template = PROMPTS[structure].replace(CONTEXT_GUIDE, rendered.guide)
+    """The structure's own prompt in the rendered context's dialect, the context filled
+    in; its guide swapped for the rendered one (a no-op for the text context, whose
+    guide it already holds, and for the JSON dialect, which holds its own)."""
+    template = PROMPTS_BY_DIALECT[rendered.dialect][structure].replace(
+        CONTEXT_GUIDE, rendered.guide)
     return template.replace(GOAL_CONTEXT_PLACEHOLDER, rendered.body)
 
 
@@ -147,7 +194,8 @@ def focused_prompt(structure: str, rendered: RenderedContext,
         return full_prompt(structure, rendered, qualifiers)
     # 2. The cycle convention only for a home that has a cycle device.
     conventions = DEVICE_CONVENTIONS if CYCLE_COMMAND in rendered.body else ""
-    return render_focused_prompt(rendered.guide, rendered.body, conventions)
+    return render_focused_prompt(rendered.guide, rendered.body, conventions,
+                                 rendered.dialect)
 
 
 # -- axis: constraint --------------------------------------------------------
@@ -259,6 +307,53 @@ def schema_constraint(structure: str, qualifiers: Sequence[str],
               else goal_schema(vocab))
     return {"type": "json_schema",
             "json_schema": {"name": SCHEMA_NAME, "strict": True, "schema": schema}}
+
+
+# -- axis: decoding ----------------------------------------------------------
+
+DECODING = STEP.axis(
+    "decoding", "free",
+    "How the reply is decoded. An (async) option takes the LLM client config "
+    "(`client`, `model`), the messages, the call's kwargs and the `GoalContext`, and "
+    "returns a `DecodedReply` (the reply text; a record of what the decoding changed, "
+    "or None).")
+
+
+@dataclass(frozen=True)
+class DecodedReply:
+    """The reply's text, and what the decoding did (None: one free call, as always)."""
+
+    text: str
+    record: Optional[Dict[str, Any]] = None
+
+
+@DECODING.option("free")
+async def free_decoding(llm_cfg: Any, messages: List[Dict[str, str]],
+                        kwargs: Dict[str, Any], context: GoalContext) -> DecodedReply:
+    """One call, the reply as the model decodes it: what structuring always did."""
+    response = await llm_cfg.client.chat.completions.create(
+        model=llm_cfg.model, messages=messages, **kwargs)
+    return DecodedReply(response.choices[0].message.content or "")
+
+
+@DECODING.option("iri_trie")
+async def iri_trie_decoding(llm_cfg: Any, messages: List[Dict[str, str]],
+                            kwargs: Dict[str, Any], context: GoalContext) -> DecodedReply:
+    """GENRE-style constrained decoding of the names: each IRI value in the reply is
+    decoded under a trie of the values the home allows there, narrowed by what the
+    same object already names (a device of the written room, an action of the written
+    device); the rest of the reply is free (`utils/iri_trie.py`).
+
+    Needs an endpoint that continues a final assistant message and returns
+    `top_logprobs` (Ollama). Not with `constraint: schema`: Ollama cannot apply a
+    grammar to a continued message."""
+    if "response_format" in kwargs:
+        raise ValueError("decoding=iri_trie cannot be combined with a response_format "
+                         "(constraint=schema)")
+    data = context.require_data("decoding=iri_trie")
+    decoded = await decode_with_iri_trie(llm_cfg.client.chat.completions.create,
+                                         llm_cfg.model, messages, kwargs, data)
+    return DecodedReply(decoded.text, decoded.as_dict())
 
 
 # -- axis: repair ------------------------------------------------------------

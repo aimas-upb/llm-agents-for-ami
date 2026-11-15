@@ -62,6 +62,8 @@ class GoalStructuringBehaviour(OneShotBehaviour):
         # What the `repair` variant changed in the model's reply, one line each
         # (empty with the default variant).
         self.repairs: List[str] = []
+        # What the `decoding` variant changed in the reply (None with the default).
+        self.decoding: Optional[dict] = None
 
     async def run(self) -> None:
         route = route_goal(self.qualifiers)
@@ -118,20 +120,18 @@ class GoalStructuringBehaviour(OneShotBehaviour):
                 f"Segmenter qualifiers: {', '.join(self.qualifiers) or 'none'}")},
         ]
 
-        # 2. The call; a constrained reply adds its `response_format`.
+        # 2. The call; a constrained reply adds its `response_format`, and the
+        #    decoding variant makes the call (one free call by default).
         llm_cfg = build_behaviour_llm_client(self.agent.config, "intent_parsing")
         kwargs = build_llm_call_kwargs(llm_cfg)
         response_format = variants["constraint"](route.structure, self.qualifiers, context)
         if response_format:
             kwargs["response_format"] = response_format
-        response = await llm_cfg.client.chat.completions.create(
-            model=llm_cfg.model,
-            messages=messages,
-            **kwargs,
-        )
+        decoded = await variants["decoding"](llm_cfg, messages, kwargs, context)
+        self.decoding = decoded.record
 
         # 3. The reply: an object, then the variant's repair of it.
-        raw = (response.choices[0].message.content or "").strip()
+        raw = decoded.text.strip()
         parsed = loose_json_loads(raw)
         if not isinstance(parsed, dict):
             raise ValueError(f"expected a JSON object, got: {raw[:200]!r}")

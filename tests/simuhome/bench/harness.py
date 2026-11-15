@@ -61,6 +61,8 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+from ami_agents.shared.utils import prompt_variants
+
 from .run import PROJECT_ROOT, select_episodes
 from .suites import DEFAULT_SUITE, ENVIRONMENT_MODES, SUITE_NAMES, Suite, get_suite
 
@@ -224,9 +226,11 @@ def main() -> int:
         if step == "judge" and not judge:       # no judge runs (--no-judge, or HomeBench)
             continue
         print(f"  {step:<18} {spec.label():<28} {'local ' + spec.base_url if spec.local else 'OpenAI'}")
-    # The steps' prompt variants, the axes that differ from the default.
-    for step, axes in variant.prompts.items():
-        print(f"  {step + ' prompt':<18} " + ", ".join(f"{k}={v}" for k, v in axes.items()))
+    # The steps' prompt variants: every axis, so the default is stated, not implied
+    # (the same rows the reports open with, `run_config`).
+    for row in prompt_variants.describe_selection(prompt_variants.full_selection(variant.prompts)):
+        print(f"  {row['step'] + '.' + row['axis']:<22} {row['option']:<24} "
+              f"{'(default)' if row['default'] else '<- NOT the default'}")
     steps = commands(config_path, records, out, options, judge, benchmark, suite)
     for command in steps:
         print("  $ " + " ".join(command[1:]))

@@ -20,6 +20,7 @@ What each group pins:
 import copy
 import hashlib
 import json
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -33,6 +34,7 @@ from ami_agents.agents.user_assistant.behaviours.goal_structuring import (
 from ami_agents.agents.user_assistant.prompts.goal_structuring_prompts import (
     CONTEXT_GUIDE,
     CONTEXT_GUIDE_JSON,
+    CONTEXT_GUIDE_JSON_V2,
     DEVICE_CONVENTIONS,
     FOCUSED_EXAMPLES,
     PROMPTS,
@@ -97,7 +99,8 @@ class TestRegistry:
     def test_no_selection_is_every_default(self):
         selection = pv.resolve("structuring")
         assert selection.chosen == {"context": "text", "prompt": "full",
-                                    "constraint": "none", "repair": "none"}
+                                    "constraint": "none", "decoding": "free",
+                                    "repair": "none"}
         assert selection.non_default() == {} and selection.label() == "default"
 
     def test_a_config_without_the_key_is_the_default(self):
@@ -159,7 +162,7 @@ class TestRegistry:
     def test_catalog_lists_every_axis_with_its_default_and_options(self):
         axes = pv.catalog()["structuring"]
         assert axes["context"]["default"] == "text"
-        assert axes["context"]["options"] == ["text", "json"]
+        assert axes["context"]["options"] == ["text", "json", "json_v2"]
         assert axes["prompt"]["options"] == ["full", "focused"]
         assert axes["constraint"]["options"] == ["none", "schema"]
         assert axes["repair"]["options"] == ["none", "class_names"]
@@ -310,6 +313,111 @@ class TestPromptOption:
         part = prompt_parts.decompose_message(
             gsv.focused_prompt("simple", rendered, ["explicit", "achievement"]))
         assert part.kind == "template" and part.name == "GOAL_STRUCTURING_FOCUSED_PROMPT"
+
+
+def _rules_of(prompt):
+    """The rules of a system prompt: everything before the home context's guide."""
+    return prompt.split("## Home context")[0]
+
+
+def _ticked(text):
+    """The backticked words of a text, as a set."""
+    return set(re.findall(r"`([^`]+)`", text))
+
+
+# What the text rendering calls things, and the JSON does not: none may be left in the
+# rules of the JSON version, where it would point at a key the model never sees.
+TEXT_FORMAT_WORDS = ("`Artifact`", "`Action`", "`Property`", "`Variable`", "`Environment`",
+                     "`Workspace`", "`command class`", "`acts upon`", "`name`",
+                     "`room class`", "`property class`", "`observed by`", "values as Action")
+
+
+class TestJsonPromptVersions:
+    """Version 1 (`json`) is the JSON context under the rules in the text's words, as it
+    ran; version 2 (`json_v2`) has the rules reworded in the JSON's keys. Neither may
+    change the other, and neither may change the default."""
+
+    def test_the_context_option_is_the_prompts_version(self):
+        v1 = gsv.json_context(_context())
+        v2 = gsv.json_v2_context(_context())
+        assert (v1.guide, v1.dialect) == (CONTEXT_GUIDE_JSON, "text")
+        assert (v2.guide, v2.dialect) == (CONTEXT_GUIDE_JSON_V2, "json")
+        # The facts are the same: only the wording of the prompt differs.
+        assert v1.body == v2.body
+
+    def test_version_1_is_unchanged_since_it_ran(self):
+        """Pinned: arm C's prompt must stay the one its results were made with."""
+        assert hashlib.sha1(CONTEXT_GUIDE_JSON.encode()).hexdigest() == \
+            "7782bf9602008e124d1a0c8eea166a515889f890"
+        for structure in ("simple", "dependency"):
+            prompt = gsv.full_prompt(structure, gsv.json_context(_context()),
+                                     ["explicit", "achievement"])
+            assert _rules_of(prompt) == _rules_of(render_goal_prompt(structure, "X"))
+
+    @pytest.mark.parametrize("structure", ["simple", "dependency"])
+    def test_version_2_rules_name_no_word_of_the_text_format(self, structure):
+        prompt = gsv.full_prompt(structure, gsv.json_v2_context(_context()),
+                                 ["explicit", "achievement"])
+        rules = _rules_of(prompt)
+        for word in TEXT_FORMAT_WORDS:
+            assert word not in rules, word
+        # The version 1 prompt, with the same context, does still say them.
+        v1_rules = _rules_of(gsv.full_prompt(structure, gsv.json_context(_context()),
+                                             ["explicit", "achievement"]))
+        assert any(word in v1_rules for word in TEXT_FORMAT_WORDS)
+
+    def test_focused_version_2_speaks_the_json_too(self):
+        rendered = gsv.json_v2_context(_context())
+        focused = gsv.focused_prompt("simple", rendered, ["explicit", "achievement"])
+        assert FOCUSED_EXAMPLES in focused and CONTEXT_GUIDE_JSON_V2 in focused
+        assert "`command_types`" in focused and "`command class`" not in _rules_of(focused)
+        assert "{conventions}" not in focused and "{context_guide}" not in focused
+        # A home with a cycle device still gets the convention, found in the JSON.
+        cycle = gsv.RenderedContext(CONTEXT_GUIDE_JSON_V2,
+                                    '"command_types": ["homeont:SetOperationalStateCommand"]',
+                                    "json")
+        assert DEVICE_CONVENTIONS in gsv.focused_prompt("simple", cycle,
+                                                        ["explicit", "achievement"])
+
+    @pytest.mark.parametrize("structure", ["simple", "dependency"])
+    def test_every_key_the_reworded_rules_name_is_explained_by_the_guide(self, structure):
+        """What the rules say to read, the guide says what it is: no key is named in
+        one and missing in the other."""
+        v2 = _rules_of(gsv.full_prompt(structure, gsv.json_v2_context(_context()),
+                                       ["explicit", "achievement"]))
+        text = _rules_of(render_goal_prompt(structure, "X"))
+        new_words = _ticked(v2) - _ticked(text)
+        assert new_words and new_words <= _ticked(CONTEXT_GUIDE_JSON_V2), \
+            new_words - _ticked(CONTEXT_GUIDE_JSON_V2)
+
+    def test_the_keys_the_guide_names_are_the_keys_of_the_real_context(self):
+        """The guide is checked against EnvExplorer's own structured view, so a key
+        renamed there cannot leave the guide (and the rules) describing a ghost."""
+        from ami_agents.agents.env_explorer.utils import actuation_context
+        source = Path(actuation_context.__file__).read_text(encoding="utf-8")
+        keys = {k for k in _ticked(CONTEXT_GUIDE_JSON_V2) if re.fullmatch(r"[a-z_]+", k)}
+        assert keys
+        for key in keys:
+            assert f'"{key}"' in source, key
+
+    def test_a_rewording_the_rules_no_longer_hold_fails_the_import(self):
+        from ami_agents.agents.user_assistant.prompts import goal_structuring_prompts as gsp
+        with pytest.raises(ValueError, match="occurs 0 times"):
+            gsp._reword("X", "a rule", [("a phrase that is gone", "new")])
+        with pytest.raises(ValueError, match="occurs 2 times"):
+            gsp._reword("X", "dup dup", [("dup", "new")])
+
+    @pytest.mark.asyncio
+    async def test_version_2_reaches_the_system_message_and_not_version_1(self):
+        _, call = await _run({"context": "json_v2"}, BARE, _context())
+        system = call["messages"][0]["content"]
+        assert CONTEXT_GUIDE_JSON_V2 in system and CONTEXT_GUIDE_JSON not in system
+        assert '"title": "master_bedroom_light"' in system
+        assert "the `title` of the device's entry in `artifacts`" in system
+        assert "`Artifact`" not in _rules_of(system)
+
+    def test_the_default_is_still_the_text_rules(self):
+        assert pv.resolve("structuring").chosen["context"] == "text"
 
 
 class TestSchemaConstraint:
@@ -649,8 +757,10 @@ class TestArmFiles:
     EXPECTED = {
         "homebench.ecai.M3.pv-schema": {"constraint": "schema"},
         "homebench.ecai.M3.pv-json": {"context": "json"},
+        "homebench.ecai.M3.pv-json-v2": {"context": "json_v2"},
         "homebench.ecai.M3.pv-focused": {"prompt": "focused"},
         "homebench.ecai.M3.pv-repair": {"repair": "class_names"},
+        "homebench.ecai.M3.pv-trie": {"decoding": "iri_trie"},
     }
 
     def test_every_arm_changes_exactly_one_axis_of_the_control(self):

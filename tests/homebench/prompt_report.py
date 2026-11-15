@@ -60,6 +60,7 @@ import yaml
 
 from tests.homebench import prompt_parts
 from tests.homebench.prompt_parts import Part
+from tests.simuhome.bench import run_config
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT = PROJECT_ROOT / "tests" / "homebench" / "results" / "prompts"
@@ -244,7 +245,7 @@ def share_line(part: Part) -> str:
             f"filled per call {dynamic:,} chars ({100 * dynamic / total:.1f}%)")
 
 
-def call_markdown(call: Dict[str, Any], decomposed) -> str:
+def call_markdown(call: Dict[str, Any], decomposed, variants: str = "") -> str:
     """The page of one call (module docstring)."""
     response = call.get("response") or {}
     usage = response.get("usage") or {}
@@ -252,6 +253,7 @@ def call_markdown(call: Dict[str, Any], decomposed) -> str:
     lines = [f"# Call {call['seq']:02d}: {call['step']}", "",
              "| | |", "|---|---|",
              f"| step | `{call['step']}` |",
+             f"| prompt variants of the run | {variants or 'not recorded'} |",
              f"| made at | {site_text(call.get('site'))} |",
              f"| model | `{call['model']}` at {call['base_url'] or 'the default endpoint'}, "
              f"{call['api']} API |",
@@ -318,7 +320,8 @@ def abstract_markdown(meta: Dict[str, Any], calls: List[Dict[str, Any]],
                       decomposed: Dict[int, list]) -> str:
     """`abstract.md`: every call's prompt as an outline, to compare the steps."""
     lines = ["# Prompts as outlines", "",
-             f"Episode `{meta['episode']}`, config `{meta['config_name']}`. For each call, "
+             f"Episode `{meta['episode']}`, config `{meta['config_name']}`, prompt variants: "
+             f"{run_config.prompt_label(meta.get('configuration'))}. For each call, "
              "each message as the parts it is made of (one level down; the full tree is in "
              "the call's page). Constants are texts of the prompt modules; a field is "
              "filled in per call.", ""]
@@ -337,14 +340,24 @@ def abstract_markdown(meta: Dict[str, Any], calls: List[Dict[str, Any]],
 def readme_markdown(meta: Dict[str, Any], calls: List[Dict[str, Any]],
                     stems: Dict[int, str]) -> str:
     """`README.md`: the episode, the models per step, the calls in order."""
+    config = meta.get("configuration")
     lines = [f"# Prompt report: {meta['episode']}", "",
              f"Config `{meta['config']}` (`{meta['config_name']}`), run {meta['started']}, "
              f"commit `{meta.get('commit')}`.", "",
+             # What the prompts below were built with, said before them, not left to be
+             # read off their text.
+             f"**Prompt variants: {run_config.prompt_label(config)}**" if config else
+             "**Prompt variants: not recorded** (a capture made before the report kept "
+             "its configuration)", "",
              "## The request", "", block(str(meta.get("input") or meta.get("query") or "")),
              "", f"Outcome: `{meta.get('outcome')}`"
-             + (f"; error: {meta['error']}" if meta.get("error") else "") + ".", "",
-             "## Models per step", "", "| step | model |", "|---|---|"]
-    lines += [f"| {step} | `{label}` |" for step, label in meta["models"].items()]
+             + (f"; error: {meta['error']}" if meta.get("error") else "") + ".", ""]
+    # The whole configuration; a capture from before it was kept has the models only.
+    if config:
+        lines += [run_config.markdown(config), ""]
+    else:
+        lines += ["## Models per step", "", "| step | model |", "|---|---|"]
+        lines += [f"| {step} | `{label}` |" for step, label in meta["models"].items()]
     lines += ["", "## LLM calls, in the order they started", "",
               "| # | step | made in | model | chars sent | tokens in/out | s | page |",
               "|---|---|---|---|---|---|---|---|"]
@@ -372,15 +385,19 @@ def write_report(directory: Path, meta: Dict[str, Any], calls: List[Dict[str, An
     """Write every file of the report (module docstring) into ``directory``."""
     calls_dir = directory / "calls"
     calls_dir.mkdir(parents=True, exist_ok=True)
-    # 1. Each call: its page, the exact text of its messages, its capture.
+    # 1. Each call: its page (headed with the prompt variants the run used, so a page
+    #    read alone says which version of the prompt it shows), the exact text of its
+    #    messages, its capture.
+    variants = run_config.prompt_label(meta.get("configuration")) \
+        if meta.get("configuration") else "not recorded"
     stems: Dict[int, str] = {}
     decomposed: Dict[int, list] = {}
     for call in calls:
         stem = file_stem(call)
         stems[call["seq"]] = stem
         decomposed[call["seq"]] = decompose_call(call)
-        (calls_dir / f"{stem}.md").write_text(call_markdown(call, decomposed[call["seq"]]),
-                                              encoding="utf-8")
+        (calls_dir / f"{stem}.md").write_text(
+            call_markdown(call, decomposed[call["seq"]], variants), encoding="utf-8")
         for message, name, _ in decomposed[call["seq"]]:
             (calls_dir / f"{stem}.{name}.txt").write_text(text_of(message), encoding="utf-8")
         (calls_dir / f"{stem}.json").write_text(
@@ -409,6 +426,10 @@ def episode_meta(config_path: Path, variant, episode: str, record_path: Path,
         "config_name": variant.name, "started": started, "commit": _git_commit(),
         "models": {step: spec.label() for step, spec in variant.specs.items()
                    if step != "judge"}}
+    # The configuration the run recorded (`run.json`, beside the record); when it never
+    # got that far, the one the config file gives, so the report still states it.
+    meta["configuration"] = run_config.load(record_path.parent) or run_config.configuration(
+        {"variant": variant.as_dict(), "settings": {"variant": meta["config"]}})
     if record_path.exists():
         record = json.loads(record_path.read_text(encoding="utf-8"))
         meta.update({k: record.get(k) for k in ("input", "query", "outcome", "error",
@@ -464,10 +485,13 @@ def report_episode(config_path: Path, variant, suite, options, benchmark,
 
 
 def index_markdown(config_name: str, rows: List[Tuple[str, str, Optional[str], int,
-                                                      Optional[Path]]]) -> str:
+                                                      Optional[Path]]],
+                   variants: str = "not recorded") -> str:
     """`index.md` of a default run: the episodes in the order they ran, each with what
-    it is there for, how far it ran, and its folder."""
+    it is there for, how far it ran, and its folder; ``variants`` is the run's prompt
+    variants (`run_config.prompt_label`), stated before the list."""
     lines = [f"# Prompt reports: {config_name}", "",
+             f"Prompt variants: **{variants}**.", "",
              "The default episodes, one folder each, run in this order. Each is chosen "
              "for the prompts it brings out (`PROMPT_EPISODES`).", "",
              "| episode | stop after | prompts it is for | exit code | report |",
@@ -538,7 +562,9 @@ def main() -> int:
         rows.append((episode, stop, purpose, code, folder))
         worst = max(worst, code)
     index = out / variant.name / "index.md"
-    index.write_text(index_markdown(variant.name, rows), encoding="utf-8")
+    label = run_config.prompt_label(
+        run_config.configuration({"variant": variant.as_dict(), "settings": {}}))
+    index.write_text(index_markdown(variant.name, rows, label), encoding="utf-8")
     print(f"read {index}")
     return worst
 

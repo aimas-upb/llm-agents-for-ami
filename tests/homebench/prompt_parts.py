@@ -73,12 +73,26 @@ FIELD_ORIGINS: Dict[str, str] = {
     "GOAL_STRUCTURING_DEPENDENCY_PROMPT.goal_context":
         "EnvExplorer's goal context for the request, narrowed to the rooms and devices it "
         "names (user_assistant/pipeline.py: fetch_goal_context)",
+    "GOAL_STRUCTURING_SIMPLE_PROMPT_JSON.goal_context":
+        "EnvExplorer's structured goal context as indented JSON (the `json_v2` context "
+        "variant; user_assistant/utils/goal_structuring_variants.py: json_v2_context)",
+    "GOAL_STRUCTURING_DEPENDENCY_PROMPT_JSON.goal_context":
+        "EnvExplorer's structured goal context as indented JSON (the `json_v2` context "
+        "variant; user_assistant/utils/goal_structuring_variants.py: json_v2_context)",
     "GOAL_STRUCTURING_FOCUSED_PROMPT.goal_context":
         "EnvExplorer's goal context for the request, as the `context` prompt variant renders "
         "it (user_assistant/utils/goal_structuring_variants.py: text_context / json_context)",
     "GOAL_STRUCTURING_FOCUSED_PROMPT.context_guide":
         "the guide to the context's format, chosen with the context (CONTEXT_GUIDE for the "
-        "text, CONTEXT_GUIDE_JSON for the JSON)",
+        "text, CONTEXT_GUIDE_JSON for the version-1 JSON)",
+    "GOAL_STRUCTURING_FOCUSED_PROMPT_JSON.goal_context":
+        "EnvExplorer's structured goal context as indented JSON (the `json_v2` context "
+        "variant; user_assistant/utils/goal_structuring_variants.py: json_v2_context)",
+    "GOAL_STRUCTURING_FOCUSED_PROMPT_JSON.context_guide":
+        "the guide to the JSON context, version 2 (CONTEXT_GUIDE_JSON_V2)",
+    "GOAL_STRUCTURING_FOCUSED_PROMPT_JSON.conventions":
+        "DEVICE_CONVENTIONS when the home has a cycle device, else empty "
+        "(goal_structuring_variants.py: focused_prompt)",
     "GOAL_STRUCTURING_FOCUSED_PROMPT.conventions":
         "DEVICE_CONVENTIONS when the home has a cycle device, else empty "
         "(goal_structuring_variants.py: focused_prompt)",

@@ -516,6 +516,10 @@ def main(execution: str = "ticks", out: Optional[Path] = None) -> int:
         "started": time.strftime("%Y-%m-%d %H:%M:%S")}, indent=1), encoding="utf-8")
     print(f"{len(names)} episode(s), variant {variant.name!r}, {workers} worker(s), "
           f"execution {args.execution} -> {out}")
+    # The prompt choices, stated at the top of the run's own output as well.
+    from .run_config import configuration, prompt_label
+    print("prompt variants: " + prompt_label(configuration(
+        {"variant": variant.as_dict(), "settings": settings})))
 
     started = time.perf_counter()
     if workers == 1:
