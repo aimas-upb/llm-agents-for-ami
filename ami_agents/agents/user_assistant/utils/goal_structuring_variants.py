@@ -8,7 +8,8 @@ mechanism, and the `doc` of each axis below for what its options receive and ret
     context      how the home context is rendered         text (default) | json | json_v2
     prompt       which system prompt is sent              full (default) | focused
     constraint   whether the reply is schema-constrained  none (default) | schema
-    decoding     how the reply's tokens are chosen        free (default) | iri_trie
+    decoding     how the reply's tokens are chosen        free (default) | iri_trie | genre
+                                                          | iri_trie_v2 | genre_v2
     repair       what is fixed in the parsed reply        none (default) | class_names
 
 With every axis at its default the call is the one structuring always made, byte for
@@ -21,6 +22,13 @@ byte. The harness's experiment arms are combinations (`tests/homebench/variants/
     E            repair: class_names
     F            context: json_v2     (version 2 of the JSON prompt)
     G            decoding: iri_trie   (GENRE-style trie of the home's IRIs, `iri_trie.py`)
+    H            decoding: genre      (GENRE itself: a mask on the logits and beam search,
+                                       in-process on the cluster, `genre_decoding.py`)
+    G2           decoding: iri_trie_v2  (G, and a device the room lacks is reported
+                                         missing, not replaced: `abstention.py`)
+    H2           decoding: genre_v2     (H, and no `null` exit for a device slot, JSON
+                                         keys held to the free answer's, the same
+                                         abstention, a cut thinking closed)
 
 Versions of the prompt. The structuring prompt is the rules (what to fill, from what),
 the guide to the context's format, and the context. The rules were written for the
@@ -354,6 +362,78 @@ async def iri_trie_decoding(llm_cfg: Any, messages: List[Dict[str, str]],
     decoded = await decode_with_iri_trie(llm_cfg.client.chat.completions.create,
                                          llm_cfg.model, messages, kwargs, data)
     return DecodedReply(decoded.text, decoded.as_dict())
+
+
+@DECODING.option("genre")
+async def genre_decoding(llm_cfg: Any, messages: List[Dict[str, str]],
+                         kwargs: Dict[str, Any], context: GoalContext) -> DecodedReply:
+    """GENRE decoding as the paper does it: the model runs in-process and the logits of
+    the whole vocabulary are masked at every step, with beam search on the answer.
+
+    The endpoint must be `tests/simuhome/bench/genre_server.py` (a Hugging Face model
+    on a GPU node): it reads `genre` in the request body, decodes the thinking freely,
+    then the answer by beam search where every name of the home is held to the trie of
+    its slot (`utils/genre_decoding.py`). `iri_trie` is the same constraint emulated on
+    an API that returns 20 tokens per step (Ollama); this one has none of its limits
+    (top 20, character fallback, greedy). The record is the server's: the beams, the
+    masked steps, the free answer from the same thinking and the slots that differ."""
+    if "response_format" in kwargs:
+        raise ValueError("decoding=genre cannot be combined with a response_format "
+                         "(constraint=schema)")
+    data = context.require_data("decoding=genre")
+    response = await llm_cfg.client.chat.completions.create(
+        model=llm_cfg.model, messages=messages, extra_body={"genre": {"data": data}},
+        **kwargs)
+    record = getattr(response, "genre", None)
+    if record is None:
+        raise ValueError("decoding=genre: the endpoint returned no `genre` record; it "
+                         "must be tests/simuhome/bench/genre_server.py")
+    return DecodedReply(response.choices[0].message.content or "", record)
+
+
+@DECODING.option("iri_trie_v2")
+async def iri_trie_v2_decoding(llm_cfg: Any, messages: List[Dict[str, str]],
+                               kwargs: Dict[str, Any],
+                               context: GoalContext) -> DecodedReply:
+    """`iri_trie` with abstention: an `artifact_class` that names a device kind of the
+    ontology the room does not have is not replaced by the room's nearest device; the
+    goal becomes one about the missing device (`unmatched_device`), which the pipeline
+    answers with "I can't find the X" (`utils/abstention.py`). Everything else is
+    `iri_trie`, which since the fep run of arm G also narrows a re-decoded value by the
+    slots the model wrote after it (`narrow_by_evidence`)."""
+    if "response_format" in kwargs:
+        raise ValueError("decoding=iri_trie_v2 cannot be combined with a "
+                         "response_format (constraint=schema)")
+    data = context.require_data("decoding=iri_trie_v2")
+    decoded = await decode_with_iri_trie(llm_cfg.client.chat.completions.create,
+                                         llm_cfg.model, messages, kwargs, data,
+                                         abstain=True)
+    return DecodedReply(decoded.text, decoded.as_dict())
+
+
+@DECODING.option("genre_v2")
+async def genre_v2_decoding(llm_cfg: Any, messages: List[Dict[str, str]],
+                            kwargs: Dict[str, Any],
+                            context: GoalContext) -> DecodedReply:
+    """`genre` with the four rules the fep run of arm H called for (see
+    `utils/genre_decoding.py`): no `null` for a room, device or action slot the home has
+    values for; a JSON key stays one the free answer wrote; a device the room lacks is
+    reported through `unmatched_device`, read from the free answer
+    (`utils/abstention.py`); a thinking cut at the token cap is closed and answered from
+    instead of failing the request. Same endpoint as `genre`."""
+    if "response_format" in kwargs:
+        raise ValueError("decoding=genre_v2 cannot be combined with a response_format "
+                         "(constraint=schema)")
+    data = context.require_data("decoding=genre_v2")
+    rules = {"no_null": True, "keys": True, "abstain": True, "close_thinking": True}
+    response = await llm_cfg.client.chat.completions.create(
+        model=llm_cfg.model, messages=messages,
+        extra_body={"genre": {"data": data, **rules}}, **kwargs)
+    record = getattr(response, "genre", None)
+    if record is None:
+        raise ValueError("decoding=genre_v2: the endpoint returned no `genre` record; "
+                         "it must be tests/simuhome/bench/genre_server.py")
+    return DecodedReply(response.choices[0].message.content or "", record)
 
 
 # -- axis: repair ------------------------------------------------------------

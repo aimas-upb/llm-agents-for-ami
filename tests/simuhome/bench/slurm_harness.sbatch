@@ -88,7 +88,10 @@ export OLLAMA_FLASH_ATTENTION="${OLLAMA_FLASH_ATTENTION:-1}"
 export OLLAMA_LLM_LIBRARY="${OLLAMA_LLM_LIBRARY:-cuda_v13}"   # skip the cuda_v12 probe (30 s on its own)
 "$OLLAMA_BIN" serve > "$JOB_DIR/ollama.log" 2>&1 &
 OLLAMA_PID=$!
-cleanup() { kill "$OLLAMA_PID" 2>/dev/null || true; }
+cleanup() {
+  kill ${WATCH_PID:-} 2>/dev/null || true      # the watchdogs first: they would restart what follows
+  kill "$OLLAMA_PID" $(cat "$JOB_DIR/genre.pid" 2>/dev/null) 2>/dev/null || true
+}
 trap cleanup EXIT
 # Wait for the GPU probe to finish, then insist on the GPU: a CPU-only server
 # would run the whole grid at a crawl and poison every latency number.
@@ -110,6 +113,80 @@ echo "ollama up on port ${OLLAMA_PORT} on $(grep 'msg="inference compute"' "$JOB
 VARIANT_RUN="$JOB_DIR/$(basename "$VARIANT_PATH")"
 sed "s#http://localhost:11434/v1#http://127.0.0.1:${OLLAMA_PORT}/v1#g; s#http://127.0.0.1:11434/v1#http://127.0.0.1:${OLLAMA_PORT}/v1#g" \
   "$VARIANT_PATH" > "$VARIANT_RUN"
+
+# --- optional: a Hugging Face model behind genre_server.py (`decoding: genre`) ---
+# Set GENRE_MODEL_DIR to the model's weights; a variant's `genre` provider
+# (http://localhost:11600/v1) is rewritten to this job's server. GENRE_BEAMS: beams of
+# the answer (default 4); GENRE_LENGTH_PENALTY: beam score = sum logprob / length^penalty
+# (default 1.0, transformers'; 0 = plain sum, no reward for a longer answer). Without GENRE_MODEL_DIR nothing here runs.
+#
+# A watchdog restarts the server when its process is gone (job 300191: it was killed by
+# the memory limit after 34 episodes and every later episode failed in 4 s with
+# `Connection error`). GENRE_RESTARTS restarts at most (default 5); past that the job is
+# stopped, so it never writes a grid of failed records. The episode whose request was in
+# flight when the server died fails with `Connection error` (the OpenAI client's retries
+# end before a restart does); `mem.log` in the job directory says what ran out of memory.
+start_genre() {
+  ( cd "$REPO" && exec "$PYTHON" -m tests.simuhome.bench.genre_server \
+      --model-dir "$GENRE_MODEL_DIR" --port "$GENRE_PORT" \
+      --num-beams "${GENRE_BEAMS:-4}" \
+      --length-penalty "${GENRE_LENGTH_PENALTY:-1.0}" ) >> "$JOB_DIR/genre_server.log" 2>&1 &
+  local pid=$!
+  echo "$pid" > "$JOB_DIR/genre.pid"
+  for _ in $(seq 1 300); do
+    curl -s -m 2 "http://127.0.0.1:${GENRE_PORT}/health" >/dev/null && return 0
+    kill -0 "$pid" 2>/dev/null || { echo "ERROR: genre server died:"; tail -20 "$JOB_DIR/genre_server.log"; return 1; }
+    sleep 2
+  done
+  echo "ERROR: genre server not answering on ${GENRE_PORT}"; tail -20 "$JOB_DIR/genre_server.log"; return 1
+}
+genre_watchdog() {
+  local restarts=0
+  while sleep 10; do
+    kill -0 "$(cat "$JOB_DIR/genre.pid")" 2>/dev/null && continue
+    restarts=$(( restarts + 1 ))
+    echo "=== WATCHDOG $(date '+%F %T'): genre server gone (restart $restarts of ${GENRE_RESTARTS:-5}); memory:"
+    tail -3 "$JOB_DIR/mem.log" 2>/dev/null
+    if [ "$restarts" -gt "${GENRE_RESTARTS:-5}" ] || ! start_genre; then
+      echo "=== WATCHDOG: giving up, stopping the job"
+      kill -TERM "$MAIN_PID"; return 1
+    fi
+    echo "=== WATCHDOG $(date '+%F %T'): genre server back up"
+  done
+}
+if [ -n "${GENRE_MODEL_DIR:-}" ]; then
+  [ -d "$GENRE_MODEL_DIR" ] || { echo "ERROR: missing GENRE_MODEL_DIR $GENRE_MODEL_DIR"; exit 1; }
+  GENRE_PORT=$(( 11800 + SLURM_JOB_ID % 200 ))
+  sed -i "s#http://localhost:11600/v1#http://127.0.0.1:${GENRE_PORT}/v1#g" "$VARIANT_RUN"
+  MAIN_PID=$$
+  start_genre || exit 1
+  echo "genre server up on port ${GENRE_PORT} (beams ${GENRE_BEAMS:-4}, model $GENRE_MODEL_DIR)"
+  genre_watchdog &
+  WATCH_PID=$!
+fi
+
+# --- memory log: what holds the job's RAM, once a minute, in $JOB_DIR/mem.log ----
+# (the job has a hard limit, --mem; sacct's MaxRSS says how much, not whose.)
+# One line per minute: the cgroup's anonymous and file-backed memory (GB), then the
+# resident size (GB) of the processes that matter, by name.
+mem_log() {
+  local cg
+  cg="/sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup | head -1)"
+  while sleep 60; do
+    {
+      printf '%s  cgroup anon=%s file=%s GB  ' "$(date '+%T')" \
+        "$(awk '$1=="anon"{printf "%.1f", $2/1073741824}' "$cg/memory.stat" 2>/dev/null)" \
+        "$(awk '$1=="file"{printf "%.1f", $2/1073741824}' "$cg/memory.stat" 2>/dev/null)"
+      ps -u "$USER" -o rss=,args= | awk '
+        /genre_server/ {n="genre_server"} /ollama serve/ {n="ollama_serve"}
+        /llama-server|ollama runner/ {n="runner"} /bench\.(harness|run)/ {n="harness"}
+        n {sum[n]+=$1; n=""}
+        END {for (k in sum) printf "%s=%.1f ", k, sum[k]/1048576; print ""}'
+    } >> "$JOB_DIR/mem.log" 2>/dev/null
+  done
+}
+mem_log &
+WATCH_PID="${WATCH_PID:-} $!"
 
 # Load every local model now (and fail early on a missing one), so the first
 # episodes are not timed with model loading inside them.

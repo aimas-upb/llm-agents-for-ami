@@ -46,6 +46,9 @@ Properties that matter for experiments:
 | `prompt` | `full` | `focused` | for an explicit/incomplete achievement goal: no ambiguous-goal rules or output shape, device conventions only if the home has a cycle device, two worked answers. Any other goal (dependency, ambiguous) gets the full prompt |
 | `constraint` | `none` | `schema` | `response_format` = strict `json_schema`; slots naming something of the home are enums of this home's values. Simple structure only (see 5) |
 | `decoding` | `free` | `iri_trie` | GENRE-style constrained decoding (De Cao et al. 2021): each IRI value of the reply is decoded under a trie of the values the home allows in that slot, narrowed by the slots the same object already holds (a device of the written room, an action of the written device); the rest of the reply, thinking included, is free. Needs an endpoint that continues a prefilled assistant message and returns `top_logprobs` (Ollama). Not with `constraint: schema`. See G |
+| `decoding` | `free` | `genre` | GENRE itself: the structuring model runs in-process (Hugging Face, `tests/simuhome/bench/genre_server.py`), the logits of the whole vocabulary are masked at every step to the tokens that keep a value inside its trie, and the answer is decoded by beam search. Needs that server as the structuring provider. Not with `constraint: schema`. See H |
+| `decoding` | `free` | `iri_trie_v2` | `iri_trie` plus abstention: an `artifact_class` that is a device family of the ontology the room does not have is not replaced by the room's nearest device; its goal becomes one about the missing device (`unmatched_device`, the IRI slots null), which the pipeline answers with "I can't find the X" (`utils/abstention.py`). Arm G2 |
+| `decoding` | `free` | `genre_v2` | `genre` plus four rules in `genre_server.py`: no `null` for a room, device or action slot the home has values for; a JSON key stays one the free answer wrote; the same abstention, read from the free answer of the same thinking; a thinking cut at the token cap is closed and answered from, not an error. Arm H2 |
 | `repair` | `none` | `class_names` | after parsing, each class slot is rewritten as the home writes it, only when exactly one class of the home has that name (prefix, case, spacing ignored) |
 
 ### Versions of the prompt
@@ -120,6 +123,9 @@ that). No paid API call: every model is local.
 | E | `homebench.ecai.M3.pv-repair.yaml` | `repair: class_names` | how much of the 22.8% is notation alone? (no LLM change) |
 | F | `homebench.ecai.M3.pv-json-v2.yaml` | `context: json_v2` | is C's result the format, or the rules left in the text's words? (F against C: the wording; F against A: both) |
 | G | `homebench.ecai.M3.pv-trie.yaml` | `decoding: iri_trie` | if the failure is malformed or invented IRIs, does decoding them under a trie of the home's valid IRIs fix it, and what is left? |
+| H | `homebench.ecai.M3.pv-genre.yaml` | `decoding: genre` | G emulates GENRE over an API that shows 20 tokens per step; with the mask on the whole vocabulary and beam search, how much of G's result was the emulation (top 20, `nearest`, greedy) and how much the constraint? |
+| G2 | `homebench.ecai.M3.pv-trie-v2.yaml` | `decoding: iri_trie_v2` | G lost the infeasible requests by putting the room's nearest device in place of the missing one; if the device the free reply named is reported missing instead, how much of that comes back, and what does the evidence rule (first run on the 400) do to the feasible ones? |
+| H2 | `homebench.ecai.M3.pv-genre-v2.yaml` | `decoding: genre_v2` | H lost goals to `null` exits and unreadable keys; with those closed and the same abstention, does the mask on the whole vocabulary beat G2? |
 
 ### B: strict schema with the home's enums
 
@@ -223,13 +229,211 @@ valid names may be chosen. Code: `ami_agents/agents/user_assistant/utils/iri_tri
   the model skips the comma it believes written); then the model continues freely, and
   the check goes on. If none of the 20 tokens is allowed, the model's free continuation
   of the value is snapped to the nearest value of the trie (`how: nearest`).
+- Evidence from the later slots (since 2026-11-15). Valid or not is decided on the slots
+  written before a value, as above; but the trie a value is re-decoded with is also
+  narrowed by the slots the model wrote after it in the same object, when they fit the
+  home. Without it, a guessed class made the correct action after it invalid:
+  `hb1_feasible_seed_4351` wrote `affordance_class: homeont:TemperatureSetpoint`, then
+  `affordance_name: temperature`; greedy took the `homeont:` branch, wrote
+  `homeont:SetModeCommand`, and `temperature` became `mode`. With the evidence the class
+  is `saref:SetAbsoluteLevelCommand` (the only class of `temperature`) and the action is
+  kept. The G v1/v2 results (20 episodes, 2026-11-14) were made before this change.
 - Recorded: `structures[].decoding` = calls, and per re-decoded value the slot, what the
-  free decoding wrote, what the trie wrote, how, steps, conditioned, candidates.
+  free decoding wrote, what the trie wrote, how, steps, conditioned, candidates, evidence;
+  and `trace`, every decision in order (the free reply, values kept, each step's 20
+  tokens with logprobs and the rank taken, forced characters, the closing token, each
+  free continuation; `iri_trie.TRACE_EVENTS`).
+- Seeing it: `python -m tests.homebench.decoding_report --config
+  tests/homebench/variants/homebench.ecai.M3.pv-trie.yaml --episode <episode>` runs one
+  episode up to structuring (the prompt report of `prompt_report.py` in the same
+  folder) and writes `decoding.md`: a timeline of the decisions, per value the candidates
+  as a prefix tree, the reply the model saw, each step's tokens (allowed or not, taken,
+  how far the trie overruled the model), and the free reply against the decoded one.
+  `--record <episode.json>` draws a record already on disk.
 - Differences from GENRE: greedy, not beam search; a character trie, so any tokenization
   of a name is accepted; constrained only inside quoted IRI values, so `null` stays
   the model's choice (an infeasible request can still name no device).
 - Cost: the meter counts the full prompt on every call (`tokens_in`), most of it served
   from Ollama's prompt cache; the generated tokens and the wall time are the cost.
+
+### H: GENRE with a mask on the logits (`decoding: genre`)
+
+G is GENRE emulated: top 20 tokens per step, greedy, `nearest` when none of the 20 is
+allowed, one API call per token. H is the same constraint where GENRE applies it. G stays
+as it ran (`homebench.ecai.M3.pv-trie.yaml`); H is a second arm, not a replacement.
+Code: `utils/genre_decoding.py` (the rules, no torch) and `tests/simuhome/bench/genre_server.py`
+(the model).
+
+- The server. An OpenAI-compatible endpoint that runs `DeepSeek-R1-Distill-Qwen-7B` (the
+  Hugging Face weights, bf16, not Ollama's Q4_K_M) on the job's GPU. The harness job starts
+  it when `GENRE_MODEL_DIR` is set (`slurm_harness.sbatch`) and rewrites the variant's
+  `genre` provider (`http://localhost:11600/v1`) to the job's port. Only structuring goes
+  to it; segmentation, planning, profiling, guarding and the response stay on Ollama.
+- A call. The thinking is decoded freely (greedy) up to `</think>`. The answer is then
+  decoded twice from that thinking: freely (the control on this backend, recorded as
+  `free_answer`) and by beam search (`num_beams`, default 4) under a `LogitsProcessor`.
+  At each step the processor reads the text written so far; if it ends inside the quoted
+  value of a slot that names something of the home, only the token ids that keep the
+  value inside that slot's trie keep their score. The trie is G's, conditioned on the
+  slots the same object already holds. Elsewhere (keys, free text, `null`) only the
+  tokens that can continue a JSON object are allowed (see "The escape through `null`").
+- Tokens, not characters. The trie stays on characters: a character trie over the text
+  of every token id of the vocabulary (`TokenTrie`) is walked along what remains of each
+  valid value, so any tokenization of a name is allowed, and a token may also finish the
+  name and close the string (`"`, `",`, `"}`). A value that leaves its trie (a dead end)
+  is not held to it (only to JSON), and counted (`dead_steps`).
+- What it removes from G: the top 20 and `nearest`, the greedy choice of a namespace, one
+  call per token, and the closing-token bug (`"` against `",`). What it does not add: an
+  exit for "known term, absent from the home" (an infeasible request can still be
+  substituted by a valid name); that is a separate change.
+- The end of the sequence. Beam search scores whole sequences, so the mask also holds the
+  end-of-sequence token until the reply is a complete JSON object (`genre_decoding.
+  may_end`; a leading code fence is ignored). Without it, `length_penalty` 0 gave
+  one-token answers (an immediate stop) and 7 of 7 smoke episodes failed to parse in 4.
+  `length_penalty` is the server's `--length-penalty` (job: `GENRE_LENGTH_PENALTY`);
+  default 1.0 (transformers'). Of 7 smoke episodes, 1.0 scored 6 and 0.0 scored 5 (0.0
+  re-wrote a correct free answer of `hb2_feasible_seed_101`: `living_room_light` ->
+  `LivingRoom`); too few to choose by, 1.0 was kept as the default.
+- D58 (evidence from the later slots) is not applied: beam search compares whole
+  sequences, so a class followed by the action only it allows should win by probability.
+  Whether it does is a thing H measures (`hb1_feasible_seed_4351`).
+- Recorded: `structures[].decoding` = the server's record: `beams`, `length_penalty`,
+  `thinking_tokens`, `answer_tokens`, `masked_steps`, `dead_steps`, `ends_held` (rows where
+  the end was refused, summed over steps), seconds per phase, the free answer and
+  `changed` (the slots the constraint changed, free against decoded).
+- Smoke test on fep (2026-11-15, one H200, 1 worker, 7 episodes: `hb1_feasible_seed_
+  {244,4351}`, `hb1_infeasible_seed_{1121,1303,1424,4644}`, `hb2_feasible_seed_101`;
+  records in `~/experiments/semantic/harness/genre-eos2-lp1.0`): the server loads in
+  ~75 s (15 GB, bf16), the token trie of 151,665 tokens in 1 s; per episode ~40-55 s,
+  structuring ~40 s of it (thinking ~15-20 s, free answer ~9 s, beam answer ~10 s).
+  `hb1_feasible_seed_4351` passes: the free answer of these weights already wrote
+  `saref:SetAbsoluteLevelCommand` + `temperature`, and the beam kept it. Masked steps
+  120-135 per constrained answer, `dead_steps` 0. Notation fixed in the same way as G
+  (`StoreRoom` -> `homeont:StoreRoom`). Not a result: 7 episodes.
+- The escape through `null` (fixed). `hb1_infeasible_seed_4644`: the free answer names
+  `StoreRoom`/`Humidifier` (no prefix); under the mask the first token of the value must
+  start `homeont:`, which the model rates low, so the beam took `"location_class": null`
+  (unmasked) and went on with a `// comment`, which is not JSON. `may_end` never opened,
+  the answer ran to the 2048-token cap (125 s) and the structure was an error, with
+  `length_penalty` 0 and 1. The fix is not about `null`: outside a constrained value the
+  mask now also keeps the reply a JSON object (`genre_decoding.JsonPrefix`, a character
+  automaton; `json_allowed` tests the best-scored tokens of each row, widening to the
+  whole vocabulary only when too few pass). A comment, prose after the object or a second
+  fence cannot be written; `null` stays a way out for a request the home cannot serve,
+  which is what an infeasible episode needs (refusing it would force a substitution such
+  as G's `Humidifier`). The end of the sequence is allowed exactly when `may_end`.
+  Recorded: `json_steps` (rows so masked), `json_widened`. Not done: falling back to the
+  free answer when the beam answer is not JSON; with this mask a non-JSON answer can only
+  be one cut at the token cap.
+- Control. Compare H with M3 only for episodes that reach the same structuring input;
+  the free answer of the server is the control on the HF backend (weights and chat
+  template differ from Ollama's). A run of `decoding: free` on this backend over the 400
+  episodes would separate the backend from the constraint; it is not part of this arm.
+- Run (on fep, from the repo root; a value with commas goes in the shell, not in
+  `--export`):
+
+  ```
+  sbatch --export=ALL,REPO=$HOME/llm-agents-for-ami,\
+  VARIANT=tests/homebench/variants/homebench.ecai.M3.pv-genre.yaml,\
+  GENRE_MODEL_DIR=$HOME/hf_models/DeepSeek-R1-Distill-Qwen-7B,WORKERS=1 \
+  tests/simuhome/bench/slurm_harness.sbatch
+  ```
+
+  Add `ATTEMPT=genre-ecai400` (in the shell, as in the sbatch header) to pick the results
+  directory under `$HOME/experiments/semantic/harness/`.
+- Safeguards, from the first ECAI-400 run (job 300191: the server was killed by the
+  job's 96 GB limit after 34 episodes, and the other 366 episodes failed in 4 s with
+  `Connection error`). Cause: `ThreadingHTTPServer` runs each request on a new thread,
+  and every thread that runs the model leaves about 1 MB of host memory per generated
+  token (0.4 GB for a 400-token request; flat when the same decode runs on one persistent
+  thread). `genre_server.py` therefore runs every model call on one worker thread. The
+  thinking stops on `ThinkEnd`, a stopping criterion on the decoded last tokens, not on
+  transformers' `stop_strings` (same tokens, checked on the real model; the latter left
+  40-70 MB per call in a controlled test). What is left is growth with the shapes the
+  server has seen: a prompt length not seen before costs memory once (measured on the
+  node: 80 distinct lengths, +0.13 GB per 20 requests, then 0 on a second pass over the
+  same lengths; the same under `CUDA_MODULE_LOADING=EAGER`, so it is not lazy kernel
+  loading), a length seen before costs nothing (9 MB per request on average in the run;
+  the resident size also steps up by 0.6-0.9 GB for a prompt longer than any before). The
+  prompts span 3k to 15k tokens, so this is bounded; the run's server was at 17 GB after
+  1 h and the expectation is a plateau near 20-25 GB (inferred, not measured to the end).
+  Around it,
+  `slurm_harness.sbatch` has a watchdog (`GENRE_RESTARTS`, default 5): it restarts the
+  server within seconds if its process is gone and stops the job after the last restart,
+  so a dead server never fills the results with failed records; the episode whose
+  request was in flight at the restart fails with `Connection error`. The job directory
+  holds `mem.log` (once a minute: the cgroup's anonymous and file memory and the resident
+  GB per process) and the server logs, per request, its resident GB after the thinking,
+  the free answer and the beam.
+
+### G2 and H2: what the fep runs of G and H called for
+
+Both arms ran on the cluster (400 episodes, commit `bf3be605`; G job 299621, H job
+300297), and `python -m tests.homebench.error_report` was run on the records.
+
+| bucket (success) | M3 | G | H |
+|---|---|---|---|
+| overall (scored) | 22.6% | 34.3% | 32.0% |
+| hb1 feasible | 8% | 51% | 65% |
+| hb1 infeasible | 88% | 49% | 33% |
+| feasible parts passed | 12.5% | 55.3% | 59.4% |
+| parts lost to segmentation (`seg_part_lost`) | 2 | 9 | 62 |
+| episodes failing on an LLM or endpoint error | 3 | 9 | 18 |
+
+Both gain heavily on feasible requests and lose most of the infeasible ones. M3 passed
+those largely because it refused almost everything (broken IRIs found no device), not
+because it saw the device was missing.
+
+**G: a replaced device.** Of the 39 `artifact_class` values the trie replaced in the
+hb1 infeasible episodes, 36 were a real device kind of the ontology that the room does
+not have (`AirConditioner` in a room with a heater, a `Curtain` in a room with none);
+the free reply had read the request correctly and the trie overruled it. In the feasible
+episodes it was 2 of 21. The failing parts are `infeas_substituted` (33),
+`infeas_executed_other` (10) and `infeas_accepted_on_target` (12, some of them label
+suspects, see the 657-row note in the dossier). On the hb1 structures of the G run
+the rule (with the ontology as the list of device kinds) fires 40 times: 37 on infeasible
+requests (21 of them pass today, 16 fail) and 3 on feasible ones (1 passes, 2 fail
+anyway). A `DimmableLight` request in a room whose light is of another class is the
+case the family rule keeps out.
+
+**H: three causes, none of them the GENRE constraint.**
+(1) `null` as a cheap exit. Beam search scores whole sequences, and a `null` costs a few
+nats where a long IRI costs more, so slots came out null although the free answer of
+the same thinking had named a value: 67 feasible goals lost their room (49 episodes
+`struct_room_missing`, against 5 for G). An all-null goal is `unrouted` in the planner,
+which is not a refusal either.
+(2) Unreadable keys. In 15 episodes beam search wrote `"location-class"` for
+`"location_class"`: the mask only recognises the underscore names, so nothing was
+constrained and the reply gave "no goal could be structured" (all 15 of the failures
+with that message).
+(3) A thinking that ran to the token cap ended the request (3 infrastructure errors).
+
+**G2 changes** (`decoding: iri_trie_v2`): abstention. When the first invalid value is an
+`artifact_class` naming a device family of the ontology (`homeont.ttl`, classes under
+SAREF's Actuator, Appliance, HVAC, Meter, Sensor) that the room the goal names does not
+have, and no class of its family is there either, the value is not decoded again: the
+object's IRI slots become null and `unmatched_device` the user's words (`air
+conditioner`). Not done, on purpose: abstention on actions (`unmatched_action`). Where
+`affordance_name` and `affordance_class` were both outside the device's actions, 3 of the
+15 feasible hb1 structures pass after the trie replaced them, against at most 2
+infeasible ones (`unexist_attribute`) that abstention would turn into a pass. It also is the first run on the 400 of the
+evidence rule (`narrow_by_evidence`, 54 of the 56 `struct_wrong_affordance` episodes).
+
+**H2 changes** (`decoding: genre_v2`, all in `genre_server.py` and `genre_decoding.py`):
+`no_null` (no `null` token for a room, device or action slot the home has values for;
+`parameter_name`, free text and `unmatched_*` stay nullable), `keys` (a JSON key stays a
+prefix of a key the free answer wrote), `abstain` (the same rule as G2, read from the
+free answer and written over the same goal of the beam answer, paired by position), and
+`close_thinking` (a thinking cut at the cap is closed with `</think>` and answered from).
+The record of a call says what each did (`filtered_steps`, `abstained`,
+`thinking_closed`, `v2`).
+
+What would count as the result, from the numbers above and not measured yet: G2 can
+return at most the 16 hb1 infeasible failures that the rule fires on (49% -> 68% there)
+plus its share of the mixed episodes; H2 at most the 48 + 18 episodes lost to the three
+causes, and its infeasible rate depends on the same rule. Whether H2 beats G2 is the
+question; the free answer of the same thinking, the control H records on its own
+backend (`structures[].decoding.free_answer`), stays in the record.
 
 ## 4. Protocol
 

@@ -1,0 +1,57 @@
+# HomeBench harness config, ECAI-400 on local models: M3 with structuring decoded by the
+# trie with abstention (experiment arm G2; the controls are homebench.ecai.M3.yaml, nothing
+# set, and homebench.ecai.M3.pv-trie.yaml, arm G, `decoding: iri_trie`):
+#   prompt_variants.structuring   decoding: iri_trie_v2
+#
+# What arm G did at the fep run (job 299621, 400 episodes, commit bf3be605: 34.3% against
+# M3's 22.6%): feasible parts 12.5% -> 55.3%, infeasible parts 95.6% -> 57.4%. The trie
+# offers a value for every slot, so a request for a device the room lacks was answered
+# with the room's nearest device: 36 of the 39 `artifact_class` values it replaced in the
+# infeasible episodes of hb1 were a real device kind the room did not have (33 parts
+# `infeas_substituted`, 22 more `infeas_executed_other` / `accepted_on_target`).
+#
+# G2 is G plus two things:
+#   1. abstention (`utils/abstention.py`): an `artifact_class` that is a device family of
+#      the ontology the room does not have (no class of its family either: a `ColorLight`
+#      request in a room with a `DimmableLight` is repaired, not refused) is not decoded
+#      again; the goal becomes one about the missing device (`unmatched_device`, the IRI
+#      slots null), which the pipeline answers with "I can't find the X in the Y";
+#   2. the evidence rule (`narrow_by_evidence`): a re-decoded value is narrowed by the
+#      slots the model wrote after it. It was written after the fep run of G (54 of the 56
+#      `struct_wrong_affordance` episodes were the trie overwriting a correct
+#      `affordance_name` after a forced wrong `affordance_class`), so G2 is its first
+#      run on the 400; the code of G at that run is commit bf3be605.
+# Everything else is M3's, so a difference in the results is the variant's. Details:
+# tests/homebench/prompt-variants.md (arm G2).
+#
+#   conda run -n ami-agents python -m tests.simuhome.bench.harness \
+#       --config tests/homebench/variants/homebench.ecai.M3.pv-trie-v2.yaml --dry-run
+
+suite: homebench
+benchmark: tests/homebench/ecai400   # the 400 ECAI episodes, corrections applied
+
+providers:
+  local: {base_url: "http://localhost:11434/v1"}     # Ollama; the planner needs tool calling
+
+models:
+  segmentation:  {provider: local, model: "qwen3-8b-16k", temperature: 0}
+  structuring:   {provider: local, model: "ds-r1-7b-16k", temperature: 0}
+  planning:
+    explicit:    {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+    general:     {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+  profiling:     {provider: local, model: "ds-r1-7b-16k", temperature: 0}
+  guarding:      {provider: local, model: "ds-r1-1.5b-16k", temperature: 0}
+  response:      {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+
+run:
+  episodes: "hb*"          # every episode of the benchmark directory above
+  limit: null
+  workers: 1               # one local model at a time: parallel workers only queue on it
+  context: none
+  memory: "off"
+  guidelines: homebench    # homebench: no device conditions | default: as deployed
+  environment: "on"        # as the ECAI run (env_on): room environments and action effects
+
+# How structuring builds its prompt (ami_agents/shared/utils/prompt_variants.py):
+prompt_variants:
+  structuring: {decoding: iri_trie_v2}

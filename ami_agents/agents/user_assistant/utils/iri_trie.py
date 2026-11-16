@@ -31,7 +31,15 @@ most probable of the 20 tokens that the trie allows is taken. Then the model
 continues freely from the corrected value, and the check goes on. When none of the
 20 tokens is allowed, the model's own free continuation of the value is snapped to
 the nearest completion in the trie (`nearest`, logged as such): the API shows 20
-tokens, not the whole vocabulary. Every re-decoded value is logged.
+tokens, not the whole vocabulary. Every re-decoded value is logged, and every decision
+(the tokens offered, which was taken, what was forced) is traced for
+`tests/homebench/decoding_report.py`.
+
+Whether a value is valid is decided on the slots written before it, as constrained
+greedy decoding would; but the trie a value is re-decoded with is also narrowed by
+the slots the model wrote after it in the same object (`narrow_by_evidence`): without
+that, a guessed `affordance_class` made the correct `affordance_name` after it invalid
+and it was overwritten too (`hb1_feasible_seed_4351`, `temperature` -> `mode`).
 
     reply   ... "location_class": "Master bedroom", "artifact_class": ...
     trie    location_class: {homeont:MasterBedroom, homeont:LaundryRoom}
@@ -90,6 +98,9 @@ MAX_VALUE_STEPS = 24
 MAX_INTERVENTIONS = 24
 # Tokens of free continuation the `nearest` fallback reads to know what the model meant.
 NEAREST_TOKENS = 24
+# Characters of the reply before a re-decoded value kept in the trace (what the model
+# sees just before it, for the decoding report).
+TRACE_TAIL = 160
 
 _END = ""      # the trie key that marks a complete value
 
@@ -285,38 +296,124 @@ def _object_start(text: str, pos: int) -> int:
     return stack[-1] if stack else 0
 
 
+def _object_end(text: str, start: int) -> int:
+    """Where the JSON object opening at ``start`` closes (the end of ``text`` when the
+    reply is cut off before it does)."""
+    depth = 0
+    in_string = escaped = False
+    for i in range(start, len(text)):
+        char = text[i]
+        # 1. Braces inside a string value are text, not structure.
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+        elif char == '"':
+            in_string = True
+        # 2. The object closes when its own brace does.
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth <= 0:
+                return i
+    return len(text)
+
+
 def written_slots(text: str, pos: int) -> Dict[str, str]:
     """The slot values already written in the object open at ``pos``."""
     return {m.group(1): m.group(2)
             for m in SLOT_VALUE.finditer(text, _object_start(text, pos), pos)}
 
 
+def later_slots(text: str, value_start: int) -> Dict[str, str]:
+    """The slot values the reply writes after the value opening at ``value_start``, in
+    the same object: what the model went on to name (the first of each slot)."""
+    value_end = text.find('"', value_start)
+    if value_end < 0:
+        return {}
+    end = _object_end(text, _object_start(text, value_start))
+    out: Dict[str, str] = {}
+    for match in SLOT_VALUE.finditer(text, value_end + 1, end):
+        out.setdefault(match.group(1), match.group(2))
+    return out
+
+
+def narrow_by_evidence(slot: str, before: Dict[str, str], after: Dict[str, str],
+                       rows: List[Row], vocab: Vocabulary,
+                       allowed: SlotValues) -> Tuple[SlotValues, Dict[str, str]]:
+    """The values an invalid ``slot`` is decoded with, narrowed by the slots the model
+    wrote after it in the same object, and those slots (the evidence used).
+
+    Why: the trie is conditioned left to right, so a value it re-decodes is chosen
+    before the slots that follow, and those are then checked against it. In
+    `hb1_feasible_seed_4351` the free reply had `affordance_class:
+    homeont:TemperatureSetpoint` (invalid) and then `affordance_name: temperature`
+    (an action of that air conditioner). Greedy took the `homeont:` branch (the
+    model's first token), wrote `homeont:SetModeCommand`, and then the correct
+    `temperature` no longer fit and became `mode`. The later slots are the model's
+    own choices; a value consistent with them is decoded instead, here
+    `saref:SetAbsoluteLevelCommand`, the only class of `temperature`.
+
+    Each later slot is taken in reply order if, with what is taken so far, it leaves
+    the slot fewer values than before, but some. One that fits nothing (a device of
+    another room, an invented name) or changes nothing (`parameter_name: NA`) is
+    passed over. Nothing narrows: ``allowed`` as it is."""
+    values, used = allowed.values, {}
+    for key, value in after.items():
+        # 1. Only another slot whose value names something of the home is evidence.
+        if key == slot or key in before or value not in flat_values(key, vocab):
+            continue
+        # 2. Taken if it leaves the slot fewer values, but some.
+        trial = slot_values(slot, {**before, **used, key: value}, rows, vocab)
+        if trial.conditioned and trial.values and set(trial.values) < set(values):
+            used[key] = value
+            values = trial.values
+    return SlotValues(values, allowed.conditioned or bool(used)), used
+
+
 @dataclass
 class InvalidSlot:
     """A slot whose value is not in its trie: where the value starts, what was written
-    (None: cut off before its closing quote) and the trie it must be decoded with."""
+    (None: cut off before its closing quote) and the trie it must be decoded with; the
+    slots written before it and the later slots that narrowed the trie (evidence)."""
 
     slot: str
     value_start: int
     written: Optional[str]
     trie: IriTrie
     conditioned: bool
+    before: Dict[str, str] = field(default_factory=dict)
+    evidence: Dict[str, str] = field(default_factory=dict)
 
 
 def first_invalid_slot(text: str, pos: int, rows: List[Row],
                        vocab: Vocabulary) -> Optional[InvalidSlot]:
-    """The first slot value at or after ``pos`` that its trie does not hold."""
+    """The first slot value at or after ``pos`` that its trie does not hold.
+
+    Valid or not is decided on the slots written before (what constrained greedy
+    decoding sees, so a kept value is the one it would write); the trie of an invalid
+    value is then narrowed by the slots after it (`narrow_by_evidence`)."""
     for match in SLOT_OPEN.finditer(text, pos):
+        # 1. What the slot may hold given the object so far.
         slot, start = match.group(1), match.end()
-        allowed = slot_values(slot, written_slots(text, match.start()), rows, vocab)
+        before = written_slots(text, match.start())
+        allowed = slot_values(slot, before, rows, vocab)
         if not allowed.values:
             continue                      # the home has nothing of this kind: free
+        # 2. A value already in the trie is kept.
         end = text.find('"', start)
         written = text[start:end] if end >= 0 else None
         if written is not None and written in allowed.values:
             continue
-        return InvalidSlot(slot, start, written, IriTrie(allowed.values),
-                           allowed.conditioned)
+        # 3. The first that is not: its trie, narrowed by what the model wrote next.
+        narrowed, evidence = narrow_by_evidence(slot, before, later_slots(text, start),
+                                                rows, vocab, allowed)
+        return InvalidSlot(slot, start, written, IriTrie(narrowed.values),
+                           narrowed.conditioned, before, evidence)
     return None
 
 
@@ -340,16 +437,49 @@ Create = Callable[..., Awaitable[Any]]
 class TrieDecoding:
     """The reply as decoded, and what the trie changed in it: one entry per value
     decoded again (slot, what the free decoding wrote, what the trie decoding wrote,
-    how: `trie` or `nearest`, steps, whether the trie was conditioned)."""
+    how: `trie` or `nearest`, steps, whether the trie was conditioned, the later slots
+    that narrowed it), and the trace of every decision, in order (`TRACE_EVENTS`)."""
 
     text: str
     calls: int = 0
     interventions: List[Dict[str, Any]] = field(default_factory=list)
+    trace: List[Dict[str, Any]] = field(default_factory=list)
+    abstain: bool = False
 
     def as_dict(self) -> Dict[str, Any]:
-        """The record's `decoding` entry."""
-        return {"option": "iri_trie", "calls": self.calls,
-                "interventions": self.interventions}
+        """The record's `decoding` entry (`abstain` only when the option set it, so a
+        record of `iri_trie` keeps the shape it always had)."""
+        record = {"option": "iri_trie", "calls": self.calls,
+                  "interventions": self.interventions, "trace": self.trace}
+        if self.abstain:
+            record["abstain"] = True
+        return record
+
+
+# What the trace holds, one event per decision, in the order they were taken (what
+# `tests/homebench/decoding_report.py` draws). `call` is the decoding's call number
+# (1 is the free reply); `top` the [token, logprob] pairs the call returned.
+TRACE_EVENTS = {
+    "free": "the free reply (call 1): text",
+    "kept": "a slot value in its trie, kept with no call: slot, value",
+    "invalid": "a value outside its trie: slot, free, before, evidence, allowed, "
+               "conditioned, tail (the reply just before the value)",
+    "forced": "characters the trie forces (one branch), written with no call: chars",
+    "step": "one constrained step: call, prefix (value so far), top, rank (of the "
+            "token taken; None: none allowed)",
+    "abstain": "the invalid `artifact_class` names a device kind the room lacks, so the "
+               "goal is rewritten as `unmatched_device`, nothing decoded: words",
+    "nearest": "no top token allowed: call, meant (free continuation), value",
+    "close": "the token that closes the value: token, call and top (None: it came "
+             "with the last step's token)",
+    "resume": "the model's free continuation after the value: call, text",
+    "done": "the reply as decoded: text",
+}
+
+
+def _event(trace: List[Dict[str, Any]], kind: str, **fields: Any) -> None:
+    """Append one trace event (`TRACE_EVENTS`)."""
+    trace.append({"event": kind, **fields})
 
 
 def _reasoning(message: Any) -> str:
@@ -376,9 +506,11 @@ class _Decoder:
     """One reply's decoding: the calls it makes and what it changed."""
 
     def __init__(self, create: Create, model: str, messages: List[Dict[str, str]],
-                 kwargs: Dict[str, Any], thinking: str, top_k: int) -> None:
+                 kwargs: Dict[str, Any], thinking: str, top_k: int,
+                 trace: List[Dict[str, Any]]) -> None:
         self.create, self.model, self.messages = create, model, messages
         self.kwargs, self.thinking, self.top_k = kwargs, thinking, top_k
+        self.trace = trace
         self.calls = 0
 
     async def _call(self, text: str, **kwargs: Any) -> Any:
@@ -387,46 +519,62 @@ class _Decoder:
                                  messages=_prefilled(self.messages, self.thinking, text),
                                  **kwargs)
 
-    async def _top_tokens(self, text: str) -> List[str]:
-        """The top tokens after ``text``, most probable first."""
+    async def _top_tokens(self, text: str) -> List[Tuple[str, float]]:
+        """The top tokens after ``text`` with their logprobs, most probable first."""
         response = await self._call(text, **_step_kwargs(
             self.kwargs, max_tokens=1, logprobs=True, top_logprobs=self.top_k))
         logprobs = response.choices[0].logprobs
         content = logprobs.content if logprobs else []
         tops = sorted(content[0].top_logprobs, key=lambda t: -t.logprob) if content else []
-        return [top.token for top in tops]
+        return [(top.token, round(top.logprob, 4)) for top in tops]
 
     async def _next_token(self, text: str, value: str,
                           trie: IriTrie) -> Optional[Tuple[str, Optional[str]]]:
-        """The most probable of the top tokens that the trie allows after ``value``."""
-        for token in await self._top_tokens(text + value):
+        """The most probable of the top tokens that the trie allows after ``value``
+        (traced with all of them, and the rank of the one taken)."""
+        tops = await self._top_tokens(text + value)
+        for rank, (token, _) in enumerate(tops):
             accepted = trie.accept(value, token)
             if accepted is not None:
+                _event(self.trace, "step", call=self.calls + 1, prefix=value, top=tops,
+                       rank=rank)
                 return accepted
+        _event(self.trace, "step", call=self.calls + 1, prefix=value, top=tops,
+               rank=None)
         return None
 
     async def _closing(self, text: str) -> str:
         """The token that closes a value the trie completed, as the model writes it:
         `",` or `"}` more often than a bare `"`. A bare quote where the model writes
         `",` leaves it believing the comma written, and the reply breaks."""
-        tokens = [t for t in await self._top_tokens(text) if t.startswith('"')]
-        return tokens[0] if tokens else '"'
+        tops = await self._top_tokens(text)
+        tokens = [t for t, _ in tops if t.startswith('"')]
+        closing = tokens[0] if tokens else '"'
+        _event(self.trace, "close", token=closing, call=self.calls + 1, top=tops)
+        return closing
 
     async def _nearest(self, text: str, value: str, trie: IriTrie) -> str:
         """No top token fits: what the model goes on to write, snapped to the trie."""
         response = await self._call(text + value, **_step_kwargs(
             self.kwargs, max_tokens=NEAREST_TOKENS, stop=['"']))
         meant = value + (response.choices[0].message.content or "").split('"')[0]
-        return nearest(meant, trie.completions(value) or trie.values)
+        snapped = nearest(meant, trie.completions(value) or trie.values)
+        _event(self.trace, "nearest", call=self.calls + 1, meant=meant, value=snapped)
+        return snapped
 
     async def _value(self, text: str, trie: IriTrie) -> Tuple[str, Optional[str], str, int]:
         """The value after ``text``, the closing token if one was decoded with it, how
         (`trie` | `nearest`) and the constrained steps it took."""
         value, steps = "", 0
         while steps < MAX_VALUE_STEPS:
-            value += trie.forced_extension(value)
+            # 1. What the trie forces is written without a call.
+            forced = trie.forced_extension(value)
+            if forced:
+                _event(self.trace, "forced", chars=forced)
+            value += forced
             if trie.is_leaf(value):
                 return value, None, "trie", steps
+            # 2. A branch: one call, the most probable allowed token.
             steps += 1
             accepted = await self._next_token(text, value, trie)
             if accepted is None:
@@ -434,7 +582,9 @@ class _Decoder:
             value, closing = accepted
             if closing is not None:
                 return value, closing, "trie", steps
-        return nearest(value, trie.completions(value) or trie.values), None, "nearest", steps
+        snapped = nearest(value, trie.completions(value) or trie.values)
+        _event(self.trace, "nearest", call=None, meant=value, value=snapped)
+        return snapped, None, "nearest", steps
 
     async def value(self, text: str, trie: IriTrie) -> Tuple[str, str, str, int]:
         """Decode one value after ``text`` (which ends at the opening quote): the value,
@@ -442,47 +592,103 @@ class _Decoder:
         value, closing, how, steps = await self._value(text, trie)
         if closing is None:
             closing = await self._closing(text + value)
+        else:
+            _event(self.trace, "close", token=closing, call=None, top=None)
         return value, closing, how, steps
 
     async def resume(self, text: str) -> str:
         """The model's free continuation of the reply after ``text``."""
         response = await self._call(text, **self.kwargs)
-        return response.choices[0].message.content or ""
+        continuation = response.choices[0].message.content or ""
+        _event(self.trace, "resume", call=self.calls + 1, text=continuation)
+        return continuation
+
+
+def _abstention(text: str, invalid: InvalidSlot, rows: List[Row],
+                vocab: Vocabulary) -> Optional[Tuple[str, str, int]]:
+    """The reply with the goal object of ``invalid`` rewritten as a goal about a missing
+    device, the user's words for it, and where the check goes on; None when ``invalid``
+    is not an `artifact_class` naming a device kind the room lacks, or its object is cut
+    off (`utils/abstention.py`)."""
+    # Imported here: abstention.py reads this module's helpers.
+    from .abstention import abstain_object, absent_goal
+
+    if invalid.slot != "artifact_class":
+        return None
+    words = absent_goal({**invalid.before, "artifact_class": invalid.written or ""},
+                        rows, vocab)
+    start = _object_start(text, invalid.value_start)
+    end = _object_end(text, start)
+    if words is None or end >= len(text):
+        return None
+    rewritten = abstain_object(text[start:end + 1], words)
+    return text[:start] + rewritten + text[end + 1:], words, start + len(rewritten)
 
 
 async def decode_with_iri_trie(create: Create, model: str,
                                messages: List[Dict[str, str]], kwargs: Dict[str, Any],
-                               data: Dict[str, Any],
-                               top_k: int = TOP_LOGPROBS) -> TrieDecoding:
+                               data: Dict[str, Any], top_k: int = TOP_LOGPROBS,
+                               abstain: bool = False) -> TrieDecoding:
     """Decode a structuring reply with every IRI value constrained to its trie.
 
     ``create`` is the client's `chat.completions.create` (an Ollama endpoint: it must
     continue a final assistant message and return `top_logprobs`); ``kwargs`` the
-    call's own settings; ``data`` the structured goal context the tries come from."""
+    call's own settings; ``data`` the structured goal context the tries come from.
+    With ``abstain`` an `artifact_class` that names a device kind the room does not
+    have is not decoded again (the trie would put the room's nearest device in its
+    place): its goal becomes one about the missing device (`unmatched_device`)."""
     # 1. The free reply: the control call, and every value it writes in its trie is
     #    what constrained decoding writes as well.
     response = await create(model=model, messages=messages, **kwargs)
     message = response.choices[0].message
-    decoder = _Decoder(create, model, messages, kwargs, _reasoning(message), top_k)
-    result = TrieDecoding(text=message.content or "", calls=1)
+    result = TrieDecoding(text=message.content or "", calls=1, abstain=abstain)
+    decoder = _Decoder(create, model, messages, kwargs, _reasoning(message), top_k,
+                       result.trace)
+    _event(result.trace, "free", call=1, text=result.text)
     rows, vocab = iri_paths(data), vocabulary(data)
     end = result.text.rfind(THINK_END)
     pos = end + len(THINK_END) if end >= 0 else 0
 
     # 2. Each value outside its trie: decoded again under the trie, then the reply
-    #    continued freely from it.
+    #    continued freely from it. The values passed over on the way are kept.
     while len(result.interventions) < MAX_INTERVENTIONS:
         invalid = first_invalid_slot(result.text, pos, rows, vocab)
+        _trace_kept(result.trace, result.text, pos,
+                    invalid.value_start if invalid else len(result.text))
         if invalid is None:
             break
         head = result.text[:invalid.value_start]
+        _event(result.trace, "invalid", slot=invalid.slot, free=invalid.written,
+               before=invalid.before, evidence=invalid.evidence,
+               allowed=invalid.trie.values, conditioned=invalid.conditioned,
+               tail=head[-TRACE_TAIL:])
+        # 2a. A device the room lacks is reported missing, not replaced.
+        missing = _abstention(result.text, invalid, rows, vocab) if abstain else None
+        if missing is not None:
+            result.text, words, pos = missing
+            _event(result.trace, "abstain", words=words)
+            result.interventions.append({
+                "slot": invalid.slot, "free": invalid.written, "decoded": None,
+                "how": "abstain", "steps": 0, "conditioned": invalid.conditioned,
+                "candidates": len(invalid.trie.values), "evidence": {},
+                "words": words})
+            continue
+        # 2b. Any other value outside its trie is decoded again.
         value, closing, how, steps = await decoder.value(head, invalid.trie)
         result.interventions.append({
             "slot": invalid.slot, "free": invalid.written, "decoded": value, "how": how,
             "steps": steps, "conditioned": invalid.conditioned,
-            "candidates": len(invalid.trie.values)})
+            "candidates": len(invalid.trie.values), "evidence": invalid.evidence})
         result.text = head + value + closing
         result.text += await decoder.resume(result.text)
         pos = len(head) + len(value) + 1
     result.calls = decoder.calls + 1
+    _event(result.trace, "done", text=result.text)
     return result
+
+
+def _trace_kept(trace: List[Dict[str, Any]], text: str, pos: int, end: int) -> None:
+    """Trace the slot values written whole between ``pos`` and ``end``: those the check
+    passed over, so kept as the free decoding wrote them (an unconstrained slot too)."""
+    for match in SLOT_VALUE.finditer(text, pos, end):
+        _event(trace, "kept", slot=match.group(1), value=match.group(2))

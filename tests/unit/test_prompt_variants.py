@@ -761,6 +761,9 @@ class TestArmFiles:
         "homebench.ecai.M3.pv-focused": {"prompt": "focused"},
         "homebench.ecai.M3.pv-repair": {"repair": "class_names"},
         "homebench.ecai.M3.pv-trie": {"decoding": "iri_trie"},
+        "homebench.ecai.M3.pv-genre": {"decoding": "genre"},
+        "homebench.ecai.M3.pv-trie-v2": {"decoding": "iri_trie_v2"},
+        "homebench.ecai.M3.pv-genre-v2": {"decoding": "genre_v2"},
     }
 
     def test_every_arm_changes_exactly_one_axis_of_the_control(self):
@@ -777,4 +780,13 @@ class TestArmFiles:
         for path in ARM_FILES:
             arm = yaml.safe_load(path.read_text(encoding="utf-8"))
             assert arm.pop("prompt_variants")
+            if path.stem.endswith(("pv-genre", "pv-genre-v2")):
+                # The one declared difference: structuring is served by genre_server.py
+                # (its own provider and the Hugging Face model's name; same temperature)
+                assert arm["providers"].pop("genre")
+                structuring = arm["models"]["structuring"]
+                assert structuring["provider"] == "genre"
+                assert structuring["temperature"] == (
+                    control["models"]["structuring"]["temperature"])
+                arm["models"]["structuring"] = control["models"]["structuring"]
             assert arm == control, path.name

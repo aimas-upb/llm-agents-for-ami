@@ -1,0 +1,66 @@
+# HomeBench harness config, ECAI-400: M3 with the structuring step decoded by GENRE with
+# the four rules the fep run of arm H called for (experiment arm H2; the controls are
+# homebench.ecai.M3.yaml, nothing set, and homebench.ecai.M3.pv-genre.yaml, arm H,
+# `decoding: genre`, which is unchanged and still runs):
+#   prompt_variants.structuring   decoding: genre_v2
+#
+# What arm H did at the fep run (job 300297, 400 episodes, commit bf3be605: 32.0%, arm G
+# 34.3%): feasible parts 59.4% (G 55.3%), but infeasible episodes 33% (G 49%, M3 88%) and
+# 48 episodes with a goal lost between segmentation and planning (G: 7). Three causes,
+# all read from the records of the 400:
+#   - `null` is a cheap exit for beam search, which scores whole sequences: a room, a
+#     device or an action slot it could only fill with a long IRI came out null (the
+#     free answer of the same thinking had named a room in 67 feasible goals). An
+#     all-null goal is "unrouted" in the planner, not a refusal;
+#   - beam search wrote JSON keys with a hyphen (`"location-class"`) in 15 episodes: no
+#     slot was recognised, nothing was masked, the reply could not be parsed;
+#   - a thinking that ran to the token cap ended the request (3 episodes, infra errors).
+#
+# H2 is H with, in genre_server.py (all four sent by `decoding: genre_v2`):
+#   no_null          `null` is not a token for location_class, artifact_class,
+#                    artifact_name, affordance_class, affordance_name while the home has
+#                    values for the slot
+#   keys             a JSON key stays a prefix of a key the free answer wrote
+#   abstain          a device kind of the ontology the room lacks (read from the free
+#                    answer of the same thinking) turns that goal of the answer into a
+#                    goal about the missing device (`unmatched_device`), which the
+#                    pipeline answers with "I can't find the X in the Y"
+#   close_thinking   a thinking cut at the token cap is closed with `</think>` and
+#                    answered from
+# Weights and the other steps are H's. Cluster job:
+#
+#   sbatch --export=ALL,VARIANT=tests/homebench/variants/homebench.ecai.M3.pv-genre-v2.yaml,\
+#     GENRE_MODEL_DIR=$HOME/hf_models/DeepSeek-R1-Distill-Qwen-7B,WORKERS=1 \
+#     tests/simuhome/bench/slurm_harness.sbatch
+#
+# See tests/homebench/prompt-variants.md (arm H2).
+
+suite: homebench
+benchmark: tests/homebench/ecai400   # the 400 ECAI episodes, corrections applied
+
+providers:
+  local: {base_url: "http://localhost:11434/v1"}     # Ollama; the planner needs tool calling
+  genre: {base_url: "http://localhost:11600/v1"}     # genre_server.py (rewritten per job)
+
+models:
+  segmentation:  {provider: local, model: "qwen3-8b-16k", temperature: 0}
+  structuring:   {provider: genre, model: "DeepSeek-R1-Distill-Qwen-7B", temperature: 0}
+  planning:
+    explicit:    {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+    general:     {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+  profiling:     {provider: local, model: "ds-r1-7b-16k", temperature: 0}
+  guarding:      {provider: local, model: "ds-r1-1.5b-16k", temperature: 0}
+  response:      {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+
+run:
+  episodes: "hb*"          # every episode of the benchmark directory above
+  limit: null
+  workers: 1               # one local model at a time: parallel workers only queue on it
+  context: none
+  memory: "off"
+  guidelines: homebench    # homebench: no device conditions | default: as deployed
+  environment: "on"        # as the ECAI run (env_on): room environments and action effects
+
+# How structuring builds its prompt (ami_agents/shared/utils/prompt_variants.py):
+prompt_variants:
+  structuring: {decoding: genre_v2}

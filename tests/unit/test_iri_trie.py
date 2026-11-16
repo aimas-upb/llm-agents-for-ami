@@ -18,6 +18,7 @@ from ami_agents.agents.user_assistant.utils.iri_trie import (
     decode_with_iri_trie,
     first_invalid_slot,
     iri_paths,
+    later_slots,
     nearest,
     slot_values,
     written_slots,
@@ -141,6 +142,38 @@ class TestReply:
         invalid = first_invalid_slot(text, 0, self.rows, self.vocab)
         assert invalid.slot == "artifact_name" and invalid.trie.values == ["laundry_washer"]
 
+    def test_the_later_slots_narrow_an_invalid_class(self):
+        # hb1_feasible_seed_4351: an invented class, then the right action of the device.
+        # Left to right, the class trie holds both classes of the light, and greedy may
+        # take the one of `onOff`; the action written next leaves only its own class.
+        text = json.dumps({"location_class": "homeont:MasterBedroom",
+                           "artifact_name": "master_bedroom_light",
+                           "affordance_class": "homeont:BrightnessSetpoint",
+                           "affordance_name": "brightness", "parameter_name": "NA"})
+        invalid = first_invalid_slot(text, 0, self.rows, self.vocab)
+        assert invalid.slot == "affordance_class"
+        assert invalid.trie.values == ["saref:SetAbsoluteLevelCommand"]
+        assert invalid.evidence == {"affordance_name": "brightness"}
+        assert invalid.before["artifact_name"] == "master_bedroom_light"
+
+    def test_later_slots_that_fit_nothing_do_not_narrow(self):
+        text = json.dumps({"artifact_name": "master_bedroom_light",
+                           "affordance_class": "homeont:VolumeCommand",
+                           "affordance_name": "volume"})
+        invalid = first_invalid_slot(text, 0, self.rows, self.vocab)
+        assert invalid.evidence == {}
+        assert invalid.trie.values == ["saref:SetAbsoluteLevelCommand",
+                                       "homeont:SetOnOffCommand"]
+
+    def test_the_evidence_is_read_in_the_same_object_only(self):
+        text = json.dumps({"G1": {"artifact_name": "master_bedroom_light",
+                                  "affordance_class": "Bad"},
+                           "G2": {"affordance_name": "brightness"}})
+        start = text.index('"Bad"') + 1
+        assert later_slots(text, start) == {}
+        invalid = first_invalid_slot(text, 0, self.rows, self.vocab)
+        assert invalid.evidence == {} and len(invalid.trie.values) == 2
+
 
 # -- decoding -----------------------------------------------------------------
 
@@ -209,6 +242,45 @@ class TestDecoding:
         assert fake.calls[-1]["max_tokens"] == 900 and result.calls == 4
 
     @pytest.mark.asyncio
+    async def test_a_class_fixed_by_the_later_action_keeps_that_action(self):
+        # hb1_feasible_seed_4351 in small: the action written after the invented class
+        # names it, so the class is forced (no step call) and the action is kept.
+        first = _text('{"location_class": "homeont:MasterBedroom", '
+                      '"artifact_name": "master_bedroom_light", '
+                      '"affordance_class": "homeont:BrightnessSetpoint", '
+                      '"affordance_name": "brightness"}')
+        fake = FakeOllama(first, [_top('",', '"'),
+                                  _text(' "affordance_name": "brightness"}')])
+        result = await decode_with_iri_trie(fake.create, "m", MESSAGES, {}, _home_data())
+        reply = json.loads(result.text)
+        assert reply["affordance_class"] == "saref:SetAbsoluteLevelCommand"
+        assert reply["affordance_name"] == "brightness"
+        [change] = result.interventions
+        assert change["steps"] == 0 and change["evidence"] == {"affordance_name":
+                                                                "brightness"}
+        assert result.calls == 3
+
+        # The trace tells the whole story, in order, with each call's number.
+        events = [e["event"] for e in result.trace]
+        assert events == ["free", "kept", "kept", "invalid", "forced", "close", "resume",
+                          "kept", "done"]
+        close = result.trace[5]
+        assert close["token"] == '",' and close["call"] == 2
+        assert result.trace[6]["call"] == 3
+        assert result.trace[3]["tail"].endswith('"affordance_class": "')
+
+    @pytest.mark.asyncio
+    async def test_a_step_is_traced_with_its_top_tokens_and_the_rank_taken(self):
+        first = _text('{"location_class": "Laundry"}')
+        fake = FakeOllama(first, [_top("Master", "La"), _text(""), _text("}")])
+        result = await decode_with_iri_trie(fake.create, "m", MESSAGES, {}, _home_data())
+        step = next(e for e in result.trace if e["event"] == "step")
+        assert step["prefix"] == "homeont:" and step["rank"] == 0
+        assert step["top"] == [("Master", 0), ("La", -1)]
+        # The rest of "homeont:MasterBedroom" is forced; no quote offered: a bare one.
+        assert json.loads(result.text) == {"location_class": "homeont:MasterBedroom"}
+
+    @pytest.mark.asyncio
     async def test_no_allowed_top_token_snaps_to_the_nearest_value(self):
         first = _text('{"location_class": "Laundry room"}')
         fake = FakeOllama(first, [_top("Wash", " Laundry"), _text("Laundry room"),
@@ -231,8 +303,13 @@ class TestVariant:
                     affordance_class="saref:SetAbsoluteLevelCommand")
         behaviour, call = await _run({"decoding": "iri_trie"}, bare,
                                      GoalContext("HOME TEXT", _home_data()))
+        trace = behaviour.decoding.pop("trace")
         assert behaviour.decoding == {"option": "iri_trie", "calls": 1,
                                       "interventions": []}
+        # Nothing re-decoded: the free reply, its values kept, the reply as it was.
+        assert [e["event"] for e in trace][0] == "free" and trace[-1]["event"] == "done"
+        assert {"event": "kept", "slot": "artifact_name",
+                "value": "master_bedroom_light"} in trace
         assert behaviour.result.goals["G1"].artifact_name == "master_bedroom_light"
 
     @pytest.mark.asyncio

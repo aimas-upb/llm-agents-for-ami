@@ -1,0 +1,49 @@
+# HomeBench harness config, ECAI-400: M3 with the structuring step decoded by GENRE itself
+# (experiment arm H; the control is homebench.ecai.M3.yaml, nothing set). Arm G
+# (homebench.ecai.M3.pv-trie.yaml, `decoding: iri_trie`) is unchanged and still runs.
+#   prompt_variants.structuring   decoding: genre
+#
+# G emulates GENRE over Ollama (20 tokens per step, greedy, a character fallback). H runs
+# the structuring model (DeepSeek-R1-Distill-Qwen-7B, Hugging Face weights, bf16) in-process
+# behind tests/simuhome/bench/genre_server.py, which masks the logits of the whole
+# vocabulary and decodes the answer by beam search (the thinking is free, greedy). Only
+# structuring moves to that server: every other step stays on Ollama as in M3. Weights
+# are not Ollama's Q4_K_M, so the free reply differs from M3's; the reply of each call
+# also carries the server's own free answer from the same thinking (`structures[].decoding
+# .free_answer`), which is the control on this backend. Cluster job:
+#
+#   sbatch --export=ALL,VARIANT=tests/homebench/variants/homebench.ecai.M3.pv-genre.yaml,\
+#     GENRE_MODEL_DIR=$HOME/hf_models/DeepSeek-R1-Distill-Qwen-7B,WORKERS=1 \
+#     tests/simuhome/bench/slurm_harness.sbatch
+#
+# See tests/homebench/prompt-variants.md (arm H).
+
+suite: homebench
+benchmark: tests/homebench/ecai400   # the 400 ECAI episodes, corrections applied
+
+providers:
+  local: {base_url: "http://localhost:11434/v1"}     # Ollama; the planner needs tool calling
+  genre: {base_url: "http://localhost:11600/v1"}     # genre_server.py (rewritten per job)
+
+models:
+  segmentation:  {provider: local, model: "qwen3-8b-16k", temperature: 0}
+  structuring:   {provider: genre, model: "DeepSeek-R1-Distill-Qwen-7B", temperature: 0}
+  planning:
+    explicit:    {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+    general:     {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+  profiling:     {provider: local, model: "ds-r1-7b-16k", temperature: 0}
+  guarding:      {provider: local, model: "ds-r1-1.5b-16k", temperature: 0}
+  response:      {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+
+run:
+  episodes: "hb*"          # every episode of the benchmark directory above
+  limit: null
+  workers: 1               # one local model at a time: parallel workers only queue on it
+  context: none
+  memory: "off"
+  guidelines: homebench    # homebench: no device conditions | default: as deployed
+  environment: "on"        # as the ECAI run (env_on): room environments and action effects
+
+# How structuring builds its prompt (ami_agents/shared/utils/prompt_variants.py):
+prompt_variants:
+  structuring: {decoding: genre}
