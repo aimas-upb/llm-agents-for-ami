@@ -154,14 +154,22 @@ class GenreProcessor(LogitsProcessor):
                 row[self.eos_ids] = float("-inf")
             return
         self.json_steps += 1
-        accept = self.rules.token_filter(text, state)
-        if accept is not None:
+        held = self.rules.filter_ids(text, state)
+        if held is not None:
+            # A v2 rule holds the token to a small set (a key, a quote): the ids come
+            # from the trie, so the vocabulary is not walked to find them.
             self.filtered += 1
+            keep = json_allowed(state, self.rules.tokens, held)
+            if ends:
+                keep += self.eos_ids
+            if keep:
+                self._keep(row, keep)
+            return
         size = row.shape[0]
         for batch, width in enumerate((*JSON_BATCHES, size)):
             width = min(width, size)
             top = torch.topk(row, width).indices.tolist()
-            keep = json_allowed(state, self.rules.tokens, top, accept)
+            keep = json_allowed(state, self.rules.tokens, top)
             if ends:
                 keep += self.eos_ids
             if len(keep) >= self.keep_min or width == size:

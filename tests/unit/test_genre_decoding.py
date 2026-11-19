@@ -317,6 +317,51 @@ class TestV2Rules:
         assert held == {self.ID[' "'], self.ID['"'], self.ID[" "]}
 
 
+class TestFilterIds:
+    """`HomeRules.filter_ids` is `token_filter` found from the trie: the same tokens."""
+
+    TOK = TestV2Rules.TOK + ['_class"', '_class":', '_class"}', "location", "loc",
+                             'ation_class": "', "ation_class\"x", "", None]
+    KEYS = ["location_class", "artifact_class", "unmatched_device"]
+
+    def _rules(self, **kwargs):
+        return HomeRules(_home_data(), TokenTrie(self.TOK), **kwargs)
+
+    def _same(self, rules, text):
+        state = JsonPrefix.of(text)
+        accept = rules.token_filter(text, state)
+        held = rules.filter_ids(text, state)
+        assert (held is None) == (accept is None)
+        if accept is None:
+            return None
+        every = range(len(self.TOK))
+        assert set(json_allowed(state, rules.tokens, held)) == \
+            set(json_allowed(state, rules.tokens, every, accept))
+        return held
+
+    def test_no_filter_is_none(self):
+        assert self._same(self._rules(), '{"location_class": ') is None
+        assert self._same(self._rules(no_null=True), '{"parameter_name": ') is None
+
+    def test_no_null_value_opening(self):
+        rules = self._rules(no_null=True)
+        for text in ('{"location_class": ', '{"artifact_class":  ',
+                     '{"a": 1, "affordance_name": '):
+            assert self._same(rules, text)
+
+    def test_every_key_prefix(self):
+        rules = self._rules(keys=self.KEYS)
+        for key in self.KEYS:
+            for cut in range(len(key) + 1):
+                self._same(rules, '{"a": 1, "' + key[:cut])
+        assert self._same(rules, '{"unknown_ke') == set()
+
+    def test_both_rules_together(self):
+        rules = self._rules(no_null=True, keys=self.KEYS)
+        self._same(rules, '{"location_class": ')
+        self._same(rules, '{"loc')
+
+
 class TestGenreV2Option:
     def _cfg(self, record):
         message = SimpleNamespace(content="{}")

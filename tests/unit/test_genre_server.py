@@ -132,6 +132,36 @@ class TestGenreProcessor:
         assert _possible(out) == {"<eos>", " ", "\n"}
 
 
+class TestV2FilterDoesNotWalkTheVocabulary:
+    """Job 300721: a v2 rule refuses nearly every token the model scores high, and
+    testing candidates widened to the whole vocabulary at almost every step (a beam of
+    60 s instead of 5). The allowed ids now come from the rule's trie."""
+
+    def _v2(self, **rules):
+        texts = [None if t in ("<eos>", "â\u0098") else t for t in TOKENS]
+        home = HomeRules(_home_data(), TokenTrie(texts, byte_pieces=[BYTES]), **rules)
+        return GenreProcessor(home, FakeTokenizer(), start=1, eos_ids=[EOS], beams=2)
+
+    def test_a_key_is_held_to_the_known_keys_without_widening(self, monkeypatch):
+        monkeypatch.setattr(genre_server, "JSON_BATCHES", (4, len(TOKENS)))
+        processor = self._v2(keys=["location_class", "artifact_class"])
+        scores = _step(processor, '{"loc', favoured=["x", "null", "//"])
+        assert _possible(scores) == {"a"}          # "loc" + "ation_class"
+        assert processor.filtered == 1 and processor.json_widened == 0
+
+    def test_a_value_opens_only_with_a_quote_without_widening(self):
+        processor = self._v2(no_null=True)
+        scores = _step(processor, '{"location_class": ', favoured=["null", "//"])
+        assert _possible(scores) == {" ", '"', "\n"}
+        assert processor.filtered == 1 and processor.json_widened == 0
+
+    def test_a_key_that_left_the_known_keys_is_unconstrained(self):
+        processor = self._v2(keys=["location_class"])
+        assert "x" not in _possible(_step(processor, '{"loc', favoured=["x"]))
+        scores = _step(processor, '{"zzz', favoured=["x"])
+        assert scores[ID["x"]] == 0.0
+
+
 class TestGenreModelAnswer:
     """`GenreModel._genre` end to end with the generations faked: it builds the
     processor, runs the three decodings and reports the record."""

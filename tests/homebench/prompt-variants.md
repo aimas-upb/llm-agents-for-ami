@@ -428,6 +428,16 @@ free answer and written over the same goal of the beam answer, paired by positio
 The record of a call says what each did (`filtered_steps`, `abstained`,
 `thinking_closed`, `v2`).
 
+**H2 speed.** The first fep run (job 300721) took 244 s per episode against 61 s for H
+on the same 66 episodes (a beam of 60 s per call against 5 s): the `keys` and `no_null`
+filters refuse nearly every token the model scores high, and testing candidates widened
+to the whole vocabulary at almost every step. The allowed ids now come from the rule's
+trie (`HomeRules.filter_ids`), the same tokens as `token_filter`; the number of beams is
+unchanged. Measured on 7 of the 66 episodes (job 302725, 1 worker): a beam of 9.4 s per
+call against 63.5 s before (H: 7.2 s on the same episodes), 77 s per episode against 215 s
+(H: 67 s), `json_widened` 7.2 against 242 per call (H: 7.7). The full 400-episode run is
+job 302815.
+
 What would count as the result, from the numbers above and not measured yet: G2 can
 return at most the 16 hb1 infeasible failures that the rule fires on (49% -> 68% there)
 plus its share of the mixed episodes; H2 at most the 48 + 18 episodes lost to the three

@@ -141,6 +141,7 @@ class HomeRules:
         self.no_null = no_null
         self.keys: Optional[IriTrie] = IriTrie(sorted(set(keys))) if keys else None
         self._tries: Dict[Tuple[str, ...], IriTrie] = {}
+        self._spaces: Optional[Set[int]] = None
 
     def _trie(self, values: List[str]) -> IriTrie:
         key = tuple(values)
@@ -198,6 +199,44 @@ class HomeRules:
             if opened and flat_values(opened.group(1), self.vocab):
                 return _quote_or_space
         return None
+
+    def filter_ids(self, text: str, state: "JsonPrefix") -> Optional[Set[int]]:
+        """`token_filter` as the set of token ids it accepts, or None when there is no
+        filter. The same rule, found from the trie instead of by testing a candidate
+        token at a time: the filter rejects nearly every token the model scores high
+        (a key must stay inside the known keys, a no-null value opens only with a quote),
+        so testing candidates widened to the whole vocabulary at almost every step and a
+        beam took 60 s instead of 5 (job 300721)."""
+        if self.keys is not None and state.in_string and state.is_key:
+            return self._key_ids(text[text.rfind('"') + 1:])
+        if self.no_null:
+            opened = VALUE_OPEN.search(text)
+            if opened and flat_values(opened.group(1), self.vocab):
+                return self._quote_or_space_ids()
+        return None
+
+    def _quote_or_space_ids(self) -> Set[int]:
+        """The ids of the tokens `_quote_or_space` accepts (worked out once)."""
+        if self._spaces is None:
+            self._spaces = {i for i, text in enumerate(self.tokens.tokens)
+                            if text and _quote_or_space(text)}
+        return self._spaces
+
+    def _key_ids(self, prefix: str) -> Set[int]:
+        """The ids of the tokens `_key_token` accepts after the key written so far
+        (``prefix``): those that keep it inside a known key, and those that close a
+        whole key with what may follow its quote."""
+        ids: Set[int] = set()
+        if self.keys is None:
+            return ids
+        for key in self.keys.completions(prefix):
+            rest = key[len(prefix):]
+            ids |= self.tokens.prefixes_of(rest)
+            for token_id in self.tokens.starting_with(rest + '"'):
+                tail = (self.tokens.tokens[token_id] or "")[len(rest) + 1:]
+                if KEY_TAIL.fullmatch(tail):
+                    ids.add(token_id)
+        return ids
 
     def _key_token(self, prefix: str, token: str) -> bool:
         """Whether ``token`` continues the key written so far (``prefix``) inside the
