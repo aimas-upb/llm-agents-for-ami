@@ -304,6 +304,38 @@ class TestGenreModelWorker:
             model.complete({})
 
 
+class TestThinkingCap:
+    """The cap of the thinking is `--max-tokens` unless the request sets its own (a
+    Qwen3 model thinks several times what a DeepSeek-R1 distill does)."""
+
+    class _Tokenizer:
+        def apply_chat_template(self, messages, add_generation_prompt, tokenize):
+            return "prompt"
+
+        def __call__(self, prompt, return_tensors, add_special_tokens):
+            import types
+            return types.SimpleNamespace(
+                input_ids=torch.zeros((1, 1), dtype=torch.long))
+
+    def _caps(self, monkeypatch, model, body):
+        seen = []
+        model.tokenizer = self._Tokenizer()
+        model._genre = lambda body, ids, max_tokens, genre: seen.append(max_tokens)
+        monkeypatch.setattr(torch.Tensor, "to", lambda self, *a, **k: self)  # no GPU
+        model._complete({"messages": [], "genre": {"data": {}}, **body})
+        return seen[0]
+
+    def test_the_default_is_the_one_runs_always_had(self, monkeypatch):
+        model = genre_server.GenreModel.__new__(genre_server.GenreModel)
+        assert self._caps(monkeypatch, model, {}) == 4096
+
+    def test_the_server_option_raises_it_and_the_request_still_wins(self, monkeypatch):
+        model = genre_server.GenreModel.__new__(genre_server.GenreModel)
+        model.default_max_tokens = 10240
+        assert self._caps(monkeypatch, model, {}) == 10240
+        assert self._caps(monkeypatch, model, {"max_tokens": 512}) == 512
+
+
 class TestThinkEnd:
     """The stop of the thinking: the text written after the prompt ends with
     `</think>` (replaces `stop_strings`, which leaks host memory on every call)."""

@@ -118,7 +118,9 @@ sed "s#http://localhost:11434/v1#http://127.0.0.1:${OLLAMA_PORT}/v1#g; s#http://
 # Set GENRE_MODEL_DIR to the model's weights; a variant's `genre` provider
 # (http://localhost:11600/v1) is rewritten to this job's server. GENRE_BEAMS: beams of
 # the answer (default 4); GENRE_LENGTH_PENALTY: beam score = sum logprob / length^penalty
-# (default 1.0, transformers'; 0 = plain sum, no reward for a longer answer). Without GENRE_MODEL_DIR nothing here runs.
+# (default 1.0, transformers'; 0 = plain sum, no reward for a longer answer). GENRE_MAX_TOKENS: cap of
+# the thinking (default 4096; a Qwen3 model thinks several times what a DeepSeek-R1 distill does).
+# Without GENRE_MODEL_DIR nothing here runs.
 #
 # A watchdog restarts the server when its process is gone (job 300191: it was killed by
 # the memory limit after 34 episodes and every later episode failed in 4 s with
@@ -130,6 +132,7 @@ start_genre() {
   ( cd "$REPO" && exec "$PYTHON" -m tests.simuhome.bench.genre_server \
       --model-dir "$GENRE_MODEL_DIR" --port "$GENRE_PORT" \
       --num-beams "${GENRE_BEAMS:-4}" \
+      --max-tokens "${GENRE_MAX_TOKENS:-4096}" \
       --length-penalty "${GENRE_LENGTH_PENALTY:-1.0}" ) >> "$JOB_DIR/genre_server.log" 2>&1 &
   local pid=$!
   echo "$pid" > "$JOB_DIR/genre.pid"

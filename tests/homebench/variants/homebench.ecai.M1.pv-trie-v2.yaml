@@ -1,0 +1,62 @@
+# HomeBench harness config, ECAI-400 on local models: M1 with structuring decoded by the
+# trie with abstention (experiment arm G2-M1; the control is homebench.ecai.M1.yaml,
+# nothing set; the same arm on M3 is homebench.ecai.M3.pv-trie-v2.yaml):
+#   prompt_variants.structuring   decoding: iri_trie_v2
+#
+# M1 is M3 with Qwen3-8B (`qwen3-8b-16k`) at structuring in place of
+# DeepSeek-R1-Distill-Qwen-7B. Every arm so far (G, H, G2, H2) was on M3, where the
+# structuring model's own errors (notation, a value in the neighbouring field) set the
+# ceiling; M1 passes 72.7% of the 400 with no decoding at all, so this arm measures what
+# the constraint adds, or costs, on a model that already writes the notation right.
+#
+# Does `iri_trie_v2` work on a Qwen3 model? Checked against Ollama (qwen3-4b-16k, same
+# family and chat template as the 8B; the fep Ollama runs the 8B), not assumed:
+#   - the thinking comes back in `message.reasoning` and `content` has no `</think>`,
+#     as for DeepSeek-R1 (iri_trie.py `_reasoning`);
+#   - the reply so far prefilled as `<think>{reasoning}</think>` + text is continued, not
+#     restarted, with the same top-20 tokens as the template's own `<think>\n...\n</think>\n\n`
+#     spacing (the first token after `"location_class": "` is `home`, logprob 0.0, both ways);
+#   - `top_logprobs` is returned for a one-token step.
+# Nothing in iri_trie.py or abstention.py names a model. What does differ is the cost: a
+# Qwen3-8B structuring step thinks about 2.3k tokens (a DeepSeek one a few hundred), and
+# every decoding step sends that thinking again as the prefilled prefix (Ollama keeps the
+# prompt cache, so it is read once).
+#
+# Everything else is M1's, so a difference in the results is the variant's. Details:
+# tests/homebench/prompt-variants.md (arm G2-M1).
+#
+#   conda run -n ami-agents python -m tests.simuhome.bench.harness \
+#       --config tests/homebench/variants/homebench.ecai.M1.pv-trie-v2.yaml --dry-run
+#
+# On fep:
+#   sbatch --export=ALL,REPO=$HOME/llm-agents-for-ami,VARIANT=tests/homebench/variants/homebench.ecai.M1.pv-trie-v2.yaml,WORKERS=1 \
+#     tests/simuhome/bench/slurm_harness.sbatch
+
+suite: homebench
+benchmark: tests/homebench/ecai400   # the 400 ECAI episodes, corrections applied
+
+providers:
+  local: {base_url: "http://localhost:11434/v1"}     # Ollama; the planner needs tool calling
+
+models:
+  segmentation:  {provider: local, model: "qwen3-8b-16k", temperature: 0}
+  structuring:   {provider: local, model: "qwen3-8b-16k", temperature: 0}
+  planning:
+    explicit:    {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+    general:     {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+  profiling:     {provider: local, model: "qwen3-8b-16k", temperature: 0}
+  guarding:      {provider: local, model: "ds-r1-1.5b-16k", temperature: 0}
+  response:      {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+
+run:
+  episodes: "hb*"          # every episode of the benchmark directory above
+  limit: null
+  workers: 1               # one local model at a time: parallel workers only queue on it
+  context: none
+  memory: "off"
+  guidelines: homebench    # homebench: no device conditions | default: as deployed
+  environment: "on"        # as the ECAI run (env_on): room environments and action effects
+
+# How structuring builds its prompt (ami_agents/shared/utils/prompt_variants.py):
+prompt_variants:
+  structuring: {decoding: iri_trie_v2}

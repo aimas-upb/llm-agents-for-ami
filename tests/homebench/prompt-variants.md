@@ -445,6 +445,40 @@ causes, and its infeasible rate depends on the same rule. Whether H2 beats G2 is
 question; the free answer of the same thinking, the control H records on its own
 backend (`structures[].decoding.free_answer`), stays in the record.
 
+### G2-M1 and H2-M1: the same two arms with Qwen3-8B at structuring
+
+Files `variants/homebench.ecai.M1.pv-trie-v2.yaml` (`decoding: iri_trie_v2`) and
+`variants/homebench.ecai.M1.pv-genre-v2.yaml` (`decoding: genre_v2`). The control is
+`homebench.ecai.M1.yaml` (72.7% of the 400, no decoding), not M3: each arm differs from M1
+in the one axis (H2-M1 also in the provider of structuring, as H2 does from M3).
+Everything before this point ran on M3, where DeepSeek-R1-Distill-Qwen-7B writes the
+notation wrong (403 parts of notation) and the constraint repairs it; Qwen3-8B writes it
+right (about 30), so these arms ask what the constraint and the abstention add to, or
+cost, a model that already passes most of the set.
+
+Whether the code worked for a Qwen3 model was checked, not assumed:
+
+- `iri_trie_v2` (Ollama): on `qwen3-4b-16k` (same family and chat template as the 8B),
+  with the real structuring prompt: the thinking is returned in `message.reasoning` and
+  `content` has no `</think>`; the reply so far prefilled as `<think>{reasoning}</think>`
+  + text is continued, not restarted (the same top-20 tokens, `home` at logprob 0.0, with
+  the template's own `<think>\n...\n</think>\n\n` spacing); `top_logprobs` is returned on a
+  one-token step. One whole episode (`hb1_feasible_seed_4351`) ran through the harness
+  with the arm: passed, and the free reply was valid, so no value was re-decoded in it;
+  the re-decoding path itself was exercised by the prefill probe above, not by an episode.
+- `genre_v2` (Hugging Face): read from `genre_server.py`, run on fep (see the run notes
+  of the arm). Qwen3's template leaves the thinking for the model to open, so `reasoning`
+  of the reply keeps the model's `<think>` tag; the stop on `</think>`, the answer after
+  it and the token trie (Qwen2.5's tokenizer, as DeepSeek-R1-Distill-Qwen's) are the same.
+
+The one change to the server: the thinking's cap was a constant, 4096, and DeepSeek steps
+never needed more (mean 370 tokens over the 963 calls of H2, 4 at the cap). Qwen3-8B
+thinks about 2.3k tokens, so most of its thinking would have been cut and closed by
+`close_thinking`. `genre_server.py --max-tokens` (sbatch: `GENRE_MAX_TOKENS`, default 4096,
+so every earlier run is unchanged) sets it; H2-M1 runs with 10240, the 16k context of the
+Ollama copy less the prompt. Backends differ as in H2: the control and the segmentation on
+Ollama (quantised), structuring of H2-M1 on Hugging Face (bf16).
+
 ## 4. Protocol
 
 1. Screening on hb1 (200 episodes: 114 feasible, 86 infeasible), per arm about 1.1 h, 400

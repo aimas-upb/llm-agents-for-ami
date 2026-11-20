@@ -183,10 +183,15 @@ class GenreProcessor(LogitsProcessor):
 class GenreModel:
     """The model, its tokenizer and the token trie, and the two ways to complete."""
 
+    # Output cap of a request that sets none (the thinking's cap): `--max-tokens`.
+    default_max_tokens: int = DEFAULT_MAX_TOKENS
+
     def __init__(self, model_dir: str, beams: int, answer_max: int,
-                 length_penalty: float = DEFAULT_LENGTH_PENALTY) -> None:
+                 length_penalty: float = DEFAULT_LENGTH_PENALTY,
+                 max_tokens: int = DEFAULT_MAX_TOKENS) -> None:
         self.beams, self.answer_max = beams, answer_max
         self.length_penalty = length_penalty
+        self.default_max_tokens = max_tokens
         self.worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="genre-model")
         started = time.time()
         self.tokenizer = AutoTokenizer.from_pretrained(model_dir)
@@ -234,7 +239,7 @@ class GenreModel:
     def _complete(self, body: Dict[str, Any]) -> Dict[str, Any]:
         genre = body.get("genre")
         max_tokens = (body.get("max_tokens") or body.get("max_completion_tokens")
-                      or DEFAULT_MAX_TOKENS)
+                      or self.default_max_tokens)
         prompt = self.tokenizer.apply_chat_template(
             body["messages"], add_generation_prompt=True, tokenize=False)
         ids = self.tokenizer(prompt, return_tensors="pt",
@@ -394,13 +399,15 @@ def main(argv: Optional[List[str]] = None) -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--num-beams", type=int, default=DEFAULT_BEAMS)
     parser.add_argument("--answer-max", type=int, default=DEFAULT_ANSWER_MAX)
+    parser.add_argument("--max-tokens", type=int, default=DEFAULT_MAX_TOKENS,
+                        help="cap of the thinking when a request sets none")
     parser.add_argument("--length-penalty", type=float,
                         default=DEFAULT_LENGTH_PENALTY)
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s %(message)s")
     model = GenreModel(args.model_dir, args.num_beams, args.answer_max,
-                       args.length_penalty)
+                       args.length_penalty, args.max_tokens)
     server = ThreadingHTTPServer((args.host, args.port), make_handler(model))
     logger.info("serving on %s:%d (beams %d)", args.host, args.port, args.num_beams)
     server.serve_forever()

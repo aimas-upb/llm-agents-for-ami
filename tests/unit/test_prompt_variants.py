@@ -790,3 +790,40 @@ class TestArmFiles:
                     control["models"]["structuring"]["temperature"])
                 arm["models"]["structuring"] = control["models"]["structuring"]
             assert arm == control, path.name
+
+
+class TestM1ArmFiles:
+    """The decoding arms on M1 (Qwen3-8B at structuring): the control is M1, and each
+    arm differs from it in the one axis only (genre also in the provider of structuring)."""
+
+    EXPECTED = {
+        "homebench.ecai.M1.pv-trie-v2": {"decoding": "iri_trie_v2"},
+        "homebench.ecai.M1.pv-genre-v2": {"decoding": "genre_v2"},
+    }
+
+    def test_the_arms_are_the_expected_ones(self):
+        found = {p.stem for p in (PROJECT_ROOT / "tests" / "homebench" / "variants"
+                                  ).glob("homebench.ecai.M1.pv-*.yaml")}
+        assert found == set(self.EXPECTED)
+
+    def test_every_arm_changes_exactly_one_axis_of_the_control(self):
+        for stem, expected in self.EXPECTED.items():
+            variant = models.load_variant(
+                str(PROJECT_ROOT / "tests/homebench/variants" / f"{stem}.yaml"))
+            assert variant.prompts == {"structuring": expected}, stem
+
+    def test_every_arm_has_the_controls_models_and_run_settings(self):
+        control = yaml.safe_load((PROJECT_ROOT / "tests/homebench/variants/"
+                                  "homebench.ecai.M1.yaml").read_text(encoding="utf-8"))
+        for stem in self.EXPECTED:
+            arm = yaml.safe_load((PROJECT_ROOT / "tests/homebench/variants" /
+                                  f"{stem}.yaml").read_text(encoding="utf-8"))
+            assert arm.pop("prompt_variants")
+            if stem.endswith("pv-genre-v2"):
+                assert arm["providers"].pop("genre")
+                structuring = arm["models"]["structuring"]
+                assert structuring["provider"] == "genre"
+                assert structuring["temperature"] == (
+                    control["models"]["structuring"]["temperature"])
+                arm["models"]["structuring"] = control["models"]["structuring"]
+            assert arm == control, stem

@@ -1,0 +1,59 @@
+# HomeBench harness config, ECAI-400: M1 with the structuring step decoded by GENRE with
+# the v2 rules (experiment arm H2-M1; the control is homebench.ecai.M1.yaml, nothing
+# set; the same arm on M3 is homebench.ecai.M3.pv-genre-v2.yaml):
+#   prompt_variants.structuring   decoding: genre_v2
+#
+# M1 is M3 with Qwen3-8B at structuring in place of DeepSeek-R1-Distill-Qwen-7B, so here
+# structuring is served by genre_server.py from the Hugging Face weights of Qwen3-8B
+# (bf16, `Qwen/Qwen3-8B`; the M1 control and the segmentation use the Ollama quantised
+# copy, as in H2 where the control ran on Ollama and the arm on Hugging Face).
+#
+# What differs from H2 because the model is a Qwen3 one (genre_server.py was written for
+# DeepSeek-R1-Distill-Qwen-7B; each point below was read from the code, none changes it):
+#   - the chat template does not open the thinking: the prompt ends `<|im_start|>assistant\n`
+#     and the model writes `<think>\n...\n</think>\n\n` itself (DeepSeek's template ends with
+#     `<think>\n`). The stop on `</think>` and the answer that follows are the same; only
+#     `reasoning` in the reply keeps the `<think>` tag the model wrote;
+#   - the tokenizer is Qwen2.5's (DeepSeek-R1-Distill-Qwen is Qwen2.5 as well): same token
+#     trie, same rows of the logits beyond the tokenizer (guarded in `json_allowed`);
+#   - Qwen3 thinks about 2.3k tokens per structuring call, a DeepSeek step 370 on average
+#     (mean over the 963 calls of H2; 4 reached the 4096 cap). The cap must follow, or
+#     `close_thinking` would cut most Qwen3 thinking: GENRE_MAX_TOKENS=10240 is the 16k
+#     context of the Ollama copy less the ~5k tokens of prompt.
+# Weights and the other steps are M1's. Cluster job:
+#
+#   sbatch --export=ALL,REPO=$HOME/llm-agents-for-ami,VARIANT=tests/homebench/variants/homebench.ecai.M1.pv-genre-v2.yaml,\
+#     GENRE_MODEL_DIR=$HOME/hf_models/Qwen3-8B,GENRE_MAX_TOKENS=10240,WORKERS=1 \
+#     tests/simuhome/bench/slurm_harness.sbatch
+#
+# See tests/homebench/prompt-variants.md (arm H2-M1).
+
+suite: homebench
+benchmark: tests/homebench/ecai400   # the 400 ECAI episodes, corrections applied
+
+providers:
+  local: {base_url: "http://localhost:11434/v1"}     # Ollama; the planner needs tool calling
+  genre: {base_url: "http://localhost:11600/v1"}     # genre_server.py (rewritten per job)
+
+models:
+  segmentation:  {provider: local, model: "qwen3-8b-16k", temperature: 0}
+  structuring:   {provider: genre, model: "Qwen3-8B", temperature: 0}
+  planning:
+    explicit:    {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+    general:     {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+  profiling:     {provider: local, model: "qwen3-8b-16k", temperature: 0}
+  guarding:      {provider: local, model: "ds-r1-1.5b-16k", temperature: 0}
+  response:      {provider: local, model: "qwen2.5-coder-7b-16k", temperature: 0}
+
+run:
+  episodes: "hb*"          # every episode of the benchmark directory above
+  limit: null
+  workers: 1               # one local model at a time: parallel workers only queue on it
+  context: none
+  memory: "off"
+  guidelines: homebench    # homebench: no device conditions | default: as deployed
+  environment: "on"        # as the ECAI run (env_on): room environments and action effects
+
+# How structuring builds its prompt (ami_agents/shared/utils/prompt_variants.py):
+prompt_variants:
+  structuring: {decoding: genre_v2}
