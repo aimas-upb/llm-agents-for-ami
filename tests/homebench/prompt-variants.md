@@ -466,18 +466,38 @@ Whether the code worked for a Qwen3 model was checked, not assumed:
   one-token step. One whole episode (`hb1_feasible_seed_4351`) ran through the harness
   with the arm: passed, and the free reply was valid, so no value was re-decoded in it;
   the re-decoding path itself was exercised by the prefill probe above, not by an episode.
-- `genre_v2` (Hugging Face): read from `genre_server.py`, run on fep (see the run notes
-  of the arm). Qwen3's template leaves the thinking for the model to open, so `reasoning`
-  of the reply keeps the model's `<think>` tag; the stop on `</think>`, the answer after
+- `genre_v2` (Hugging Face): read from `genre_server.py`, then run on fep with the real
+  weights (smoke jobs 303339 and 303357, 6 episodes): the server loads Qwen3-8B, the
+  stop on `</think>`, the beam answer and the v2 rules work (the record has the thinking,
+  the free answer and the answer). Qwen3's template leaves the thinking for the model to
+  open, so `reasoning` of the reply keeps the model's `<think>` tag; the answer after
   it and the token trie (Qwen2.5's tokenizer, as DeepSeek-R1-Distill-Qwen's) are the same.
 
-The one change to the server: the thinking's cap was a constant, 4096, and DeepSeek steps
-never needed more (mean 370 tokens over the 963 calls of H2, 4 at the cap). Qwen3-8B
-thinks about 2.3k tokens, so most of its thinking would have been cut and closed by
-`close_thinking`. `genre_server.py --max-tokens` (sbatch: `GENRE_MAX_TOKENS`, default 4096,
-so every earlier run is unchanged) sets it; H2-M1 runs with 10240, the 16k context of the
-Ollama copy less the prompt. Backends differ as in H2: the control and the segmentation on
-Ollama (quantised), structuring of H2-M1 on Hugging Face (bf16).
+What the smoke jobs showed, and the three changes it led to (each default leaves every
+earlier run as it was):
+
+- The thinking's cap was a constant, 4096, and DeepSeek steps seldom needed more (mean 370
+  tokens over the 963 calls of H2, 4 at the cap). Qwen3-8B in the 13 calls measured: 364 to
+  3282 tokens, one at the 10240 cap, mean 1.9k. `genre_server.py --max-tokens` (sbatch:
+  `GENRE_MAX_TOKENS`, default 4096) sets it; H2-M1 runs with 10240, the 16k context of the
+  Ollama copy less the prompt.
+- Speed: Hugging Face generation ran at 13 to 20 tokens per second here, about 0.075 s per
+  thinking token, so a call took 25 s at 400 tokens, 240 s at 3.3k and 495 s at the cap:
+  94 s per call on average, against about 25 s per call in H2. At the ~960 calls of the 400
+  episodes that is about 25 h in one job (limit 23 h), so H2-M1 runs as four jobs of 100
+  episodes each (weights balanced by the number of commands, `ATTEMPT=s1..s4`, merged into
+  `1/homebench.ecai.M1.pv-genre-v2` afterwards, then evaluated and counted once).
+- Timeout: every bench request has 180 s (`models.REQUEST_TIMEOUT`), and one request to
+  `genre_server.py` holds the whole thinking step; `hb1_infeasible_seed_4644` timed out
+  ("Request timed out", an infra episode) while the server went on generating. The
+  variable `BENCH_REQUEST_TIMEOUT` (default 180) raises it; H2-M1 runs with 1500.
+- Weights: the fep home quota has no room for them (a download died at 4.9 of 16 GB with
+  "Disk quota exceeded"), so sbatch `GENRE_HF_REPO` downloads them to the node-local `/tmp`.
+
+Backends differ as in H2: the control and the segmentation on Ollama (quantised),
+structuring of H2-M1 on Hugging Face (bf16). The control M1 had the 180 s timeout on every
+request, and its 71 failed calls were timeouts of Ollama's thinking; G2-M1 keeps 180 s
+(same as the control), H2-M1 does not (1500), so its infra episodes will be fewer.
 
 ## 4. Protocol
 

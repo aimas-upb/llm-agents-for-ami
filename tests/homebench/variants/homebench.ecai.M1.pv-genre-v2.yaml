@@ -16,12 +16,18 @@
 #     `reasoning` in the reply keeps the `<think>` tag the model wrote;
 #   - the tokenizer is Qwen2.5's (DeepSeek-R1-Distill-Qwen is Qwen2.5 as well): same token
 #     trie, same rows of the logits beyond the tokenizer (guarded in `json_allowed`);
-#   - Qwen3 thinks about 2.3k tokens per structuring call, a DeepSeek step 370 on average
-#     (mean over the 963 calls of H2; 4 reached the 4096 cap). The cap must follow, or
-#     `close_thinking` would cut most Qwen3 thinking: GENRE_MAX_TOKENS=10240 is the 16k
-#     context of the Ollama copy less the ~5k tokens of prompt.
+#   - Qwen3 thinks 1.9k tokens per structuring call on average (13 calls of the smoke jobs,
+#     364 to 10243), a DeepSeek step 370 (mean over the 963 calls of H2; 4 reached the 4096
+#     cap). The cap must follow, or `close_thinking` would cut much Qwen3 thinking:
+#     GENRE_MAX_TOKENS=10240 is the 16k context of the Ollama copy less the ~5k tokens of
+#     prompt. At 13-20 tokens per second that is ~94 s per call (H2: ~25 s), so the 400
+#     episodes do not fit one 23 h job: run four jobs of 100 episodes (EPISODES=<names>,
+#     ATTEMPT=s1..s4), merge the records, then evaluate and count once.
+#   - one request holds the whole thinking step and the bench's request timeout is 180 s:
+#     BENCH_REQUEST_TIMEOUT=1500.
 # Weights and the other steps are M1's. Cluster job:
 #
+#   export BENCH_REQUEST_TIMEOUT=1500      # and EPISODES=<comma-separated names> for a shard
 #   sbatch --export=ALL,REPO=$HOME/llm-agents-for-ami,VARIANT=tests/homebench/variants/homebench.ecai.M1.pv-genre-v2.yaml,\
 #     GENRE_MODEL_DIR=/tmp/hf_models-$USER/Qwen3-8B,GENRE_HF_REPO=Qwen/Qwen3-8B,\
 #     GENRE_MAX_TOKENS=10240,WORKERS=1 \
