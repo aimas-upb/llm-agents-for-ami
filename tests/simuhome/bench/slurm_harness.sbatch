@@ -157,6 +157,15 @@ genre_watchdog() {
     echo "=== WATCHDOG $(date '+%F %T'): genre server back up"
   done
 }
+# GENRE_HF_REPO (e.g. Qwen/Qwen3-8B): download the weights into GENRE_MODEL_DIR first when
+# they are not there (for a home quota too small to keep them: point GENRE_MODEL_DIR at the
+# node-local disk, /tmp/...; the copy is kept per node and reused, like the ollama bundle).
+if [ -n "${GENRE_MODEL_DIR:-}" ] && [ -n "${GENRE_HF_REPO:-}" ] && [ ! -f "$GENRE_MODEL_DIR/.complete" ]; then
+  echo "downloading $GENRE_HF_REPO to $GENRE_MODEL_DIR ..."
+  mkdir -p "$GENRE_MODEL_DIR"
+  "$PYTHON" -c 'import os; from huggingface_hub import snapshot_download as d; d(os.environ["GENRE_HF_REPO"], local_dir=os.environ["GENRE_MODEL_DIR"], allow_patterns=["*.safetensors", "*.json", "*.txt"])' \
+    && touch "$GENRE_MODEL_DIR/.complete" || { echo "ERROR: download of $GENRE_HF_REPO failed"; exit 1; }
+fi
 if [ -n "${GENRE_MODEL_DIR:-}" ]; then
   [ -d "$GENRE_MODEL_DIR" ] || { echo "ERROR: missing GENRE_MODEL_DIR $GENRE_MODEL_DIR"; exit 1; }
   GENRE_PORT=$(( 11800 + SLURM_JOB_ID % 200 ))

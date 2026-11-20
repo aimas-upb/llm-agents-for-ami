@@ -23,8 +23,11 @@
 # Weights and the other steps are M1's. Cluster job:
 #
 #   sbatch --export=ALL,REPO=$HOME/llm-agents-for-ami,VARIANT=tests/homebench/variants/homebench.ecai.M1.pv-genre-v2.yaml,\
-#     GENRE_MODEL_DIR=$HOME/hf_models/Qwen3-8B,GENRE_MAX_TOKENS=10240,WORKERS=1 \
+#     GENRE_MODEL_DIR=/tmp/hf_models-$USER/Qwen3-8B,GENRE_HF_REPO=Qwen/Qwen3-8B,\
+#     GENRE_MAX_TOKENS=10240,WORKERS=1 \
 #     tests/simuhome/bench/slurm_harness.sbatch
+# (the home quota on fep has no room for the 16 GB of weights beside DeepSeek's and the
+# Ollama models, so the job downloads them to the node-local /tmp, about 7 minutes.)
 #
 # See tests/homebench/prompt-variants.md (arm H2-M1).
 
