@@ -79,8 +79,10 @@ from ami_agents.agents.user_assistant.utils.llm_client import (
 from ami_agents.shared.utils import prompt_variants
 
 OPENAI_URL = "https://api.openai.com/v1"
-# One request may take this long before it counts as failed (seconds).
-REQUEST_TIMEOUT = 180.0
+# One request may take this long before it counts as failed (seconds). The environment
+# variable BENCH_REQUEST_TIMEOUT raises it for a run whose one request holds a whole
+# thinking step (`decoding: genre`, a Qwen3 model: thinking, free answer and beam search).
+REQUEST_TIMEOUT = float(os.getenv("BENCH_REQUEST_TIMEOUT", "180"))
 
 STEPS = ("segmentation", "structuring", "planning.explicit", "planning.general",
          "profiling", "guarding", "response", "judge")
