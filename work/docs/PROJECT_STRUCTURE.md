@@ -1,6 +1,6 @@
 # Project Structure
 
-**Generated**: 2026-11-15 13:05:04
+**Generated**: 2026-11-21 11:52:59
 **Project**: llm-agents-for-ami
 
 ## Work Directory Structure
@@ -17,6 +17,10 @@ work/
 │   └── M5.log
 └── reports/
     ├── analiza-timp-rulari-locale.md
+    ├── experimente_complet.md
+    ├── experiments_summary.py
+    ├── structurare_explicat.md
+    ├── structuring_analysis.py
     └── timing_analysis.py
 ```
 

@@ -1,5 +1,7 @@
 # Unde se duce timpul în rulările locale HomeBench
 
+> **Nota (2026-11-21): snapshot al rularilor partiale din 31.10.2026.** Folderele `homebench.ecai.M1` si `homebench.ecai.M3` contin acum rularile complete de 400 de episoade (M1: segmentare Qwen3-8B, pornita 31.10 13:10), asa ca `timing_analysis.py` nu mai regenereaza cifrele M1 / M3 de mai jos (pe datele de acum: M1 6,85 h, 0 hang-uri ale simulatorului, 70 de apeluri de structurare taiate). Cifrele `qwen2.5-coder-7b` si `qwen3-8b` raman valabile. Varianta curenta si comparatia cu aceasta analiza: `experimente_complet.md`, sectiunea 14.
+
 Raport de analiză pentru Alex Sorici. Rulări parțiale ECAI-400 pe modele locale (Ollama), 31.10.2026.
 
 Sursa: înregistrările pe episod din `tests/homebench/results/harness/` (M1, M3, qwen2.5-coder-7b, qwen3-8b), logul serverului Ollama și codul din `ami_agents/` și `tests/simuhome/bench/`. Toate cifrele se regenerează cu `python -I work/reports/timing_analysis.py`.
