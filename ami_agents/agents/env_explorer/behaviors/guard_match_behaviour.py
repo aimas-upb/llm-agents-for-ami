@@ -36,7 +36,7 @@ class GuardMatchBehaviour(CyclicBehaviour):
             payload = {}
 
         # 2. The answer, then the reply.
-        response = await self.match(payload)
+        response = await self.find_match(payload)
         reply = msg.make_reply()
         reply.body = json.dumps(response)
         reply.set_metadata("type", MessageType.GUARD_MATCH_RESPONSE.value)
@@ -47,7 +47,9 @@ class GuardMatchBehaviour(CyclicBehaviour):
             reply.thread = msg.thread
         await self.send(reply)
 
-    async def match(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    # Not `match`: SPADE's Behaviour.match(message) decides which behaviour
+    # receives a message; overriding it made this one claim every message.
+    async def find_match(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """The decision under the payload's key, or `match: None`."""
         key = payload.get("key") if isinstance(payload, dict) else None
         if not isinstance(key, dict):

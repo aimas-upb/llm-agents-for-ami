@@ -60,6 +60,14 @@ class TestStarts:
         structure.goals["G1"].timing.stated_start_time_text = "6:30 PM"
         assert check(structure, NOW, WASHER_LEFT).conflicts
 
+    def test_held_starts_no_earlier_than_after(self):
+        """A trigger that must hold for a span starts at the earliest that long
+        after it turns true -- the same moment as "after", for the check."""
+        structure = _structure({"G1": {**ACHIEVE, "timing": {
+            "starts": "on_trigger", "stated_start_time_text": "6:00 PM"}}},
+            _washer("held", "6 minutes"))
+        assert not check(structure, NOW, WASHER_LEFT).conflicts      # 17:54:35 + 6 min
+
     def test_minutes_from_now(self):
         # qt4-1: "At 11:35 AM, that is 13 minutes from now", said at 11:36:54.
         structure = _structure({"G1": {**ACHIEVE, "timing": {

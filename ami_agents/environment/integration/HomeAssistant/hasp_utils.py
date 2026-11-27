@@ -5,6 +5,7 @@ from __future__ import annotations
 import httpx
 import json
 import urllib.parse
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 import websockets
@@ -695,32 +696,106 @@ SCALE_MEANINGS = {
 }
 
 
-def _camel(text: str, first_upper: bool) -> str:
-    parts = [p for p in "".join(c if c.isalnum() else " " for c in text).split() if p]
-    out = "".join(p[:1].upper() + p[1:] for p in parts)
-    return out if first_upper else out[:1].lower() + out[1:]
+# -- artifact and affordance naming -----------------------------------------
+#
+# One artifact is one HA device; each of its entities contributes affordances
+# named after the entity, not after HA's routing. Example, the SolarAssistant
+# Effekta device (`sensor.solarassistant_effekta_battery_state_of_charge`,
+# `select.solarassistant_effekta_charger_source_priority`, ...): the device
+# prefix `solarassistant_effekta` is stripped, giving the keys
+# `battery_state_of_charge` and `charger_source_priority`; the state property
+# is the key, an attribute `<key>_<attribute>`, an action `<key>_<service>`
+# (`charger_source_priority_select_option`). HASP keeps name -> `Affordance`
+# to route a request; the graph carries only the names.
 
 
-def state_property_names(entity_ids: List[str]) -> Dict[str, str]:
-    """entity_id -> the name of the property that reads its state.
+@dataclass(frozen=True)
+class Affordance:
+    """What one affordance name of an artifact stands for in Home Assistant.
 
-    `<domain>State` (`lightState`, `mediaPlayerState`), so every entity of a
-    device has its own property instead of all of them sharing `state`. Where a
-    device has two entities of one domain the entity's object id tells them
-    apart: `sensorTemperatureSensing308eState`.
+    `kind` is `state` (the entity's state), `attribute` (one of its
+    attributes, `attribute`), `metadata` (its descriptive attributes),
+    `service` (an HA service on it, `service`) or `climate_snapshot` (a
+    climate entity's whole state in one read).
     """
-    domains: Dict[str, int] = {}
-    for entity_id in entity_ids:
-        domain = entity_id.split(".", 1)[0]
-        domains[domain] = domains.get(domain, 0) + 1
-    names: Dict[str, str] = {}
-    for entity_id in entity_ids:
-        domain, _, object_id = entity_id.partition(".")
-        stem = _camel(domain, first_upper=False)
-        if domains[domain] > 1:
-            stem += _camel(object_id, first_upper=True)
-        names[entity_id] = f"{stem}State"
-    return names
+    kind: str
+    entity_id: str
+    domain: str
+    service: Optional[str] = None
+    attribute: Optional[str] = None
+
+
+def slugify(text: Optional[str]) -> str:
+    """`text` as a lowercase `_`-separated slug ("Blue Air Garage" ->
+    `blue_air_garage`, "Camera termica 1" -> `camera_termica_1`); "" for none.
+
+    Artifact slugs and the device prefix of affordance names are compared in
+    this form, so a device name and the object ids HA derived from it match.
+    """
+    tokens = "".join(ch.lower() if ch.isalnum() else " " for ch in str(text or "")).split()
+    return "_".join(tokens)
+
+
+def _device_prefix(device_name: Optional[str], object_ids: List[str]) -> str:
+    """The prefix the device's object ids share, to strip from their names.
+
+    The device name's slug when every object id starts with it (or is it);
+    else the longest run of leading `_`-tokens all the object ids share (the
+    Netatmo station "Weather station 70:ee:..." names its entities
+    `netatmo_*`); "" when there is none. A one-entity device whose object id
+    does not start with the device name gets its whole object id as prefix,
+    so its key falls back to the domain.
+    """
+    # 1. The device name, when HA derived the object ids from it.
+    device_slug = slugify(device_name)
+    if device_slug and all(o == device_slug or o.startswith(device_slug + "_")
+                           for o in object_ids):
+        return device_slug
+
+    # 2. A lone entity: all of its object id is the device's.
+    if len(object_ids) == 1:
+        return object_ids[0]
+
+    # 3. Otherwise the leading tokens every object id shares.
+    token_lists = [o.split("_") for o in object_ids]
+    shared: List[str] = []
+    for tokens in zip(*token_lists):
+        if len(set(tokens)) != 1:
+            break
+        shared.append(tokens[0])
+    return "_".join(shared)
+
+
+def affordance_keys(device_name: Optional[str], entity_ids: List[str]) -> Dict[str, str]:
+    """entity_id -> the key its affordances are named by, within its device.
+
+    The object id with the device prefix stripped (`_device_prefix`);
+    the domain when nothing is left (`fan.blue_air_garage` on "Blue Air
+    Garage" -> `fan`); the domain in front only where two entities of the
+    device would get the same key (`fan_blue_air`, `sensor_blue_air`); the
+    whole entity id as a last resort, so keys are always unique.
+    """
+    # 1. Strip the device prefix from every object id.
+    split_ids = [(e, *e.split(".", 1)) for e in entity_ids if "." in e]
+    prefix = _device_prefix(device_name, [object_id for _, _, object_id in split_ids])
+    keys: Dict[str, str] = {}
+    for entity_id, domain, object_id in split_ids:
+        rest = object_id[len(prefix):] if prefix and object_id.startswith(prefix) else object_id
+        keys[entity_id] = rest.strip("_") or domain
+
+    # 2. Clashes: the domain tells two entities apart; failing that, the id.
+    for attempt in ("domain", "entity_id"):
+        counts: Dict[str, int] = {}
+        for key in keys.values():
+            counts[key] = counts.get(key, 0) + 1
+        clashing = [e for e, key in keys.items() if counts[key] > 1]
+        if not clashing:
+            break
+        for entity_id in clashing:
+            domain = entity_id.split(".", 1)[0]
+            keys[entity_id] = (f"{domain}_{keys[entity_id]}" if attempt == "domain"
+                               else slugify(entity_id))
+    return keys
 
 
 # Common metadata/admin attributes to filter out

@@ -255,14 +255,14 @@ def test_the_window_lowers_co2(graph):
     context = build_specific_context(closed, _ambiguous(
         "homeont:CarbonDioxideConcentration", "decrease"))
     assert context is not None
-    assert any(a["artifact_name"] == "window_308e" and a["name"] == "CoverOpenCover"
+    assert any(a["artifact_name"] == "window_308e" and a["name"] == "cover_open_cover"
                and a["type"] == "action_affordance" for a in context.affordances)
     assert any(a["artifact_name"] == "co2_sensing_308e" and a["type"] == "property_affordance"
                for a in context.affordances)
     effects = [action for result in context.observable_property_hints["results"]
                for action in result["actions"]]
     assert any(action["artifact_title"] == "window_308e"
-               and action["action_name"] == "CoverOpenCover"
+               and action["action_name"] == "cover_open_cover"
                and action["direction"] == "decrease" for action in effects)
 
 

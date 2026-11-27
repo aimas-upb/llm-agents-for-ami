@@ -43,7 +43,12 @@ DIRECTIONS = ("high", "low")
 CHANGE_DIRECTIONS = ("increase", "decrease")
 ROLES = ("guard", "trigger", "scope", "recurrence", "termination", "filter")
 CONNECTIVES = ("and", "or")
-OFFSET_DIRECTIONS = ("after", "before")
+# A trigger's offset: act that long after it, that long before it, or once it
+# has held without a break for that long ("above 25 for 5 minutes").
+OFFSET_DIRECTIONS = ("after", "before", "held")
+# What achieves a goal: a device's action, or an alert to the user, which the
+# UserAssistant raises itself ("alert me when the import tops 3 kW").
+ACTION_KINDS = ("device", "alert")
 STARTS = ("now", "at_time", "after_delay", "after_goal", "with_goal", "on_trigger")
 END_KINDS = ("duration", "at_time")
 
@@ -254,6 +259,11 @@ class GoalSpec:
     Explicit and incomplete goals fill the device-side slots (incomplete ones
     leave some None); an ambiguous goal names no device and lists the
     environment variables it implies instead.
+
+    A goal is reached by an action. Usually that is a device's action (the
+    device slots say which); with `action_kind` "alert" it is an alert to the
+    user instead -- the user knows -- whose words are `action_text`, and the
+    device slots stay empty.
     """
 
     goal_specificity: Optional[str] = None
@@ -283,6 +293,10 @@ class GoalSpec:
     implied_environment_vars: List[EnvironmentVar] = field(default_factory=list)
     timing: Optional[GoalTiming] = None
     rationale: Optional[str] = None
+    # The action reaching the goal: "device" (the slots above) or "alert",
+    # whose text is `action_text`.
+    action_kind: str = "device"
+    action_text: Optional[str] = None
     # UA-local, never on the wire: the question to ask when resolution found
     # the goal's devices in several rooms and the goal means only one of them,
     # or when the device the request names is not in the home.
@@ -329,9 +343,26 @@ class GoalSpec:
             implied_environment_vars=_env_vars(data.get("implied_environment_vars")),
             timing=GoalTiming.from_dict(data.get("timing")),
             rationale=_text(data.get("rationale")),
+            action_kind=_choice(data.get("action_kind"), ACTION_KINDS) or "device",
+            action_text=_text(data.get("action_text")),
         )
 
+    @property
+    def is_alert(self) -> bool:
+        """Whether an alert to the user, not a device, reaches this goal."""
+        return self.action_kind == "alert"
+
     def to_wire_dict(self) -> Dict[str, Any]:
+        # An alert goal: its words are all there is; no device slot applies.
+        if self.is_alert:
+            out = {"goal_specificity": self.goal_specificity, "goal_kind": self.goal_kind,
+                   "intent_text": self.intent_text, "action_kind": "alert",
+                   "action_text": self.action_text}
+            if self.timing:
+                out["timing"] = self.timing.to_wire_dict()
+            if self.rationale:
+                out["rationale"] = self.rationale
+            return out
         out: Dict[str, Any] = {
             "goal_specificity": self.goal_specificity,
             "goal_kind": self.goal_kind,
@@ -454,7 +485,10 @@ class PredicateSpec:
         out["role"] = self.role
         out["applies_to"] = list(self.applies_to)
         out["connective"] = self.connective
-        if self.role == "trigger":
+        # A trigger's offset (after / before / held); a recurrence ("whenever
+        # X") may only say how long X must hold before each run.
+        if self.role == "trigger" or (self.role == "recurrence"
+                                      and self.offset_direction == "held"):
             out["offset_text"] = self.offset_text
             out["offset_direction"] = self.offset_direction
         return out
@@ -463,6 +497,31 @@ class PredicateSpec:
 # --------------------------------------------------------------------------
 # The request
 # --------------------------------------------------------------------------
+
+def _start_on_triggers(goals: Dict[str, GoalSpec],
+                       predicates: Dict[str, PredicateSpec]) -> None:
+    """A goal that gives no start, and that a trigger predicate applies to,
+    starts on that trigger.
+
+    "Whenever the AC turns on, close the window" read with a trigger P1 on G1
+    but no timing on G1 has one meaning only; the model left out what the
+    trigger already says. Without this, the planner sees a trigger no goal
+    waits for and plans nothing. A goal whose start IS given ("now", a
+    time, after another goal) is left as it is: a trigger it ignores is a
+    contradiction for the planner to report, not to guess away.
+    """
+    for pred in predicates.values():
+        if pred.role != "trigger":
+            continue
+        for gid in pred.applies_to or []:
+            goal = goals.get(gid)
+            if goal is None:
+                continue
+            if goal.timing is None:
+                goal.timing = GoalTiming(starts="on_trigger")
+            elif not goal.timing.starts and not goal.timing.completes_with:
+                goal.timing.starts = "on_trigger"
+
 
 @dataclass
 class GoalStructure:
@@ -494,17 +553,21 @@ class GoalStructure:
         if not isinstance(raw_predicates, dict):
             raw_predicates = {}
 
+        # 1. The goals and predicates, each cleaned on its own.
         goals = {str(k): GoalSpec.from_dict(v) for k, v in raw_goals.items()}
         for goal in goals.values():
             goal.intent_text = goal.intent_text or intent_text or None
+        predicates = {str(k): PredicateSpec.from_dict(v)
+                      for k, v in raw_predicates.items()}
+        # 2. What the two together imply.
+        _start_on_triggers(goals, predicates)
         return cls(
             intent_text=intent_text or _text(data.get("text_intent")) or "",
             qualifiers=list(qualifiers if qualifiers is not None
                             else data.get("qualifiers") or []),
             structure=structure,
             goals=goals,
-            predicates={str(k): PredicateSpec.from_dict(v)
-                        for k, v in raw_predicates.items()},
+            predicates=predicates,
         )
 
     def to_query_string(self) -> str:

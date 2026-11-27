@@ -235,7 +235,8 @@ def test_temperature_sensor_does_not_expose_synthetic_status_action():
 
 
 def test_temperature_sensor_state_property_returns_number():
-    r = TestClient(appmod.app).get("/workspaces/lab308/artifacts/temp_sensor/properties/state")
+    """The sensor's state property (its key) reads as a number."""
+    r = TestClient(appmod.app).get("/workspaces/lab308/artifacts/temp_sensor/properties/sensor")
     assert r.status_code == 200
     assert r.json() == 21.5
 
@@ -244,6 +245,7 @@ def test_temperature_sensor_state_property_returns_number():
 
 @pytest.mark.parametrize("asked", ["illuminance", "luminosity"])
 def test_query_actions_affecting_observable_property(asked):
+    """The light's and the cover's actions move illuminance, both ways, under their new names."""
     r = TestClient(appmod.app).post(
         "/_graph/query/actions-affecting-observable-property",
         json={"workspace_id": "lab308", "observable_property": asked})
@@ -256,7 +258,7 @@ def test_query_actions_affecting_observable_property(asked):
     # 2. The light's and the cover's actions move it, both ways.
     action_names = {item["action_name"] for item in payload["actions"]}
     directions = {item["direction"] for item in payload["actions"]}
-    assert {"LightTurnOn", "LightTurnOff", "CoverOpenCover", "CoverCloseCover"} <= action_names
+    assert {"light_turn_on", "light_turn_off", "cover_open_cover", "cover_close_cover"} <= action_names
     assert {"increase", "decrease"} <= directions
     assert all("settling_time_seconds" not in item for item in payload["actions"])
 
@@ -272,7 +274,8 @@ def test_query_actions_includes_target_range(home_config):
 
 
 def test_query_action_effects_for_action_target():
-    action_url = f"{BASE}/artifacts/blinds/ha/cover/close_cover"
+    """An action's form target (HASP's action route) finds the variable it moves."""
+    action_url = f"{BASE}/artifacts/blinds/actions/cover_close_cover"
     r = TestClient(appmod.app).post(
         "/_graph/query/action-effects",
         json={"workspace_id": "lab308", "action_url": action_url})

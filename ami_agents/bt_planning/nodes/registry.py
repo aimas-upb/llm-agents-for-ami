@@ -30,6 +30,7 @@ from .affordance_nodes import (
     SettlingTimeWaitNode,
     WaitPropertyConditionNode,
 )
+from .alert_node import compile_alert, validate_alert
 from .compute_node import BlackboardComputeNode, COMPUTE_OPS
 from .dependency_nodes import (
     COMBINERS,
@@ -506,3 +507,11 @@ for _type, _compile, _validate in (
     register_node_type(_type, compile=_compile, validate=_validate)
 register_node_type("ignore_failure", compile=_compile_ignore_failure,
                    validate=_validate_ignore_failure)
+
+
+# ---------------------------------------------------------------------------
+# The `alert` action: the plan tells its user something; no device is touched.
+# The UA delivers what the node raises (`alert_node.py`).
+# ---------------------------------------------------------------------------
+
+register_node_type("alert", compile=compile_alert, validate=validate_alert)

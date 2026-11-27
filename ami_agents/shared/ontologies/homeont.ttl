@@ -184,6 +184,37 @@ Four groups of terms:
     owl:inverseOf :hasSpace .
 
 # ===============================================================================
+# Grouping artifacts without a place
+#
+# Not every workspace stands for a room. An energy system (the inverters, the
+# grid meter) or a telemetry set groups devices by function, system or
+# ownership, and where each device physically sits means nothing to it. Such a
+# workspace stands for a device group instead of a building space: the group has
+# no environment, its artifacts are not located in it, and they observe or move
+# no room variable. hmas:Workspace itself is unchanged; what a workspace stands
+# for is said by which of the two it is linked to.
+# ===============================================================================
+
+:DeviceGroup a owl:Class ;
+    rdfs:comment "A logical grouping of devices by function, system or ownership (for example an energy system or a telemetry set), with no physical extent: it has no environment, and its devices' placement is irrelevant to it."@en ;
+    rdfs:label "Device Group"@en ;
+    owl:disjointWith :BuildingSpace .
+
+:isGroupOfWorkspace a owl:ObjectProperty ;
+    rdfs:domain :DeviceGroup ;
+    rdfs:range hmas:Workspace ;
+    rdfs:comment "Relates a device group to the HMAS workspace that holds its artifacts. The counterpart of isSpaceOfWorkspace for a workspace that stands for no place."@en ;
+    rdfs:label "isGroupOfWorkspace"@en ;
+    owl:inverseOf :hasGroup .
+
+:hasGroup a owl:ObjectProperty ;
+    rdfs:domain hmas:Workspace ;
+    rdfs:range :DeviceGroup ;
+    rdfs:comment "Relates an HMAS workspace to the device group it stands for."@en ;
+    rdfs:label "hasGroup"@en ;
+    owl:inverseOf :isGroupOfWorkspace .
+
+# ===============================================================================
 # The environment of a building space
 #
 # A space and the environment within it are two distinct resources. The space is
@@ -1814,3 +1845,240 @@ closed a CloseCommand."""@en ;
 	rdfs:label "Vacuum State"@en ;
 	rdfs:comment "The operating state of a robot vacuum, for example cleaning, paused or charging. Its start, pause, stop and charge commands change it."@en ;
 	rdfs:subClassOf :DeviceStateProperty .
+
+################################################################################
+# 11. Home Assistant deployments (BEIA lab: a kitchen, a garage, energy systems)
+#
+# Classes a real Home Assistant home needs and neither SimuHome, the lab308e lab
+# nor HomeBench did: leak detection, thermal cameras, window actuators, smart
+# plugs, the gateways other devices are reached through, and the photovoltaic
+# and grid side of a home (inverters, a meter and their readings). Additions
+# only, each under an existing root, so nothing above changes meaning.
+################################################################################
+
+# -- Room variables (a space's environment) ------------------------------------
+
+:Pm25MassConcentration a owl:Class ;
+	rdfs:label "PM2.5 Mass Concentration"@en ;
+	rdfs:comment """Fine particulate matter up to 2.5 micrometres, as a mass concentration. Shares its unit with PM10, so a reading is told apart by what the device says it measures, not by the unit.
+quantitykind:MassConcentration is the closest QUDT quantity kind; it does not encode the particle-size cut-off, which is carried by this class."""@en ;
+	rdfs:subClassOf sosa:ObservableProperty , :AirQuality ;
+	ssn:isPropertyOf :Environment ;
+	qudt:hasQuantityKind quantitykind:MassConcentration ;
+	qudt:unit unit:MicroGM-PER-M3 .
+
+:SoundPressureLevel a owl:Class ;
+	rdfs:label "Sound Pressure Level"@en ;
+	skos:altLabel "noise"@en ;
+	rdfs:comment "How loud a space is, as a sound pressure level in decibels."@en ;
+	rdfs:subClassOf sosa:ObservableProperty ;
+	ssn:isPropertyOf :Environment ;
+	qudt:hasQuantityKind quantitykind:SoundPressureLevel ;
+	qudt:unit unit:DeciB .
+
+:AtmosphericPressure a owl:Class ;
+	rdfs:label "Atmospheric Pressure"@en ;
+	skos:altLabel "air pressure"@en ;
+	rdfs:comment "The pressure of the air of a space, in hectopascals."@en ;
+	rdfs:subClassOf sosa:ObservableProperty ;
+	ssn:isPropertyOf :Environment ;
+	qudt:hasQuantityKind quantitykind:Pressure ;
+	qudt:unit unit:HectoPA .
+
+# -- Devices --------------------------------------------------------------------
+
+:WaterLeakSensor a owl:Class ;
+	rdfs:label "Water Leak Sensor"@en ;
+	skos:altLabel "flood sensor"@en ;
+	rdfs:comment "An instrument that detects water on the floor where it stands: a leak or a flood."@en ;
+	rdfs:subClassOf saref:Sensor .
+
+:ThermalCamera a owl:Class ;
+	rdfs:label "Thermal Camera"@en ;
+	skos:altLabel "infrared camera"@en ;
+	rdfs:comment "An instrument that images the surface temperatures in its field of view and reports their maximum, minimum and average, not the temperature of the air."@en ;
+	rdfs:subClassOf saref:Sensor .
+
+:WeatherStation a owl:Class ;
+	rdfs:label "Weather Station"@en ;
+	rdfs:comment "An instrument that measures several properties of the air where it stands: temperature, humidity, CO2, pressure, noise."@en ;
+	rdfs:subClassOf saref:Sensor .
+
+:WindowController a owl:Class ;
+	rdfs:label "Window Controller"@en ;
+	skos:altLabel "window opener"@en ;
+	skos:altLabel "window actuator"@en ;
+	rdfs:comment "A motor that opens and closes a window. Not a window covering: opening it lets air in, it does not change the light."@en ;
+	rdfs:subClassOf saref:Actuator .
+
+:SmartPlug a owl:Class ;
+	rdfs:label "Smart Plug"@en ;
+	skos:altLabel "smart outlet"@en ;
+	rdfs:comment "A switchable mains outlet, usually metering the power and energy drawn through it."@en ;
+	rdfs:subClassOf saref:Actuator .
+
+:Gateway a owl:Class ;
+	rdfs:label "Gateway"@en ;
+	rdfs:comment "A device through which other devices are commanded or reached: it sends codes, relays radio messages, or hosts a network of devices."@en ;
+	rdfs:subClassOf saref:Actuator .
+
+:InfraredBlaster a owl:Class ;
+	rdfs:label "Infrared Blaster"@en ;
+	skos:altLabel "IR remote"@en ;
+	rdfs:comment "A gateway that sends learned infrared (and often radio) codes, standing in for the remote controls of the devices it faces."@en ;
+	rdfs:subClassOf :Gateway .
+
+:RadioBridge a owl:Class ;
+	rdfs:label "Radio Bridge"@en ;
+	skos:altLabel "RF bridge"@en ;
+	rdfs:comment "A gateway that sends and receives short-range radio codes (for example 433 MHz) for the devices that use them."@en ;
+	rdfs:subClassOf :Gateway .
+
+:HomeAutomationHub a owl:Class ;
+	rdfs:label "Home Automation Hub"@en ;
+	rdfs:comment "A gateway hosting a network of devices of one system, through which they are reached."@en ;
+	rdfs:subClassOf :Gateway .
+
+:SolarInverter a owl:Class ;
+	rdfs:label "Solar Inverter"@en ;
+	skos:altLabel "PV inverter"@en ;
+	rdfs:comment "Converts the direct current of photovoltaic panels into the alternating current of the home and the grid, and meters what flows through it."@en ;
+	rdfs:subClassOf saref:Meter .
+
+:HybridInverter a owl:Class ;
+	rdfs:label "Hybrid Inverter"@en ;
+	rdfs:comment "A solar inverter that also charges and discharges a battery, choosing between solar, battery and grid by priorities it is set to."@en ;
+	rdfs:subClassOf :SolarInverter .
+
+:EnergyMeter a owl:Class ;
+	rdfs:label "Energy Meter"@en ;
+	skos:altLabel "grid meter"@en ;
+	rdfs:comment "An instrument metering the electrical energy and power exchanged at a connection point, for example between the home and the grid."@en ;
+	rdfs:subClassOf saref:Meter .
+
+# -- Commands ---------------------------------------------------------------------
+
+:SendCodeCommand a owl:Class ;
+	rdfs:label "Send Code Command"@en ;
+	rdfs:comment """Sends one named code (infrared or radio) that a gateway has learned, to whichever device that code commands.
+No SAREF command fits: the code is not a level, a state or a mode of the gateway itself, but a message it passes on."""@en ;
+	rdfs:subClassOf saref:Command .
+
+# -- Readings of a device ------------------------------------------------------------
+
+:WaterLeak a owl:Class ;
+	rdfs:label "Water Leak"@en ;
+	rdfs:comment "Whether water is detected where a leak sensor stands: true while it is wet."@en ;
+	rdfs:subClassOf :DeviceStateProperty .
+
+:HeatAlarm a owl:Class ;
+	rdfs:label "Heat Alarm"@en ;
+	rdfs:comment "Whether a device reports an overheating: true while what it watches is above its alarm threshold."@en ;
+	rdfs:subClassOf :DeviceStateProperty .
+
+:Connectivity a owl:Class ;
+	rdfs:label "Connectivity"@en ;
+	rdfs:comment "Whether a device is reachable: true while it is online."@en ;
+	rdfs:subClassOf :DeviceStateProperty .
+
+:ProblemDetected a owl:Class ;
+	rdfs:label "Problem Detected"@en ;
+	rdfs:comment "Whether a device reports a fault or a pending service message."@en ;
+	rdfs:subClassOf :DeviceStateProperty .
+
+:SurfaceTemperature a owl:Class ;
+	rdfs:label "Surface Temperature"@en ;
+	rdfs:comment "The temperature of surfaces in a thermal camera's view. A reading of the device, not of the air of a space: a hot motor does not make the room warm."@en ;
+	rdfs:subClassOf sosa:ObservableProperty ;
+	qudt:hasQuantityKind quantitykind:ThermodynamicTemperature ;
+	qudt:unit unit:DEG_C .
+
+:SurfaceTemperatureMax a owl:Class ;
+	rdfs:label "Maximum Surface Temperature"@en ;
+	rdfs:comment "The hottest surface temperature in a thermal camera's view."@en ;
+	rdfs:subClassOf :SurfaceTemperature .
+
+:SurfaceTemperatureMin a owl:Class ;
+	rdfs:label "Minimum Surface Temperature"@en ;
+	rdfs:comment "The coldest surface temperature in a thermal camera's view."@en ;
+	rdfs:subClassOf :SurfaceTemperature .
+
+:SurfaceTemperatureAverage a owl:Class ;
+	rdfs:label "Average Surface Temperature"@en ;
+	rdfs:comment "The average surface temperature over a thermal camera's view."@en ;
+	rdfs:subClassOf :SurfaceTemperature .
+
+:DeviceInternalTemperature a owl:Class ;
+	rdfs:label "Device Internal Temperature"@en ;
+	rdfs:comment "The temperature inside a device (for example an inverter's heat sink), which says how hard it works, not how warm its surroundings are."@en ;
+	rdfs:subClassOf sosa:ObservableProperty ;
+	qudt:hasQuantityKind quantitykind:ThermodynamicTemperature ;
+	qudt:unit unit:DEG_C .
+
+:TemperatureAlarmThreshold a owl:Class ;
+	rdfs:label "Temperature Alarm Threshold"@en ;
+	rdfs:comment "The temperature above which a device raises its heat alarm."@en ;
+	rdfs:subClassOf :ActuatableDeviceProperty ;
+	qudt:hasQuantityKind quantitykind:ThermodynamicTemperature ;
+	qudt:unit unit:DEG_C .
+
+# -- Electrical readings -----------------------------------------------------------
+
+:EnergyExported a owl:Class ;
+	rdfs:label "Energy Exported"@en ;
+	rdfs:comment "Cumulative electrical energy a device or connection point has delivered, for example to the grid. The counterpart of EnergyImported."@en ;
+	qudt:hasQuantityKind quantitykind:Energy ;
+	qudt:unit unit:MilliW-HR ;
+	rdfs:subClassOf sosa:ObservableProperty .
+
+:ReactivePower a owl:Class ;
+	rdfs:label "Reactive Power"@en ;
+	rdfs:comment "The reactive electrical power exchanged at this instant, in volt-amperes reactive."@en ;
+	qudt:hasQuantityKind quantitykind:ReactivePower ;
+	qudt:unit unit:V-A_Reactive ;
+	rdfs:subClassOf sosa:ObservableProperty .
+
+:PhotovoltaicPower a owl:Class ;
+	rdfs:label "Photovoltaic Power"@en ;
+	skos:altLabel "solar power"@en ;
+	rdfs:comment "The power the photovoltaic panels deliver at this instant."@en ;
+	rdfs:subClassOf :ActivePower .
+
+:GridPower a owl:Class ;
+	rdfs:label "Grid Power"@en ;
+	rdfs:comment "The power exchanged with the grid at this instant."@en ;
+	rdfs:subClassOf :ActivePower .
+
+:BatteryPower a owl:Class ;
+	rdfs:label "Battery Power"@en ;
+	rdfs:comment "The power flowing into or out of a home battery at this instant."@en ;
+	rdfs:subClassOf :ActivePower .
+
+:LoadPower a owl:Class ;
+	rdfs:label "Load Power"@en ;
+	rdfs:comment "The power the home's loads draw from an inverter at this instant."@en ;
+	rdfs:subClassOf :ActivePower .
+
+:BatteryStateOfCharge a owl:Class ;
+	rdfs:label "Battery State of Charge"@en ;
+	rdfs:comment "How full a home storage battery is, as a percentage. Not BatteryLevel, which is a battery-powered device's own battery."@en ;
+	qudt:hasQuantityKind quantitykind:DimensionlessRatio ;
+	qudt:unit unit:PERCENT ;
+	rdfs:subClassOf sosa:ObservableProperty .
+
+:InverterLoad a owl:Class ;
+	rdfs:label "Inverter Load"@en ;
+	rdfs:comment "How much of its rated output an inverter is delivering, as a percentage."@en ;
+	qudt:hasQuantityKind quantitykind:DimensionlessRatio ;
+	qudt:unit unit:PERCENT ;
+	rdfs:subClassOf sosa:ObservableProperty .
+
+:InverterOperatingMode a owl:Class ;
+	rdfs:label "Inverter Operating Mode"@en ;
+	rdfs:comment "What an inverter is doing, for example producing, on battery, or on grid. Reported, not set."@en ;
+	rdfs:subClassOf :DeviceStateProperty .
+
+:EnergySourcePriority a owl:Class ;
+	rdfs:label "Energy Source Priority"@en ;
+	rdfs:comment "The order in which a hybrid inverter draws on solar, battery and grid, for its output or for charging its battery, chosen from the orders it offers."@en ;
+	rdfs:subClassOf :DeviceMode .

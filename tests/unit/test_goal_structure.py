@@ -20,6 +20,23 @@ EXPLICIT = {
 
 
 class TestGoalSpec:
+    def test_an_alert_reaches_the_goal_instead_of_a_device(self):
+        """"Alert me when ...": the action is an alert; no device slot travels."""
+        goal = GoalSpec.from_dict({**EXPLICIT, "action_kind": "alert",
+                                   "action_text": "Grid import above 3 kW"})
+        assert goal.is_alert and goal.action_text == "Grid import above 3 kW"
+        wire = goal.to_wire_dict()
+        assert (wire["action_kind"], wire["action_text"]) == ("alert", "Grid import above 3 kW")
+        assert "artifact_class" not in wire
+        assert GoalSpec.from_dict(wire).is_alert
+
+    def test_a_device_action_by_default(self):
+        """Every existing structure stays a device goal, and its wire is unchanged."""
+        goal = GoalSpec.from_dict(EXPLICIT)
+        assert goal.action_kind == "device" and not goal.is_alert
+        assert "action_kind" not in goal.to_wire_dict()
+        assert GoalSpec.from_dict({"action_kind": "shout"}).action_kind == "device"
+
     def test_na_and_null_are_kept_apart(self):
         assert GoalSpec.from_dict({"parameter_name": "NA"}).parameter_name == NA
         assert GoalSpec.from_dict({"parameter_name": None}).parameter_name is None
@@ -129,6 +146,21 @@ class TestPredicateSpec:
         assert wire["applies_to"] == ["G1"]
         assert (wire["offset_text"], wire["offset_direction"]) == ("23 minutes", "before")
 
+    def test_a_span_the_trigger_must_hold(self):
+        """"Above 25 for 5 minutes": held, on a trigger or a recurrence;
+        an unknown direction is None."""
+        for role in ("trigger", "recurrence"):
+            wire = PredicateSpec.from_dict({
+                "role": role, "applies_to": ["G1"],
+                "offset_text": "5 minutes", "offset_direction": "held"}).to_wire_dict()
+            assert (wire["offset_text"], wire["offset_direction"]) == ("5 minutes", "held")
+            assert PredicateSpec.from_dict(wire).offset_direction == "held"
+        assert PredicateSpec.from_dict({"offset_direction": "during"}).offset_direction is None
+        # A recurrence's offset travels only when it is a hold.
+        plain = PredicateSpec.from_dict({"role": "recurrence", "offset_text": "5 minutes",
+                                         "offset_direction": "after"}).to_wire_dict()
+        assert "offset_text" not in plain
+
     def test_ambiguous_environment_predicate(self):
         wire = PredicateSpec.from_dict({
             "predicate_specificity": "ambiguous",
@@ -165,3 +197,31 @@ class TestGoalStructure:
         wire = GoalStructure.from_dict(EXPLICIT, intent_text="set it").to_wire_dict()
         assert wire["text_intent"] == "set it"
         assert "category" not in wire
+
+
+class TestStartOnTrigger:
+    """A goal with no start, conditioned by a trigger, starts on it."""
+
+    @staticmethod
+    def _structure(timing=None):
+        # The A4 run's structure: P1 a trigger of G1, G1 given no timing.
+        goal = {**EXPLICIT, **({"timing": timing} if timing else {})}
+        return GoalStructure.from_dict(
+            {"goals": {"G1": goal},
+             "predicates": {"P1": {"predicate_subject": "device_property", "role": "trigger",
+                                   "applies_to": ["G1"], "comparison": "!=",
+                                   "target_value_determined": "off"}}},
+            structure="dependency")
+
+    def test_no_start_given_means_on_the_trigger(self):
+        assert self._structure().goals["G1"].timing.starts == "on_trigger"
+        assert self._structure({"ends": {"kind": "duration", "text": "1 hour"}}
+                               ).goals["G1"].timing.starts == "on_trigger"
+
+    def test_a_given_start_is_kept(self):
+        """'now' plus a trigger is a contradiction the planner reports."""
+        assert self._structure({"starts": "now"}).goals["G1"].timing.starts == "now"
+
+    def test_finishing_with_the_event_is_not_starting_on_it(self):
+        timing = self._structure({"completes_with": "P1"}).goals["G1"].timing
+        assert timing.starts is None and timing.completes_with == "P1"

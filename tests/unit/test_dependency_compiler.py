@@ -590,3 +590,148 @@ class TestAlreadyEnded:
         assert compiled.tree == _act("G1")
         assert any("G1:" in n and "left out" in n for n in compiled.notes)
 
+
+
+# --------------------------------------------------------------------------
+# "Held for a span": a trigger or recurrence that must stay true that long
+# --------------------------------------------------------------------------
+
+WARM = {"predicate_specificity": "explicit", "predicate_subject": "device_property",
+        "predicate_text": "the sensor reads above 25", "artifact_name": "sensor",
+        "property_name": "temperature", "comparison": ">", "target_value_determined": "25"}
+SENSOR_URL = "http://h/sensor/p/temperature"
+
+
+def _run_scripted(compiled, script, step_seconds, steps):
+    """Tick one tree `steps` times, a `step_seconds` apart on the plan clock;
+    before each tick `script(elapsed_seconds)` gives the sensor's reading.
+    Returns the elapsed seconds of every action POST, and the final status."""
+    # 1. A plan clock, the reading, and the HTTP stand-ins.
+    clock = _Clock()
+    start = clock.moment
+    readings = {}
+    posts = []
+
+    def post(url, payload=None, headers=None):
+        posts.append((clock.moment - start).total_seconds())
+        return HTTPResponse(200, {}, {}, url, 0.0)
+
+    http = MagicMock()
+    http.get.side_effect = lambda url, headers=None: HTTPResponse(
+        200, readings.get(url), {}, url, 0.0)
+
+    def compile_child(spec):
+        return registry.compile_node(spec, compile_child)
+
+    # 2. One tree, ticked through the whole script.
+    with patch("ami_agents.bt_planning.nodes.affordance_nodes.HTTPClient",
+               return_value=MagicMock(post=MagicMock(side_effect=post))):
+        tree = compile_child(compiled.tree)
+        tree.setup_with_descendants()
+        runtime = PlanRuntime(compiled.runtime, clock=clock, http_client=http, synchronous=True)
+        for _ in range(steps):
+            readings[SENSOR_URL] = script((clock.moment - start).total_seconds())
+            runtime.before_tick()
+            tree.tick_once()
+            import time
+            time.sleep(0.002)           # let action futures land
+            if tree.status != Status.RUNNING:
+                break
+            clock.moment += timedelta(seconds=step_seconds)
+    return posts, tree.status
+
+
+def _held_plan(graph, role="trigger", span="5 minutes"):
+    """G1 acts once the sensor has read above 25 for `span`."""
+    timing = {"starts": "on_trigger"}
+    return _plan(graph, {"G1": _goal(timing=timing)},
+                 {"P1": {**WARM, "role": role, "applies_to": ["G1"],
+                         "offset_text": span, "offset_direction": "held"}})
+
+
+class TestHeld:
+    def test_held_compiles_to_retry_until_one_attempt_holds(self, graph):
+        """inverter(repeat(inverter(sequence[wait_for P,
+        parallel[timer, inverter(wait_for not P)]]))), then the action."""
+        compiled = _held_plan(graph)
+        held, act = compiled.tree["children"]
+        assert _types(held)[:5] == ["inverter", "repeat", "inverter", "sequence", "wait_for"]
+        attempt = held["children"][0]["children"][0]["children"][0]
+        wait, race = attempt["children"]
+        timer, watchdog = race["children"]
+        assert race["policy"] == "success_on_one"
+        assert timer == {"type": "timer", "name": "G1: 5 minutes of P1", "seconds": 300.0}
+        assert watchdog["type"] == "inverter"
+        assert watchdog["children"][0]["checks"][0]["op"] == "le"     # not (> 25)
+        assert act["type"] == "action" and compiled.runtime["clock"]
+
+    def test_a_short_spike_does_not_act(self, graph):
+        """Above 25 for 4 of the 5 minutes, then back: nothing happens."""
+        posts, status = _run_scripted(_held_plan(graph),
+                                      lambda t: 28 if t < 240 else 20,
+                                      step_seconds=10, steps=60)
+        assert posts == [] and status == Status.RUNNING
+
+    def test_a_full_span_acts_once(self, graph):
+        posts, status = _run_scripted(_held_plan(graph), lambda t: 28,
+                                      step_seconds=10, steps=60)
+        assert status == Status.SUCCESS
+        (fired,) = posts
+        assert 300 <= fired <= 320
+
+    def test_a_drop_mid_span_restarts_the_count(self, graph):
+        """The A1 timeline: up at 1:00, down at 3:00, up again at 4:00 -- it
+        acts at 9:00, five unbroken minutes after 4:00 (not at 6:00)."""
+        def pm(t):
+            return 28 if 60 <= t < 180 or t >= 240 else 20
+        posts, status = _run_scripted(_held_plan(graph), pm, step_seconds=10, steps=80)
+        assert status == Status.SUCCESS
+        (fired,) = posts
+        assert 540 <= fired <= 560
+
+    def test_whenever_it_has_held(self, graph):
+        """A recurrence may hold too: each run waits for an unbroken span."""
+        compiled = _held_plan(graph, role="recurrence")
+        loop = compiled.tree
+        assert loop["type"] == "repeat" and compiled.long_running
+        first = loop["children"][0]["children"][0]
+        assert _types(first)[:2] == ["inverter", "repeat"]
+        posts, _ = _run_scripted(compiled, lambda t: 28 if t < 240 else 20,
+                                 step_seconds=10, steps=60)
+        assert posts == []
+
+
+# --------------------------------------------------------------------------
+# A goal reached by an alert
+# --------------------------------------------------------------------------
+
+class TestAlertGoal:
+    def test_whenever_either_threshold_is_crossed_alert(self, graph):
+        """A3's shape: two triggers joined by or, recurring; the goal's tree is
+        the alert node, and it re-arms once back in band."""
+        # 1. The structure: one alert goal, two `or` recurrence predicates.
+        high = {**WARM, "predicate_text": "above 30", "target_value_determined": "30"}
+        low = {**WARM, "predicate_text": "below 10", "comparison": "<",
+               "target_value_determined": "10", "connective": "or"}
+        alert = {"type": "alert", "name": "G1: alert", "text": "temperature out of band"}
+        compiled = _plan(graph, {"G1": _goal(timing={"starts": "on_trigger"},
+                                             action_kind="alert",
+                                             action_text="temperature out of band")},
+                         {"P1": {**high, "role": "recurrence", "applies_to": ["G1"],
+                                 "connective": "or"},
+                          "P2": {**low, "role": "recurrence", "applies_to": ["G1"]}},
+                         subtrees={"G1": alert})
+        # 2. Whenever either holds: alert, then wait until neither does.
+        loop = compiled.tree
+        assert loop["type"] == "repeat"
+        wait, run, rearm = loop["children"][0]["children"]
+        assert "alert" in _types(run)
+        assert wait["type"] == "await" and rearm["type"] == "await"
+
+
+def test_a_trigger_on_a_goal_with_no_start_is_planned(graph):
+    """The A4 run: the structurer gave G1 no timing; G1 still waits for P1."""
+    compiled = _plan(graph, {"G1": _goal()},
+                     {"P1": {**WASHER_DONE, "role": "trigger", "applies_to": ["G1"]}})
+    wait, act = compiled.tree["children"]
+    assert wait["type"] == "wait_for" and act["type"] == "action"

@@ -248,22 +248,27 @@ class TestCapabilities:
 
 class TestPropertyNames:
     def test_no_artifact_advertises_a_bare_state_property(self, graph):
-        """Every entity's state has its own name (decided: always rename)."""
+        """Every entity's state has its own name: the entity's key (its object
+        id minus the device prefix; the domain for a one-entity device)."""
         rows = graph.query(f"""
             PREFIX td: <{TD}>
             SELECT ?name WHERE {{ ?a td:hasPropertyAffordance ?p . ?p td:name ?name }}
         """)
         names = {str(r.name) for r in rows}
         assert "state" not in names
-        assert {"lightState", "coverState", "climateState"} <= names
+        assert {"light", "cover", "climate"} <= names
 
     def test_each_state_name_reads_its_entity(self, client):
-        url = f"/workspaces/{AREA}/artifacts/temperature_sensing_308e/properties/sensorState"
+        """The state property named by the entity's key reads that entity."""
+        url = f"/workspaces/{AREA}/artifacts/temperature_sensing_308e/properties/sensor"
         assert client.get(url).json() == 22
 
-    def test_bare_state_is_still_served_as_an_alias(self, client):
+    def test_bare_state_is_not_served(self, client):
+        """Only the names the TD advertises route; the old `state` alias is gone."""
         url = f"/workspaces/{AREA}/artifacts/temperature_sensing_308e/properties/state"
-        assert client.get(url).json() == 22
+        response = client.get(url)
+        assert response.status_code == 404
+        assert "sensor" in response.json()["detail"]["available"]
 
 
 class TestArtifactNames:
@@ -296,24 +301,26 @@ def test_no_action_carries_the_legacy_status_command(graph):
 
 
 def test_the_thermostat_read_is_a_get_command(graph):
+    """The climate snapshot action is typed saref:GetCommand."""
     rows = graph.query(f"""
         PREFIX td: <{TD}>
         PREFIX saref: <{SAREF}>
         SELECT ?name WHERE {{ ?a td:hasActionAffordance ?x . ?x td:name ?name ; a saref:GetCommand }}""")
-    assert {str(r.name) for r in rows} == {"getThermostatState"}
+    assert {str(r.name) for r in rows} == {"climate_get_state"}
 
 
 
 class TestActsUpon:
     def test_light_turn_on_changes_state_and_brightness(self, graph):
+        """light_turn_on acts upon the light's state and its brightness."""
         rows = graph.query(f"""
             PREFIX td: <{TD}>
             PREFIX saref: <{SAREF}>
             SELECT ?pn WHERE {{ ?a td:title "ambient_lights_308e" ;
                                   td:hasActionAffordance ?x .
-                               ?x td:name "LightTurnOn" ; saref:actsUpon ?p .
+                               ?x td:name "light_turn_on" ; saref:actsUpon ?p .
                                ?p td:name ?pn }}""")
-        assert {str(r.pn) for r in rows} >= {"lightState", "brightness"}
+        assert {str(r.pn) for r in rows} >= {"light", "light_brightness"}
 
     def test_play_answers_through_the_playback_state_it_changes(self, graph):
         """Playback state is reported, not actuatable: only the commands that
@@ -377,7 +384,7 @@ def test_entity_only_covers_publish_canonical_names_for_the_unmodified_planner(m
     # 3. The planner resolves an action by the slug.
     affordances = artifact_affordances(graph, URIRef(
         f"http://testserver/workspaces/{AREA}/artifacts/{names[0]}#artifact"))
-    tree = {"type": "action", "artifact": names[0], "affordance": "CoverOpenCover",
+    tree = {"type": "action", "artifact": names[0], "affordance": "cover_open_cover",
             "affordance_class": "saref:OpenCommand"}
     assert AsyncBTPlanner()._resolve_affordance_refs(tree, AffordanceCatalog(affordances)) == []
-    assert tree["action_url"].endswith(f"/{names[0]}/ha/cover/open_cover")
+    assert tree["action_url"].endswith(f"/{names[0]}/actions/cover_open_cover")

@@ -27,7 +27,7 @@ class SignifierMatchBehaviour(CyclicBehaviour):
         except json.JSONDecodeError:
             payload = {}
 
-        response = await self.match(payload)
+        response = await self.find_match(payload)
 
         reply = msg.make_reply()
         reply.body = json.dumps(response)
@@ -39,7 +39,9 @@ class SignifierMatchBehaviour(CyclicBehaviour):
             reply.thread = msg.thread
         await self.send(reply)
 
-    async def match(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    # Not `match`: SPADE's Behaviour.match(message) decides which behaviour
+    # receives a message; overriding it made this one claim every message.
+    async def find_match(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """The record under the payload's kind and key, or `match: None`."""
         kind = payload.get("kind") if isinstance(payload, dict) else None
         key = payload.get("key") if isinstance(payload, dict) else None

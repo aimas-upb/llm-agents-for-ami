@@ -7,6 +7,7 @@ import asyncio
 import contextlib
 import urllib.parse
 import uuid
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
@@ -19,12 +20,13 @@ from rdflib import BNode, Graph, Literal, RDF, URIRef
 from rdflib.namespace import XSD
 
 from http import HTTPStatus
-from hasp_utils import (HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST,
-                        get_supported_service_fields, is_service_supported_for_entity,
+from hasp_utils import (Affordance, HomeAssistantWS, HomeAssistantRDF, HomeAssistantREST,
+                        affordance_keys, get_supported_service_fields,
+                        is_service_supported_for_entity, slugify,
                         validate_service_payload_for_entity)
-from hasp_cache import HASPGraphCache
+from hasp_cache import HASPGraphCache, UnknownAffordance
 import hasp_semantics
-from hasp_utils import entity_field_options, state_property_names
+from hasp_utils import entity_field_options
 from hasp_namespaces import (HCTL, HMAS, HTV, JACAMO, JS, QUDT, SCHEMA, SOSA, SSN, TD,
                              TDSOSA, UNIT, WEBSUB, WOTSEC)
 
@@ -51,6 +53,9 @@ if not HA_BASE_URL:
 
 AREAS = {a.strip() for a in os.getenv("AREAS", "").split(",") if a.strip()}  # allowed area_ids
 BASE_WS_URI = os.getenv("BASE_WS_URI", BASE_FALLBACK)  # e.g., https://example.org/ws/lab
+# The HA entity whose state is the home's clock (an ISO timestamp), served at
+# GET /_clock -- e.g. a simulator's sensor.sim_time. Unset: no clock is served.
+CLOCK_ENTITY = os.getenv("CLOCK_ENTITY", "").strip()
 GRAPH_SNAPSHOT_DIR = os.path.join(os.path.dirname(__file__), "graph_snapshots")
 subscriptions: Dict[str, Dict[str, Any]] = {}
 
@@ -212,15 +217,6 @@ def _entity_display_name(entity: Optional[Dict[str, Any]], devices_by_id: Dict[s
     if device_name:
         return device_name
     return object_id or ent_id or "artifact"
-
-
-def _artifact_slug_from_entity(entity: Dict[str, Any], fallback_label: str) -> str:
-    entity_id = entity.get("entity_id", "")
-    if isinstance(entity_id, str) and "." in entity_id:
-        object_id = entity_id.split(".", 1)[1].strip()
-        if object_id:
-            return object_id
-    return fallback_label
 
 
 def _sensor_action_names(device_class: Optional[str], unit: Optional[str]) -> List[str]:
@@ -406,111 +402,6 @@ def _add_effect(rdf: HomeAssistantRDF, art: URIRef, action: BNode, workspace_id:
                hasp_semantics.environment_uri(rdf.base, workspace_id, variable.environment)))
 
 
-async def _resolve_device_and_entities(workspace_id: str, artifact_name: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]], Optional[Dict[str, Any]], str]:
-    decoded_name = urllib.parse.unquote(artifact_name)
-    decoded_canon = _canonical_label(decoded_name)
-    devices, entities = await _get_workspace_devices_and_entities(workspace_id)
-    dev_by_id = {d["id"]: d for d in devices}
-    # Try matching named entities first
-    for entity in entities:
-        label = entity.get("_artifact_label") or _entity_display_name(entity, dev_by_id)
-        object_id = entity.get("entity_id", "").split(".", 1)[-1]
-        candidates = {
-            label,
-            entity.get("_artifact_base_label", ""),
-            entity.get("_artifact_slug", ""),
-            _entity_display_name(entity, dev_by_id),
-            entity.get("entity_id", ""),
-            object_id,
-        }
-        matched = decoded_name in {c for c in candidates if c} or any(
-            _canonical_label(c) == decoded_canon for c in candidates if c
-        )
-        if matched:
-            device = dev_by_id.get(entity.get("device_id"))
-            device_entities = [entity]
-            return device or {}, device_entities, entity, label
-    device = next((d for d in devices if d.get("name") == decoded_name), None)
-    if not device:
-        device = next((d for d in devices if _canonical_label(d.get("name", "")) == decoded_canon), None)
-    if not device:
-        raise HTTPException(status_code=404, detail="Artifact not found")
-    device_entities = [e for e in entities if e.get("device_id") == device["id"]]
-    if not device_entities:
-        raise HTTPException(status_code=404, detail="No entities for artifact")
-    return device, device_entities, None, decoded_name
-
-
-_ORIGINAL_RESOLVE_DEVICE_AND_ENTITIES = _resolve_device_and_entities
-
-
-async def _get_workspace_devices_and_entities(workspace_id: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    devices = await ha_client.get_devices()
-    entities = await ha_client.get_entities()
-    workspace_device_ids = {d["id"] for d in devices if _area_matches(workspace_id, d.get("area_id"))}
-    workspace_entities: List[Dict[str, Any]] = []
-    external_entities: List[Dict[str, Any]] = []
-    for ent in entities:
-        dev_id = ent.get("device_id")
-        ent_area = ent.get("area_id")
-        ent_match = _area_matches(workspace_id, ent_area) or _entity_matches_workspace(ent.get("entity_id"), workspace_id)
-        if ent_match or (dev_id in workspace_device_ids):
-            workspace_entities.append(ent)
-            if dev_id:
-                workspace_device_ids.add(dev_id)
-        elif _area_matches(workspace_id, next((d.get("area_id") for d in devices if d.get("id") == dev_id), None)):
-            external_entities.append(ent)
-    filtered_devices = [d for d in devices if d["id"] in workspace_device_ids]
-    dev_by_id = {d["id"]: d for d in filtered_devices}
-    label_counts: Dict[str, int] = {}
-    slug_counts: Dict[str, int] = {}
-    def _register_label(ent: Dict[str, Any]) -> None:
-        label = _entity_display_name(ent, dev_by_id)
-        ent["_artifact_base_label"] = label
-        label_counts[label] = label_counts.get(label, 0) + 1
-    filtered_entities: List[Dict[str, Any]] = []
-    for ent in workspace_entities:
-        if AREAS:
-            ent_area = ent.get("area_id") or (dev_by_id.get(ent.get("device_id"), {}) or {}).get("area_id")
-            if not _workspace_allowed(ent_area):
-                continue
-        filtered_entities.append(ent)
-        _register_label(ent)
-    workspace_entities = filtered_entities
-    for ent in external_entities:
-        if ent.get("device_id") in workspace_device_ids:
-            if AREAS:
-                ent_area = ent.get("area_id") or (dev_by_id.get(ent.get("device_id"), {}) or {}).get("area_id")
-                if not _workspace_allowed(ent_area):
-                    continue
-            workspace_entities.append(ent)
-            _register_label(ent)
-    for ent in workspace_entities:
-        base_label = ent.get("_artifact_base_label", "artifact")
-        label = base_label
-        if label_counts.get(base_label, 0) > 1:
-            suffix = ent.get("entity_id", "")
-            object_id = suffix.split(".", 1)[1] if isinstance(suffix, str) and "." in suffix else suffix
-            label = f"{base_label} ({object_id})"
-        ent["_artifact_label"] = label
-        base_slug = _artifact_slug_from_entity(ent, label)
-        slug_counts[base_slug] = slug_counts.get(base_slug, 0) + 1
-        if slug_counts[base_slug] > 1:
-            entity_id = ent.get("entity_id", "")
-            if isinstance(entity_id, str) and entity_id:
-                base_slug = entity_id.replace(".", "_")
-            else:
-                base_slug = label
-        ent["_artifact_slug"] = urllib.parse.quote(base_slug, safe="")
-    return filtered_devices, workspace_entities
-
-def _pick_entity(device_entities: List[Dict[str, Any]], domain: str) -> Optional[str]:
-    for e in device_entities:
-        if e.get("entity_id", "").startswith(domain + "."):
-            return e["entity_id"]
-    return None
-
-# ---------------- Endpoints -----------------
 @app.get("/", response_class=Response,
          responses={200: {"content": {"text/turtle": {}}}})
 async def get_platform(request: Request):
@@ -669,10 +560,16 @@ def _extract_hub_request(payload: Dict[str, Any]) -> Tuple[str, str, str, Option
 
 
 async def _iter_notification_targets(entity_id: str) -> List[Dict[str, Any]]:
+    """Every active subscription a change of `entity_id` must reach: those on
+    the workspace topic and those on the topic of the artifact (device) that
+    holds the entity, once per callback and topic, with the names the
+    notification carries (including the property that reads the state)."""
+    # 1. Where the entity is published: its device's artifact, per workspace.
     cache = _get_graph_cache()
     contexts = await cache.get_entity_contexts(entity_id)
     if not contexts:
         return []
+    # 2. The live subscriptions on those topics, each callback once per topic.
     _prune_expired_subscriptions()
     notifications: List[Dict[str, Any]] = []
     seen: set[Tuple[str, str]] = set()
@@ -692,6 +589,7 @@ async def _iter_notification_targets(entity_id: str) -> List[Dict[str, Any]]:
                         "workspace_id": context["workspace_id"],
                         "artifact_uri": context["artifact_uri"],
                         "artifact_title": context["artifact_title"],
+                        "affordance": context.get("affordance", ""),
                     }
                 )
     return notifications
@@ -702,6 +600,10 @@ async def _notify_subscribers_for_entity(
     new_state: Optional[Dict[str, Any]],
     timestamp: Optional[str],
 ) -> None:
+    """POST one entity's new state to every subscriber of its workspace or its
+    device's artifact (`_iter_notification_targets`); a failing callback is
+    logged and skipped, never raised to HA's event loop."""
+    # 1. Who to tell, and what every notification shares.
     notifications = await _iter_notification_targets(entity_id)
     if not notifications:
         return
@@ -711,6 +613,7 @@ async def _notify_subscribers_for_entity(
         "state": (new_state or {}).get("state"),
         "attributes": (new_state or {}).get("attributes", {}),
     }
+    # 2. One POST per subscriber, with its topic and the artifact's names.
     async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
         for target in notifications:
             body = {
@@ -719,6 +622,8 @@ async def _notify_subscribers_for_entity(
                 "workspaceId": target["workspace_id"],
                 "artifactUri": target["artifact_uri"],
                 "artifactTitle": target["artifact_title"],
+                # The device's property that reads this entity's state.
+                "affordance": target["affordance"],
             }
             try:
                 response = await client.post(
@@ -783,23 +688,33 @@ def _build_cached_artifact_ttl(
     device_entities: List[Dict[str, Any]],
     state_map: Dict[str, Dict[str, Any]],
     device: Dict[str, Any],
-) -> str:
-    """The Thing Description of one artifact (one HA entity), as Turtle.
+    display_label: Optional[str] = None,
+) -> Tuple[str, Dict[str, Affordance]]:
+    """The Thing Description of one artifact (one HA device and all its
+    entities), as Turtle, and its affordance map (name -> `Affordance`).
 
     What it carries, in order: the Thing and its registry metadata; what the
     device is (its homeont class and label) and where it is (`isLocatedIn` the
-    room's place, which has the room's environment); one action per HA
-    service the entity supports, typed with its command class, and -- when
-    the service moves a room variable -- its effect actuation; one property
-    per state / attribute, typed with its property class, and -- when that
-    class is an environment variable -- the device's observation of it; the
-    `saref:actsUpon` links from actions to the properties they change; the
-    JaCaMo and WebSub actions every artifact has.
+    room's place, which has the room's environment); per entity, one action
+    per HA service it supports, typed with its command class, and -- when the
+    service moves a room variable -- its effect actuation; per entity, one
+    property for its state and one per attribute, typed with its property
+    class, and -- when that class is an environment variable -- the device's
+    observation of it; the `saref:actsUpon` links from actions to the
+    properties they change; the JaCaMo and WebSub actions every artifact has.
 
-    Example, the lab308e desk lamp: `homeont:DimmableLight`, `saref:Actuator`,
-    `isLocatedIn` the study room; `LightTurnOn` increases `desk_illuminance`
-    (the home gives the lamp `zone: desk`); `lightState` is its
-    `homeont:DimmableLightOnOff`.
+    Affordances are named from the entity's key (`affordance_keys`: object id
+    minus the device prefix, the domain when nothing is left): the state is
+    `<key>`, an attribute `<key>_<attribute>`, an action `<key>_<service>`.
+    Every form targets HASP's own routes (`.../properties/<name>`,
+    `.../actions/<name>`); the map records which entity and service each
+    name stands for.
+
+    Example, the lab308e desk lamp (device `desk_lamp_308e`, one entity
+    `light.desk_lamp_308e`, key `light`): `homeont:DimmableLight`,
+    `saref:Actuator`, `isLocatedIn` the study room; `light_turn_on` increases
+    `desk_illuminance` (the home gives the lamp `zone: desk`); `light` is its
+    `homeont:DimmableLightOnOff`, `light_brightness` its brightness.
     """
     # 1. The Thing, its IRIs, and the prefixes its document uses.
     rdf = HomeAssistantRDF(BASE_WS_URI)
@@ -807,6 +722,7 @@ def _build_cached_artifact_ttl(
     ws = URIRef(f"{rdf.base}workspaces/{aid}#workspace")
     art_dir = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/")
     art = URIRef(f"{art_dir}{safe_name}#artifact")
+    artifact_path = f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}"
 
     for prefix, ns in {
         "sosa": SOSA,
@@ -823,9 +739,7 @@ def _build_cached_artifact_ttl(
     rdf.g.add((art, TD.title, Literal(artifact_label)))
     # `td:title` is the stable instance name (the slug); HA's display name,
     # which a user may change, is `schema:name`.
-    display_label = next((e.get("_artifact_display_label") for e in device_entities
-                          if e.get("_artifact_display_label")), artifact_label)
-    rdf.g.add((art, SCHEMA.name, Literal(display_label)))
+    rdf.g.add((art, SCHEMA.name, Literal(display_label or artifact_label)))
 
     # 2. Thing-level device metadata, straight from the Home Assistant device
     # registry (`config/device_registry/list`). A fact about the device, not an
@@ -853,13 +767,39 @@ def _build_cached_artifact_ttl(
             (state_map.get(e["entity_id"]) or {}).get("attributes") or {})
         for e in device_entities if e.get("entity_id")
     }
-    device_class = semantics.device_class(device_name, semantic_entities.values())
-    hasp_semantics.add_type(rdf.g, art, device_class)
-    hasp_semantics.add_label(rdf.g, art, device_class)
+    # A device is typed with every class the home gives it (a 2-in-1 is both
+    # an AirPurifier and a Dehumidifier); its kind label names the primary
+    # one, and the mapping rules below see them all.
+    device_classes = semantics.device_classes(device_name, semantic_entities.values())
+    for device_class in device_classes:
+        hasp_semantics.add_type(rdf.g, art, device_class)
+    hasp_semantics.add_label(rdf.g, art, device_classes[0] if device_classes else None)
     hasp_semantics.add_place_context(rdf.g, rdf.base, _area_for(aid), art)
+    # A device group has no environment: its devices observe and move no room
+    # variable, whatever their readings are typed as.
+    in_group = semantics.group_class(_area_for(aid)) is not None
     if any(_domain_is_actuator(domain) for domain in domains):
         rdf.g.add((art, RDF.type, hasp_semantics.SAREF.Actuator))
-    state_names = state_property_names(list(semantic_entities))
+    # Each entity's key names its affordances (`affordance_keys`); `claim`
+    # registers a name in the artifact's map, falling back to the entity's
+    # full id when two would collide, so no name ever routes to two things.
+    entity_ids = sorted(semantic_entities)
+    keys = affordance_keys(device_name, entity_ids)
+    affordances: Dict[str, Affordance] = {}
+
+    def claim(name: str, affordance: Affordance) -> str:
+        """Register `name` for `affordance`; returns the name actually used
+        (prefixed with the entity id if another affordance already has it)."""
+        if name in affordances:
+            name = f"{slugify(affordance.entity_id)}_{name}"
+        affordances[name] = affordance
+        return name
+
+    def friendly(entity_id: str) -> str:
+        """How descriptions name an entity: HA's friendly name, not its id."""
+        attrs = (state_map.get(entity_id) or {}).get("attributes") or {}
+        return str(attrs.get("friendly_name") or keys.get(entity_id) or "entity")
+
     # Actions are built before the properties they change; `saref:actsUpon`
     # is linked once both exist.
     property_nodes: Dict[Tuple[str, str], BNode] = {}
@@ -868,8 +808,8 @@ def _build_cached_artifact_ttl(
     rdf.g.add((art, TD.hasSecurityConfiguration, sec))
     rdf.g.add((sec, RDF.type, WOTSEC.NoSecurityScheme))
 
-    # 4. The actions: one per HA service the entity supports, with the room
-    #    variables it moves (`semantics.effects`).
+    # 4. The actions: per entity, one per HA service it supports, with the
+    #    room variables it moves (`semantics.effects`).
     svc_by_domain: Dict[str, Dict[str, Dict[str, Any]]] = {}
     graph_cache = getattr(app.state, "graph_cache", None)
     if graph_cache is not None:
@@ -878,13 +818,14 @@ def _build_cached_artifact_ttl(
             for dom, payload in graph_cache.services_by_domain.items()
         }
 
-    for domain in sorted(domains):
+    for entity_id in entity_ids:
+        domain = entity_id.split(".", 1)[0]
         domain_svcs = svc_by_domain.get(domain, {})
-        domain_entity = _pick_entity(device_entities, domain)
-        domain_entity_state = state_map.get(domain_entity, {}) if domain_entity else {}
-        domain_entity_attrs = domain_entity_state.get("attributes", {}) if isinstance(domain_entity_state, dict) else {}
+        entity_attrs = (state_map.get(entity_id) or {}).get("attributes") or {}
 
-        for svc_name, definition in domain_svcs.items():
+        for svc_name, definition in sorted(domain_svcs.items()):
+            # 4a. Only services that act on an entity of this domain, and
+            #     that this entity supports (its features, its climate fields).
             legacy_applies = "entity_id" in (definition.get("fields") or {})
             modern_applies = any(
                 domain in (entry.get("domain") or [])
@@ -892,11 +833,10 @@ def _build_cached_artifact_ttl(
             )
             if not (legacy_applies or modern_applies):
                 continue
-            if not is_service_supported_for_entity(domain, svc_name, domain_entity_attrs):
+            if not is_service_supported_for_entity(domain, svc_name, entity_attrs):
                 continue
-            action_name = f"{_camel_token(domain)}{_camel_token(svc_name)}"
             all_service_fields = definition.get("fields", {})
-            supported_fields = get_supported_service_fields(domain, domain_entity_attrs, all_service_fields)
+            supported_fields = get_supported_service_fields(domain, entity_attrs, all_service_fields)
             if domain == "climate":
                 required_fields = {
                     "set_humidity": "humidity",
@@ -908,149 +848,166 @@ def _build_cached_artifact_ttl(
                 required_field = required_fields.get(svc_name)
                 if required_field and required_field not in supported_fields:
                     continue
-            # Modern HA services may target entities without requiring any
-            # explicit input fields. Those should still be exposed as actions.
-            if not supported_fields and not (legacy_applies or modern_applies):
-                continue
-            # The entity's own accepted values (its modes, presets, options)
-            # go into the schema; the service definition cannot know them.
+
+            # 4b. The affordance: named `<key>_<service>`, its form HASP's own
+            #     action route; the entity's accepted values (its modes,
+            #     presets, options) go into the schema.
+            action_name = claim(f"{keys[entity_id]}_{svc_name}",
+                                Affordance("service", entity_id, domain, service=svc_name))
             input_schema = rdf._build_input_schema_from_fields(
-                supported_fields, entity_field_options(domain, svc_name, domain_entity_attrs),
+                supported_fields, entity_field_options(domain, svc_name, entity_attrs),
                 domain=domain)
             action_affordance = rdf._add_action(
                 art,
                 action_name,
                 None,
                 "POST",
-                URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/ha/{urllib.parse.quote(domain, safe='')}/{urllib.parse.quote(svc_name, safe='')}"),
+                URIRef(f"{artifact_path}/actions/{urllib.parse.quote(action_name, safe='')}"),
                 "application/json",
                 input_schema=input_schema,
                 description=definition.get("description"),
             )
-            hasp_semantics.add_type(
-                rdf.g, action_affordance,
-                semantics.command_class(device_name, domain, svc_name))
-            if action_affordance is not None and domain_entity:
-                pending_acts_upon.append((action_affordance, domain_entity, domain,
-                                          svc_name, list(supported_fields)))
             if action_affordance is None:
                 continue
-            for variable, direction in semantics.effects(device_name, domain, svc_name):
+
+            # 4c. What it is (its command class), what it changes, and the room
+            #     variables it moves.
+            hasp_semantics.add_type(
+                rdf.g, action_affordance,
+                semantics.command_class(device_name, domain, svc_name, name=action_name))
+            pending_acts_upon.append((action_affordance, entity_id, domain,
+                                      svc_name, list(supported_fields)))
+            effects = ([] if in_group else
+                       semantics.effects(device_name, domain, svc_name, device_classes))
+            for variable, direction in effects:
                 actuation_uri = URIRef(
-                    f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/actuations/"
-                    f"{urllib.parse.quote(domain, safe='')}_{urllib.parse.quote(svc_name, safe='')}"
-                    f"_{variable.name}")
+                    f"{artifact_path}/actuations/"
+                    f"{urllib.parse.quote(action_name, safe='')}_{variable.name}")
                 _add_effect(rdf, art, action_affordance, aid, actuation_uri, variable, direction)
 
     # 5. A climate entity's whole state, readable in one call.
-    if "climate" in domains:
-        climate_ent = _pick_entity(device_entities, "climate")
-        if climate_ent and climate_ent in state_map:
-            rdf._add_action(
-                art,
-                "getThermostatState",
-                # Reads the climate entity's whole state: a get, not a change.
-                hasp_semantics.expand("saref:GetCommand"),
-                "POST",
-                URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/getThermostatState"),
-                "application/json",
-                output_schema=rdf._build_climate_output_schema(),
-            )
+    for entity_id in entity_ids:
+        if not entity_id.startswith("climate.") or entity_id not in state_map:
+            continue
+        snapshot_name = claim(f"{keys[entity_id]}_get_state",
+                              Affordance("climate_snapshot", entity_id, "climate"))
+        rdf._add_action(
+            art,
+            snapshot_name,
+            # Reads the climate entity's whole state: a get, not a change.
+            hasp_semantics.expand("saref:GetCommand"),
+            "POST",
+            URIRef(f"{artifact_path}/actions/{urllib.parse.quote(snapshot_name, safe='')}"),
+            "application/json",
+            output_schema=rdf._build_climate_output_schema(),
+        )
 
     # 6. The properties: each entity's state and attributes, typed, and --
     #    where the type is a room variable -- observed (`_add_observation`).
     def observe(prop: Optional[BNode], prop_class: Optional[str], domain: str) -> None:
+        """Link a property to the room variable its class is, if it is one
+        (never in a device group, which has no room)."""
+        if in_group:
+            return
         variable = semantics.variable(device_name, prop_class)
         if prop is not None and variable is not None:
             _add_observation(rdf, art, prop, aid, variable, domain)
 
-    for entity in device_entities:
-        entity_id = entity.get("entity_id")
-        if not entity_id:
-            continue
+    def property_form(name: str) -> URIRef:
+        """The form target of a property affordance: HASP's property route."""
+        return URIRef(f"{artifact_path}/properties/{urllib.parse.quote(name, safe='')}")
+
+    from hasp_utils import get_operational_attributes, get_metadata_attributes
+    for entity_id in entity_ids:
         entity_state = state_map.get(entity_id, {})
         if not entity_state:
             continue
+        domain = entity_id.split(".", 1)[0]
+        key = keys[entity_id]
         entity_attrs = entity_state.get("attributes", {}) if isinstance(entity_state, dict) else {}
+
+        # 6a. The entity's state, as `<key>`; a number for a measurement.
         state_value = entity_state.get("state")
         if state_value and state_value not in ("unknown", "unavailable"):
-            entity_domain = entity_id.split(".")[0] if "." in entity_id else ""
             unit = entity_attrs.get("unit_of_measurement")
             schema_value = state_value
-            if (entity_domain == "sensor" or unit) and isinstance(state_value, str):
+            if (domain == "sensor" or unit) and isinstance(state_value, str):
                 try:
                     schema_value = int(state_value) if "." not in state_value else float(state_value)
                 except ValueError:
                     pass
-            state_name = state_names.get(entity_id, "state")
-            property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/{state_name}")
-            schema = rdf._build_property_schema("state", schema_value, entity_attrs, entity_domain=entity_domain)
+            state_name = claim(key, Affordance("state", entity_id, domain))
+            schema = rdf._build_property_schema("state", schema_value, entity_attrs, entity_domain=domain)
             state_prop = rdf._add_property(
-                art, state_name, property_uri, output_schema=schema,
-                description=f"Current state of {entity_id}", observable=True
+                art, state_name, property_form(state_name), output_schema=schema,
+                description=f"Current state of {friendly(entity_id)}", observable=True
             )
             state_class = semantics.property_class(
-                device_name, device_class,
-                hasp_semantics.Entity(entity_domain, entity_attrs), "state")
+                device_name, device_classes,
+                hasp_semantics.Entity(domain, entity_attrs), "state", name=state_name)
             hasp_semantics.add_type(rdf.g, state_prop, state_class)
             property_nodes[(entity_id, "state")] = state_prop
-            observe(state_prop, state_class, entity_domain)
+            observe(state_prop, state_class, domain)
 
-        if entity_attrs:
-            from hasp_utils import get_operational_attributes, get_metadata_attributes
-            domain = entity_id.split(".")[0] if "." in entity_id else ""
-            operational_attrs = get_operational_attributes(domain, entity_attrs)
-            semantic_entity = hasp_semantics.Entity(domain, entity_attrs)
-            emitted = set()
-            for attr_name, attr_value in operational_attrs.items():
-                if attr_value is None:
-                    continue
-                emitted.add(attr_name)
-                property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/{urllib.parse.quote(attr_name, safe='')}")
-                schema = rdf._build_property_schema(attr_name, attr_value, entity_attrs,
-                                                    entity_domain=domain)
-                op_prop = rdf._add_property(
-                    art, attr_name, property_uri, output_schema=schema,
-                    description=f"{attr_name} of {entity_id}", observable=True
-                )
-                op_class = semantics.property_class(
-                    device_name, device_class, semantic_entity, attr_name)
-                hasp_semantics.add_type(rdf.g, op_prop, op_class)
-                property_nodes[(entity_id, attr_name)] = op_prop
-                observe(op_prop, op_class, domain)
+        if not entity_attrs:
+            continue
 
-            # Properties the device has by what it supports, whatever HA
-            # reports right now: an off light has no `brightness` attribute,
-            # yet it can be dimmed.
-            for rule in semantics.declared_properties(device_name, device_class, semantic_entity):
-                attr_name = str(rule["signal"])
-                if attr_name in emitted:
-                    continue
-                emitted.add(attr_name)
-                default = rule.get("default")
-                property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/{urllib.parse.quote(attr_name, safe='')}")
-                schema = rdf._build_property_schema(
-                    attr_name, default, {**entity_attrs, attr_name: default},
-                    entity_domain=domain)
-                declared_prop = rdf._add_property(
-                    art, attr_name, property_uri, output_schema=schema,
-                    description=f"{attr_name} of {entity_id}", observable=True
-                )
-                hasp_semantics.add_type(rdf.g, declared_prop, str(rule["class"]))
-                property_nodes[(entity_id, attr_name)] = declared_prop
-                observe(declared_prop, str(rule["class"]), domain)
+        # 6b. Its operational attributes, as `<key>_<attribute>`.
+        operational_attrs = get_operational_attributes(domain, entity_attrs)
+        semantic_entity = hasp_semantics.Entity(domain, entity_attrs)
+        emitted = set()
+        for attr_name, attr_value in operational_attrs.items():
+            if attr_value is None:
+                continue
+            emitted.add(attr_name)
+            prop_name = claim(f"{key}_{attr_name}",
+                              Affordance("attribute", entity_id, domain, attribute=attr_name))
+            schema = rdf._build_property_schema(attr_name, attr_value, entity_attrs,
+                                                entity_domain=domain)
+            op_prop = rdf._add_property(
+                art, prop_name, property_form(prop_name), output_schema=schema,
+                description=f"{attr_name} of {friendly(entity_id)}", observable=True
+            )
+            op_class = semantics.property_class(
+                device_name, device_classes, semantic_entity, attr_name, name=prop_name)
+            hasp_semantics.add_type(rdf.g, op_prop, op_class)
+            property_nodes[(entity_id, attr_name)] = op_prop
+            observe(op_prop, op_class, domain)
 
-            metadata_attrs = get_metadata_attributes(entity_attrs)
-            for ts_field in ("last_changed", "last_reported", "last_updated"):
-                if ts_field in entity_state:
-                    metadata_attrs[ts_field] = entity_state[ts_field]
-            if metadata_attrs:
-                metadata_property_uri = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}/properties/metadata")
-                metadata_schema = rdf._build_metadata_schema(metadata_attrs)
-                rdf._add_property(
-                    art, "metadata", metadata_property_uri, output_schema=metadata_schema,
-                    description=f"Metadata attributes of {entity_id}", observable=False
-                )
+        # 6c. Properties the device has by what it supports, whatever HA
+        #     reports right now: an off light has no `brightness` attribute,
+        #     yet it can be dimmed.
+        for rule in semantics.declared_properties(device_name, device_classes, semantic_entity):
+            attr_name = str(rule["signal"])
+            if attr_name in emitted:
+                continue
+            emitted.add(attr_name)
+            default = rule.get("default")
+            prop_name = claim(f"{key}_{attr_name}",
+                              Affordance("attribute", entity_id, domain, attribute=attr_name))
+            schema = rdf._build_property_schema(
+                attr_name, default, {**entity_attrs, attr_name: default},
+                entity_domain=domain)
+            declared_prop = rdf._add_property(
+                art, prop_name, property_form(prop_name), output_schema=schema,
+                description=f"{attr_name} of {friendly(entity_id)}", observable=True
+            )
+            hasp_semantics.add_type(rdf.g, declared_prop, str(rule["class"]))
+            property_nodes[(entity_id, attr_name)] = declared_prop
+            observe(declared_prop, str(rule["class"]), domain)
+
+        # 6d. Its descriptive attributes and timestamps, as `<key>_metadata`.
+        metadata_attrs = get_metadata_attributes(entity_attrs)
+        for ts_field in ("last_changed", "last_reported", "last_updated"):
+            if ts_field in entity_state:
+                metadata_attrs[ts_field] = entity_state[ts_field]
+        if metadata_attrs:
+            metadata_name = claim(f"{key}_metadata", Affordance("metadata", entity_id, domain))
+            metadata_schema = rdf._build_metadata_schema(metadata_attrs)
+            rdf._add_property(
+                art, metadata_name, property_form(metadata_name), output_schema=metadata_schema,
+                description=f"Metadata attributes of {friendly(entity_id)}", observable=False
+            )
 
     # 7. What each action changes: the property affordances of its entity named
     # by its fields or by the `acts_upon` rules in semantic_mappings.yaml.
@@ -1078,7 +1035,7 @@ def _build_cached_artifact_ttl(
     profile = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/{safe_name}")
     rdf.g.add((profile, RDF.type, HMAS.ResourceProfile))
     rdf.g.add((profile, HMAS.isProfileOf, art))
-    return rdf.serialize()
+    return rdf.serialize(), affordances
 
 @app.on_event("startup")
 async def _startup_cache():
@@ -1132,6 +1089,48 @@ async def save_graph_snapshot(request: Request):
     with open(output_path, "w", encoding="utf-8") as handle:
         handle.write(graph_ttl)
     return {"path": output_path, "filename": filename, "format": rdf_format}
+
+
+# -- the home's clock ------------------------------------------------------------
+
+def clock_reading(state: Dict[str, Any]) -> Optional[datetime]:
+    """The moment an HA timestamp entity's state holds, or None when it holds
+    none (unknown, unavailable, not ISO 8601)."""
+    value = (state or {}).get("state")
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+@app.get("/_clock")
+async def get_clock():
+    """The home's current time, from the entity CLOCK_ENTITY names.
+
+    The counterpart of SHTD's `/_shtd/time`: the agents' plan clock
+    (`shared/utils/clock.py`, `CLOCK_SOURCE=http CLOCK_URL=<hasp>/_clock`)
+    reads `now` from it, so the plan waits in the time the home runs on -- a
+    simulator's, sped up, in tests. The agents cannot read HA's API directly
+    (their clock sends no token); HASP already holds the state.
+
+    `now` is the entity's wall time at its own UTC offset, in the format the
+    agents' clock reads ("YYYY-MM-DD HH:MM:SS"); `iso` keeps the offset.
+    404 when no clock entity is configured, or it has no time now.
+    """
+    # 1. No clock entity: this home serves no clock.
+    if not CLOCK_ENTITY:
+        raise HTTPException(status_code=404, detail={
+            "error": "no_clock", "hint": "set CLOCK_ENTITY to an HA timestamp entity"})
+    # 2. Its state, from HASP's cache (kept current by the HA event stream).
+    cache = await _ensure_graph_cache()
+    moment = clock_reading(cache.entity_state(CLOCK_ENTITY))
+    if moment is None:
+        raise HTTPException(status_code=404, detail={
+            "error": "clock_unavailable", "entity_id": CLOCK_ENTITY})
+    return {"now": moment.strftime("%Y-%m-%d %H:%M:%S"), "iso": moment.isoformat(),
+            "entity_id": CLOCK_ENTITY}
 
 
 @app.post("/_graph/refresh-states")
@@ -1219,15 +1218,14 @@ async def list_artifacts(workspace_id: str, request: Request):
         raise HTTPException(status_code=500, detail=str(exc))
 
 @app.get("/workspaces/{workspace_id}/artifacts/{artifact_name}", response_class=Response,
-         responses={200: {"content": {"text/turtle": {}, "application/json": {}}}, 404: {"description": "Not found"}})
+         responses={200: {"content": {"text/turtle": {}}}, 404: {"description": "Not found"}})
 async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
-    """Return RDF TD (Accept: text/turtle) or JSON snapshot (application/json) for an artifact."""
+    """The artifact's Thing Description (Turtle).
+
+    `artifact_name` is the artifact's slug, or any name of its device or of
+    one of its entities (an old per-entity link still finds the device).
+    """
     try:
-        if (
-            getattr(app.state, "graph_cache", None) is None
-            or _resolve_device_and_entities is not _ORIGINAL_RESOLVE_DEVICE_AND_ENTITIES
-        ):
-            await _resolve_device_and_entities(workspace_id, artifact_name)
         cache = await _ensure_graph_cache()
         ttl, _ = await cache.get_artifact_ttl(workspace_id, artifact_name)
         return Response(_ttl_for_request(ttl, request, cache), media_type="text/turtle")
@@ -1239,24 +1237,37 @@ async def get_artifact(workspace_id: str, artifact_name: str, request: Request):
         print(exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
-async def _ensure_entity(workspace_id: str, artifact_name: str, domain: str) -> str:
-    _, device_entities, _, _ = await _resolve_device_and_entities(workspace_id, artifact_name)
-    ent = _pick_entity(device_entities, domain)
-    if not ent:
-        raise HTTPException(status_code=404, detail=f"No {domain} entity on artifact")
-    return ent
+
+def _unknown_affordance(exc: KeyError, kind: str) -> HTTPException:
+    """The 404 for a request naming no artifact, or no affordance of it; the
+    latter lists the names the artifact does have."""
+    if isinstance(exc, UnknownAffordance):
+        return HTTPException(status_code=404, detail={
+            "error": f"unknown_{kind}", "name": exc.name, "available": exc.available})
+    return HTTPException(status_code=404, detail="Artifact not found")
+
 
 # Property affordance endpoint - read property value
 @app.get("/workspaces/{workspace_id}/artifacts/{artifact_name}/properties/{property_name}")
 async def read_property(workspace_id: str, artifact_name: str, property_name: str):
-    """Read the current value of a property from a Home Assistant entity."""
+    """Read one property affordance of an artifact, by the name its TD gives.
+
+    404 when the artifact has no such property, or it has no value now.
+    """
+    cache = await _ensure_graph_cache()
+    # 1. The name must be one of the artifact's properties.
     try:
-        cache = await _ensure_graph_cache()
+        _, affordance = await cache.resolve_affordance(workspace_id, artifact_name, property_name)
+    except KeyError as exc:
+        raise _unknown_affordance(exc, "property")
+    if affordance.kind not in ("state", "attribute", "metadata"):
+        raise HTTPException(status_code=404, detail=f"'{urllib.parse.unquote(property_name)}' is an action, not a property")
+
+    # 2. Its current value, from the cached HA state.
+    try:
         return JSONResponse(await cache.read_property(workspace_id, artifact_name, property_name))
     except KeyError:
-        raise HTTPException(status_code=404, detail=f"Property '{urllib.parse.unquote(property_name)}' not found on artifact")
-    except HTTPException:
-        raise
+        raise HTTPException(status_code=404, detail=f"Property '{urllib.parse.unquote(property_name)}' has no value")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -1283,31 +1294,63 @@ async def read_room_property(workspace_id: str, variable_name: str):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
-# Generic HA service forwarder for dynamically discovered actions
-@app.post("/workspaces/{workspace_id}/artifacts/{artifact_name}/ha/{domain}/{service}")
-async def action_ha_service(workspace_id: str, artifact_name: str, domain: str, service: str, request: Request):
-    # Ensure entity for the requested domain exists on this artifact
-    try:
-        cache = await _ensure_graph_cache()
-        ent = await cache.resolve_artifact_domain_entity(workspace_id, artifact_name, domain)
-    except KeyError:
-        raise HTTPException(status_code=404, detail=f"No {domain} entity on artifact")
 
-    # Validate the service exists for the domain
+# Action affordance endpoint - invoke an action by the name its TD gives
+@app.post("/workspaces/{workspace_id}/artifacts/{artifact_name}/actions/{action_name}")
+async def invoke_action(workspace_id: str, artifact_name: str, action_name: str, request: Request):
+    """Invoke one action affordance of an artifact.
+
+    HASP looks the name up in the artifact's affordance map: a `service`
+    action becomes that HA service call on its entity (`_call_ha_service`),
+    a `climate_snapshot` returns the climate entity's whole state. 404 for a
+    name the artifact does not have, listing the names it has.
+    """
+    cache = await _ensure_graph_cache()
+    # 1. What the name routes to.
+    try:
+        _, affordance = await cache.resolve_affordance(workspace_id, artifact_name, action_name)
+    except KeyError as exc:
+        raise _unknown_affordance(exc, "action")
+
+    # 2. A climate entity's whole state.
+    if affordance.kind == "climate_snapshot":
+        climate_state = cache.entity_state(affordance.entity_id)
+        if not climate_state:
+            raise HTTPException(status_code=404, detail="Climate state not found")
+        return JSONResponse(_format_climate_state(climate_state))
+
+    # 3. An HA service on the entity.
+    if affordance.kind == "service":
+        payload: Dict[str, Any] = {}
+        if request.headers.get("content-length") not in (None, "0"):
+            with contextlib.suppress(Exception):
+                payload = await request.json()
+        return await _call_ha_service(cache, workspace_id, artifact_name, affordance,
+                                      payload if isinstance(payload, dict) else {})
+    raise HTTPException(status_code=404, detail=f"'{urllib.parse.unquote(action_name)}' is a property, not an action")
+
+
+async def _call_ha_service(cache: HASPGraphCache, workspace_id: str, artifact_name: str,
+                           affordance: Affordance, payload: Dict[str, Any]) -> Response:
+    """Forward one action to Home Assistant: `affordance.service` on
+    `affordance.entity_id`, with the caller's payload reduced to the service's
+    declared fields and checked against the entity; then update the cache
+    and notify subscribers from HA's result.
+
+    404 when HA no longer has the service or the entity no longer supports
+    it, 400 for a payload the entity would reject, 502 when HA fails.
+    """
+    domain, service, ent = affordance.domain, affordance.service or "", affordance.entity_id
+
+    # 1. The service must still exist, and the entity support it.
     svc = await cache.get_service_definition(domain, service)
     if not svc:
         raise HTTPException(status_code=404, detail="Service not found for domain")
-    ent_state = cache.states_by_entity_id.get(ent, {}) if hasattr(cache, "states_by_entity_id") else {}
-    ent_attrs = ent_state.get("attributes", {}) if isinstance(ent_state, dict) else {}
+    ent_attrs = cache.entity_state(ent).get("attributes") or {}
     if not is_service_supported_for_entity(domain, service, ent_attrs):
         raise HTTPException(status_code=404, detail="Service not supported by this entity")
 
-    payload = {}
-    if request.headers.get("content-length") not in (None, "0"):
-        try:
-            payload = await request.json()
-        except Exception:
-            payload = {}
+    # 2. Only the service's own fields, aimed at this entity, and valid for it.
     payload, dropped_fields = _sanitize_service_payload(payload, svc, entity_id=ent)
     if dropped_fields:
         print(
@@ -1318,6 +1361,7 @@ async def action_ha_service(workspace_id: str, artifact_name: str, domain: str, 
     if payload_error:
         raise HTTPException(status_code=400, detail=payload_error)
 
+    # 3. The call; a failure reports what HA said.
     print(
         f"HASP forwarding service call: workspace={workspace_id} artifact={artifact_name} "
         f"domain={domain} service={service} entity_id={ent} payload={payload}"
@@ -1344,26 +1388,25 @@ async def action_ha_service(workspace_id: str, artifact_name: str, domain: str, 
             f"response={response_text}"
         )
         raise HTTPException(status_code=502, detail=detail)
+
+    # 4. HA's new states into the cache, and out to subscribers.
     await cache.apply_service_result(result)
-    if isinstance(result, list):
-        for item in result:
-            if isinstance(item, dict) and item.get("entity_id"):
-                await _notify_subscribers_for_entity(
-                    item["entity_id"],
-                    item,
-                    item.get("last_updated") or item.get("last_changed"),
-                )
-    elif isinstance(result, dict) and result.get("entity_id"):
-        await _notify_subscribers_for_entity(
-            result["entity_id"],
-            result,
-            result.get("last_updated") or result.get("last_changed"),
-        )
+    for item in (result if isinstance(result, list) else [result]):
+        if isinstance(item, dict) and item.get("entity_id"):
+            await _notify_subscribers_for_entity(
+                item["entity_id"],
+                item,
+                item.get("last_updated") or item.get("last_changed"),
+            )
     return Response(content="Action succeeded:")
 
 # Jacamo/WebSub
 @app.post("/workspaces/{workspace_id}/focus")
 async def focus_workspace(workspace_id: str, request: Request):
+    """Subscribe `callbackUrl` to a workspace, or to one artifact of it
+    (`artifactName`: its slug, device name or an entity of it). 404 for an
+    unknown workspace or artifact; 202 once the callback is verified."""
+    # 1. The request: a callback, and optionally the artifact to focus on.
     body = await request.json()
     callback_url = body.get("callbackUrl") if isinstance(body, dict) else None
     artifact_name = body.get("artifactName") if isinstance(body, dict) else None
@@ -1372,12 +1415,17 @@ async def focus_workspace(workspace_id: str, request: Request):
     cache = await _ensure_graph_cache()
     if not await cache.has_workspace(workspace_id):
         raise HTTPException(status_code=404, detail="Workspace not found")
+    # 2. The topic: the workspace's, or the artifact's when one is named.
     topic = _workspace_topic(workspace_id)
     if artifact_name:
-        contexts = await cache.get_artifact_contexts(workspace_id, artifact_name)
+        try:
+            contexts = await cache.get_artifact_contexts(workspace_id, artifact_name)
+        except KeyError:
+            contexts = []
         if not contexts:
             raise HTTPException(status_code=404, detail="Artifact not found")
         topic = contexts[0]["artifact_topic"]
+    # 3. Verify the callback and record the subscription.
     await _register_subscription(
         topic=topic,
         callback_url=callback_url,
@@ -1426,23 +1474,3 @@ async def update_artifact_representation(workspace_id: str, artifact_name: str, 
 @app.delete("/workspaces/{workspace_id}/artifacts/{artifact_name}")
 async def delete_artifact_representation(workspace_id: str, artifact_name: str):
     return Response(content="Action succeeded:")
-
-# Dynamic climate status action
-@app.post("/workspaces/{workspace_id}/artifacts/{artifact_name}/{action_name}")
-async def action_sensor_dynamic(workspace_id: str, artifact_name: str, action_name: str):
-    cache = await _ensure_graph_cache()
-    try:
-        device_entities, state_map = await cache.get_artifact_snapshot(workspace_id, artifact_name)
-    except KeyError:
-        raise HTTPException(status_code=404, detail="Artifact not found")
-    climate_ent = _pick_entity(device_entities, "climate")
-    climate_state = state_map.get(climate_ent) if climate_ent else None
-
-    if action_name == "getThermostatState":
-        if not climate_ent:
-            raise HTTPException(status_code=404, detail="No climate entity on artifact")
-        if not climate_state:
-            raise HTTPException(status_code=404, detail="Climate state not found")
-        return JSONResponse(_format_climate_state(climate_state))
-
-    raise HTTPException(status_code=404, detail="Unknown action")

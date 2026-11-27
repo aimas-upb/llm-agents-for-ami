@@ -54,6 +54,14 @@ class TestGoalQuery:
 
 
 class TestClarification:
+    def test_an_alert_names_no_device_and_is_never_asked_about(self):
+        """"Alert me when ...": even an incomplete goal naming nothing goes on
+        to planning, and nothing is looked up for it."""
+        alert = _goal(intent_text="alert me", action_kind="alert",
+                      action_text="Grid import above 3 kW")
+        assert clarification_question(alert) is None
+        assert goal_query(alert) is None
+
     def test_an_incomplete_goal_naming_nothing_needs_the_user(self):
         question = clarification_question(_goal(intent_text="turn it off",
                                                 affordance_class=ONOFF))

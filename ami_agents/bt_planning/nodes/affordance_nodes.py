@@ -841,7 +841,8 @@ class ComparisonPropertyConditionNode(PropertyConditionNode):
             True if the comparison succeeds, False otherwise
         """
         # The LLM sometimes points wait conditions at composite endpoints
-        # (e.g. /getThermostatState) that return a dict instead of a scalar.
+        # (e.g. HASP's `<key>_get_state` climate snapshot) that return a dict
+        # instead of a scalar.
         # When the expected side is a scalar, fish a likely numeric field out
         # of the dict so the comparison can succeed rather than spinning
         # until the wait times out.

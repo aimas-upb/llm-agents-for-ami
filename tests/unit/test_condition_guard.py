@@ -517,7 +517,7 @@ class TestRecording:
             record.agent = match.agent = agent
             stored = await record.record({"guard": {"key": key, "protection": False,
                                                     "why": "not_applicable"}})
-            found = await match.match({"key": key})
+            found = await match.find_match({"key": key})
             assert stored["ok"] and found["match"]["guard_id"] == stored["guard_id"]
-            assert (await match.match({"key": {**key, "device_name": "x"}}))["match"] is None
+            assert (await match.find_match({"key": {**key, "device_name": "x"}}))["match"] is None
             assert (await record.record({}))["error"] == "malformed_payload"

@@ -42,6 +42,16 @@ class TestChecklist:
             ("time_to_event", "P1", None)]
         assert [c["id"] for c in checklist] == ["Q1", "Q2", "Q3", "Q4"]
 
+    def test_a_held_trigger_asks_nothing(self):
+        """Only "before" an event needs its time left; a span the trigger must
+        hold is waited out in the tree (`dependency_compiler._held`)."""
+        checklist = build_checklist(_structure(
+            {"G1": {**ACHIEVE, "timing": {"starts": "on_trigger"}}},
+            {"P1": {"predicate_subject": "device_property", "role": "trigger",
+                    "applies_to": ["G1"], "offset_direction": "held",
+                    "offset_text": "5 minutes"}}))
+        assert checklist == []
+
     def test_completing_with_an_event_with_a_start_given(self):
         """Seed 46: "start dryer 1 now so it and dishwasher 1 finish
         together". The start is the user's, but the run length and the

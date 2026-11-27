@@ -1,0 +1,96 @@
+version: 1
+
+semantic:
+  # Read by HASP (via SEMANTIC_CONFIG), overriding semantic_mappings.yaml, for the
+  # BEIA lab home: the Peroni 22 kitchen, the garage, and three device groups.
+  # Only what Home Assistant cannot tell is here.
+  #   areas     per HA area_id: the room it is (location_class), or the device
+  #             group it stands for when it is no place at all (group_class)
+  #   devices   per HA device name: device_class (a list for a device that is
+  #             several things at once), and per property / action --
+  #             keyed by the affordance name the TD shows (`max_temperature`,
+  #             `send_command_set_value`) -- its homeont class
+  #   ranges    comfort targets, by variable name (every room)
+  #
+  # Run with: AREAS="peroni_22,garaj,telemetrie,invertoare,solaredge"
+  #           SEMANTIC_CONFIG="$PWD/homelab.yaml"
+
+  areas:
+    peroni_22:  {location_class: "homeont:Kitchen"}
+    garaj:      {location_class: "homeont:Garage"}
+    # Energy and telemetry systems: where their devices sit means nothing.
+    telemetrie: {group_class: "homeont:DeviceGroup"}
+    invertoare: {group_class: "homeont:DeviceGroup"}
+    solaredge:  {group_class: "homeont:DeviceGroup"}
+
+  devices:
+    # -- Garage -------------------------------------------------------------------
+    "Blue Air Garage":
+      # A 2-in-1: an air purifier HA exposes as a fan, and a dehumidifier
+      # (its humidifier entity, typed by the defaults).
+      device_class: ["homeont:AirPurifier", "homeont:Dehumidifier"]
+      properties:
+        fan: "homeont:AirPurifierOnOff"
+        fan_percentage: "homeont:AirPurifierFanSpeed"
+    "Televizor Samsung QE75Q800TATXXH":
+      # A TV HA exposes as a switch (driven by IR through the Broadlink).
+      device_class: "homeont:Tv"
+      properties:
+        switch: "homeont:TvOnOff"
+    "Broadlink RM4 pro Garaj":
+      device_class: "homeont:InfraredBlaster"
+      commands:
+        send_command_set_value: "homeont:SendCodeCommand"
+      effects: []                 # what a code does is the target device's
+    "RFBridge433":
+      device_class: "homeont:RadioBridge"
+      commands:
+        send_code_set_value: "homeont:SendCodeCommand"
+      effects: []
+    "Homematic CCU3":
+      device_class: "homeont:HomeAutomationHub"
+    "Camera termica 1": &thermal_camera
+      # Surface temperatures, not the garage's air.
+      device_class: "homeont:ThermalCamera"
+      properties:
+        max_temperature: "homeont:SurfaceTemperatureMax"
+        min_temperature: "homeont:SurfaceTemperatureMin"
+        average_temperature: "homeont:SurfaceTemperatureAverage"
+        alarm_threshold: "homeont:TemperatureAlarmThreshold"
+    "Camera termica 2": *thermal_camera
+    "Weather station 70:ee:50:2e:da:88":
+      # Indoors: its readings are the garage's own air.
+      device_class: "homeont:WeatherStation"
+
+    # -- Invertoare (device group) ------------------------------------------------
+    "SolarAssistant Effekta":
+      device_class: "homeont:HybridInverter"
+      properties:
+        pv_power: "homeont:PhotovoltaicPower"
+        grid_power: "homeont:GridPower"
+        battery_power: "homeont:BatteryPower"
+        load_power: "homeont:LoadPower"
+        battery_state_of_charge: "homeont:BatteryStateOfCharge"
+        load_percentage: "homeont:InverterLoad"
+        device_mode: "homeont:InverterOperatingMode"
+        temperature: "homeont:DeviceInternalTemperature"
+        charger_source_priority: "homeont:EnergySourcePriority"
+        output_source_priority: "homeont:EnergySourcePriority"
+
+    # -- SolarEdge (device group) -------------------------------------------------
+    "Solaredge I4":
+      device_class: "homeont:SolarInverter"
+      properties:
+        dc_power: "homeont:PhotovoltaicPower"
+        temperature: "homeont:DeviceInternalTemperature"
+        status: "homeont:InverterOperatingMode"
+    "Solaredge I4 M1":
+      device_class: "homeont:EnergyMeter"
+      properties:
+        ac_power: "homeont:GridPower"
+        exported_kwh: "homeont:EnergyExported"
+
+  ranges:
+    air_temperature: {min: 16, max: 26, unit: degC}
+    carbon_dioxide_concentration: {max: 1000, unit: ppm}
+    pm25_mass_concentration: {max: 25, unit: "μg/m³"}

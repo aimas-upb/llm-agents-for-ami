@@ -58,6 +58,49 @@ source prepare-adapter-env.sh
 uvicorn hasp:app --reload --port 8080 --log-level debug
 ```
 
+### The home's clock: `GET /_clock`
+With `CLOCK_ENTITY` set to an HA timestamp entity (the BEIA virtual lab's
+`sensor.sim_time`), HASP serves that entity's time:
+
+```
+export CLOCK_ENTITY="sensor.sim_time"
+curl -s http://localhost:8080/_clock
+# {"now": "2026-11-27 13:05:30", "iso": "2026-11-27T13:05:30+02:00", "entity_id": "sensor.sim_time"}
+```
+
+The agents' plan clock reads it (`CLOCK_SOURCE=http
+CLOCK_URL=http://localhost:8080/_clock`), so a plan's waits ("held for 5
+minutes") run on the simulator's time, sped up by its `number.sim_speed`. Unset,
+or with the entity unavailable, `/_clock` is a 404.
+
+## 6b) Artifacts, affordance names and routes
+One artifact is one Home Assistant **device**, holding all of its entities. An
+entity with no device (a helper, a template sensor) is an artifact of its own.
+
+- **Artifact slug** (URL segment, `td:title`): the device name, slugified
+  ("Blue Air Garage" -> `blue_air_garage`). `schema:name` is HA's display name.
+  A request may also name the artifact by its device name or by any of its
+  entities' ids / object ids.
+- **Affordance names** come from each entity's *key*: its object id with the
+  device prefix stripped; the domain when nothing is left; the domain in front
+  only when two entities of the device would get the same key.
+  - state property: `<key>`
+  - attribute property: `<key>_<attribute>`; descriptive attributes: `<key>_metadata`
+  - action: `<key>_<service>`; a climate entity's whole state: `<key>_get_state`
+
+  Example, the SolarAssistant Effekta device:
+  `sensor.solarassistant_effekta_battery_state_of_charge` -> property
+  `battery_state_of_charge`; `select.solarassistant_effekta_charger_source_priority`
+  -> property `charger_source_priority`, action
+  `charger_source_priority_select_option`. A one-entity device such as
+  lab308e's `desk_lamp_308e` gets `light`, `light_brightness`, `light_turn_on`.
+- **Routes** are HASP's own; no entity id or HA service path appears in a TD:
+  - `GET  /workspaces/{ws}/artifacts/{artifact}/properties/{name}`
+  - `POST /workspaces/{ws}/artifacts/{artifact}/actions/{name}`
+
+  HASP keeps, per artifact, which entity and service each name stands for. A
+  name the artifact does not have returns 404 with the names it does have.
+
 ## 7) Subscriptions
 HASP supports two callback-based notification entry points:
 
@@ -70,7 +113,7 @@ Use `focus` to subscribe to a workspace or a specific artifact with a JSON body:
 ```json
 {
   "callbackUrl": "http://listener.example/callback",
-  "artifactName": "Temp Sensor"
+  "artifactName": "temp_sensor"
 }
 ```
 
@@ -99,19 +142,20 @@ Example:
 ```bash
 curl -X POST http://localhost:8080/hub/ \
   -d "hub.mode=subscribe" \
-  -d "hub.topic=http://localhost:8080/workspaces/lab308/artifacts/Temp%20Sensor#artifact" \
+  -d "hub.topic=http://localhost:8080/workspaces/lab308/artifacts/temp_sensor#artifact" \
   -d "hub.callback=http://listener.example/callback"
 ```
 
 ### Notification Payload
-When Home Assistant emits an unsolicited `state_changed` event, HASP updates its cache and sends a JSON `POST` to matching subscribers:
+When Home Assistant emits an unsolicited `state_changed` event, HASP updates its cache and sends a JSON `POST` to matching subscribers. The topic is the artifact (device) holding the entity; `affordance` is the property that reads the entity's state:
 
 ```json
 {
-  "topic": "http://localhost:8080/workspaces/lab308/artifacts/Temp%20Sensor#artifact",
+  "topic": "http://localhost:8080/workspaces/lab308/artifacts/temp_sensor#artifact",
   "workspaceId": "lab308",
-  "artifactUri": "http://localhost:8080/workspaces/lab308/artifacts/Temp%20Sensor#artifact",
-  "artifactTitle": "Temp Sensor",
+  "artifactUri": "http://localhost:8080/workspaces/lab308/artifacts/temp_sensor#artifact",
+  "artifactTitle": "temp_sensor",
+  "affordance": "sensor",
   "entityId": "sensor.temp_sensor",
   "timestamp": "2025-01-01T00:00:00Z",
   "state": "21.5",
@@ -124,7 +168,7 @@ When Home Assistant emits an unsolicited `state_changed` event, HASP updates its
 
 Topic shapes:
 - workspace topic: `http://localhost:8080/workspaces/lab308`
-- artifact topic: `http://localhost:8080/workspaces/lab308/artifacts/Temp%20Sensor#artifact`
+- artifact topic: `http://localhost:8080/workspaces/lab308/artifacts/temp_sensor#artifact`
 
 ## 8) Useful scripts
 - `./tick_clock.py` updates the `clock_308` artifact every second.
@@ -167,9 +211,38 @@ Assistant home:
 
 Defaults live in `semantic_mappings.yaml`. A home overrides them in the
 `semantic:` block of its config, read from `SEMANTIC_CONFIG`: `location_class`,
-`environments`, `ranges`, and per device `device_class`, `properties`,
-`commands`, `zone`, `environment` and `effects` (see `lab308e.yaml`).
-Anything unmapped stays untyped and is logged once. No `ex:` types are emitted.
+`areas`, `environments`, `ranges`, and per device `device_class`, `properties`,
+`commands`, `zone`, `environment` and `effects` (see `lab308e.yaml`, one
+room, and `homelab.yaml`, several areas). Anything unmapped stays untyped and is
+logged once. No `ex:` types are emitted.
+
+- **Per area** (`areas:`, keyed by HA area_id): `location_class` says which
+  room an area is (`homeont:Kitchen`). A home-wide `location_class` still
+  types every area that has none of its own.
+- **Device groups.** `group_class: "homeont:DeviceGroup"` declares an area that is
+  no place at all: an energy system, a telemetry set, where a device's physical
+  placement means nothing.
+  - Its workspace stands for the group: `<ws#group> a homeont:DeviceGroup ;
+    rdfs:label "<area name>" ; homeont:isGroupOfWorkspace <ws>`. It has no
+    `#place`, no environment, and no room variables.
+  - Its devices are `hmas:contains`ed but not `homeont:isLocatedIn` anything, and
+    observe or move no room variable. An inverter's °C reading is never a room's
+    `air_temperature`.
+  - The agents still find these devices by class or name, and an answer names
+    the group ("… in Invertoare").
+  - A request cannot yet be *scoped* to a group: the UA's location slot is a
+    room class.
+- **A device of several classes.** `device_class` may be a list, for a device
+  that is several things at once: the BEIA Blue Air is
+  `["homeont:AirPurifier", "homeont:Dehumidifier"]`. The artifact gets every
+  class, its kind label names the first, and a rule's `device:` filter matches
+  any of them, so each half (its fan, its humidifier entity) is typed by the
+  rules of its own class.
+- **Per property and action.** On a device with several entities, a
+  `properties:` / `commands:` key may be the affordance name the TD shows
+  (`max_temperature`, `send_command_set_value`). That types one entity. A
+  signal or service key (`state`, `set_value`) types that signal of every
+  entity of the device.
 
 ### Room variables
 The same model SimuHome's TD builder serves, built from the HA deployment:
@@ -204,10 +277,9 @@ The same model SimuHome's TD builder serves, built from the HA deployment:
   takes a variable name, its IRI, or one of the older keys (`luminosity`,
   `thermal_comfort`; `variable_aliases`).
 
-Each entity's state is its own property, `<domain>State` (`lightState`,
-`coverState`, `binarySensorState`; with the entity's object id appended when a
-device has two entities of one domain). `…/properties/state` is still served as
-a deprecated alias but is no longer advertised.
+Each entity's state is its own property, named by the entity's key (see
+"Artifacts, affordance names and routes"). The old `<domain>State` names and
+the `…/properties/state` alias are no longer served.
 
 ## 10) lab308e simulator loop
 `./simulate_lab308e.py` is a hardcoded real-time environment loop for `lab308e`.

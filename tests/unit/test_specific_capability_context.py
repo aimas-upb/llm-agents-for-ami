@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 from rdflib import Graph
+from rdflib.namespace import RDF
 
 from ami_agents.agents.env_explorer.utils.data_formatting import (
     format_capabilities_detailed_rdf,
@@ -18,6 +19,8 @@ from ami_agents.agents.env_explorer.utils.data_formatting import (
 from ami_agents.agents.interaction_solver.utils.specific_capability_context import (
     DIRECT_VALUE_KEY,
     build_specific_context,
+    device_class,
+    device_classes,
     find_artifacts,
     goal_brief,
 )
@@ -183,3 +186,21 @@ class TestShapesAndAmbiguity:
     def test_two_matching_devices_have_no_specific_context(self, odd_graph):
         assert len(find_artifacts(odd_graph, name="light")) == 2
         assert build_specific_context(odd_graph, self._light()) is None
+
+
+# -- a device of several classes ---------------------------------------------------
+
+def test_a_2_in_1_shows_both_classes_and_keys_on_one():
+    """A model reads every class of a 2-in-1 (purifier and dehumidifier);
+    the places that key on one class (guards, a goal's artifact_class) get
+    a single, stable one."""
+    # 1. One artifact typed with two unrelated homeont classes.
+    graph = Graph()
+    art = HOMEONT["test_blue_air"]
+    graph.add((art, RDF.type, HOMEONT.AirPurifier))
+    graph.add((art, RDF.type, HOMEONT.Dehumidifier))
+    # 2. Both for the model, one for keys.
+    assert device_classes(graph, art) == "homeont:AirPurifier, homeont:Dehumidifier"
+    assert device_class(graph, art) in ("homeont:AirPurifier", "homeont:Dehumidifier")
+    # 3. A device of no homeont class has none.
+    assert device_classes(graph, HOMEONT["nothing"]) is None

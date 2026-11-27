@@ -154,31 +154,36 @@ def test_workspace(sample_data):
 
 
 def test_list_artifacts(sample_data):
+    """The directory lists one artifact per HA device, by the device's slug."""
     client = TestClient(appmod.app)
     r = client.get("/workspaces/lab308/artifacts")
     assert r.status_code == 200
     ttl = r.text
-    assert "lab308_light#artifact" in ttl
+    # One artifact per HA device: the light is its device, "Lab308 Light System".
+    assert "lab308_light_system#artifact" in ttl
     assert "temperature_sensing_308#artifact" in ttl
     assert "occupancy_sensor_308#artifact" in ttl
     assert "home2_kitchen_thermostat#artifact" in ttl
 
 
 def test_get_artifact_builds_dynamic_actions(sample_data):
+    """A device's TD has one action per supported HA service, on HASP's own route."""
     client = TestClient(appmod.app)
     # Light device artifact exposes HA services and sensor action if any
     r = client.get("/workspaces/lab308/artifacts/Lab308%20Light%20System")
     assert r.status_code == 200
     ttl = r.text
-    # Has CamelCase action name for light service
-    assert "LightTurnOn" in ttl or "LightTurnOff" in ttl
-    # Target points to /ha/light/turn_on
-    assert "/ha/light/turn_on" in ttl or "/ha/light/turn_off" in ttl
+    # Actions are named `<entity key>_<service>`; the lone light entity's key
+    # is its domain. Forms target HASP's own action route, not HA's.
+    assert "light_turn_on" in ttl and "light_turn_off" in ttl
+    assert "/actions/light_turn_on" in ttl
+    assert "/ha/" not in ttl
 
 
 def test_action_ha_service_forwarder(sample_data):
+    """Invoking an action calls that HA service on the action's own entity."""
     client = TestClient(appmod.app)
-    r = client.post("/workspaces/lab308/artifacts/Lab308%20Light%20System/ha/light/turn_on", json={})
+    r = client.post("/workspaces/lab308/artifacts/Lab308%20Light%20System/actions/light_turn_on", json={})
     assert r.status_code == 200
     # Verify ha_rest.call_service was invoked
     calls = appmod.ha_rest.calls
@@ -186,6 +191,8 @@ def test_action_ha_service_forwarder(sample_data):
 
 
 def test_action_ha_service_drops_unsupported_payload_fields(monkeypatch):
+    """Payload fields the HA service does not declare are dropped before the call."""
+    # 1. A one-device home: its registries, state and HA services.
     areas = [{"area_id": "lab308", "name": "Lab 308"}]
     devices_by_area = {
         "lab308": [{"id": "dev1", "name": "blinds_308_cover", "area_id": "lab308"}],
@@ -200,7 +207,9 @@ def test_action_ha_service_drops_unsupported_payload_fields(monkeypatch):
         {
             "domain": "cover",
             "services": {
-                "open_cover": {"fields": {}},
+                # Modern HA: the service targets cover entities and has no
+                # fields of its own, so any payload field is dropped.
+                "open_cover": {"fields": {}, "target": {"entity": [{"domain": ["cover"]}]}},
             },
         },
     ]
@@ -210,9 +219,10 @@ def test_action_ha_service_drops_unsupported_payload_fields(monkeypatch):
     monkeypatch.setattr(appmod, "ha_client", fake_ws)
     monkeypatch.setattr(appmod, "ha_rest", fake_rest)
 
+    # 2. HASP over it: what it serves, and what reaches HA.
     client = TestClient(appmod.app)
     r = client.post(
-        "/workspaces/lab308/artifacts/blinds_308_cover/ha/cover/open_cover",
+        "/workspaces/lab308/artifacts/blinds_308_cover/actions/cover_open_cover",
         json={"open_close": False},
     )
     assert r.status_code == 200
@@ -220,6 +230,8 @@ def test_action_ha_service_drops_unsupported_payload_fields(monkeypatch):
 
 
 def test_cover_artifact_hides_tilt_services_for_non_tilt_entity(monkeypatch):
+    """A cover without tilt support advertises no tilt actions."""
+    # 1. A one-device home: its registries, state and HA services.
     areas = [{"area_id": "lab308", "name": "Lab 308"}]
     devices_by_area = {
         "lab308": [{"id": "dev1", "name": "window_308_cover", "area_id": "lab308"}],
@@ -250,16 +262,19 @@ def test_cover_artifact_hides_tilt_services_for_non_tilt_entity(monkeypatch):
     monkeypatch.setattr(appmod, "ha_client", fake_ws)
     monkeypatch.setattr(appmod, "ha_rest", fake_rest)
 
+    # 2. HASP over it: what it serves, and what reaches HA.
     client = TestClient(appmod.app)
     r = client.get("/workspaces/lab308/artifacts/window_308_cover")
     assert r.status_code == 200
     ttl = r.text
-    assert "/ha/cover/open_cover" in ttl
-    assert "/ha/cover/open_cover_tilt" not in ttl
-    assert "/ha/cover/set_cover_tilt_position" not in ttl
+    assert "/actions/cover_open_cover" in ttl
+    assert "/actions/cover_open_cover_tilt" not in ttl
+    assert "/actions/cover_set_cover_tilt_position" not in ttl
 
 
 def test_action_ha_service_rejects_tilt_service_for_non_tilt_cover(monkeypatch):
+    """A tilt action on a non-tilt cover is not an affordance: 404, HA never called."""
+    # 1. A one-device home: its registries, state and HA services.
     areas = [{"area_id": "lab308", "name": "Lab 308"}]
     devices_by_area = {
         "lab308": [{"id": "dev1", "name": "window_308_cover", "area_id": "lab308"}],
@@ -288,14 +303,19 @@ def test_action_ha_service_rejects_tilt_service_for_non_tilt_cover(monkeypatch):
     monkeypatch.setattr(appmod, "ha_client", fake_ws)
     monkeypatch.setattr(appmod, "ha_rest", fake_rest)
 
+    # 2. HASP over it: what it serves, and what reaches HA.
     client = TestClient(appmod.app)
-    r = client.post("/workspaces/lab308/artifacts/window_308_cover/ha/cover/open_cover_tilt", json={})
+    r = client.post("/workspaces/lab308/artifacts/window_308_cover/actions/cover_open_cover_tilt", json={})
     assert r.status_code == 404
-    assert r.json()["detail"] == "Service not supported by this entity"
+    # An unsupported service is never an affordance of the artifact: the
+    # request names no action it has, and HA is never called.
+    assert r.json()["detail"]["error"] == "unknown_action"
     assert appmod.ha_rest.calls == []
 
 
 def test_climate_artifact_hides_turn_off_and_turn_on_services(monkeypatch):
+    """A climate device advertises its mode and setpoint actions, not turn_on/turn_off."""
+    # 1. A one-device home: its registries, state and HA services.
     areas = [{"area_id": "lab308", "name": "Lab 308"}]
     devices_by_area = {
         "lab308": [{"id": "dev1", "name": "heater_308e", "area_id": "lab308"}],
@@ -334,17 +354,20 @@ def test_climate_artifact_hides_turn_off_and_turn_on_services(monkeypatch):
     monkeypatch.setattr(appmod, "ha_client", fake_ws)
     monkeypatch.setattr(appmod, "ha_rest", fake_rest)
 
+    # 2. HASP over it: what it serves, and what reaches HA.
     client = TestClient(appmod.app)
     r = client.get("/workspaces/lab308/artifacts/heater_308e")
     assert r.status_code == 200
     ttl = r.text
-    assert "/ha/climate/turn_off" not in ttl
-    assert "/ha/climate/turn_on" not in ttl
-    assert "/ha/climate/set_hvac_mode" in ttl
-    assert "/ha/climate/set_temperature" in ttl
+    assert "/actions/climate_turn_off" not in ttl
+    assert "/actions/climate_turn_on" not in ttl
+    assert "/actions/climate_set_hvac_mode" in ttl
+    assert "/actions/climate_set_temperature" in ttl
 
 
 def test_action_ha_service_rejects_turn_off_for_climate_entity(monkeypatch):
+    """turn_off on a climate device is not an affordance: 404, HA never called."""
+    # 1. A one-device home: its registries, state and HA services.
     areas = [{"area_id": "lab308", "name": "Lab 308"}]
     devices_by_area = {
         "lab308": [{"id": "dev1", "name": "heater_308e", "area_id": "lab308"}],
@@ -381,14 +404,19 @@ def test_action_ha_service_rejects_turn_off_for_climate_entity(monkeypatch):
     monkeypatch.setattr(appmod, "ha_client", fake_ws)
     monkeypatch.setattr(appmod, "ha_rest", fake_rest)
 
+    # 2. HASP over it: what it serves, and what reaches HA.
     client = TestClient(appmod.app)
-    r = client.post("/workspaces/lab308/artifacts/heater_308e/ha/climate/turn_off", json={})
+    r = client.post("/workspaces/lab308/artifacts/heater_308e/actions/climate_turn_off", json={})
     assert r.status_code == 404
-    assert r.json()["detail"] == "Service not supported by this entity"
+    # An unsupported service is never an affordance of the artifact: the
+    # request names no action it has, and HA is never called.
+    assert r.json()["detail"]["error"] == "unknown_action"
     assert appmod.ha_rest.calls == []
 
 
 def test_climate_artifact_hides_set_humidity_when_unsupported(monkeypatch):
+    """A climate entity without humidity bounds advertises no set_humidity."""
+    # 1. A one-device home: its registries, state and HA services.
     areas = [{"area_id": "lab308", "name": "Lab 308"}]
     devices_by_area = {
         "lab308": [{"id": "dev1", "name": "air_conditioner_308e", "area_id": "lab308"}],
@@ -425,15 +453,18 @@ def test_climate_artifact_hides_set_humidity_when_unsupported(monkeypatch):
     monkeypatch.setattr(appmod, "ha_client", fake_ws)
     monkeypatch.setattr(appmod, "ha_rest", fake_rest)
 
+    # 2. HASP over it: what it serves, and what reaches HA.
     client = TestClient(appmod.app)
     r = client.get("/workspaces/lab308/artifacts/air_conditioner_308e")
     assert r.status_code == 200
     ttl = r.text
-    assert "/ha/climate/set_humidity" not in ttl
-    assert "/ha/climate/set_hvac_mode" in ttl
+    assert "/actions/climate_set_humidity" not in ttl
+    assert "/actions/climate_set_hvac_mode" in ttl
 
 
 def test_action_ha_service_rejects_set_humidity_for_unsupported_climate_entity(monkeypatch):
+    """set_humidity it cannot do is not an affordance: 404, HA never called."""
+    # 1. A one-device home: its registries, state and HA services.
     areas = [{"area_id": "lab308", "name": "Lab 308"}]
     devices_by_area = {
         "lab308": [{"id": "dev1", "name": "air_conditioner_308e", "area_id": "lab308"}],
@@ -469,52 +500,62 @@ def test_action_ha_service_rejects_set_humidity_for_unsupported_climate_entity(m
     monkeypatch.setattr(appmod, "ha_client", fake_ws)
     monkeypatch.setattr(appmod, "ha_rest", fake_rest)
 
+    # 2. HASP over it: what it serves, and what reaches HA.
     client = TestClient(appmod.app)
-    r = client.post("/workspaces/lab308/artifacts/air_conditioner_308e/ha/climate/set_humidity", json={"humidity": 50})
+    r = client.post("/workspaces/lab308/artifacts/air_conditioner_308e/actions/climate_set_humidity", json={"humidity": 50})
     assert r.status_code == 404
-    assert r.json()["detail"] == "Service not supported by this entity"
+    # An unsupported service is never an affordance of the artifact: the
+    # request names no action it has, and HA is never called.
+    assert r.json()["detail"]["error"] == "unknown_action"
     assert appmod.ha_rest.calls == []
 
 
 def test_action_ha_service_no_entity(sample_data):
+    """An action the device does not have is a 404 listing the ones it has."""
     client = TestClient(appmod.app)
-    # Use sensor device but request light domain → should 404 for missing entity
-    r = client.post("/workspaces/lab308/artifacts/temperature_sensing_308/ha/light/turn_on", json={})
+    # The sensor device has no light action: 404, listing what it has.
+    r = client.post("/workspaces/lab308/artifacts/temperature_sensing_308/actions/light_turn_on", json={})
     assert r.status_code == 404
+    assert r.json()["detail"]["error"] == "unknown_action"
+    assert "sensor" in r.json()["detail"]["available"]
 
 
 def test_sensor_state_is_readable_via_property_not_dynamic_action(sample_data):
+    """A sensor's reading is a property (its key), not a synthetic action."""
     client = TestClient(appmod.app)
     r = client.get("/workspaces/lab308/artifacts/Lab308.Entry.Temperature")
     assert r.status_code == 200
     assert "getTemperatureInDegc" not in r.text
-    resp = client.get("/workspaces/lab308/artifacts/Lab308.Entry.Temperature/properties/state")
+    resp = client.get("/workspaces/lab308/artifacts/Lab308.Entry.Temperature/properties/sensor")
     assert resp.status_code == 200
     assert resp.json() == 21.5
-    resp2 = client.post("/workspaces/lab308/artifacts/Lab308.Entry.Temperature/getTemperatureInDegc")
+    resp2 = client.post("/workspaces/lab308/artifacts/Lab308.Entry.Temperature/actions/getTemperatureInDegc")
     assert resp2.status_code == 404
 
 
 def test_binary_sensor_state_is_readable_via_property_not_dynamic_action(sample_data):
+    """A binary sensor's state is a property (its key), not a synthetic action."""
     client = TestClient(appmod.app)
     r = client.get("/workspaces/lab308/artifacts/Lab308.Entry.Motion")
     assert r.status_code == 200
     ttl = r.text
     assert "getOccupancyState" not in ttl
-    resp = client.get("/workspaces/lab308/artifacts/Lab308.Entry.Motion/properties/state")
+    resp = client.get("/workspaces/lab308/artifacts/Lab308.Entry.Motion/properties/binary_sensor")
     assert resp.status_code == 200
     assert resp.json() == "on"
-    resp2 = client.post("/workspaces/lab308/artifacts/Lab308.Entry.Motion/getOccupancyState")
+    resp2 = client.post("/workspaces/lab308/artifacts/Lab308.Entry.Motion/actions/getOccupancyState")
     assert resp2.status_code == 404
 
 
 def test_climate_dynamic_action_returns_state(sample_data):
+    """The climate snapshot action returns the thermostat's whole state."""
     client = TestClient(appmod.app)
     r = client.get("/workspaces/lab308/artifacts/Home2.Kitchen.Thermostat")
     assert r.status_code == 200
     ttl = r.text
-    assert "getThermostatState" in ttl
-    resp = client.post("/workspaces/lab308/artifacts/Home2.Kitchen.Thermostat/getThermostatState")
+    # The climate entity's whole state, as `<key>_get_state`.
+    assert "climate_get_state" in ttl
+    resp = client.post("/workspaces/lab308/artifacts/Home2.Kitchen.Thermostat/actions/climate_get_state")
     assert resp.status_code == 200
     data = resp.json()
     assert data["state"] == "heat"
@@ -523,8 +564,11 @@ def test_climate_dynamic_action_returns_state(sample_data):
 
 
 def test_artifact_lookup_is_canonical(sample_data):
+    """An artifact is found by its slug, case-insensitively, and by its entity's name."""
     client = TestClient(appmod.app)
     # Request using lowercase + underscores
     resp = client.get("/workspaces/lab308/artifacts/home2_kitchen_thermostat")
     assert resp.status_code == 200
-    assert "Home2.Kitchen.Thermostat" in resp.text
+    # Found by the entity's registry name too; titled by its device.
+    assert "home2_kitchen_thermostat" in resp.text
+    assert client.get("/workspaces/lab308/artifacts/Home2.Kitchen.Thermostat").status_code == 200

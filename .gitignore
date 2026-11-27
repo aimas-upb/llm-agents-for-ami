@@ -304,3 +304,6 @@ CLAUDE.md
 .gradle/
 
 .workspaceos/
+
+# BEIA results
+tests/BEIA/results/

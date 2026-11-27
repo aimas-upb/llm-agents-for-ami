@@ -11,12 +11,11 @@ agent; nothing is dereferenced here.
 """
 
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from spade.behaviour import CyclicBehaviour
 
 from ....shared.models.messages import MessageType, META_CORRELATION_ID
-from ....shared.models.environment import AffordanceType
 from ....shared.utils.demo_log import demo
 
 
@@ -63,7 +62,6 @@ def environment_snapshot(agent) -> Dict[str, Any]:
             "name": artifact.name,
             "workspace_id": getattr(artifact, "workspace_id", None),
             "state": state,
-            "state_property_urls": state_property_urls(agent, artifact_id),
         }
         total_properties += len(state)
 
@@ -83,24 +81,3 @@ def environment_snapshot(agent) -> Dict[str, Any]:
         },
     }
 
-
-def state_property_urls(agent, artifact_id: str) -> List[str]:
-    """Where an artifact's state is read from, per its own TD.
-
-    HASP names one state property per entity (`lightState`, `climateState`),
-    so a consumer cannot build the URL as `{artifact}/properties/state`; it
-    takes these. Empty when the TD advertises none (a SimuHome device names
-    each attribute instead) or the engine is not available.
-    """
-    engine = getattr(agent, "integration_engine", None)
-    if engine is None:
-        return []
-    urls: List[str] = []
-    for affordance in engine.get_affordances_for_artifact(artifact_id):
-        if getattr(affordance, "affordance_type", None) != AffordanceType.PROPERTY:
-            continue
-        name = str(getattr(affordance, "name", "") or "")
-        href = getattr(getattr(affordance, "form", None), "href", None)
-        if href and (name == "state" or name.endswith("State")):
-            urls.append(str(href))
-    return sorted(urls)

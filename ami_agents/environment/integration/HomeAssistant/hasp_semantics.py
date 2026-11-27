@@ -39,7 +39,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
 
 import yaml
 from rdflib import BNode, Graph, Literal, Namespace, URIRef
@@ -95,6 +95,10 @@ def expand(curie: Optional[str]) -> Optional[URIRef]:
     prefix, _, local = str(curie).partition(":")
     namespace = _PREFIXES.get(prefix)
     return URIRef(namespace + local) if namespace and local else None
+
+
+# A device's homeont class, or its classes when the home lists several.
+DeviceClasses = Union[None, str, Sequence[str]]
 
 
 def _as_set(value: Any) -> Set[str]:
@@ -181,8 +185,14 @@ class Entity:
 
 
 def _matches(rule: Dict[str, Any], entity: Entity, *,
-             device: Optional[str] = None, signal: Optional[str] = None,
+             device: DeviceClasses = None, signal: Optional[str] = None,
              service: Optional[str] = None) -> bool:
+    """Whether a mapping rule applies to an entity.
+
+    Every key the rule states must hold; a key it leaves out matches
+    anything. `device` is the device's homeont class -- or its classes, when
+    the home gives it several.
+    """
     if "domain" in rule and entity.domain not in _as_set(rule["domain"]):
         return False
     if "device_class" in rule and entity.device_class not in _as_set(rule["device_class"]):
@@ -196,7 +206,9 @@ def _matches(rule: Dict[str, Any], entity: Entity, *,
             _as_set(rule["hvac_modes_include"])
             <= _as_set(entity.attributes.get("hvac_modes"))):
         return False
-    if "device" in rule and device not in _as_set(rule["device"]):
+    # A device may be of several classes (a 2-in-1 purifier and dehumidifier):
+    # a `device:` rule applies when any of them is listed.
+    if "device" in rule and not (_as_set(device) & _as_set(rule["device"])):
         return False
     if "signal" in rule and signal not in _as_set(rule["signal"]):
         return False
@@ -228,8 +240,14 @@ class Semantics:
     # -- overrides -------------------------------------------------------
 
     def _device_override(self, device_name: Optional[str]) -> Dict[str, Any]:
+        """The home's `devices:` entry for one device (by HA device name), or {}."""
         devices = self.home.get("devices") or {}
         return devices.get(device_name or "") or {}
+
+    def _area_override(self, area: Dict[str, Any]) -> Dict[str, Any]:
+        """The home's `areas:` entry for one HA area (by area_id), or {}."""
+        areas = self.home.get("areas") or {}
+        return areas.get(area.get("area_id") or "") or {}
 
     def _unmapped(self, key: str) -> None:
         """Log a gap once, so missing mappings are visible but not noisy."""
@@ -240,15 +258,21 @@ class Semantics:
     # -- classes ---------------------------------------------------------
 
     def location_class(self, area: Dict[str, Any]) -> Optional[str]:
-        """The room class of an HA area.
+        """The room class of an HA area; None for a device group (`group_class`).
 
-        The home's `location_class` wins (one home is one area today);
-        otherwise the area's name or id is matched against the room labels in
-        homeont ("Living Room" -> homeont:LivingRoom).
+        Order: the area's own `areas.<id>.location_class`, then the home-wide
+        `location_class`, then the area's name or id matched against the room
+        labels in homeont ("Living Room" -> homeont:LivingRoom).
         """
-        override = self.home.get("location_class")
+        # 1. A device group is no room at all.
+        if self.group_class(area) is not None:
+            return None
+        # 2. What the home says, for this area, then for all of them.
+        override = (self._area_override(area).get("location_class")
+                    or self.home.get("location_class"))
         if override:
             return str(override)
+        # 3. The area's own name.
         for text in (area.get("name"), area.get("area_id")):
             cls = self.room_labels.get(_normalise(text))
             if cls:
@@ -256,12 +280,44 @@ class Semantics:
         self._unmapped(f"area {area.get('area_id')!r}")
         return None
 
-    def device_class(self, device_name: Optional[str],
-                     entities: Iterable[Entity]) -> Optional[str]:
-        """What a device is, from its primary entity."""
+    def group_class(self, area: Dict[str, Any]) -> Optional[str]:
+        """The device-group class an HA area stands for (`homeont:DeviceGroup`),
+        or None for an area that is a place.
+
+        Only the home says so (`areas.<id>.group_class`): HA cannot tell an
+        energy system from a room. A group has no place and no environment.
+        """
+        group = self._area_override(area).get("group_class")
+        return str(group) if group else None
+
+    def device_classes(self, device_name: Optional[str],
+                       entities: Iterable[Entity]) -> List[str]:
+        """Every homeont class a device is, primary first; [] when unmapped.
+
+        A home override may list several (`["homeont:AirPurifier",
+        "homeont:Dehumidifier"]` for a 2-in-1); the defaults give one, from
+        the device's primary entity (`device_class`).
+        """
+        # 1. The home says what the device is: one class or a list of them.
         override = self._device_override(device_name).get("device_class")
         if override:
+            listed = override if isinstance(override, (list, tuple)) else [override]
+            return [str(c) for c in listed if c]
+        # 2. Otherwise the defaults' one class, if any.
+        single = self.device_class(device_name, entities)
+        return [single] if single else []
+
+    def device_class(self, device_name: Optional[str],
+                     entities: Iterable[Entity]) -> Optional[str]:
+        """What a device primarily is: the home's (first) class, else the
+        defaults' class of its primary entity, else None (logged once)."""
+        # 1. The home's override; for a list, the first class is the primary.
+        override = self._device_override(device_name).get("device_class")
+        if override:
+            if isinstance(override, (list, tuple)):
+                return str(override[0]) if override else None
             return str(override)
+        # 2. The defaults, by the device's entities in domain priority.
         priority = self.mappings.get("domain_priority") or []
         ordered = sorted(entities, key=lambda e: (
             priority.index(e.domain) if e.domain in priority else len(priority)))
@@ -272,17 +328,22 @@ class Semantics:
         self._unmapped(f"device {device_name!r}")
         return None
 
-    def property_rule(self, device_name: Optional[str], device_class: Optional[str],
-                      entity: Entity, signal: str) -> Optional[Dict[str, Any]]:
+    def property_rule(self, device_name: Optional[str], device_class: DeviceClasses,
+                      entity: Entity, signal: str,
+                      name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """The rule typing one property, or None. An override is a bare class.
 
-        Order: the home's override, then the first matching `properties` rule,
-        then -- for a sensor's own reading only -- its unit
-        (`environment_class_for_unit`), so a sensor HA gives no device_class
-        is still typed when its unit names one environment variable.
+        Order: the home's override -- by the affordance `name` the TD shows
+        (`max_temperature`), which types one entity of the device, then by
+        `signal` (`state`), which types that signal of every entity of it --
+        then the first matching `properties` rule, then, for a sensor's own
+        reading only, its unit (`environment_class_for_unit`), so a sensor HA
+        gives no device_class is still typed when its unit names one
+        environment variable.
         """
-        # 1. The home says what this property is.
-        override = (self._device_override(device_name).get("properties") or {}).get(signal)
+        # 1. The home says what this property is: by its name, then its signal.
+        overrides = self._device_override(device_name).get("properties") or {}
+        override = (overrides.get(name) if name else None) or overrides.get(signal)
         if override:
             return {"class": str(override)}
         # 2. The defaults, first match wins.
@@ -296,13 +357,15 @@ class Semantics:
                 return {"class": by_unit.curie}
         return None
 
-    def property_class(self, device_name: Optional[str], device_class: Optional[str],
-                       entity: Entity, signal: str) -> Optional[str]:
-        rule = self.property_rule(device_name, device_class, entity, signal)
+    def property_class(self, device_name: Optional[str], device_class: DeviceClasses,
+                       entity: Entity, signal: str,
+                       name: Optional[str] = None) -> Optional[str]:
+        """The homeont class of one property (`property_rule`), or None."""
+        rule = self.property_rule(device_name, device_class, entity, signal, name)
         return str(rule["class"]) if rule else None
 
     def declared_properties(self, device_name: Optional[str],
-                            device_class: Optional[str],
+                            device_class: DeviceClasses,
                             entity: Entity) -> List[Dict[str, Any]]:
         """Properties a device has by what it supports, whatever HA reports now."""
         return [
@@ -313,10 +376,19 @@ class Semantics:
         ]
 
     def command_class(self, device_name: Optional[str], domain: str,
-                      service: str) -> Optional[str]:
-        override = (self._device_override(device_name).get("commands") or {}).get(service)
+                      service: str, name: Optional[str] = None) -> Optional[str]:
+        """The command class of one action, or None (logged once).
+
+        Order: the home's override by the action `name` the TD shows
+        (`send_command_set_value`), then by `service`, then the first matching
+        `commands` rule.
+        """
+        # 1. The home says what this action is: by its name, then its service.
+        overrides = self._device_override(device_name).get("commands") or {}
+        override = (overrides.get(name) if name else None) or overrides.get(service)
         if override:
             return str(override)
+        # 2. The defaults, first match wins.
         entity = Entity(domain=domain)
         for rule in self.mappings.get("commands") or []:
             if _matches(rule, entity, service=service):
@@ -385,24 +457,33 @@ class Semantics:
         return Variable(cls=cls, name=name, environment=environment)
 
     def effects(self, device_name: Optional[str], domain: str,
-                service: str) -> List[Tuple[Variable, Optional[str]]]:
+                service: str, device_class: DeviceClasses = None
+                ) -> List[Tuple[Variable, Optional[str]]]:
         """The variables a service of a device moves, each with its direction
         (`increase` / `decrease`, or None when the value decides).
 
         The device's own `effects` replace the defaults (`effects` rules in
-        semantic_mappings.yaml). In a rule, `services` restricts which
-        services it covers, `<service>: increase|decrease` states a direction,
-        and `direction: none` makes every covered service directionless.
-        Otherwise the direction is read from the service name; a service with
-        none and no setter (a toggle, a stop) has no stated effect.
+        semantic_mappings.yaml). Among the defaults of a domain, rules naming
+        the device's class (`device:`) replace the domain's general rules --
+        a window controller lets air in, it does not move the light as a
+        cover does. In a rule, `services` restricts which services it covers,
+        `<service>: increase|decrease` states a direction, and `direction:
+        none` makes every covered service directionless. Otherwise the
+        direction is read from the service name; a service with none and no
+        setter (a toggle, a stop) has no stated effect.
         """
-        # 1. The rules that apply: the device's own, else the defaults for its domain.
+        # 1. The rules that apply: the device's own, else the defaults for its
+        #    domain -- those for its class if any, the general ones otherwise.
         override = self._device_override(device_name)
         if "effects" in override:
             rules = list(override.get("effects") or [])
         else:
-            rules = [r for r in self.mappings.get("effects") or []
-                     if domain in _as_set(r.get("domain"))]
+            for_domain = [r for r in self.mappings.get("effects") or []
+                          if domain in _as_set(r.get("domain"))]
+            specific = [r for r in for_domain
+                        if "device" in r
+                        and _as_set(device_class) & _as_set(r["device"])]
+            rules = specific or [r for r in for_domain if "device" not in r]
 
         # 2. Each rule covering this service, with its direction.
         out: List[Tuple[Variable, Optional[str]]] = []
@@ -555,6 +636,11 @@ def place_uri(base: str, workspace_id: str) -> URIRef:
     return URIRef(f"{base}workspaces/{workspace_id}#place")
 
 
+def group_uri(base: str, workspace_id: str) -> URIRef:
+    """The device group an HA area is, when it is no place (`group_class`)."""
+    return URIRef(f"{base}workspaces/{workspace_id}#group")
+
+
 def environment_uri(base: str, workspace_id: str,
                     environment: str = ROOM_ENVIRONMENT) -> URIRef:
     """An environment of a workspace: the room's own (`#environment`), or
@@ -576,25 +662,40 @@ def variable_target(base: str, workspace_id: str, name: str) -> URIRef:
 # -- emitting it ----------------------------------------------------------
 
 def add_room(graph: Graph, base: str, area: Dict[str, Any], workspace: URIRef) -> None:
-    """The place and environment of one area, as SimuHome's room_workspace has them.
+    """The place and environment of one area, as SimuHome's room_workspace has
+    them -- or, for an area the home declares a device group, the group alone.
 
     The resolvers scope by `?place a <room> ; homeont:isSpaceOfWorkspace ?ws`
     and name the room by the place's `rdfs:label`; they reach the room's
     variables by `?place homeont:hasEnvironment ?env . ?env ssn:hasProperty ?var`.
+    A group (`<ws#group> a homeont:DeviceGroup ; homeont:isGroupOfWorkspace
+    <ws>`) has no place and no environment, so none of those patterns reach it.
     """
-    # 1. The place and its workspace.
     workspace_id = area["area_id"]
     title = area.get("name") or workspace_id
+    graph.bind("homeont", HOMEONT)
+
+    # 1. A device group: typed, named, linked both ways; nothing else.
+    group_class = current().group_class(area)
+    if group_class is not None:
+        group = group_uri(base, workspace_id)
+        add_type(graph, group, group_class)
+        graph.add((group, RDF.type, HOMEONT.DeviceGroup))
+        graph.add((group, RDFS.label, Literal(title)))
+        graph.add((group, HOMEONT.isGroupOfWorkspace, workspace))
+        graph.add((workspace, HOMEONT.hasGroup, group))
+        return
+
+    # 2. The place and its workspace.
     place = _add_place(graph, base, area)
     graph.add((place, RDFS.label, Literal(title)))
     graph.add((place, HOMEONT.isSpaceOfWorkspace, workspace))
     graph.add((workspace, HOMEONT.hasSpace, place))
 
-    # 2. Its environment, labelled, and offered on the workspace as SimuHome does.
+    # 3. Its environment, labelled, and offered on the workspace as SimuHome does.
     environment = environment_uri(base, workspace_id)
     graph.add((environment, RDFS.label, Literal(f"{title} environment")))
     graph.add((workspace, TD.hasPropertyAffordance, environment))
-    graph.bind("homeont", HOMEONT)
 
 
 def _add_place(graph: Graph, base: str, area: Dict[str, Any]) -> URIRef:
@@ -617,7 +718,10 @@ def _add_place(graph: Graph, base: str, area: Dict[str, Any]) -> URIRef:
 def add_place_context(graph: Graph, base: str, area: Dict[str, Any], artifact: URIRef) -> None:
     """Where an artifact is, in its own document: located in the room's
     place, which has the room's environment -- so an agent holding only this
-    TD can walk from the device to the room and its variables."""
+    TD can walk from the device to the room and its variables. Nothing for an
+    artifact of a device group: where it sits means nothing there."""
+    if current().group_class(area) is not None:
+        return
     place = _add_place(graph, base, area)
     graph.add((artifact, HOMEONT.isLocatedIn, place))
     graph.add((place, HOMEONT.containsArtifact, artifact))

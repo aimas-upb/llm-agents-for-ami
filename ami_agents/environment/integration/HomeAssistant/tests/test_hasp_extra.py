@@ -73,6 +73,7 @@ def test_artifact_not_found(monkeypatch):
 
 
 def test_service_forwarder_not_found(monkeypatch):
+    """A sensor-only device has no light action: the action route answers 404."""
     class WS:
         async def get_devices(self, area=None):
             devs = [{"id": "d", "name": "dev"}]
@@ -87,11 +88,13 @@ def test_service_forwarder_not_found(monkeypatch):
     appmod.ha_client = WS()
     appmod.ha_rest = REST()
     client = TestClient(appmod.app)
-    r = client.post("/workspaces/lab/artifacts/dev/ha/light/turn_on", json={})
+    # A sensor-only device has no light action: 404 from the action route.
+    r = client.post("/workspaces/lab/artifacts/dev/actions/light_turn_on", json={})
     assert r.status_code == 404
 
 
 def test_dynamic_sensor_action_invalid_and_mismatch(monkeypatch):
+    """Synthetic sensor status actions are not affordances: 404."""
     class WS:
         async def get_devices(self, area=None):
             devs = [{"id": "d", "name": "temp"}]
@@ -111,9 +114,9 @@ def test_dynamic_sensor_action_invalid_and_mismatch(monkeypatch):
     appmod.ha_rest = REST()
     client = TestClient(appmod.app)
     # synthetic sensor status actions are no longer exposed
-    r2 = client.post("/workspaces/lab/artifacts/temp/getTemperatureInDegf")
+    r2 = client.post("/workspaces/lab/artifacts/temp/actions/getTemperatureInDegf")
     assert r2.status_code == 404
-    r3 = client.post("/workspaces/lab/artifacts/temp/getTemperatureInDegc")
+    r3 = client.post("/workspaces/lab/artifacts/temp/actions/getTemperatureInDegc")
     assert r3.status_code == 404
 
 
@@ -237,7 +240,9 @@ def test_focus_hub_update_delete(monkeypatch):
     assert client.delete("/workspaces/ws/artifacts/a").status_code == 200
 
 
-def test_artifact_slug_prefers_entity_object_id(monkeypatch):
+def test_artifact_slug_is_the_device_name(monkeypatch):
+    """One artifact per HA device: slugged by the device name, titled by the
+    slug, named by HA's display name, and still found by its entity's id."""
     class WS:
         async def get_areas(self):
             return [{"area_id": "lab", "name": "Lab"}]
@@ -263,20 +268,25 @@ def test_artifact_slug_prefers_entity_object_id(monkeypatch):
     monkeypatch.setattr(appmod, "ha_rest", REST())
     client = TestClient(appmod.app)
 
+    # 1. Listed by the device's slug, not the entity's object id.
     listing = client.get("/workspaces/lab/artifacts")
     assert listing.status_code == 200
-    assert "artifacts/blinds_308#artifact" in listing.text
-    assert "artifacts/blinds_308%20cover#artifact" not in listing.text
+    assert "artifacts/blinds_device#artifact" in listing.text
+    assert "artifacts/blinds_308#artifact" not in listing.text
 
-    artifact = client.get("/workspaces/lab/artifacts/blinds_308")
+    # 2. Its TD: the slug as title, HA's device name as name.
+    artifact = client.get("/workspaces/lab/artifacts/blinds_device")
     assert artifact.status_code == 200
-    assert 'td:title "blinds_308"' in artifact.text
-    assert 'schema:name "blinds_308 cover"' in artifact.text
+    assert 'td:title "blinds_device"' in artifact.text
+    assert 'schema:name "Blinds Device"' in artifact.text
+
+    # 3. A link by the entity (what the artifact used to be) finds the device.
+    assert client.get("/workspaces/lab/artifacts/blinds_308").status_code == 200
+    assert client.get("/workspaces/lab/artifacts/cover.blinds_308").status_code == 200
 
     workspace = client.get("/workspaces/lab")
     assert workspace.status_code == 200
-    assert "artifacts/blinds_308#artifact" in workspace.text
-    assert "artifacts/blinds_308_cover#artifact" not in workspace.text
+    assert "artifacts/blinds_device#artifact" in workspace.text
 
 
 def test_platform_profile_uri_rewrites_to_request_base(monkeypatch):
@@ -423,9 +433,10 @@ async def test_shutdown_closes_clients(monkeypatch):
 
 
 def test_get_artifact_error(monkeypatch):
+    """A failure building the cache is a 500, not a 404."""
     async def boom(*a, **kw):
         raise RuntimeError("fail")
-    monkeypatch.setattr(appmod, "_resolve_device_and_entities", boom)
+    monkeypatch.setattr(appmod, "_ensure_graph_cache", boom)
     from fastapi.testclient import TestClient
     client = TestClient(appmod.app)
     r = client.get("/workspaces/lab/artifacts/any")

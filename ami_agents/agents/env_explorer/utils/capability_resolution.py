@@ -334,16 +334,21 @@ def _effect_direction(graph: Graph, actuation: Any) -> Optional[str]:
 
 
 def workspace_label(graph: Graph, artifact: Any) -> Optional[str]:
-    """The room an artifact is in, by the label of the space its workspace is.
+    """Where an artifact is, by name: the label of the space its workspace is,
+    or of the device group it stands for (an energy system has no room).
 
     The scoped queries project it only when a location was asked for; an answer
-    naming devices needs it either way ("the living-room light").
+    naming devices needs it either way ("the living-room light", "the battery
+    charge in Invertoare"). `workspace_class` stays a room's class only, so a
+    group is never taken for a room.
     """
     for workspace in graph.subjects(HMAS.contains, URIRef(str(artifact))):
-        for space in graph.subjects(HOMEONT.isSpaceOfWorkspace, workspace):
-            label = graph.value(space, RDFS.label)
-            if label is not None:
-                return str(label)
+        # 1. A room first, then a device group, by the same label.
+        for link in (HOMEONT.isSpaceOfWorkspace, HOMEONT.isGroupOfWorkspace):
+            for holder in graph.subjects(link, workspace):
+                label = graph.value(holder, RDFS.label)
+                if label is not None:
+                    return str(label)
     return None
 
 

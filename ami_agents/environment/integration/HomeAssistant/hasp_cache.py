@@ -1,25 +1,65 @@
+"""HASP's cache of one Home Assistant snapshot and the documents built from it.
+
+The registries (areas, devices, entities), states and service definitions are
+read once (`refresh`) and kept up to date from HA's state events; every TD HASP
+serves is built from them (`_rebuild_documents_unlocked`), lazily and at most
+every `min_rebuild_interval_s`.
+
+One artifact is one HA device, holding all of its entities (`ArtifactEntry`);
+an entity with no device is an artifact of its own. Building an artifact's TD
+also yields its affordance map, name -> `Affordance` (`hasp_utils`), which is
+how a request to `.../artifacts/{a}/properties/{name}` or `.../actions/{name}`
+finds its entity. Example: the Effekta inverter's TD lists
+`charger_source_priority_select_option`; a POST to that action looks it up and
+gets `select.select_option` on `select.solarassistant_effekta_charger_source_priority`.
+"""
 from __future__ import annotations
 
 import asyncio
 import time
 import urllib.parse
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from rdflib import Graph, Literal, Namespace, RDF, URIRef
+from rdflib import Graph, Literal, RDF, URIRef
 
 try:
-    from .hasp_utils import HomeAssistantRDF, state_property_names
+    from .hasp_utils import Affordance, HomeAssistantRDF, slugify
     from . import hasp_semantics
     from .hasp_namespaces import HCTL, HMAS, SCHEMA, SOSA, SSN, TD, TDSOSA
 except ImportError:  # pragma: no cover
-    from hasp_utils import HomeAssistantRDF, state_property_names
+    from hasp_utils import Affordance, HomeAssistantRDF, slugify
     import hasp_semantics
     from hasp_namespaces import HCTL, HMAS, SCHEMA, SOSA, SSN, TD, TDSOSA
 
 
+# Builds one artifact's TD: (workspace id, slug, display name, its entities,
+# states by entity id, its device registry entry) -> (Turtle, name -> Affordance).
+ArtifactBuilder = Callable[..., Tuple[str, Dict[str, Affordance]]]
 
 
-ArtifactBuilder = Callable[[str, str, str, List[Dict[str, Any]], Dict[str, Dict[str, Any]], Dict[str, Any]], str]
+@dataclass
+class ArtifactEntry:
+    """One artifact of a workspace: an HA device and its entities.
+
+    `slug` is the stable instance name (URL segment, `td:title`);
+    `display_name` HA's own, mutable name (`schema:name`); `device` the
+    registry entry, empty for an entity with no device.
+    """
+    slug: str
+    display_name: str
+    device: Dict[str, Any]
+    entities: List[Dict[str, Any]] = field(default_factory=list)
+
+
+class UnknownAffordance(KeyError):
+    """An affordance name the artifact does not have; carries the names it has,
+    so the 404 can list them."""
+
+    def __init__(self, name: str, available: List[str]) -> None:
+        super().__init__(name)
+        self.name = name
+        self.available = available
 
 
 def _curie(uri: Any) -> str:
@@ -96,21 +136,72 @@ def _entity_display_name(entity: Optional[Dict[str, Any]], devices_by_id: Dict[s
     return object_id or ent_id or "artifact"
 
 
-def _artifact_slug_from_entity(entity: Dict[str, Any], fallback_label: str) -> str:
-    entity_id = entity.get("entity_id", "")
-    if isinstance(entity_id, str) and "." in entity_id:
-        object_id = entity_id.split(".", 1)[1].strip()
-        if object_id:
-            return object_id
-    return fallback_label
+def _object_id(entity_id: str) -> str:
+    """`light.desk_lamp` -> `desk_lamp`."""
+    return entity_id.split(".", 1)[-1]
 
 
-def _pick_entity(device_entities: List[Dict[str, Any]], domain: str) -> Optional[str]:
-    for entity in device_entities:
-        ent_id = entity.get("entity_id", "")
-        if ent_id.startswith(domain + "."):
-            return ent_id
-    return None
+def _group_artifacts(entities: List[Dict[str, Any]],
+                     dev_by_id: Dict[str, Dict[str, Any]]) -> List[ArtifactEntry]:
+    """A workspace's entities grouped into artifacts, one per HA device.
+
+    The slug is the device name's slug ("Blue Air Garage" -> `blue_air_garage`);
+    an entity with no device is its own artifact, slugged by its object id. Two
+    devices with one slug are told apart by a short device-id suffix. Sorted by
+    slug, so listings and rebuilds are deterministic.
+    """
+    # 1. Group by device; an entity without one stands alone.
+    groups: Dict[str, Tuple[Dict[str, Any], List[Dict[str, Any]]]] = {}
+    for ent in entities:
+        entity_id = ent.get("entity_id") or ""
+        dev_id = ent.get("device_id")
+        key = f"device:{dev_id}" if dev_id in dev_by_id else f"entity:{entity_id}"
+        device = dev_by_id.get(dev_id, {}) if dev_id in dev_by_id else {}
+        groups.setdefault(key, (device, []))[1].append(ent)
+
+    # 2. Name each group: its slug and HA's display name.
+    entries: List[ArtifactEntry] = []
+    taken: set[str] = set()
+    for key in sorted(groups):
+        device, members = groups[key]
+        members.sort(key=lambda e: e.get("entity_id") or "")
+        if device:
+            base = slugify(device.get("name")) or slugify(device.get("name_by_user"))
+            display = device.get("name_by_user") or device.get("name") or base
+        else:
+            entity_id = members[0].get("entity_id") or ""
+            base = slugify(_object_id(entity_id))
+            display = _entity_display_name(members[0], dev_by_id)
+        base = base or "artifact"
+        slug = base
+        if slug in taken:
+            slug = f"{base}_{slugify(str(device.get('id') or key))[:6]}"
+        taken.add(slug)
+        entries.append(ArtifactEntry(slug=slug, display_name=display,
+                                     device=device, entities=members))
+
+    # 3. Display names HA gives twice (device-less covers all called "Cover")
+    #    get the slug appended, so each still names one artifact.
+    counts: Dict[str, int] = {}
+    for entry in entries:
+        counts[entry.display_name] = counts.get(entry.display_name, 0) + 1
+    for entry in entries:
+        if counts[entry.display_name] > 1:
+            entry.display_name = f"{entry.display_name} ({entry.slug})"
+    return sorted(entries, key=lambda e: e.slug)
+
+
+def _artifact_aliases(entry: ArtifactEntry) -> List[str]:
+    """Every name a request may use for an artifact: its slug, the device's
+    names, and each entity's id, object id and registry names (so a link to
+    the entity an artifact used to be still finds its device)."""
+    names = [entry.slug, entry.display_name,
+             entry.device.get("name") or "", entry.device.get("name_by_user") or ""]
+    for ent in entry.entities:
+        entity_id = ent.get("entity_id") or ""
+        names += [entity_id, _object_id(entity_id),
+                  ent.get("name") or "", ent.get("original_name") or ""]
+    return [n for n in names if n]
 
 
 class HASPGraphCache:
@@ -136,14 +227,17 @@ class HASPGraphCache:
         self.states_by_entity_id: Dict[str, Dict[str, Any]] = {}
         self.services_by_domain: Dict[str, Dict[str, Any]] = {}
 
-        self.workspace_devices: Dict[str, List[Dict[str, Any]]] = {}
-        self.workspace_entities: Dict[str, List[Dict[str, Any]]] = {}
+        # Per workspace: its artifacts (one per HA device), by slug.
+        self.workspace_artifacts: Dict[str, Dict[str, ArtifactEntry]] = {}
 
         self.platform_ttl: str = ""
         self.workspaces_ttl: str = ""
         self.workspace_ttls: Dict[str, str] = {}
         self.artifacts_ttls: Dict[str, str] = {}
         self.artifact_ttls: Dict[Tuple[str, str], str] = {}
+        # (workspace, artifact slug) -> affordance name -> what it routes to;
+        # filled with each TD, so the names served are the names routed.
+        self.affordances: Dict[Tuple[str, str], Dict[str, Affordance]] = {}
         # (workspace, variable name) -> [(artifact, property)] that read it, a
         # sensor first: where the room-property route takes a variable's value.
         self.variable_readers: Dict[Tuple[str, str], List[Tuple[str, str]]] = {}
@@ -431,34 +525,49 @@ class HASPGraphCache:
             return self.artifacts_ttls[workspace_id]
 
     async def get_artifact_ttl(self, workspace_id: str, artifact_name: str) -> Tuple[str, str]:
+        """The artifact's TD and HA's display name for it; KeyError when the
+        workspace has no artifact by that name."""
         async with self._lock:
             self._ensure_documents_unlocked()
-            _, device_entities, device, artifact_label, safe_name = self._resolve_artifact_unlocked(workspace_id, artifact_name)
-            return self.artifact_ttls[(workspace_id, safe_name)], artifact_label
+            entry = self._resolve_artifact_unlocked(workspace_id, artifact_name)
+            return self.artifact_ttls[(workspace_id, entry.slug)], entry.display_name
 
     async def get_service_definition(self, domain: str, service: str) -> Optional[Dict[str, Any]]:
         async with self._lock:
             return ((self.services_by_domain.get(domain) or {}).get("services") or {}).get(service)
 
-    async def resolve_artifact_domain_entity(self, workspace_id: str, artifact_name: str, domain: str) -> str:
-        async with self._lock:
-            _, device_entities, _, _, _ = self._resolve_artifact_unlocked(workspace_id, artifact_name)
-            ent = _pick_entity(device_entities, domain)
-            if not ent:
-                raise KeyError(domain)
-            return ent
+    # -- affordances ---------------------------------------------------------
 
-    async def get_artifact_snapshot(
-        self, workspace_id: str, artifact_name: str
-    ) -> Tuple[List[Dict[str, Any]], Dict[str, Dict[str, Any]]]:
+    async def resolve_affordance(self, workspace_id: str, artifact_name: str,
+                                 affordance_name: str) -> Tuple[str, Affordance]:
+        """The artifact's slug and what one of its affordance names routes to.
+
+        KeyError when there is no such artifact; `UnknownAffordance` (a
+        KeyError, carrying the names the artifact has) when it has no such
+        affordance.
+        """
         async with self._lock:
-            _, device_entities, _, _, _ = self._resolve_artifact_unlocked(workspace_id, artifact_name)
-            state_map = {
-                ent.get("entity_id"): dict(self.states_by_entity_id.get(ent.get("entity_id"), {}))
-                for ent in device_entities
-                if ent.get("entity_id")
-            }
-            return [dict(ent) for ent in device_entities], state_map
+            return self._resolve_affordance_unlocked(workspace_id, artifact_name, affordance_name)
+
+    def _resolve_affordance_unlocked(self, workspace_id: str, artifact_name: str,
+                                     affordance_name: str) -> Tuple[str, Affordance]:
+        """`resolve_affordance` without the lock."""
+        # 1. The artifact; its map comes with its TD, so build that first if
+        #    the cache has never built documents.
+        entry = self._resolve_artifact_unlocked(workspace_id, artifact_name)
+        if (workspace_id, entry.slug) not in self.affordances:
+            self._rebuild_documents_unlocked()
+        names = self.affordances.get((workspace_id, entry.slug), {})
+
+        # 2. The name, as served in the TD (URL-decoded).
+        name = urllib.parse.unquote(affordance_name)
+        if name not in names:
+            raise UnknownAffordance(name, sorted(names))
+        return entry.slug, names[name]
+
+    def entity_state(self, entity_id: str) -> Dict[str, Any]:
+        """The cached HA state object of one entity ({} when it has none)."""
+        return dict(self.states_by_entity_id.get(entity_id) or {})
 
     async def read_property(self, workspace_id: str, artifact_name: str, property_name: str) -> Any:
         """An artifact property's current value (`read_property_unlocked`)."""
@@ -484,94 +593,94 @@ class HASPGraphCache:
                                 property_name: str) -> Any:
         """The value of one property of an artifact, from the cached HA state.
 
-        `<domain>State` reads one entity's state, bare `state` the first
-        entity's (deprecated alias), `metadata` the descriptive attributes,
-        anything else the attribute of that name. KeyError when there is none.
+        The name is looked up in the artifact's affordance map: a `state`
+        reads the entity's state (a number for a sensor or anything with a
+        unit), an `attribute` that attribute, `metadata` the descriptive
+        attributes and timestamps. KeyError when the artifact has no such
+        property or the entity has no value for it right now.
         """
-        _, device_entities, _, _, _ = self._resolve_artifact_unlocked(workspace_id, artifact_name)
-        decoded_property_name = urllib.parse.unquote(property_name)
-        # `<domain>State` names one entity's state (see
-        # `state_property_names`); bare `state` is the deprecated alias
-        # that reads the first entity with one.
-        state_names = state_property_names(
-            [e.get("entity_id") for e in device_entities if e.get("entity_id")])
-        named_entity = next((entity_id for entity_id, name in state_names.items()
-                             if name == decoded_property_name), None)
-        if named_entity is not None:
-            device_entities = [e for e in device_entities
-                               if e.get("entity_id") == named_entity]
-            decoded_property_name = "state"
-        for entity in device_entities:
-            entity_id = entity.get("entity_id")
-            entity_state = self.states_by_entity_id.get(entity_id, {})
-            entity_attrs = entity_state.get("attributes", {}) if isinstance(entity_state, dict) else {}
+        # 1. What the name stands for; an action name is not readable.
+        _, affordance = self._resolve_affordance_unlocked(workspace_id, artifact_name, property_name)
+        if affordance.kind not in ("state", "attribute", "metadata"):
+            raise KeyError(property_name)
+        entity_state = self.states_by_entity_id.get(affordance.entity_id) or {}
+        entity_attrs = entity_state.get("attributes") or {}
 
-            if decoded_property_name == "metadata":
-                metadata_attrs = {}
-                for key, value in entity_attrs.items():
-                    if key in {
-                        "friendly_name", "icon", "entity_picture", "supported_features",
-                        "device_class", "state_class", "unit_of_measurement", "attribution",
-                        "restored", "supported_color_modes", "entity_id",
-                    }:
-                        metadata_attrs[key] = value
-                for ts_field in ("last_changed", "last_reported", "last_updated"):
-                    if ts_field in entity_state:
-                        metadata_attrs[ts_field] = entity_state[ts_field]
-                if metadata_attrs:
-                    return metadata_attrs
+        # 2. Its descriptive attributes, with HA's timestamps.
+        if affordance.kind == "metadata":
+            metadata_attrs = {
+                key: value for key, value in entity_attrs.items()
+                if key in {
+                    "friendly_name", "icon", "entity_picture", "supported_features",
+                    "device_class", "state_class", "unit_of_measurement", "attribution",
+                    "restored", "supported_color_modes",
+                }
+            }
+            for ts_field in ("last_changed", "last_reported", "last_updated"):
+                if ts_field in entity_state:
+                    metadata_attrs[ts_field] = entity_state[ts_field]
+            if metadata_attrs:
+                return metadata_attrs
+            raise KeyError(property_name)
 
-            if decoded_property_name == "state":
-                state_value = entity_state.get("state")
-                if state_value and state_value not in ("unknown", "unavailable"):
-                    entity_domain = entity_id.split(".")[0] if isinstance(entity_id, str) and "." in entity_id else ""
-                    unit = entity_attrs.get("unit_of_measurement")
-                    if (entity_domain == "sensor" or unit) and isinstance(state_value, str):
-                        try:
-                            return int(state_value) if "." not in state_value else float(state_value)
-                        except ValueError:
-                            return state_value
+        # 3. Its state: numeric for a measurement, as the TD's schema says.
+        if affordance.kind == "state":
+            state_value = entity_state.get("state")
+            if not state_value or state_value in ("unknown", "unavailable"):
+                raise KeyError(property_name)
+            unit = entity_attrs.get("unit_of_measurement")
+            if (affordance.domain == "sensor" or unit) and isinstance(state_value, str):
+                try:
+                    return int(state_value) if "." not in state_value else float(state_value)
+                except ValueError:
                     return state_value
+            return state_value
 
-            if decoded_property_name in entity_attrs and entity_attrs[decoded_property_name] is not None:
-                return entity_attrs[decoded_property_name]
-        raise KeyError(decoded_property_name)
+        # 4. One attribute.
+        value = entity_attrs.get(affordance.attribute or "")
+        if value is None:
+            raise KeyError(property_name)
+        return value
+
+    # -- WebSub contexts -----------------------------------------------------
+
+    def _context(self, workspace_id: str, entry: ArtifactEntry) -> Dict[str, str]:
+        """The topics and names a notification about one artifact carries."""
+        artifact_uri = f"{self.base_uri}workspaces/{workspace_id}/artifacts/{entry.slug}#artifact"
+        return {
+            "workspace_id": workspace_id,
+            "artifact_title": entry.slug,
+            "artifact_slug": entry.slug,
+            "artifact_uri": artifact_uri,
+            "workspace_topic": f"{self.base_uri.rstrip('/')}/workspaces/{workspace_id}",
+            "artifact_topic": artifact_uri,
+        }
 
     async def get_artifact_contexts(self, workspace_id: str, artifact_name: str) -> List[Dict[str, str]]:
+        """The WebSub topics of one artifact (for `focus`); KeyError when the
+        workspace has no artifact by that name."""
         async with self._lock:
-            _, _, _, label, safe_name = self._resolve_artifact_unlocked(workspace_id, artifact_name)
-            artifact_uri = f"{self.base_uri}workspaces/{workspace_id}/artifacts/{safe_name}#artifact"
-            return [
-                {
-                    "workspace_id": workspace_id,
-                    "artifact_title": label,
-                    "artifact_slug": safe_name,
-                    "artifact_uri": artifact_uri,
-                    "workspace_topic": f"{self.base_uri.rstrip('/')}/workspaces/{workspace_id}",
-                    "artifact_topic": artifact_uri,
-                }
-            ]
+            entry = self._resolve_artifact_unlocked(workspace_id, artifact_name)
+            return [self._context(workspace_id, entry)]
 
     async def get_entity_contexts(self, entity_id: str) -> List[Dict[str, str]]:
+        """The topics a state change of one entity is published on: those of
+        the artifact (device) holding it, in every workspace that has it, with
+        the name of the property that reads its state (`affordance`)."""
         async with self._lock:
             contexts: List[Dict[str, str]] = []
-            for workspace_id, entities in self.workspace_entities.items():
-                for ent in entities:
-                    if ent.get("entity_id") != entity_id:
+            for workspace_id, entries in self.workspace_artifacts.items():
+                for entry in entries.values():
+                    # 1. Only the artifact (device) that holds the entity.
+                    if not any(e.get("entity_id") == entity_id for e in entry.entities):
                         continue
-                    label = ent.get("_artifact_label") or ent.get("_artifact_base_label") or _entity_display_name(ent, self.devices_by_id)
-                    safe_name = ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
-                    artifact_uri = f"{self.base_uri}workspaces/{workspace_id}/artifacts/{safe_name}#artifact"
-                    contexts.append(
-                        {
-                            "workspace_id": workspace_id,
-                            "artifact_title": label,
-                            "artifact_slug": safe_name,
-                            "artifact_uri": artifact_uri,
-                            "workspace_topic": f"{self.base_uri.rstrip('/')}/workspaces/{workspace_id}",
-                            "artifact_topic": artifact_uri,
-                        }
-                    )
+                    # 2. Its topics, and the property reading the entity's state.
+                    context = self._context(workspace_id, entry)
+                    names = self.affordances.get((workspace_id, entry.slug), {})
+                    context["affordance"] = next(
+                        (name for name, aff in names.items()
+                         if aff.kind == "state" and aff.entity_id == entity_id), "")
+                    contexts.append(context)
             return contexts
 
     def _load_snapshot_unlocked(self, areas, devices, entities, states, services) -> None:
@@ -584,11 +693,18 @@ class HASPGraphCache:
         self._rebuild_workspace_indexes_unlocked()
 
     def _rebuild_workspace_indexes_unlocked(self) -> None:
-        self.workspace_devices = {}
-        self.workspace_entities = {}
+        """Which entities each workspace holds, grouped into its artifacts.
+
+        An entity belongs to a workspace when it, or its device, is in the
+        area (or its object id carries the area id); a device's entity
+        assigned to another allowed area stays with that area. The workspace's
+        entities are then grouped one artifact per device (`_group_artifacts`).
+        """
+        self.workspace_artifacts = {}
         devices = list(self.devices_by_id.values())
         entities = [dict(e) for e in self.entities_by_id.values()]
         for workspace_id in self.areas_by_id:
+            # 1. Entities in the area, directly or through their device.
             workspace_device_ids = {
                 d["id"] for d in devices if _area_matches(workspace_id, d.get("area_id"), self.allowed_workspaces)
             }
@@ -606,77 +722,36 @@ class HASPGraphCache:
                     external_entities.append(dict(ent))
             filtered_devices = [dict(d) for d in devices if d["id"] in workspace_device_ids]
             dev_by_id = {d["id"]: d for d in filtered_devices}
-            label_counts: Dict[str, int] = {}
-            slug_counts: Dict[str, int] = {}
 
-            def _register(ent: Dict[str, Any]) -> None:
-                label = _entity_display_name(ent, dev_by_id)
-                ent["_artifact_base_label"] = label
-                label_counts[label] = label_counts.get(label, 0) + 1
-
-            filtered_entities: List[Dict[str, Any]] = []
-            for ent in workspace_entities:
+            # 2. Keep those whose own area is allowed (an entity may be moved
+            #    to another area than its device's).
+            kept: List[Dict[str, Any]] = []
+            for ent in workspace_entities + [e for e in external_entities
+                                             if e.get("device_id") in workspace_device_ids]:
                 ent_area = ent.get("area_id") or (dev_by_id.get(ent.get("device_id"), {}) or {}).get("area_id")
                 if _workspace_allowed(ent_area, self.allowed_workspaces):
-                    filtered_entities.append(ent)
-                    _register(ent)
-            workspace_entities = filtered_entities
-            for ent in external_entities:
-                if ent.get("device_id") in workspace_device_ids:
-                    ent_area = ent.get("area_id") or (dev_by_id.get(ent.get("device_id"), {}) or {}).get("area_id")
-                    if _workspace_allowed(ent_area, self.allowed_workspaces):
-                        workspace_entities.append(ent)
-                        _register(ent)
-            for ent in workspace_entities:
-                base_label = ent.get("_artifact_base_label", "artifact")
-                label = base_label
-                if label_counts.get(base_label, 0) > 1:
-                    suffix = ent.get("entity_id", "")
-                    object_id = suffix.split(".", 1)[1] if isinstance(suffix, str) and "." in suffix else suffix
-                    label = f"{base_label} ({object_id})"
-                ent["_artifact_display_label"] = label
-                base_slug = _artifact_slug_from_entity(ent, label)
-                slug_counts[base_slug] = slug_counts.get(base_slug, 0) + 1
-                if slug_counts[base_slug] > 1:
-                    entity_id = ent.get("entity_id", "")
-                    if isinstance(entity_id, str) and entity_id:
-                        base_slug = entity_id.replace(".", "_")
-                    else:
-                        base_slug = label
-                ent["_artifact_slug"] = urllib.parse.quote(base_slug, safe="")
-                # One instance name across listings, TDs, and focus contexts.
-                # Keep HA's mutable display name as separate metadata.
-                ent["_artifact_label"] = base_slug
-            self.workspace_devices[workspace_id] = filtered_devices
-            self.workspace_entities[workspace_id] = workspace_entities
+                    kept.append(ent)
 
-    def _resolve_artifact_unlocked(self, workspace_id: str, artifact_name: str):
+            # 3. One artifact per device.
+            self.workspace_artifacts[workspace_id] = {
+                entry.slug: entry for entry in _group_artifacts(kept, dev_by_id)}
+
+    def _resolve_artifact_unlocked(self, workspace_id: str, artifact_name: str) -> ArtifactEntry:
+        """The artifact a request names: by slug, device name, or the id or
+        name of one of its entities -- exactly first, then ignoring case and
+        punctuation. KeyError when none matches."""
         decoded_name = urllib.parse.unquote(artifact_name)
-        decoded_canon = _canonical_label(decoded_name)
-        devices = self.workspace_devices.get(workspace_id, [])
-        entities = self.workspace_entities.get(workspace_id, [])
-        dev_by_id = {d["id"]: d for d in devices}
-        for ent in entities:
-            label = ent.get("_artifact_label") or _entity_display_name(ent, dev_by_id)
-            object_id = ent.get("entity_id", "").split(".", 1)[-1]
-            candidates = {
-                label, ent.get("_artifact_base_label", ""), ent.get("_artifact_slug", ""),
-                ent.get("_artifact_display_label", ""),
-                _entity_display_name(ent, dev_by_id), ent.get("entity_id", ""), object_id,
-            }
-            matched = decoded_name in {c for c in candidates if c} or any(_canonical_label(c) == decoded_canon for c in candidates if c)
-            if matched:
-                device = dev_by_id.get(ent.get("device_id")) or {}
-                return device, [ent], device, label, ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
-        device = next((d for d in devices if d.get("name") == decoded_name), None)
-        if not device:
-            device = next((d for d in devices if _canonical_label(d.get("name", "")) == decoded_canon), None)
-        if not device:
-            raise KeyError("artifact")
-        device_entities = [ent for ent in entities if ent.get("device_id") == device["id"]]
-        if not device_entities:
-            raise KeyError("artifact_entities")
-        return device, device_entities, device, decoded_name, urllib.parse.quote(decoded_name, safe="")
+        entries = self.workspace_artifacts.get(workspace_id, {})
+        # 1. The slug itself, the common case.
+        if decoded_name in entries:
+            return entries[decoded_name]
+        # 2. Any other name, exactly; then canonically.
+        for matches in (lambda alias: alias == decoded_name,
+                        lambda alias: _canonical_label(alias) == _canonical_label(decoded_name)):
+            for entry in entries.values():
+                if any(matches(alias) for alias in _artifact_aliases(entry)):
+                    return entry
+        raise KeyError(decoded_name)
 
     def _rebuild_documents_unlocked(self) -> None:
         """Every TD HASP serves, rebuilt from the cached HA snapshot: the
@@ -691,6 +766,7 @@ class HASPGraphCache:
         self.workspace_ttls = {}
         self.artifacts_ttls = {}
         self.artifact_ttls = {}
+        self.affordances = {}
         self.full_graph = Graph(base=self.base_uri)
 
         # 2. The platform and the list of its workspaces.
@@ -711,20 +787,20 @@ class HASPGraphCache:
         # its artifact directory.
         self.variable_readers = {}
         for workspace_id, area in self.areas_by_id.items():
-            devices = self.workspace_devices.get(workspace_id, [])
-            entities = self.workspace_entities.get(workspace_id, [])
+            entries = list(self.workspace_artifacts.get(workspace_id, {}).values())
             artifacts_graph = Graph()
-            for ent in entities:
-                label = ent.get("_artifact_label") or ent.get("_artifact_base_label") or _entity_display_name(ent, self.devices_by_id)
-                safe_name = ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
-                device = self.devices_by_id.get(ent.get("device_id"), {})
-                ttl = self.artifact_builder(workspace_id, safe_name, label, [ent], self.states_by_entity_id, device)
-                self.artifact_ttls[(workspace_id, safe_name)] = ttl
+            for entry in entries:
+                ttl, names = self.artifact_builder(
+                    workspace_id, entry.slug, entry.slug, entry.entities,
+                    self.states_by_entity_id, entry.device,
+                    display_label=entry.display_name)
+                self.artifact_ttls[(workspace_id, entry.slug)] = ttl
+                self.affordances[(workspace_id, entry.slug)] = names
                 artifacts_graph.parse(data=ttl, format="turtle")
             variables = self._variables_unlocked(workspace_id, artifacts_graph)
             self.workspace_ttls[workspace_id] = self._build_workspace_ttl(
-                area, devices, entities, artifacts_graph, variables)
-            self.artifacts_ttls[workspace_id] = self._build_artifacts_ttl(workspace_id, devices, entities)
+                area, entries, artifacts_graph, variables)
+            self.artifacts_ttls[workspace_id] = self._build_artifacts_ttl(workspace_id, entries)
             self.full_graph.parse(data=self.workspace_ttls[workspace_id], format="turtle")
             self.full_graph.parse(data=self.artifacts_ttls[workspace_id], format="turtle")
             self.full_graph += artifacts_graph
@@ -776,8 +852,7 @@ class HASPGraphCache:
     def _build_workspace_ttl(
         self,
         area: Dict[str, Any],
-        devices: List[Dict[str, Any]],
-        entities: Optional[List[Dict[str, Any]]] = None,
+        entries: Optional[List[ArtifactEntry]] = None,
         artifacts_graph: Optional[Graph] = None,
         variables: Optional[List[Tuple[Any, bool]]] = None,
     ) -> str:
@@ -807,31 +882,30 @@ class HASPGraphCache:
 
         # 3. The artifacts it contains, each with what kind of device it is.
         art_dir = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/")
-        for ent in entities or []:
-            label = ent.get("_artifact_label") or ent.get("_artifact_base_label") or _entity_display_name(ent, self.devices_by_id)
-            safe_name = ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
-            art = URIRef(f"{art_dir}{safe_name}#artifact")
-            rdf.g.add((art, RDF.type, HMAS.Artifact))
-            rdf.g.add((ws, HMAS.contains, art))
-            rdf.g.add((art, TD.title, Literal(label)))
-            rdf.g.add((art, SCHEMA.name, Literal(ent.get("_artifact_display_label") or label)))
+        for entry in entries or []:
+            art = self._add_contained_artifact(rdf, ws, art_dir, entry)
             for cls in (artifacts_graph.objects(art, RDF.type) if artifacts_graph is not None else []):
                 if str(cls).startswith(str(hasp_semantics.HOMEONT)):
                     rdf.g.add((art, RDF.type, cls))
         return rdf.serialize()
 
-    def _build_artifacts_ttl(self, workspace_id: str, devices: List[Dict[str, Any]], entities: List[Dict[str, Any]]) -> str:
+    def _build_artifacts_ttl(self, workspace_id: str, entries: List[ArtifactEntry]) -> str:
+        """The workspace's artifact directory: one `hmas:contains` per device."""
         rdf = HomeAssistantRDF(self.base_uri)
-        aid = workspace_id
-        ws = URIRef(f"{rdf.base}workspaces/{aid}#workspace")
-        art_dir = URIRef(f"{rdf.base}workspaces/{aid}/artifacts/")
-        dev_by_id = {d["id"]: d for d in devices}
-        for ent in entities:
-            label = ent.get("_artifact_label") or _entity_display_name(ent, dev_by_id)
-            safe_name = ent.get("_artifact_slug") or urllib.parse.quote(label, safe="")
-            art = URIRef(f"{art_dir}{safe_name}#artifact")
-            rdf.g.add((art, RDF.type, HMAS.Artifact))
-            rdf.g.add((ws, HMAS.contains, art))
-            rdf.g.add((art, TD.title, Literal(label)))
-            rdf.g.add((art, SCHEMA.name, Literal(ent.get("_artifact_display_label") or label)))
+        ws = URIRef(f"{rdf.base}workspaces/{workspace_id}#workspace")
+        art_dir = URIRef(f"{rdf.base}workspaces/{workspace_id}/artifacts/")
+        for entry in entries:
+            self._add_contained_artifact(rdf, ws, art_dir, entry)
         return rdf.serialize()
+
+    @staticmethod
+    def _add_contained_artifact(rdf: HomeAssistantRDF, ws: URIRef, art_dir: URIRef,
+                                entry: ArtifactEntry) -> URIRef:
+        """One artifact in a workspace listing: contained, titled by its slug,
+        named by HA's display name. Returns its IRI."""
+        art = URIRef(f"{art_dir}{urllib.parse.quote(entry.slug, safe='')}#artifact")
+        rdf.g.add((art, RDF.type, HMAS.Artifact))
+        rdf.g.add((ws, HMAS.contains, art))
+        rdf.g.add((art, TD.title, Literal(entry.slug)))
+        rdf.g.add((art, SCHEMA.name, Literal(entry.display_name)))
+        return art

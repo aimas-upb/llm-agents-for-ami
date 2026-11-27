@@ -75,9 +75,9 @@ class TestHost:
         assert recorded["ok"] and recorded["signifier_id"]
 
         sk = signifier_key(EXPLICIT)
-        found = await matcher.match({"kind": sk.kind, "key": sk.key})
+        found = await matcher.find_match({"kind": sk.kind, "key": sk.key})
         assert found["match"]["tree"] == TREE
-        missed = await matcher.match({"kind": sk.kind, "key": {**sk.key, "artifact_name": "x"}})
+        missed = await matcher.find_match({"kind": sk.kind, "key": {**sk.key, "artifact_name": "x"}})
         assert missed == {"ok": True, "match": None}
 
     @pytest.mark.asyncio
@@ -87,7 +87,7 @@ class TestHost:
         assert (await recorder.record({"signifiers": []}))["error"] == "malformed_payload"
         assert (await recorder.record({"signifier": {"kind": "vague", "key": {}}}))[
             "error"] == "invalid_signifier"
-        assert (await matcher.match({"key": {}}))["error"] == "malformed_payload"
+        assert (await matcher.find_match({"key": {}}))["error"] == "malformed_payload"
 
 
 # --------------------------------------------------------------------------

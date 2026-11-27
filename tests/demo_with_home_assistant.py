@@ -298,8 +298,8 @@ async def _reset_lab308_state(*, light_state: str = "off", blinds_position: int 
         light_state: "on" or "off"
         blinds_position: Position as percentage (0-100)
     """
-    light_url = f"{LAB308_BASE}/artifacts/lights_308/ha/light/turn_{'on' if light_state == 'on' else 'off'}"
-    blinds_url = f"{LAB308_BASE}/artifacts/blinds_308/ha/cover/set_cover_position"
+    light_url = f"{LAB308_BASE}/artifacts/lights_308/actions/light_turn_{'on' if light_state == 'on' else 'off'}"
+    blinds_url = f"{LAB308_BASE}/artifacts/blinds_308/actions/cover_set_cover_position"
     try:
         async with aiohttp.ClientSession() as session:
             await session.post(light_url, json={})
@@ -537,8 +537,8 @@ class OrchestratorAgent(Agent):
                 light_state: "on" or "off"
                 blinds_position: Position as percentage (0-100)
             """
-            light_url = f"{LAB308_BASE}/artifacts/lights_308/ha/light/turn_{'on' if light_state == 'on' else 'off'}"
-            blinds_url = f"{LAB308_BASE}/artifacts/blinds_308/ha/cover/set_cover_position"
+            light_url = f"{LAB308_BASE}/artifacts/lights_308/actions/light_turn_{'on' if light_state == 'on' else 'off'}"
+            blinds_url = f"{LAB308_BASE}/artifacts/blinds_308/actions/cover_set_cover_position"
 
             try:
                 async with aiohttp.ClientSession() as session:
@@ -939,7 +939,7 @@ class OrchestratorAgent(Agent):
                 return
 
             toggle_url = f"{base}/workspaces/lab308/artifacts/light308/toggle"
-            blinds_url = f"{base}/workspaces/lab308/artifacts/blinds_308/ha/cover/set_cover_position"
+            blinds_url = f"{base}/workspaces/lab308/artifacts/blinds_308/actions/cover_set_cover_position"
 
             snapshot = await self._get_state_snapshot()
             artifacts = snapshot.get("artifacts") if isinstance(snapshot.get("artifacts"), dict) else {}

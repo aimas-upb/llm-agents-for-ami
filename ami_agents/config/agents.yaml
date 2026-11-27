@@ -38,6 +38,8 @@ user_assistant:
       reasoning_effort: "low"
 
   planning:
+    # How long a goal request waits for the InteractionSolver's plan (seconds).
+    timeout: "${UA_GOAL_REQUEST_TIMEOUT:-60.0}"
     # How long an action plan waits for a yes/no before assuming confirmation.
     # Read-only plans auto-confirm and never wait.
     confirmation_timeout: "${UA_CONFIRMATION_TIMEOUT:-5.0}"
@@ -135,6 +137,9 @@ default_llm:
   providers:
     openai:
       api_key: null  # Set via environment variable OPENAI_API_KEY
+      # Every agent's client: OPENAI_BASE_URL points it elsewhere (OpenRouter,
+      # a local OpenAI-compatible server).
+      base_url: "${OPENAI_BASE_URL:-https://api.openai.com/v1}"
 
   retry:
     timeout: "${LLM_TIMEOUT_DEFAULT:-30}"  # seconds

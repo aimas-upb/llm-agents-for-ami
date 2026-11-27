@@ -18,6 +18,7 @@ from ami_agents.agents.interaction_solver.interaction_solver_agent import Intera
 from ami_agents.environment.discovery.discovery_service import DiscoveryFactory
 from ami_agents.environment.integration.integration_engine import IntegrationEngineFactory
 from ami_agents.shared.utils.logger import LoggerFactory
+from ami_agents.shared.utils.llm_tasks import log_task_llms
 from ami_agents.shared.utils.config_resolver import resolve_yggdrasil_url
 
 
@@ -128,6 +129,8 @@ class AMIAgentsOrchestrator:
 
         if self.logger:
             self.logger.info("Configuration loaded successfully from %s", config_dir)
+            # Every agent's LLM tasks and their models, before any is called.
+            log_task_llms(self.config, self.logger)
 
     def validate_agent_specs(self) -> None:
         """
