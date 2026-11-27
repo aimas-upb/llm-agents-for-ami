@@ -17,6 +17,9 @@ from openai import AsyncOpenAI
 # it, or a model is configured as a reasoning model but called as a normal one.
 from ami_agents.shared.utils.llm_models import is_reasoning_model
 
+# Used only when agents.yaml names no base URL for the provider.
+DEFAULT_BASE_URL = "https://api.openai.com/v1"
+
 
 @dataclass
 class LLMClientConfig:
@@ -116,7 +119,8 @@ def build_llm_client(config: Dict[str, Any]) -> LLMClientConfig:
 
 
 def build_llm_call_kwargs(cfg: LLMClientConfig) -> Dict[str, Any]:
-    """Build extra kwargs for ``client.chat.completions.create``.
+    """Build extra kwargs for ``shared/utils/llm_call.complete``, in the Chat Completions
+    shape it takes (it converts them when the call goes over the Responses API).
 
     Returns ``temperature`` and ``max_tokens`` for a non-reasoning model, and
     ``reasoning_effort`` and ``max_completion_tokens`` for a reasoning model,
@@ -160,7 +164,11 @@ def build_behaviour_llm_client(
     llm_root = config.get("default_llm", {}) or {}
 
     model = str(behaviour_cfg.get("model") or llm_root.get("default_model") or "gpt-4o-mini")
-    base_url = "https://api.openai.com/v1"
+    # The provider's base URL (agents.yaml > default_llm.providers, which reads
+    # OPENAI_BASE_URL), as the InteractionSolver's client takes it.
+    provider_name = llm_root.get("default_provider", "openai")
+    provider_cfg = (llm_root.get("providers", {}) or {}).get(provider_name, {}) or {}
+    base_url = str(provider_cfg.get("base_url") or llm_root.get("base_url") or DEFAULT_BASE_URL)
 
     # Reasoning effort for o-series and gpt-5 models
     reasoning_effort = behaviour_cfg.get("reasoning_effort") or os.getenv("OPENAI_REASONING_EFFORT")

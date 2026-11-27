@@ -86,7 +86,7 @@ class IncompleteGoalPlanningBehaviour(OneShotBehaviour):
             self.logger.info(demo(
                 f"Incomplete goal {goal.intent_text!r}: no action named -- planning "
                 f"against the {goal.artifact_class or 'devices'} with the small model"))
-            (entry,) = await self._run(ExplicitGoalLLMPlanningBehaviour(
+            (entry,) = await self._run_planner(ExplicitGoalLLMPlanningBehaviour(
                 [goal], graph, logger=self.logger, recall_memory=False))
             return {**entry, "source": SOURCE}
 
@@ -106,9 +106,11 @@ class IncompleteGoalPlanningBehaviour(OneShotBehaviour):
         #    path, and the per-device plans combined.
         goals = [as_explicit(goal, c) for c in choice.chosen]
         behaviour = ExplicitGoalPlanningBehaviour(goals, logger=self.logger, graph=graph)
-        return combine(await self._run(behaviour), choice.chosen)
+        return combine(await self._run_planner(behaviour), choice.chosen)
 
-    async def _run(self, behaviour) -> List[Dict[str, Any]]:
+    # Not `_run`: SPADE's own _step() calls self._run() to run a behaviour;
+    # overriding it made every incomplete-goal request crash.
+    async def _run_planner(self, behaviour) -> List[Dict[str, Any]]:
         """Run a planning sub-behaviour to completion; its per-goal entries."""
         self.agent.add_behaviour(behaviour)
         await behaviour.join()

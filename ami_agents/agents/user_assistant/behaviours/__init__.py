@@ -1,5 +1,6 @@
 """Composable SPADE behaviours for the UserAssistant agent."""
 
+from .alert import AlertBehaviour
 from .capability_answer import CapabilityAnswerBehaviour
 from .env_capability_structuring import EnvCapabilityStructuringBehaviour
 from .env_state_structuring import EnvStateStructuringBehaviour
@@ -12,9 +13,9 @@ from .plan_execution import (
     MaintenancePlanBehaviour,
     PlanExecutionBehaviour,
 )
-from .visual_request_logger import VisualRequestLoggerBehaviour
 
 __all__ = [
+    "AlertBehaviour",
     "CapabilityAnswerBehaviour",
     "EnvCapabilityStructuringBehaviour",
     "EnvStateStructuringBehaviour",
@@ -25,5 +26,4 @@ __all__ = [
     "PlanExecutionBehaviour",
     "AchievementPlanBehaviour",
     "MaintenancePlanBehaviour",
-    "VisualRequestLoggerBehaviour",
 ]

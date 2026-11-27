@@ -126,6 +126,9 @@ def unmatched_question(goal: GoalSpec) -> Optional[str]:
 def clarification_question(goal: GoalSpec) -> Optional[str]:
     """The question to ask the user about this goal, or None when the goal can
     go on to planning."""
+    # 0. An alert names no device: there is nothing to ask about one.
+    if goal.is_alert:
+        return None
     # 1. Set by resolution: the devices are in several rooms and the goal means
     #    one of them, or the named device is missing (with what there is).
     if goal.clarification:
@@ -173,7 +176,7 @@ def goal_query(goal: GoalSpec) -> Optional[Dict[str, Any]]:
     is not to be looked up: only goals whose action is known are, since
     without one nothing can be promoted -- and never a goal the user is asked
     about (`unmatched_question`)."""
-    if incomplete_case(goal) not in (NO_LOCATION, NO_CLASS, NO_NAME):
+    if goal.is_alert or incomplete_case(goal) not in (NO_LOCATION, NO_CLASS, NO_NAME):
         return None
     # A goal the user is asked about is never looked up: a lookup by room and
     # action could promote it onto another device.

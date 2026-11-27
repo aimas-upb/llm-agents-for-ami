@@ -35,7 +35,7 @@ from .specific_capability_context import (
     _READING_QUERY,
     _room_variables,
     artifact_affordances,
-    device_class,
+    device_classes,
     device_location,
     find_artifacts,
     json_schema,
@@ -207,7 +207,7 @@ def _all_rooms(graph: Graph, property_class: str) -> List[Tuple[Any, Any]]:
 
 def artifact_context(graph: Graph, artifact: Any) -> Dict[str, Any]:
     """One device as the profiling model sees it."""
-    return {"name": _title(graph, artifact), "class": device_class(graph, artifact),
+    return {"name": _title(graph, artifact), "class": device_classes(graph, artifact),
             "location_class": device_location(graph, artifact),
             "affordances": artifact_affordances(graph, artifact)}
 

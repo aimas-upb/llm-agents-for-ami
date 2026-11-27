@@ -38,6 +38,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from ....shared.models.goal_structure import GoalStructure
 from ....shared.utils.demo_log import demo
+from ....shared.utils.llm_call import complete
 from ....shared.utils.llm_models import is_reasoning_model
 from .dependency_context import known_properties
 from .goal_profile import (
@@ -132,12 +133,12 @@ async def ask_profile(agent, logger, structure: GoalStructure,
     #    tokens, so later answers are missing), then check every answer
     #    against its question and the devices of its context.
     try:
-        response = await cfg.client.chat.completions.create(
-            model=cfg.model, messages=[{"role": "user", "content": prompt}],
+        # Over the API the client's endpoint serves (`shared/utils/llm_call.py`).
+        reply = await complete(
+            cfg.client, cfg.model, [{"role": "user", "content": prompt}],
             response_format=RESPONSE_FORMAT, **kwargs)
-        choice = response.choices[0]
-        trace["answer"] = choice.message.content or ""
-        trace["finish_reason"] = getattr(choice, "finish_reason", None)
+        trace["answer"] = reply.content
+        trace["finish_reason"] = reply.finish_reason
         output = _json_object(trace["answer"])
         profile, log = resolve_profile(checklist, output, known_properties(context))
     except InconsistentStructure:

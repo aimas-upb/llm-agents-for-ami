@@ -25,6 +25,7 @@ from spade.behaviour import OneShotBehaviour
 
 from ....shared.models.goal_structure import GoalStructure
 from ....shared.utils.demo_log import demo
+from ....shared.utils.llm_call import complete
 from ....shared.utils.logger import LoggerFactory
 from .. import pipeline
 from ..prompts.goal_structuring_prompts import render_goal_prompt
@@ -101,12 +102,13 @@ class GoalStructuringBehaviour(OneShotBehaviour):
                 f"Segmenter qualifiers: {', '.join(self.qualifiers) or 'none'}")},
         ]
         llm_cfg = build_behaviour_llm_client(self.agent.config, "intent_parsing")
-        response = await llm_cfg.client.chat.completions.create(
-            model=llm_cfg.model,
-            messages=messages,
+        # Over the API the client's endpoint serves (`shared/utils/llm_call.py`).
+        reply = await complete(
+            llm_cfg.client, llm_cfg.model,
+            messages,
             **build_llm_call_kwargs(llm_cfg),
         )
-        raw = (response.choices[0].message.content or "").strip()
+        raw = reply.content.strip()
         parsed = loose_json_loads(raw)
         if not isinstance(parsed, dict):
             raise ValueError(f"expected a JSON object, got: {raw[:200]!r}")

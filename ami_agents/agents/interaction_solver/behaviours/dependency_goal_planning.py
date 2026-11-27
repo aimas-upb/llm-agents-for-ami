@@ -464,14 +464,14 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
             step = replace(goal, goal_kind="achievement", timing=None)
             # A filtered incomplete goal: one tree per candidate device; the
             # filter picks among them when the plan runs.
-            if gid in filtered and step.goal_specificity == "incomplete":
+            if gid in filtered and step.goal_specificity == "incomplete" and not step.is_alert:
                 entries = await self._per_device(graph, gid, step)
                 per_device[gid] = [(title, entry["tree"]) for title, entry in entries]
                 trees = [entry["tree"] for _, entry in entries]
                 llm = llm or any(entry.get("llm") for _, entry in entries)
             # Any other goal: one tree, from the planner its specificity needs.
             else:
-                entry = await self._step(graph, gid, step)
+                entry = await self._plan_goal(graph, gid, step)
                 subtrees[gid] = entry["tree"]
                 trees = [entry["tree"]]
                 llm = llm or bool(entry.get("llm"))
@@ -480,10 +480,20 @@ class DependencyGoalPlanningBehaviour(OneShotBehaviour):
                             for url in _actions(tree)]
         return subtrees, per_device, devices, llm
 
-    async def _step(self, graph: Graph, gid: str, goal: GoalSpec) -> Dict[str, Any]:
+    # Not `_step`: SPADE's Behaviour._step() is the method its run loop calls
+    # (`_start` -> `_step()`); overriding it broke every dependency request.
+    async def _plan_goal(self, graph: Graph, gid: str, goal: GoalSpec) -> Dict[str, Any]:
         """One goal through the achievement planner its specificity calls for;
         returns that planner's entry. Raises _Stop when the goal names no
-        action, or its planner did not produce a tree."""
+        action, or its planner did not produce a tree.
+
+        A goal reached by an alert needs no planner: the alert is the whole
+        action, the UA raises it, and no device is involved."""
+        # 0. An alert: its achieve(G) tree is the alert node itself.
+        if goal.is_alert:
+            text = goal.action_text or goal.intent_text or gid
+            return {"tree": {"type": "alert", "name": f"{gid}: alert", "text": text},
+                    "llm": False}
         # 1. Pick the planner, by what the goal names (a single goal is
         #    presented as a simple structure, as the planners expect).
         simple = GoalStructure(intent_text=goal.intent_text or gid, structure="simple",

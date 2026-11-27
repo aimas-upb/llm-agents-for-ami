@@ -38,6 +38,7 @@ from spade.behaviour import OneShotBehaviour
 
 from ....shared.models.goal_structure import GoalSpec
 from ....shared.utils.demo_log import demo
+from ....shared.utils.llm_call import complete
 from ....shared.utils.llm_models import is_reasoning_model
 from ....shared.utils.logger import LoggerFactory
 from ..prompts import MODIFY_RECIPE_PROMPT
@@ -149,9 +150,9 @@ class ExplicitGoalLLMPlanningBehaviour(OneShotBehaviour):
             kwargs["temperature"] = cfg.temperature
         self.logger.info(demo(f"Explicit goal {where}: asking {cfg.model} for a modify recipe"))
         try:
-            response = await cfg.client.chat.completions.create(
-                model=cfg.model, messages=messages, **kwargs)
-            answer = _json_object(response.choices[0].message.content or "")
+            # Over the API the client's endpoint serves (`shared/utils/llm_call.py`).
+            reply = await complete(cfg.client, cfg.model, messages, **kwargs)
+            answer = _json_object(reply.content)
         except Exception as exc:
             self.logger.warning(f"Explicit goal {where}: recipe request failed: {exc}")
             return {"tree": None, "error": "explicit_planning_failed", "source": SOURCE,

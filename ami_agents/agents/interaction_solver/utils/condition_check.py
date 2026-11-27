@@ -52,6 +52,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from rdflib import Graph
 
 from ....shared.utils.demo_log import demo
+from ....shared.utils.llm_call import complete
 from ..prompts import CONDITION_GUARD_PROMPT
 from .condition_guard import (
     CHECK_FAILED,
@@ -72,7 +73,7 @@ from .specific_capability_context import (
     _command_types,
     _title,
     artifact_affordances,
-    device_class,
+    device_classes,
 )
 
 
@@ -185,7 +186,7 @@ def _step_brief(graph: Graph, step: Step) -> Dict[str, Any]:
     commands = _command_types(graph, step.action)
     return {"id": step.id, **({"goal": step.goal} if step.goal else {}),
             "device_name": _title(graph, step.artifact),
-            "device_class": device_class(graph, step.artifact),
+            "device_class": device_classes(graph, step.artifact),
             "action_name": _title(graph, step.action),
             "action_class": commands[0] if commands else None,
             "value": step.value,
@@ -231,15 +232,15 @@ async def _ask(agent, logger, graph: Graph, steps: List[Step], request: Any,
     else:
         kwargs["temperature"] = cfg.temperature
     logger.info(demo(f"Condition check: {len(steps)} step(s) for {cfg.model}"))
-    response = await cfg.client.chat.completions.create(
-        model=cfg.model, messages=[{"role": "user", "content": prompt}],
+    # Over the API the client's endpoint serves (`shared/utils/llm_call.py`).
+    reply = await complete(
+        cfg.client, cfg.model, [{"role": "user", "content": prompt}],
         response_format=RESPONSE_FORMAT, **kwargs)
 
     # 3. The raw reply kept for the entry, then its answers by id. `_json_object`
     #    still guards the parse: a refusal or a truncated reply has no JSON.
-    choice = response.choices[0]
-    trace["answer"] = choice.message.content or ""
-    trace["finish_reason"] = getattr(choice, "finish_reason", None)
+    trace["answer"] = reply.content
+    trace["finish_reason"] = reply.finish_reason
     output = _json_object(trace["answer"])
     return {str(a.get("id")): a for a in output.get("answers") or [] if isinstance(a, dict)}
 

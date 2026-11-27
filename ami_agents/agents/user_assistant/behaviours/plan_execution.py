@@ -43,6 +43,7 @@ from ....bt_planning.nodes.affordance_nodes import (
     PropertyConditionNode,
     SettlingTimeWaitNode,
 )
+from ....bt_planning.nodes.alert_node import AlertNode
 from ....bt_planning.nodes.registry import compile_node
 from ....shared.models.messages import (
     META_CORRELATION_ID,
@@ -55,6 +56,7 @@ from ....shared.utils.clock import make_clock
 from ....shared.utils.demo_log import demo
 from ....shared.utils.logger import LoggerFactory
 from ..guards import GuardRecordingBehaviour
+from .alert import AlertBehaviour
 from ..signifiers import (
     ExecutionOutcome,
     SignifierRecordingBehaviour,
@@ -120,6 +122,35 @@ class PlanExecutionBehaviour(CyclicBehaviour):
 
     def _compile_child(self, spec: Dict[str, Any]):
         return compile_node(spec, self._compile_child)
+
+    # -- ticking, and what a tick raised ----------------------------------
+
+    def _tick(self) -> None:
+        """Tick the tree once, then deliver the alerts that tick raised.
+
+        Every lifecycle ticks through here, so an `alert` node behaves the
+        same in an achievement, a maintenance or a dependency plan.
+        """
+        self.tree.tick_once()
+        self._deliver_alerts()
+
+    def _deliver_alerts(self) -> None:
+        """One AlertBehaviour per alert the tree's alert nodes raised.
+
+        Delivering is its own task: the plan's next tick does not wait for a
+        chat message or a hook to finish.
+        """
+        # 1. What this tick raised, from every alert node of this plan's tree.
+        raised = [alert for node in self.tree.iterate()
+                  if isinstance(node, AlertNode) for alert in node.drain()]
+        if not raised:
+            return
+        # 2. Each on its own behaviour, on the plan's conversation.
+        record = self.agent.plans.get(self.plan_id)
+        conversation = record.plan.conversation_id if record else None
+        for alert in raised:
+            self.agent.add_behaviour(
+                AlertBehaviour(self.plan_id, conversation, alert, logger=self.logger))
 
     def _finish(self, status: PlanStatus, error: Optional[str] = None) -> None:
         self.agent.plans.finish(self.plan_id, status, error=error)
@@ -341,7 +372,7 @@ class AchievementPlanBehaviour(PlanExecutionBehaviour):
 
         # EXACTLY ONE TICK. Everything else this agent has to do happens
         # between this call and the next.
-        self.tree.tick_once()
+        self._tick()
         status = self.tree.status
         ticks = self.agent.plans.bump_tick(self.plan_id, status.name)
 
@@ -408,7 +439,7 @@ class MaintenancePlanBehaviour(PlanExecutionBehaviour):
             await self._wait_for_next_burst()
             return
 
-        self.tree.tick_once()
+        self._tick()
         status = self.tree.status
         self.agent.plans.bump_tick(self.plan_id, status.name)
         self._burst_ticks += 1
@@ -521,7 +552,7 @@ class DependencyPlanBehaviour(PlanExecutionBehaviour):
 
         if self.runtime is not None:
             self.runtime.before_tick()
-        self.tree.tick_once()
+        self._tick()
         status = self.tree.status
         self.agent.plans.bump_tick(self.plan_id, status.name)
 

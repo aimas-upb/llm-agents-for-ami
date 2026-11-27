@@ -9,7 +9,7 @@ signifier recording — is handled by deterministic SPADE behaviours.
 
 import asyncio
 import os
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from spade.agent import Agent
 from spade.message import Message as SpadeMessage
@@ -38,7 +38,6 @@ from ...environment.integration.integration_engine import YggdrasilIntegration
 from .models import ConversationState
 from .registry import PlanRegistry, RequestRegistry
 from .behaviours import (
-    VisualRequestLoggerBehaviour,
     PlanManagementBehaviour,
     UserMessageBehaviour,
 )
@@ -160,6 +159,11 @@ class UserAssistantAgent(Agent, IAgent):
         # that asked for it has finished.
         self.requests = RequestRegistry()
         self.plans = PlanRegistry()
+        # What an alert a plan raises does besides going to stderr
+        # (`behaviours/alert.py`): each handler is called with the
+        # AlertBehaviour and the alert. Empty by default; a deployment or a
+        # test harness appends its own.
+        self.alert_handlers: List[Any] = []
         self.confirmation_timeout: float = float(
             (config.get("planning", {}) or {}).get(
                 "confirmation_timeout", _DEFAULT_CONFIRMATION_TIMEOUT_S)
@@ -222,7 +226,7 @@ class UserAssistantAgent(Agent, IAgent):
         return self._behaviour_llm_cfgs[behaviour_key]
 
     def build_llm_kwargs(self) -> Dict[str, Any]:
-        """Build extra kwargs for ``llm_client.chat.completions.create``.
+        """Build extra kwargs for ``shared/utils/llm_call.complete`` (Chat Completions shape).
 
         Uses the default (atomic_segmentation) config for backward compatibility.
         """
@@ -273,14 +277,13 @@ class UserAssistantAgent(Agent, IAgent):
 
         # Register behaviours with template routing.
         #
-        # `dispatch` gives a copy to EVERY behaviour whose template matches, so
-        # these do not compete: the receiver takes fresh utterances, while a
+        # `dispatch` gives a copy to EVERY behaviour whose template matches:
+        # the receiver takes fresh utterances, while a
         # reply belonging to a request in progress carries `active_request_id`
         # and is matched by that request's own FSM template instead.
         fresh = Template()
         fresh.set_metadata("message_type", "llm")
         self.add_behaviour(UserMessageBehaviour(self.logger), template=fresh)
-        self.add_behaviour(VisualRequestLoggerBehaviour(self.logger), template=fresh)
 
         # One manager for every confirmed plan. Execution is reached by message,
         # never by call, so a plan outlives the request that asked for it.

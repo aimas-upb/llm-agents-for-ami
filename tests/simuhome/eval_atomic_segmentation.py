@@ -59,6 +59,7 @@ from ami_agents.agents.user_assistant.prompts.intent_segmentation_prompts import
     ATOMIC_SEGMENTATION_SYSTEM_PROMPT,
 )
 from ami_agents.agents.user_assistant.utils import loose_json_loads
+from ami_agents.shared.utils.llm_call import complete
 from ami_agents.agents.user_assistant.utils.llm_client import (
     LLMClientConfig,
     build_behaviour_llm_client,
@@ -213,19 +214,20 @@ def parse_intents(raw: str) -> List[Dict[str, Any]]:
 
 
 async def segment_one(llm_cfg, call_kwargs, prompt: str, query: str, capture=None) -> List[Dict[str, Any]]:
-    response = await llm_cfg.client.chat.completions.create(
-        model=llm_cfg.model,
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": query},
-        ],
+    """Segment one query as the UserAssistant does: the same prompt, and the same
+    call over the API the client's endpoint serves (`shared/utils/llm_call.py`)."""
+    # 1. The call.
+    reply = await complete(
+        llm_cfg.client, llm_cfg.model,
+        [{"role": "system", "content": prompt}, {"role": "user", "content": query}],
         **call_kwargs,
     )
     if capture is not None:
-        capture["raw_response"] = response.model_dump(mode="json")
-    if response.choices[0].finish_reason == "length":
+        capture["raw_response"] = {"content": reply.content, "finish_reason": reply.finish_reason}
+    # 2. A reply cut off by the token limit holds no complete JSON.
+    if reply.finish_reason == "length":
         raise ValueError("Segmentation response truncated by the output token limit")
-    return parse_intents((response.choices[0].message.content or "").strip())
+    return parse_intents(reply.content.strip())
 
 
 async def run_episode(

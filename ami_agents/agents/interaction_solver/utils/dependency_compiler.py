@@ -17,7 +17,9 @@ Every construct of a dependency `GoalStructure` maps to a fixed pattern
                     scope false) skips the goal: it need not run
     guard           Selector[not X, unit] -- a false guard skips the goal
     start           now / at_time / after_delay / on_trigger (trigger, offset
-                    after or -- profiled -- before; recurrence)
+                    after or -- profiled -- before; recurrence); a trigger or
+                    recurrence that must hold for a span ("held") waits until
+                    it has held that long without a break (`_held`)
     placement       after_goal / with_goal followers, and goals that complete
                     with a goal and have no start of their own, hang off their
                     referenced goal; heads run side by side under the root;
@@ -484,12 +486,60 @@ class _Compiler:
             if wait is None:
                 return None
             return _seq(f"{gid}: {pred.offset_text} before {pid}", [wait, inner])
+        if pred.offset_direction == "held" and pred.offset_text:
+            return _seq(f"{gid}: when {pid} held {pred.offset_text}",
+                        [self._held(gid, triggers), inner])
         steps = [self._wait(triggers)]
         if pred.offset_text:
             self.clock = True
             steps.append(_timer(f"{gid}: {pred.offset_text} after {pid}",
                                 self._span(pred.offset_text, gid)))
         return _seq(f"{gid}: when {pid}", steps + [inner])
+
+    def _wait_or_held(self, gid: str, pids: List[str]) -> Dict[str, Any]:
+        """Wait for the predicates; when the first says it must hold for a span
+        ("above 25 for 5 minutes"), wait until it has held that long."""
+        pred = self.preds[pids[0]]
+        if pred.offset_direction == "held" and pred.offset_text:
+            return self._held(gid, pids)
+        return self._wait(pids)
+
+    def _held(self, gid: str, pids: List[str]) -> Dict[str, Any]:
+        """RUNNING until the predicates have held, without a break, for the
+        first one's span; then SUCCESS.
+
+        "After a span" (the `after` offset) starts a timer when P first turns
+        true and acts when it runs out, even if P fell back meanwhile. "Held
+        for a span" must restart the count each time P breaks. One attempt:
+
+            sequence[ wait_for P,
+                      parallel(success_on_one)[ timer(span),
+                                                inverter(wait_for not P) ] ]
+
+        The timer finishing first means P held: the attempt succeeds. P
+        turning false first makes the inverted wait fail, which fails the
+        parallel and so the attempt (and stops the timer). The IR's `repeat`
+        re-runs its child after each SUCCESS and stops at a FAILURE, so
+        inverters turn it into "retry until an attempt succeeds":
+
+            inverter( repeat( inverter( attempt ) ) )
+        """
+        # 1. The span, on the plan's clock.
+        pred = self.preds[pids[0]]
+        label = "+".join(pids)
+        span = self._span(pred.offset_text, gid)
+        self.clock = True
+        # 2. One attempt: P true, then P stays true while the timer runs.
+        attempt = _seq(f"{gid}: {label} for {pred.offset_text}", [
+            self._wait(pids),
+            _par_one(f"{gid}: {label} holds {pred.offset_text}", [
+                _timer(f"{gid}: {pred.offset_text} of {label}", span),
+                _one("inverter", f"{gid}: {label} broke",
+                     self._wait(pids, negate=True))])])
+        # 3. Retried until one attempt succeeds.
+        return _one("inverter", f"{gid}: {label} held {pred.offset_text}",
+                    _one("repeat", f"{gid}: retry {label}",
+                         _one("inverter", f"{gid}: until {label} holds", attempt)))
 
     def _before(self, gid: str, pid: str, pred: PredicateSpec) -> Optional[Dict[str, Any]]:
         answer = self._answer("time_to_event", pid) or {"fallback": "at_event"}
@@ -519,7 +569,7 @@ class _Compiler:
         pids = self._role(gid, "recurrence")
         self.long_running = True
         loop = _one("repeat", f"{gid}: whenever {'+'.join(pids)}", _seq(f"{gid}: once", [
-            self._wait(pids),
+            self._wait_or_held(gid, pids),
             _one("ignore_failure", f"{gid}: a failed run does not stop later ones",
                  self._guard(gid, self._body(gid))),
             self._wait(pids, negate=True)]))

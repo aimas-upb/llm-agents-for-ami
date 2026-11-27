@@ -170,9 +170,25 @@ def _homeont_types(graph: Graph, node: Any) -> List[str]:
 
 
 def device_class(graph: Graph, artifact: Any) -> Optional[str]:
-    """The device's most specific homeont class, as a CURIE."""
+    """The device's most specific homeont class, as a CURIE.
+
+    One class, for the places that key on it (the guard store, a goal's
+    `artifact_class`); a device of several classes gives its first. What a
+    model reads of the device uses `device_classes`.
+    """
     types = _homeont_types(graph, artifact)
     return types[0] if types else None
+
+
+def device_classes(graph: Graph, artifact: Any) -> Optional[str]:
+    """Every most specific homeont class of the device, as CURIEs joined by
+    ", " ("homeont:AirPurifier, homeont:Dehumidifier"), or None.
+
+    A 2-in-1 device carries two classes; a model shown only the first would
+    not know the device can also do the other half's job.
+    """
+    types = sorted(_homeont_types(graph, artifact))
+    return ", ".join(types) if types else None
 
 
 def device_location(graph: Graph, artifact: Any) -> Optional[str]:

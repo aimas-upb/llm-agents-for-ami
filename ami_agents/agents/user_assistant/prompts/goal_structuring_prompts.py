@@ -163,6 +163,8 @@ A predicate is something the plan must **check, wait for or stop on**. Words tha
 - **target_value_text**: the words stating the value compared against ("finished", "on", "half open", "loud"), copied verbatim; null if none.
 - **target_value_determined**: the value of the property those words correspond to, read from the property's `output` in the home context — or, for a property shown "values as Action …", from that action's `input`: the enum member its description gives ("finished" against "0 = Stopped" → "0"), the boolean, or the number in its unit. null when they do not determine it ("loud" has no stated threshold).
 
+A device "is on" or "turns on" read on a property that has an off value but no on value (an HVAC mode: off, cool, heat, …; a cover's state): **comparison** "!=" and **target_value_determined** the off value ("the AC turns on" → hvac mode != "off"). "Is off" is "==" the off value.
+
 explicit: device and property both identifiable. incomplete: some of location, device or property missing — leave those null. A device condition stated qualitatively ("while the TV is loud") is incomplete, not ambiguous: keep the words in target_value_text.
 
 ### Environment property predicates
@@ -186,11 +188,20 @@ Give every goal an id G1, G2, … and every predicate an id P1, P2, … in the o
   - "filter" — "any / all … that are X": selects which candidates of the goal's device pool the goal applies to.
 - **applies_to**: the ids of the goals it conditions.
 - **connective**: "and" (default) or "or" — how it combines with the other predicates of the same role on the same goals ("while A and B" → both "and").
-- for a **trigger** only: **offset_text** (the span, e.g. "23 minutes"; null if none) and **offset_direction** ("after" | "before").
+- for a **trigger** only: **offset_text** (the span, e.g. "23 minutes"; null if none) and **offset_direction** ("after" | "before" | "held").
+  - "held" — the condition must stay true, without a break, for the whole span before the goal is due: for example "if PM2.5 stays above 25 for 5 minutes", "once nobody has been in the room for 10 minutes". It is not "after": "5 minutes after X" acts 5 minutes after X first happens, even if X has stopped since.
+  - A **recurrence** may carry the same two fields, with offset_direction "held" only: "whenever the humidity has been above 65% for 10 minutes".
 
 State a trigger or termination as the condition that BECOMES TRUE: "after I close it" is a trigger on "the light is off".
 
 A trigger predicate is used only by a goal that starts "on_trigger", or that names it in **completes_with**. The event in a "finish together" request is such a trigger: its applies_to is the goal that completes with it.
+
+### Goals reached by an alert
+A goal is usually reached by a device's action. When what the request asks to happen is that the user is told something ("alert me", "notify me", "let me know", "warn me"), the goal is reached by an **alert** instead, which the assistant raises itself:
+- **action_kind**: "alert" (it is "device" for every other goal, and may be left out then);
+- **action_text**: what the alert says, in a few words of the request's own content, for example "Grid import above 3 kW";
+- **goal_specificity** "explicit", **goal_kind** "achievement", **intent_text** as usual; every device field (location_class, artifact_class, artifact_name, affordance_*, parameter_name, goal_effect, target_value_*) is null: no device is acted on.
+The condition the user wants to hear about is a predicate (a trigger, or a recurrence for "whenever"), as for any other goal.
 
 ### Each goal
 - **timing**: {"starts": …, plus the field it needs}
@@ -275,6 +286,15 @@ For example, "Dishwasher 1 in the kitchen is running; start dryer 1 in the bathr
 - G2 Normal dryness: timing {"starts": "after_goal", "ref_goal": "G1", "offset_text": null}
 - G3 start the cycle (operational state Running): timing {"starts": "after_goal", "ref_goal": "G2", "offset_text": null, "completes_with": "P1", "stated_end_time_text": "11:39"}
 
+For example, "In the garage, if PM2.5 stays above 25 µg/m³ for 5 minutes, turn the purifier up to full speed.":
+- P1 garage PM2.5 above 25: role "trigger", applies_to ["G1"], offset_text "5 minutes", offset_direction "held".
+- G1 purifier to 100%: timing {"starts": "on_trigger"}
+
+For example, "Alert me whenever the meter shows more than 3 kW imported or more than 3 kW exported.":
+- P1 more than 3 kW imported: role "recurrence", applies_to ["G1"], connective "or".
+- P2 more than 3 kW exported: role "recurrence", applies_to ["G1"], connective "or".
+- G1: action_kind "alert", action_text "Grid import or export above 3 kW", no device fields, timing {"starts": "on_trigger"}
+
 "Keep the living room at 22 degrees Celsius while the light is on, then 2 minutes after that set the heating pump level to 20 degrees."
 - P1 a living room light is on: predicate_subject "device_property", predicate_specificity "incomplete", quantifier "any", role "scope", applies_to ["G1"].
 - G1 hold 22 °C: goal_kind "maintenance", timing {"starts": "now"}.
@@ -317,10 +337,12 @@ DEPENDENCY_OUTPUT = """\
 
 Return ONLY one JSON object — no prose, no markdown fences:
 
-{"goals": {"G1": {<goal fields as above>, "timing": {...}, "rationale": string (optional)}, ...},
+{"goals": {"G1": {<goal fields as above>, "timing": {...}, "rationale": string (optional),
+                  "action_kind": "device" | "alert" (optional, "device" when left out),
+                  "action_text": string | null}, ...},
  "predicates": {"P1": {<predicate fields as above>, "role": string, "applies_to": [string],
                        "connective": "and" | "or", "offset_text": string | null,
-                       "offset_direction": "after" | "before" | null}, ...}}
+                       "offset_direction": "after" | "before" | "held" | null}, ...}}
 
 "predicates" is {} when the request has none. Every goal has a timing; every predicate a role and applies_to.
 """

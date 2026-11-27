@@ -21,6 +21,7 @@ import json
 from ...shared.models.messages import MessageType
 from ...shared.utils.spade_rpc import rpc_call
 from ...shared.utils.demo_log import demo
+from ...shared.utils.llm_call import complete
 from .models import AtomicIntent
 from .prompts.intent_response_prompts import (
     PLAN_SUMMARY_SYSTEM_PROMPT,
@@ -42,12 +43,13 @@ async def segment_into_atomic_intents(agent, logger, user_text: str) -> list[Ato
         {"role": "user", "content": user_text},
     ]
     try:
-        response = await agent.llm_client.chat.completions.create(
-            model=agent.llm_model,
-            messages=messages,
+        # Over the API the client's endpoint serves (`shared/utils/llm_call.py`).
+        reply = await complete(
+            agent.llm_client, agent.llm_model,
+            messages,
             **agent.build_llm_kwargs(),
         )
-        raw = (response.choices[0].message.content or "").strip()
+        raw = reply.content.strip()
         parsed = loose_json_loads(raw)
         if not isinstance(parsed, dict):
             logger.warning("LLM atomic segmentation returned non-dict: %r", raw[:200])
@@ -102,13 +104,14 @@ async def summarize_plan(agent, logger, plan_json: str) -> str:
     try:
         # 1. Call the LLM with the summarisation step's own client and kwargs.
         llm_cfg = agent.get_llm_client_for_behaviour("plan_summarization")
-        response = await llm_cfg.client.chat.completions.create(
-            model=llm_cfg.model,
-            messages=messages,
+        # Over the API the client's endpoint serves (`shared/utils/llm_call.py`).
+        reply = await complete(
+            llm_cfg.client, llm_cfg.model,
+            messages,
             **agent.build_llm_kwargs_for_behaviour("plan_summarization"),
         )
         # 2. An empty answer still gets a line the user can confirm against.
-        return (response.choices[0].message.content or "").strip() or (
+        return reply.content.strip() or (
             "Plan ready. Does this plan look good to you?"
         )
     except Exception as exc:
@@ -127,12 +130,13 @@ async def format_query_response(agent, logger, raw_data: str, user_text: str) ->
         {"role": "user", "content": f"User asked: {user_text}\n\nRaw data:\n{raw_data}"},
     ]
     try:
-        response = await agent.llm_client.chat.completions.create(
-            model=agent.llm_model,
-            messages=messages,
+        # Over the API the client's endpoint serves (`shared/utils/llm_call.py`).
+        reply = await complete(
+            agent.llm_client, agent.llm_model,
+            messages,
             **agent.build_llm_kwargs(),
         )
-        return (response.choices[0].message.content or "").strip() or raw_data
+        return reply.content.strip() or raw_data
     except Exception as exc:
         logger.error("LLM query formatting failed: %s", exc)
         return raw_data

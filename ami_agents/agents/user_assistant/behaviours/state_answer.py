@@ -21,6 +21,7 @@ from spade.behaviour import OneShotBehaviour
 
 from ....shared.utils.class_labels import label_for
 from ....shared.utils.demo_log import demo
+from ....shared.utils.llm_call import complete
 from ....shared.utils.logger import LoggerFactory
 from ..prompts.intent_response_prompts import STATE_ANSWER_PROMPT
 from ..utils import loose_json_loads
@@ -87,15 +88,16 @@ class StateAnswerBehaviour(OneShotBehaviour):
 
         try:
             llm_cfg = build_behaviour_llm_client(self.agent.config, "state_answer")
-            response = await llm_cfg.client.chat.completions.create(
-                model=llm_cfg.model,
-                messages=[
+            # Over the API the client's endpoint serves (`shared/utils/llm_call.py`).
+            reply = await complete(
+                llm_cfg.client, llm_cfg.model,
+                [
                     {"role": "system", "content": STATE_ANSWER_PROMPT},
                     {"role": "user", "content": json.dumps(payload)},
                 ],
                 **build_llm_call_kwargs(llm_cfg),
             )
-            raw = (response.choices[0].message.content or "").strip()
+            raw = reply.content.strip()
             parsed = loose_json_loads(raw)
             answer = (parsed.get("answer") if isinstance(parsed, dict) else None)
             if not answer:
