@@ -1,0 +1,162 @@
+{
+  "name": "A5_garage_humidity_band",
+  "id": "A5",
+  "workspace_id": "garaj",
+  "kind": "maintenance",
+  "beia_original": "Netatmo: Umiditate – porneste dezumidificatorul peste 65% si il opreste cand umiditatea scade sub 60%.",
+  "query": "Keep the garage humidity between 60% and 65%: when the weather station reads above 65%, turn on the Blue Air dehumidifier, and turn it off when the humidity falls below 60%.",
+  "ground_truth": {
+    "any_of": [
+      {
+        "reads": [
+          {
+            "any_of": [
+              "garaj/weather_station_70_ee_50_2e_da_88/humidity"
+            ],
+            "op": ">",
+            "value": 65
+          },
+          {
+            "any_of": [
+              "garaj/weather_station_70_ee_50_2e_da_88/humidity"
+            ],
+            "op": "<",
+            "value": 60
+          }
+        ],
+        "acts": {
+          "any_of": [
+            {
+              "ordered": true,
+              "steps": [
+                {
+                  "ref": "garaj/blue_air_garage/dehumidifier_turn_on"
+                },
+                {
+                  "ref": "garaj/blue_air_garage/dehumidifier_turn_off"
+                }
+              ]
+            }
+          ]
+        },
+        "forbidden": [
+          {
+            "ref_prefix": "garaj/blue_air_garage/fan_"
+          },
+          {
+            "ref_prefix": "peroni_22/"
+          }
+        ],
+        "shape": {
+          "recurring": true
+        }
+      },
+      {
+        "acts": {
+          "any_of": [
+            {
+              "steps": [
+                {
+                  "ref": "garaj/blue_air_garage/dehumidifier_set_humidity",
+                  "params": {
+                    "humidity": {
+                      "min": 60,
+                      "max": 65
+                    }
+                  }
+                },
+                {
+                  "ref": "garaj/blue_air_garage/dehumidifier_turn_on"
+                }
+              ]
+            }
+          ]
+        },
+        "forbidden": [
+          {
+            "ref_prefix": "garaj/blue_air_garage/fan_"
+          },
+          {
+            "ref_prefix": "peroni_22/"
+          }
+        ]
+      }
+    ]
+  },
+  "sim_speed": 20,
+  "initial_state": [
+    {
+      "type": "sim",
+      "set": {
+        "number.sim_outdoor_humidity": 50
+      }
+    },
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/garaj/artifacts/actuator_geam_2/actions/cover_open_cover",
+      "json": {},
+      "expect_status": 200
+    },
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/garaj/artifacts/blue_air_garage/actions/dehumidifier_turn_off",
+      "json": {},
+      "expect_status": 200
+    },
+    {
+      "type": "sleep",
+      "seconds": 25
+    }
+  ],
+  "stimuli": [
+    {
+      "at": "0:00",
+      "steps": [
+        {
+          "type": "sim",
+          "set": {
+            "number.sim_outdoor_humidity": 95
+          }
+        }
+      ],
+      "then": [
+        {
+          "type": "property_equals",
+          "path": "/workspaces/garaj/artifacts/blue_air_garage/properties/dehumidifier",
+          "equals": "on",
+          "timeout_seconds": 1800
+        }
+      ]
+    },
+    {
+      "at": "35:00",
+      "steps": [
+        {
+          "type": "request",
+          "method": "POST",
+          "path": "/workspaces/garaj/artifacts/actuator_geam_2/actions/cover_close_cover",
+          "json": {},
+          "expect_status": 200
+        },
+        {
+          "type": "sim",
+          "set": {
+            "number.sim_outdoor_humidity": 40
+          }
+        }
+      ],
+      "then": [
+        {
+          "type": "property_equals",
+          "path": "/workspaces/garaj/artifacts/blue_air_garage/properties/dehumidifier",
+          "equals": "off",
+          "timeout_seconds": 3600
+        }
+      ]
+    }
+  ],
+  "auto_confirm": true,
+  "confirmation_text": "yes"
+}

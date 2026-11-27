@@ -1,0 +1,181 @@
+{
+  "name": "A4_close_window_when_ac_starts",
+  "id": "A4",
+  "workspace_id": "garaj",
+  "kind": "triggered achievement, recurring",
+  "beia_original": "Actuator geam: Inchidere Geam atunci cand AC-urile pornesc.",
+  "query": "Whenever the garage air conditioner turns on, close the garage window.",
+  "ground_truth": {
+    "reads": [
+      {
+        "alternatives": [
+          {
+            "any_of": [
+              "garaj/lg_garaj_hvac/climate"
+            ],
+            "op": "!=",
+            "value": "off"
+          },
+          {
+            "any_of": [
+              "garaj/lg_garaj_hvac/climate"
+            ],
+            "op": "==",
+            "value": [
+              "cool",
+              "heat",
+              "dry",
+              "fan_only",
+              "auto"
+            ]
+          }
+        ]
+      }
+    ],
+    "acts": {
+      "any_of": [
+        {
+          "steps": [
+            {
+              "ref": "garaj/actuator_geam_2/cover_close_cover"
+            }
+          ]
+        },
+        {
+          "steps": [
+            {
+              "ref": "garaj/broadlink_rm4_pro_garaj/send_command_set_value",
+              "params": {
+                "value": "window2_close"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "ref_prefix": "peroni_22/"
+      },
+      {
+        "ref": "garaj/actuator_geam_2/cover_open_cover"
+      }
+    ],
+    "shape": {
+      "recurring": true,
+      "rearm": true
+    }
+  },
+  "sim_speed": 5,
+  "initial_state": [
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/garaj/artifacts/lg_garaj_hvac/actions/climate_set_hvac_mode",
+      "json": {
+        "hvac_mode": "off"
+      },
+      "expect_status": 200
+    },
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/garaj/artifacts/actuator_geam_2/actions/cover_open_cover",
+      "json": {},
+      "expect_status": 200
+    },
+    {
+      "type": "sleep",
+      "seconds": 25
+    }
+  ],
+  "stimuli": [
+    {
+      "at": "0:00",
+      "steps": [
+        {
+          "type": "request",
+          "method": "POST",
+          "path": "/workspaces/garaj/artifacts/lg_garaj_hvac/actions/climate_set_hvac_mode",
+          "json": {
+            "hvac_mode": "cool"
+          },
+          "expect_status": 200
+        }
+      ],
+      "then": [
+        {
+          "type": "property_equals",
+          "path": "/workspaces/garaj/artifacts/actuator_geam_2/properties/cover",
+          "equals": "closed",
+          "timeout_seconds": 600
+        },
+        {
+          "type": "property_stays",
+          "path": "/workspaces/peroni_22/artifacts/deschidere_inchidere_geam_telecontact/properties/cover",
+          "seconds": 60,
+          "why": "the kitchen window is another room's"
+        }
+      ]
+    },
+    {
+      "at": "10:00",
+      "steps": [
+        {
+          "type": "request",
+          "method": "POST",
+          "path": "/workspaces/garaj/artifacts/lg_garaj_hvac/actions/climate_set_hvac_mode",
+          "json": {
+            "hvac_mode": "off"
+          },
+          "expect_status": 200
+        },
+        {
+          "type": "sleep",
+          "seconds": 5
+        },
+        {
+          "type": "request",
+          "method": "POST",
+          "path": "/workspaces/garaj/artifacts/actuator_geam_2/actions/cover_open_cover",
+          "json": {},
+          "expect_status": 200
+        }
+      ],
+      "then": [
+        {
+          "type": "property_equals",
+          "path": "/workspaces/garaj/artifacts/actuator_geam_2/properties/cover",
+          "equals": "open",
+          "timeout_seconds": 600,
+          "why": "setup: the window open again"
+        }
+      ]
+    },
+    {
+      "at": "20:00",
+      "steps": [
+        {
+          "type": "request",
+          "method": "POST",
+          "path": "/workspaces/garaj/artifacts/lg_garaj_hvac/actions/climate_set_hvac_mode",
+          "json": {
+            "hvac_mode": "cool"
+          },
+          "expect_status": 200
+        }
+      ],
+      "then": [
+        {
+          "type": "property_equals",
+          "path": "/workspaces/garaj/artifacts/actuator_geam_2/properties/cover",
+          "equals": "closed",
+          "timeout_seconds": 600,
+          "why": "the rule recurs"
+        }
+      ]
+    }
+  ],
+  "auto_confirm": true,
+  "confirmation_text": "yes"
+}

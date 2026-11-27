@@ -1,0 +1,132 @@
+{
+  "name": "A3_solaredge_grid_alert",
+  "id": "A3",
+  "workspace_id": "garaj",
+  "kind": "maintenance (monitor)",
+  "beia_original": "Solaredge: Se pot configura alerte cand importul/exportul depaseste un prag.",
+  "query": "Alert me whenever the SolarEdge meter shows more than 2 kW imported from the grid or more than 2 kW exported to it.",
+  "ground_truth": {
+    "reads": [
+      {
+        "any_of": [
+          "solaredge/solaredge_i4_m1/ac_power"
+        ],
+        "op": "<",
+        "value": -2000
+      },
+      {
+        "any_of": [
+          "solaredge/solaredge_i4_m1/ac_power"
+        ],
+        "op": ">",
+        "value": 2000
+      }
+    ],
+    "alerts": [
+      {
+        "contains_any": [
+          "grid",
+          "import",
+          "export",
+          "kw",
+          "solaredge"
+        ]
+      }
+    ],
+    "forbidden": [
+      {
+        "any_action": true
+      }
+    ],
+    "shape": {
+      "recurring": true,
+      "rearm": true
+    }
+  },
+  "sim_speed": 10,
+  "initial_state": [
+    {
+      "type": "sim",
+      "set": {
+        "number.sim_clock_hour": 12,
+        "number.sim_cloud_cover": 100,
+        "number.sim_base_load": 1500
+      }
+    },
+    {
+      "type": "sleep",
+      "seconds": 10
+    }
+  ],
+  "stimuli": [
+    {
+      "at": "0:00",
+      "steps": [
+        {
+          "type": "sim",
+          "set": {
+            "number.sim_base_load": 4000
+          }
+        }
+      ],
+      "then": [
+        {
+          "type": "alert_raised",
+          "contains_any": [
+            "grid",
+            "import",
+            "export",
+            "kw"
+          ],
+          "timeout_seconds": 300,
+          "why": "importing about 3.3 kW"
+        }
+      ]
+    },
+    {
+      "at": "5:00",
+      "steps": [
+        {
+          "type": "sim",
+          "set": {
+            "number.sim_base_load": 1500
+          }
+        }
+      ],
+      "then": [
+        {
+          "type": "no_alert",
+          "seconds": 120,
+          "why": "back in band"
+        }
+      ]
+    },
+    {
+      "at": "8:00",
+      "steps": [
+        {
+          "type": "sim",
+          "set": {
+            "number.sim_cloud_cover": 0,
+            "number.sim_base_load": 200
+          }
+        }
+      ],
+      "then": [
+        {
+          "type": "alert_raised",
+          "contains_any": [
+            "grid",
+            "import",
+            "export",
+            "kw"
+          ],
+          "timeout_seconds": 300,
+          "why": "exporting about 2.7 kW: alerted again"
+        }
+      ]
+    }
+  ],
+  "auto_confirm": true,
+  "confirmation_text": "yes"
+}

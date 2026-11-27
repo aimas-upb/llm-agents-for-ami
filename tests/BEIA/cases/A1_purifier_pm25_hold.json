@@ -1,0 +1,161 @@
+{
+  "name": "A1_purifier_pm25_hold",
+  "id": "A1",
+  "workspace_id": "garaj",
+  "kind": "maintenance",
+  "beia_original": "Blueair: Creste viteza daca PM2.5 din camera depaseste 25 µg/m³ timp de 5 minute. Revine la Auto cand scade sub 12 µg/m³ timp de 10 minute.",
+  "query": "In the garage, if PM2.5 stays above 25 µg/m³ for 5 minutes, turn the Blue Air purifier up to full speed. When it has stayed below 12 µg/m³ for 10 minutes, put it back on Auto.",
+  "ground_truth": {
+    "reads": [
+      {
+        "any_of": [
+          "garaj/blue_air_garage/pm25"
+        ],
+        "op": ">",
+        "value": 25
+      },
+      {
+        "any_of": [
+          "garaj/blue_air_garage/pm25"
+        ],
+        "op": "<",
+        "value": 12
+      }
+    ],
+    "acts": {
+      "any_of": [
+        {
+          "ordered": true,
+          "steps": [
+            {
+              "ref": "garaj/blue_air_garage/fan_set_percentage",
+              "params": {
+                "percentage": 100
+              }
+            },
+            {
+              "ref": "garaj/blue_air_garage/fan_set_preset_mode",
+              "params": {
+                "preset_mode": "auto"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "ref_prefix": "peroni_22/"
+      },
+      {
+        "ref_prefix": "garaj/blue_air_garage/dehumidifier"
+      }
+    ],
+    "shape": {
+      "recurring": true,
+      "hold": true
+    }
+  },
+  "sim_speed": 10,
+  "initial_state": [
+    {
+      "type": "sim",
+      "set": {
+        "number.sim_outdoor_pm25": 5
+      }
+    },
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/garaj/artifacts/actuator_geam_2/actions/cover_open_cover",
+      "json": {},
+      "expect_status": 200
+    },
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/garaj/artifacts/blue_air_garage/actions/fan_set_preset_mode",
+      "json": {
+        "preset_mode": "auto"
+      },
+      "expect_status": 200
+    },
+    {
+      "type": "sleep",
+      "seconds": 25
+    }
+  ],
+  "stimuli": [
+    {
+      "at": "0:00",
+      "steps": [
+        {
+          "type": "sim",
+          "set": {
+            "number.sim_outdoor_pm25": 100
+          }
+        }
+      ]
+    },
+    {
+      "at": "3:30",
+      "steps": [
+        {
+          "type": "sim",
+          "set": {
+            "number.sim_outdoor_pm25": 0
+          }
+        }
+      ],
+      "then": [
+        {
+          "type": "property_stays",
+          "path": "/workspaces/garaj/artifacts/blue_air_garage/properties/fan_percentage",
+          "not_equals": 100,
+          "seconds": 480,
+          "why": "PM2.5 was above 25 for about 3 minutes only: no full speed"
+        }
+      ]
+    },
+    {
+      "at": "12:00",
+      "steps": [
+        {
+          "type": "sim",
+          "set": {
+            "number.sim_outdoor_pm25": 100
+          }
+        }
+      ],
+      "then": [
+        {
+          "type": "property_equals",
+          "path": "/workspaces/garaj/artifacts/blue_air_garage/properties/fan_percentage",
+          "equals": 100,
+          "timeout_seconds": 900
+        }
+      ]
+    },
+    {
+      "at": "30:00",
+      "steps": [
+        {
+          "type": "sim",
+          "set": {
+            "number.sim_outdoor_pm25": 0
+          }
+        }
+      ],
+      "then": [
+        {
+          "type": "property_equals",
+          "path": "/workspaces/garaj/artifacts/blue_air_garage/properties/fan_preset_mode",
+          "equals": "auto",
+          "timeout_seconds": 1500
+        }
+      ]
+    }
+  ],
+  "auto_confirm": true,
+  "confirmation_text": "yes"
+}

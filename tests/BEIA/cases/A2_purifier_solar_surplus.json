@@ -1,0 +1,120 @@
+{
+  "name": "A2_purifier_solar_surplus",
+  "id": "A2",
+  "workspace_id": "garaj",
+  "kind": "triggered achievement, recurring",
+  "beia_original": "Cand SolarEdge indica surplus si PM2.5 din camera este ridicat, HA poate trece purificatorul pe o treapta mai mare.",
+  "query": "Whenever the SolarEdge system is exporting power to the grid and the garage PM2.5 is above 25 µg/m³, set the Blue Air purifier to full speed.",
+  "ground_truth": {
+    "reads": [
+      {
+        "any_of": [
+          "solaredge/solaredge_i4_m1/ac_power"
+        ],
+        "op": ">",
+        "value": 0
+      },
+      {
+        "any_of": [
+          "garaj/blue_air_garage/pm25"
+        ],
+        "op": ">",
+        "value": 25
+      }
+    ],
+    "acts": {
+      "any_of": [
+        {
+          "steps": [
+            {
+              "ref": "garaj/blue_air_garage/fan_set_percentage",
+              "params": {
+                "percentage": 100
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "ref_prefix": "invertoare/"
+      },
+      {
+        "ref_prefix": "peroni_22/"
+      }
+    ],
+    "shape": {
+      "recurring": true,
+      "rearm": true
+    }
+  },
+  "sim_speed": 10,
+  "initial_state": [
+    {
+      "type": "sim",
+      "set": {
+        "number.sim_clock_hour": 12,
+        "number.sim_cloud_cover": 100,
+        "number.sim_base_load": 1500,
+        "number.sim_outdoor_pm25": 100
+      }
+    },
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/garaj/artifacts/actuator_geam_2/actions/cover_open_cover",
+      "json": {},
+      "expect_status": 200
+    },
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/garaj/artifacts/blue_air_garage/actions/fan_set_preset_mode",
+      "json": {
+        "preset_mode": "auto"
+      },
+      "expect_status": 200
+    },
+    {
+      "type": "sleep",
+      "seconds": 25
+    }
+  ],
+  "stimuli": [
+    {
+      "at": "0:00",
+      "then": [
+        {
+          "type": "property_stays",
+          "path": "/workspaces/garaj/artifacts/blue_air_garage/properties/fan_percentage",
+          "not_equals": 100,
+          "seconds": 600,
+          "why": "dusty but importing (overcast, 1.5 kW load): no full speed"
+        }
+      ]
+    },
+    {
+      "at": "10:00",
+      "steps": [
+        {
+          "type": "sim",
+          "set": {
+            "number.sim_cloud_cover": 0,
+            "number.sim_base_load": 200
+          }
+        }
+      ],
+      "then": [
+        {
+          "type": "property_equals",
+          "path": "/workspaces/garaj/artifacts/blue_air_garage/properties/fan_percentage",
+          "equals": 100,
+          "timeout_seconds": 600
+        }
+      ]
+    }
+  ],
+  "auto_confirm": true,
+  "confirmation_text": "yes"
+}

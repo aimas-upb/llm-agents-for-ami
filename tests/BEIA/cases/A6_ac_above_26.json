@@ -1,0 +1,213 @@
+{
+  "name": "A6_ac_above_26",
+  "id": "A6",
+  "workspace_id": "garaj",
+  "kind": "triggered achievement, recurring",
+  "beia_original": "Netatmo: Temperatura – porneste aerul conditionat prin BroadLink RM4 cand temperatura din garaj depaseste pragul setat.",
+  "query": "Whenever it gets warmer than 26 degrees in the garage, turn on the AC and set it to 21 degrees.",
+  "ground_truth": {
+    "reads": [
+      {
+        "any_of": [
+          "garaj/weather_station_70_ee_50_2e_da_88/temperature",
+          "garaj/optix_lg/temperature",
+          "garaj/lg_garaj_hvac/climate_current_temperature"
+        ],
+        "op": ">",
+        "value": 26
+      }
+    ],
+    "acts": {
+      "any_of": [
+        {
+          "ordered": false,
+          "steps": [
+            {
+              "ref": "garaj/lg_garaj_hvac/climate_set_hvac_mode",
+              "params": {
+                "hvac_mode": [
+                  "cool",
+                  "auto"
+                ]
+              }
+            },
+            {
+              "ref": "garaj/lg_garaj_hvac/climate_set_temperature",
+              "params": {
+                "temperature": 21
+              }
+            }
+          ]
+        },
+        {
+          "ordered": true,
+          "steps": [
+            {
+              "ref": "garaj/priza_inteligenta_fibaro/switch_turn_on"
+            },
+            {
+              "ref": "garaj/broadlink_rm4_pro_garaj/send_command_set_value",
+              "params": {
+                "value": "lg_mode_cool"
+              }
+            },
+            {
+              "ref": "garaj/broadlink_rm4_pro_garaj/send_command_set_value",
+              "params": {
+                "value": "lg_temp_21"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "ref_prefix": "peroni_22/"
+      },
+      {
+        "ref": "garaj/lg_garaj_hvac/climate_set_hvac_mode",
+        "params": {
+          "hvac_mode": "heat"
+        }
+      },
+      {
+        "ref": "garaj/lg_garaj_hvac/climate_set_temperature",
+        "params": {
+          "temperature": [
+            {
+              "min": -100,
+              "max": 20.5
+            },
+            {
+              "min": 21.5,
+              "max": 100
+            }
+          ]
+        }
+      }
+    ],
+    "shape": {
+      "recurring": true,
+      "rearm": true
+    }
+  },
+  "sim_speed": 10,
+  "initial_state": [
+    {
+      "type": "sim",
+      "set": {
+        "number.sim_outdoor_temperature": 15
+      }
+    },
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/garaj/artifacts/lg_garaj_hvac/actions/climate_set_hvac_mode",
+      "json": {
+        "hvac_mode": "off"
+      },
+      "expect_status": 200
+    },
+    {
+      "type": "request",
+      "method": "POST",
+      "path": "/workspaces/garaj/artifacts/actuator_geam_2/actions/cover_open_cover",
+      "json": {},
+      "expect_status": 200
+    },
+    {
+      "type": "sleep",
+      "seconds": 25
+    }
+  ],
+  "stimuli": [
+    {
+      "at": "0:00",
+      "steps": [
+        {
+          "type": "sim",
+          "set": {
+            "number.sim_outdoor_temperature": 40
+          }
+        }
+      ],
+      "then": [
+        {
+          "type": "property_in",
+          "path": "/workspaces/garaj/artifacts/lg_garaj_hvac/properties/climate",
+          "values": [
+            "cool",
+            "auto"
+          ],
+          "timeout_seconds": 1800
+        },
+        {
+          "type": "property_equals",
+          "path": "/workspaces/garaj/artifacts/lg_garaj_hvac/properties/climate_temperature",
+          "equals": 21,
+          "timeout_seconds": 300
+        }
+      ]
+    },
+    {
+      "at": "30:00",
+      "steps": [
+        {
+          "type": "sim",
+          "set": {
+            "number.sim_outdoor_temperature": 5
+          }
+        }
+      ]
+    },
+    {
+      "at": "45:00",
+      "steps": [
+        {
+          "type": "request",
+          "method": "POST",
+          "path": "/workspaces/garaj/artifacts/lg_garaj_hvac/actions/climate_set_hvac_mode",
+          "json": {
+            "hvac_mode": "off"
+          },
+          "expect_status": 200
+        }
+      ],
+      "then": [
+        {
+          "type": "property_equals",
+          "path": "/workspaces/garaj/artifacts/lg_garaj_hvac/properties/climate",
+          "equals": "off",
+          "timeout_seconds": 300,
+          "why": "setup: the AC off again"
+        }
+      ]
+    },
+    {
+      "at": "50:00",
+      "steps": [
+        {
+          "type": "sim",
+          "set": {
+            "number.sim_outdoor_temperature": 40
+          }
+        }
+      ],
+      "then": [
+        {
+          "type": "property_in",
+          "path": "/workspaces/garaj/artifacts/lg_garaj_hvac/properties/climate",
+          "values": [
+            "cool",
+            "auto"
+          ],
+          "timeout_seconds": 1800,
+          "why": "the rule recurs"
+        }
+      ]
+    }
+  ],
+  "auto_confirm": true,
+  "confirmation_text": "yes"
+}
